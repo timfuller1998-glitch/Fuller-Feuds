@@ -1,4 +1,8 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import SearchBar from "@/components/SearchBar";
 import TopicCard from "@/components/TopicCard";
 import StreamingTopicCard from "@/components/StreamingTopicCard";
@@ -7,16 +11,160 @@ import OpinionCard from "@/components/OpinionCard";
 import CumulativeOpinion from "@/components/CumulativeOpinion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye } from "lucide-react";
+import { insertTopicSchema, insertOpinionSchema, type Topic, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import climateImage from '@assets/generated_images/Climate_change_debate_thumbnail_3b0bbda7.png';
 import aiImage from '@assets/generated_images/AI_ethics_debate_thumbnail_98fa03cc.png';
 import educationImage from '@assets/generated_images/Education_reform_debate_thumbnail_a88506ee.png';
 import healthcareImage from '@assets/generated_images/Healthcare_policy_debate_thumbnail_269685b7.png';
 
+const topicFormSchema = insertTopicSchema.omit({
+  createdById: true,  // Server will set this from authenticated user
+}).extend({
+  title: z.string().min(1, "Title is required").max(200, "Title too long"),
+  description: z.string().min(1, "Description is required").max(1000, "Description too long"),
+  category: z.string().min(1, "Category is required"),
+});
+
+const opinionFormSchema = insertOpinionSchema.omit({
+  topicId: true,  // Server will set this from URL params
+  userId: true,   // Server will set this from authenticated user
+}).extend({
+  content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
+  stance: z.enum(["for", "against", "neutral"], { required_error: "Please select a stance" }),
+});
+
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [viewingLiveStream, setViewingLiveStream] = useState<string | null>(null);
+  const [showCreateTopic, setShowCreateTopic] = useState(false);
+  const [showCreateOpinion, setShowCreateOpinion] = useState(false);
+  const { toast } = useToast();
+
+  // Fetch real topics from API
+  const { data: apiTopics, isLoading: topicsLoading } = useQuery<Topic[]>({
+    queryKey: ["/api/topics", { search: searchQuery }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("search", searchQuery);
+      const response = await fetch(`/api/topics?${params}`);
+      if (!response.ok) throw new Error("Failed to fetch topics");
+      return response.json();
+    },
+  });
+
+  // Fetch opinions for selected topic
+  const { data: apiOpinions } = useQuery<Opinion[]>({
+    queryKey: ["/api/topics", selectedTopic, "opinions"],
+    queryFn: async () => {
+      if (!selectedTopic) return [];
+      const response = await fetch(`/api/topics/${selectedTopic}/opinions`);
+      if (!response.ok) throw new Error("Failed to fetch opinions");
+      return response.json();
+    },
+    enabled: !!selectedTopic,
+  });
+
+  // Fetch cumulative opinion for selected topic
+  const { data: apiCumulativeOpinion } = useQuery<CumulativeOpinionType>({
+    queryKey: ["/api/topics", selectedTopic, "cumulative"],
+    queryFn: async () => {
+      if (!selectedTopic) return null;
+      const response = await fetch(`/api/topics/${selectedTopic}/cumulative`);
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!selectedTopic,
+  });
+
+  // Create topic mutation
+  const createTopicMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof topicFormSchema>) => {
+      return apiRequest('POST', '/api/topics', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
+      setShowCreateTopic(false);
+      toast({ title: "Topic created successfully!" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to create topic", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Create opinion mutation
+  const createOpinionMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof opinionFormSchema>) => {
+      return apiRequest('POST', `/api/topics/${selectedTopic}/opinions`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "opinions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "cumulative"] });
+      setShowCreateOpinion(false);
+      toast({ title: "Opinion shared successfully!" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to share opinion", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Vote mutation
+  const voteMutation = useMutation({
+    mutationFn: async ({ opinionId, voteType }: { opinionId: string; voteType: 'like' | 'dislike' }) => {
+      return apiRequest('POST', `/api/opinions/${opinionId}/vote`, { voteType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "opinions"] });
+      toast({ title: "Vote recorded!" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to vote", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Forms
+  const topicForm = useForm<z.infer<typeof topicFormSchema>>({
+    resolver: zodResolver(topicFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      category: "",
+      imageUrl: "",
+    },
+  });
+
+  const opinionForm = useForm<z.infer<typeof opinionFormSchema>>({
+    resolver: zodResolver(opinionFormSchema),
+    defaultValues: {
+      content: "",
+      stance: "neutral",
+    },
+  });
+
+  const categories = [
+    "Politics", "Technology", "Science", "Economics", "Social Issues", 
+    "Environment", "Education", "Healthcare", "Ethics", "Culture"
+  ];
 
   // todo: remove mock functionality
   const trendingTopics = [
@@ -131,11 +279,38 @@ export default function Home() {
     }
   ];
 
-  const filteredTopics = trendingTopics.filter(topic =>
+  // Combine API topics with mock topics for display
+  const combinedTopics = [
+    ...(apiTopics?.map(topic => ({
+      id: topic.id,
+      title: topic.title,
+      description: topic.description,
+      imageUrl: topic.imageUrl || climateImage, // Use default image if none provided
+      category: topic.category,
+      participantCount: 0, // We'll calculate this later
+      opinionsCount: 0, // We'll calculate this later
+      isActive: topic.isActive || false
+    })) || []),
+    ...trendingTopics
+  ];
+
+  const filteredTopics = combinedTopics.filter(topic =>
     topic.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     topic.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
     topic.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Transform API opinions for display
+  const transformedOpinions = apiOpinions?.map(opinion => ({
+    id: opinion.id,
+    userName: "User", // We'll need to join with users table later
+    content: opinion.content,
+    stance: opinion.stance as "for" | "against" | "neutral",
+    timestamp: new Date(opinion.createdAt!).toLocaleDateString(),
+    likesCount: opinion.likesCount || 0,
+    dislikesCount: opinion.dislikesCount || 0,
+    repliesCount: opinion.repliesCount || 0
+  })) || [];
 
   // If viewing a live stream, show the full streaming interface
   if (viewingLiveStream) {
@@ -204,10 +379,106 @@ export default function Home() {
             <TrendingUp className="w-4 h-4 mr-2" />
             Browse Trending
           </Button>
-          <Button variant="outline" data-testid="button-create-topic">
-            <Plus className="w-4 h-4 mr-2" />
-            Start New Topic
-          </Button>
+          
+          <Dialog open={showCreateTopic} onOpenChange={setShowCreateTopic}>
+            <DialogTrigger asChild>
+              <Button variant="outline" data-testid="button-create-topic">
+                <Plus className="w-4 h-4 mr-2" />
+                Start New Topic
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Create New Topic</DialogTitle>
+                <DialogDescription>
+                  Start a new debate topic for the community to discuss.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...topicForm}>
+                <form onSubmit={topicForm.handleSubmit((data) => createTopicMutation.mutate(data))} className="space-y-4">
+                  <FormField
+                    control={topicForm.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter debate topic..." {...field} data-testid="input-topic-title" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={topicForm.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-topic-category">
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={topicForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Provide more details about this topic..." 
+                            {...field} 
+                            data-testid="textarea-topic-description"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={topicForm.control}
+                    name="imageUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Image URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://example.com/image.jpg" {...field} value={field.value || ""} data-testid="input-topic-image" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setShowCreateTopic(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createTopicMutation.isPending} data-testid="button-submit-topic">
+                      {createTopicMutation.isPending ? "Creating..." : "Create Topic"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -338,25 +609,123 @@ export default function Home() {
 
       {/* Recent Opinions */}
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold">Recent Opinions</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Recent Opinions</h2>
+          {selectedTopic && (
+            <Dialog open={showCreateOpinion} onOpenChange={setShowCreateOpinion}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-share-opinion">
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Share Opinion
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Share Your Opinion</DialogTitle>
+                  <DialogDescription>
+                    Share your thoughts on the selected topic.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...opinionForm}>
+                  <form onSubmit={opinionForm.handleSubmit((data) => createOpinionMutation.mutate(data))} className="space-y-4">
+                    <FormField
+                      control={opinionForm.control}
+                      name="stance"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Your Stance</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-opinion-stance">
+                                <SelectValue placeholder="Select your stance" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="for">For</SelectItem>
+                              <SelectItem value="against">Against</SelectItem>
+                              <SelectItem value="neutral">Neutral</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={opinionForm.control}
+                      name="content"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Your Opinion</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Share your thoughts..." 
+                              className="min-h-32"
+                              {...field} 
+                              data-testid="textarea-opinion-content"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => setShowCreateOpinion(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={createOpinionMutation.isPending} data-testid="button-submit-opinion">
+                        {createOpinionMutation.isPending ? "Sharing..." : "Share Opinion"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
         
         <div className="space-y-4">
-          {recentOpinions.map((opinion) => (
-            <OpinionCard
-              key={opinion.id}
-              {...opinion}
-              onLike={(id) => console.log('Liked:', id)}
-              onDislike={(id) => console.log('Disliked:', id)}
-              onReply={(id) => console.log('Reply to:', id)}
-            />
-          ))}
+          {/* Display real opinions when viewing a specific topic */}
+          {selectedTopic && transformedOpinions.length > 0 ? (
+            transformedOpinions.map((opinion) => (
+              <OpinionCard
+                key={opinion.id}
+                {...opinion}
+                onLike={(id) => voteMutation.mutate({ opinionId: id, voteType: 'like' })}
+                onDislike={(id) => voteMutation.mutate({ opinionId: id, voteType: 'dislike' })}
+                onReply={(id) => console.log('Reply to:', id)}
+              />
+            ))
+          ) : selectedTopic ? (
+            <div className="text-center py-8">
+              <MessageCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground mb-4">No opinions yet for this topic.</p>
+              <Button onClick={() => setShowCreateOpinion(true)}>
+                Share First Opinion
+              </Button>
+            </div>
+          ) : (
+            /* Show mock opinions when no specific topic is selected */
+            recentOpinions.map((opinion) => (
+              <OpinionCard
+                key={opinion.id}
+                {...opinion}
+                onLike={(id) => console.log('Liked:', id)}
+                onDislike={(id) => console.log('Disliked:', id)}
+                onReply={(id) => console.log('Reply to:', id)}
+              />
+            ))
+          )}
         </div>
         
-        <div className="text-center">
-          <Button variant="outline" data-testid="button-view-more-opinions">
-            View More Opinions
-          </Button>
-        </div>
+        {!selectedTopic && (
+          <div className="text-center">
+            <Button variant="outline" data-testid="button-view-more-opinions">
+              View More Opinions
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
