@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Users, TrendingUp } from "lucide-react";
+import { MessageCircle, Users, TrendingUp, Mic } from "lucide-react";
 
 interface TopicCardProps {
   id: string;
@@ -14,6 +14,7 @@ interface TopicCardProps {
   isActive: boolean;
   onJoinDebate?: (id: string) => void;
   onViewTopic?: (id: string) => void;
+  onJoinLiveDebate?: (id: string) => void;
 }
 
 export default function TopicCard({
@@ -26,7 +27,8 @@ export default function TopicCard({
   opinionsCount,
   isActive,
   onJoinDebate,
-  onViewTopic
+  onViewTopic,
+  onJoinLiveDebate
 }: TopicCardProps) {
   return (
     <Card className="hover-elevate overflow-hidden group cursor-pointer" data-testid={`card-topic-${id}`}>
@@ -74,11 +76,11 @@ export default function TopicCard({
           </div>
         </div>
         
-        <div className="flex gap-2">
+        <div className="space-y-2">
           <Button 
             variant="outline" 
             size="sm" 
-            className="flex-1"
+            className="w-full"
             onClick={() => {
               onViewTopic?.(id);
               console.log('View topic clicked:', id);
@@ -87,17 +89,32 @@ export default function TopicCard({
           >
             View Topic
           </Button>
-          <Button 
-            size="sm" 
-            className="flex-1"
-            onClick={() => {
-              onJoinDebate?.(id);
-              console.log('Join debate clicked:', id);
-            }}
-            data-testid={`button-join-debate-${id}`}
-          >
-            Join Debate
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              className="flex-1"
+              onClick={() => {
+                onJoinDebate?.(id);
+                console.log('Join debate clicked:', id);
+              }}
+              data-testid={`button-join-debate-${id}`}
+            >
+              Join Debate
+            </Button>
+            <Button 
+              variant="secondary"
+              size="sm" 
+              className="flex-1"
+              onClick={() => {
+                onJoinLiveDebate?.(id);
+                console.log('Join live debate clicked:', id);
+              }}
+              data-testid={`button-join-live-debate-${id}`}
+            >
+              <Mic className="w-3 h-3 mr-1" />
+              Live
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

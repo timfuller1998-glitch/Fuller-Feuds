@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { 
@@ -252,6 +253,270 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+
+  // WebSocket server for real-time features following blueprint pattern
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+
+  // Store active connections by room and user
+  const rooms = new Map<string, Map<string, WebSocket>>();
+  const userConnections = new Map<WebSocket, { userId?: string, roomId?: string }>();
+
+  wss.on('connection', (ws: WebSocket, req) => {
+    console.log('New WebSocket connection');
+    userConnections.set(ws, {});
+
+    ws.on('message', (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString());
+        
+        switch (message.type) {
+          case 'join_room':
+            handleJoinRoom(ws, message.roomId, message.userId);
+            break;
+          
+          case 'leave_room':
+            handleLeaveRoom(ws);
+            break;
+          
+          case 'chat_message':
+            handleChatMessage(ws, message);
+            break;
+          
+          case 'live_vote':
+            handleLiveVote(ws, message);
+            break;
+          
+          case 'moderator_action':
+            handleModeratorAction(ws, message);
+            break;
+          
+          case 'stream_update':
+            handleStreamUpdate(ws, message);
+            break;
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+      }
+    });
+
+    ws.on('close', () => {
+      handleDisconnection(ws);
+    });
+
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+      handleDisconnection(ws);
+    });
+  });
+
+  // Helper functions for WebSocket message handling
+  function handleJoinRoom(ws: WebSocket, roomId: string, userId?: string) {
+    if (!roomId) return;
+    
+    // Leave previous room if any
+    handleLeaveRoom(ws);
+    
+    // Join new room
+    if (!rooms.has(roomId)) {
+      rooms.set(roomId, new Map());
+    }
+    
+    const room = rooms.get(roomId)!;
+    const connectionId = userId || `guest_${Date.now()}_${Math.random()}`;
+    room.set(connectionId, ws);
+    
+    // Update user connection info
+    userConnections.set(ws, { userId, roomId });
+    
+    // Notify user they joined
+    ws.send(JSON.stringify({
+      type: 'room_joined',
+      roomId,
+      userId: connectionId,
+      participantCount: room.size
+    }));
+    
+    // Notify others in room
+    broadcastToRoom(roomId, {
+      type: 'user_joined',
+      roomId,
+      userId: connectionId,
+      participantCount: room.size
+    }, ws);
+    
+    console.log(`User ${connectionId} joined room ${roomId}`);
+  }
+
+  function handleLeaveRoom(ws: WebSocket) {
+    const connection = userConnections.get(ws);
+    if (!connection?.roomId) return;
+    
+    const room = rooms.get(connection.roomId);
+    let departingUserId: string | null = null;
+    
+    if (room) {
+      // Find and remove user from room
+      for (const [userId, socket] of Array.from(room.entries())) {
+        if (socket === ws) {
+          departingUserId = userId;
+          room.delete(userId);
+          break;
+        }
+      }
+      
+      // Clean up empty rooms
+      if (room.size === 0) {
+        rooms.delete(connection.roomId);
+      } else {
+        // Notify others user left - include departing userId
+        broadcastToRoom(connection.roomId, {
+          type: 'user_left',
+          roomId: connection.roomId,
+          userId: departingUserId,
+          participantCount: room.size
+        });
+      }
+    }
+    
+    // Update connection info
+    userConnections.set(ws, { userId: connection.userId });
+  }
+
+  function handleChatMessage(ws: WebSocket, message: any) {
+    const connection = userConnections.get(ws);
+    if (!connection?.roomId) return;
+    
+    // Validate user is actually in the room
+    const room = rooms.get(connection.roomId);
+    if (!room) return;
+    
+    let userInRoom = false;
+    for (const [userId, socket] of room.entries()) {
+      if (socket === ws) {
+        userInRoom = true;
+        break;
+      }
+    }
+    if (!userInRoom) return;
+    
+    const chatMessage = {
+      type: 'chat_message',
+      roomId: connection.roomId,
+      userId: connection.userId || 'Anonymous',
+      content: message.content,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Broadcast to all users in room
+    broadcastToRoom(connection.roomId, chatMessage);
+  }
+
+  function handleLiveVote(ws: WebSocket, message: any) {
+    const connection = userConnections.get(ws);
+    if (!connection?.roomId) return;
+    
+    // Validate user is actually in the room
+    const room = rooms.get(connection.roomId);
+    if (!room) return;
+    
+    let userInRoom = false;
+    for (const [userId, socket] of room.entries()) {
+      if (socket === ws) {
+        userInRoom = true;
+        break;
+      }
+    }
+    if (!userInRoom) return;
+    
+    const voteMessage = {
+      type: 'live_vote',
+      roomId: connection.roomId,
+      userId: connection.userId || 'Anonymous',
+      vote: message.vote, // 'for', 'against', 'neutral'
+      timestamp: new Date().toISOString()
+    };
+    
+    // Broadcast vote to room
+    broadcastToRoom(connection.roomId, voteMessage);
+  }
+
+  function handleModeratorAction(ws: WebSocket, message: any) {
+    const connection = userConnections.get(ws);
+    if (!connection?.roomId) return;
+    
+    // Validate user is actually in the room
+    const room = rooms.get(connection.roomId);
+    if (!room) return;
+    
+    let userInRoom = false;
+    for (const [userId, socket] of room.entries()) {
+      if (socket === ws) {
+        userInRoom = true;
+        break;
+      }
+    }
+    if (!userInRoom) return;
+    
+    // TODO: Add additional verification that user is moderator for this room
+    const modAction = {
+      type: 'moderator_action',
+      roomId: connection.roomId,
+      action: message.action, // 'mute', 'unmute', 'kick', 'pause_stream', etc.
+      target: message.target,
+      moderatorId: connection.userId,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Broadcast moderator action to room
+    broadcastToRoom(connection.roomId, modAction);
+  }
+
+  function handleStreamUpdate(ws: WebSocket, message: any) {
+    const connection = userConnections.get(ws);
+    if (!connection?.roomId) return;
+    
+    // Validate user is actually in the room
+    const room = rooms.get(connection.roomId);
+    if (!room) return;
+    
+    let userInRoom = false;
+    for (const [userId, socket] of room.entries()) {
+      if (socket === ws) {
+        userInRoom = true;
+        break;
+      }
+    }
+    if (!userInRoom) return;
+    
+    const streamUpdate = {
+      type: 'stream_update',
+      roomId: connection.roomId,
+      status: message.status, // 'live', 'paused', 'ended'
+      timestamp: new Date().toISOString()
+    };
+    
+    // Broadcast stream status to room
+    broadcastToRoom(connection.roomId, streamUpdate);
+  }
+
+  function handleDisconnection(ws: WebSocket) {
+    handleLeaveRoom(ws);
+    userConnections.delete(ws);
+  }
+
+  function broadcastToRoom(roomId: string, message: any, exclude?: WebSocket) {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    
+    const messageStr = JSON.stringify(message);
+    
+    for (const [userId, socket] of Array.from(room.entries())) {
+      if (socket !== exclude && socket.readyState === WebSocket.OPEN) {
+        socket.send(messageStr);
+      }
+    }
+  }
 
   return httpServer;
 }

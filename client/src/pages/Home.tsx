@@ -7,6 +7,7 @@ import SearchBar from "@/components/SearchBar";
 import TopicCard from "@/components/TopicCard";
 import StreamingTopicCard from "@/components/StreamingTopicCard";
 import LiveStreamDebate from "@/components/LiveStreamDebate";
+import LiveDebateRoom from "@/components/LiveDebateRoom";
 import OpinionCard from "@/components/OpinionCard";
 import CumulativeOpinion from "@/components/CumulativeOpinion";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye, RefreshCw, Zap } from "lucide-react";
+import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye, RefreshCw, Zap, Mic } from "lucide-react";
 import { insertTopicSchema, insertOpinionSchema, type Topic, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +47,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [viewingLiveStream, setViewingLiveStream] = useState<string | null>(null);
+  const [viewingLiveDebate, setViewingLiveDebate] = useState<string | null>(null);
   const [showCreateTopic, setShowCreateTopic] = useState(false);
   const [showCreateOpinion, setShowCreateOpinion] = useState(false);
   const { toast } = useToast();
@@ -352,6 +354,20 @@ export default function Home() {
     repliesCount: opinion.repliesCount || 0
   })) || [];
 
+  // If viewing a live debate room, show the full debate interface
+  if (viewingLiveDebate) {
+    const selectedTopicData = filteredTopics.find(topic => topic.id === viewingLiveDebate);
+    if (selectedTopicData) {
+      return (
+        <LiveDebateRoom
+          topicId={viewingLiveDebate}
+          topicTitle={selectedTopicData.title}
+          onClose={() => setViewingLiveDebate(null)}
+        />
+      );
+    }
+  }
+
   // If viewing a live stream, show the full streaming interface
   if (viewingLiveStream) {
     const streamTopic = liveStreamingTopics.find(topic => topic.id === viewingLiveStream);
@@ -609,6 +625,10 @@ export default function Home() {
                 console.log('View topic:', id);
               }}
               onJoinDebate={(id) => console.log('Join debate:', id)}
+              onJoinLiveDebate={(id) => {
+                setViewingLiveDebate(id);
+                console.log('Join live debate:', id);
+              }}
             />
           ))}
         </div>
