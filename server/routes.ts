@@ -133,6 +133,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/topics/:topicId/cumulative/generate', isAuthenticated, async (req, res) => {
+    try {
+      const cumulative = await storage.generateCumulativeOpinion(req.params.topicId);
+      res.status(201).json(cumulative);
+    } catch (error) {
+      console.error("Error generating cumulative opinion:", error);
+      res.status(500).json({ message: "Failed to generate cumulative opinion" });
+    }
+  });
+
+  app.patch('/api/topics/:topicId/cumulative/refresh', isAuthenticated, async (req, res) => {
+    try {
+      const cumulative = await storage.refreshCumulativeOpinion(req.params.topicId);
+      res.json(cumulative);
+    } catch (error) {
+      console.error("Error refreshing cumulative opinion:", error);
+      res.status(500).json({ message: "Failed to refresh cumulative opinion" });
+    }
+  });
+
   // Debate room routes
   app.get('/api/debates/my-rooms', isAuthenticated, async (req: any, res) => {
     try {

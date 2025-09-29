@@ -27,6 +27,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, ilike } from "drizzle-orm";
+import { AIService } from "./aiService";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -51,6 +52,8 @@ export interface IStorage {
   // Cumulative opinions
   getCumulativeOpinion(topicId: string): Promise<CumulativeOpinion | undefined>;
   upsertCumulativeOpinion(topicId: string, data: Partial<CumulativeOpinion>): Promise<CumulativeOpinion>;
+  generateCumulativeOpinion(topicId: string): Promise<CumulativeOpinion>;
+  refreshCumulativeOpinion(topicId: string): Promise<CumulativeOpinion>;
   
   // Debate rooms
   createDebateRoom(room: InsertDebateRoom): Promise<DebateRoom>;
@@ -207,6 +210,35 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  async generateCumulativeOpinion(topicId: string): Promise<CumulativeOpinion> {
+    // Get the topic and all opinions
+    const topic = await this.getTopic(topicId);
+    if (!topic) {
+      throw new Error("Topic not found");
+    }
+
+    const opinions = await this.getOpinionsByTopic(topicId);
+    
+    // Generate AI analysis
+    const analysis = await AIService.generateCumulativeOpinion(topic, opinions);
+    
+    // Save the cumulative opinion
+    return await this.upsertCumulativeOpinion(topicId, {
+      summary: analysis.summary,
+      keyPoints: analysis.keyPoints,
+      supportingPercentage: analysis.supportingPercentage,
+      opposingPercentage: analysis.opposingPercentage,
+      neutralPercentage: analysis.neutralPercentage,
+      totalOpinions: analysis.totalOpinions,
+      confidence: analysis.confidence,
+    });
+  }
+
+  async refreshCumulativeOpinion(topicId: string): Promise<CumulativeOpinion> {
+    // This is the same as generate - refresh regenerates the analysis
+    return await this.generateCumulativeOpinion(topicId);
   }
 
   // Debate rooms

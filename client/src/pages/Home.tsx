@@ -11,12 +11,13 @@ import OpinionCard from "@/components/OpinionCard";
 import CumulativeOpinion from "@/components/CumulativeOpinion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye } from "lucide-react";
+import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye, RefreshCw, Zap } from "lucide-react";
 import { insertTopicSchema, insertOpinionSchema, type Topic, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -74,16 +75,20 @@ export default function Home() {
   });
 
   // Fetch cumulative opinion for selected topic
-  const { data: apiCumulativeOpinion } = useQuery<CumulativeOpinionType>({
+  const { data: cumulativeData } = useQuery<CumulativeOpinionType>({
     queryKey: ["/api/topics", selectedTopic, "cumulative"],
     queryFn: async () => {
       if (!selectedTopic) return null;
       const response = await fetch(`/api/topics/${selectedTopic}/cumulative`);
-      if (!response.ok) return null;
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error("Failed to fetch cumulative opinion");
+      }
       return response.json();
     },
     enabled: !!selectedTopic,
   });
+
 
   // Create topic mutation
   const createTopicMutation = useMutation({
@@ -136,6 +141,41 @@ export default function Home() {
     onError: (error: any) => {
       toast({ 
         title: "Failed to vote", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // AI synthesis mutations
+  const generateCumulativeMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', `/api/topics/${selectedTopic}/cumulative/generate`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "cumulative"] });
+      toast({ title: "AI analysis generated successfully!" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to generate analysis", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const refreshCumulativeMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('PATCH', `/api/topics/${selectedTopic}/cumulative/refresh`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "cumulative"] });
+      toast({ title: "AI analysis refreshed successfully!" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to refresh analysis", 
         description: error.message,
         variant: "destructive" 
       });
@@ -582,28 +622,125 @@ export default function Home() {
         )}
       </div>
 
-      {/* Featured Topic with AI Summary */}
-      {selectedTopic === "climate-change" && (
+      {/* AI Synthesis Section */}
+      {selectedTopic && (
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold">Featured Discussion</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">AI Synthesis</h2>
+            <div className="flex gap-2">
+              {!cumulativeData && (
+                <Button 
+                  onClick={() => generateCumulativeMutation.mutate()}
+                  disabled={generateCumulativeMutation.isPending}
+                  data-testid="button-generate-synthesis"
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  {generateCumulativeMutation.isPending ? "Generating..." : "Generate Analysis"}
+                </Button>
+              )}
+              {cumulativeData && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => refreshCumulativeMutation.mutate()}
+                  disabled={refreshCumulativeMutation.isPending}
+                  data-testid="button-refresh-synthesis"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {refreshCumulativeMutation.isPending ? "Refreshing..." : "Refresh Analysis"}
+                </Button>
+              )}
+            </div>
+          </div>
           
-          <CumulativeOpinion
-            topicId="climate-change"
-            summary="The discussion reveals a nuanced debate between individual responsibility and systemic change. While most participants acknowledge that both approaches are necessary, there's significant disagreement about where to focus efforts. Supporters of individual action emphasize personal accountability and the power of collective behavior change, while critics argue that this narrative deflects from the need for policy reform and corporate responsibility."
-            keyPoints={[
-              "Individual actions can create momentum for larger policy changes",
-              "Corporate responsibility and government policy are seen as more impactful",
-              "The 'both approaches' perspective is gaining traction among participants",
-              "Concerns about action paralysis when focusing solely on systemic solutions"
-            ]}
-            supportingPercentage={45}
-            opposingPercentage={32}
-            neutralPercentage={23}
-            totalOpinions={1832}
-            confidence="high"
-            lastUpdated="1 hour ago"
-            onViewDetails={(id) => console.log('View details for:', id)}
-          />
+          {cumulativeData ? (
+            <Card>
+              <CardContent className="p-6">
+                <div className="grid gap-6">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Summary</h3>
+                    <p className="text-muted-foreground leading-relaxed">
+                      {cumulativeData.summary}
+                    </p>
+                  </div>
+                  
+                  {cumulativeData.keyPoints && cumulativeData.keyPoints.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Key Points</h3>
+                      <ul className="space-y-2">
+                        {cumulativeData.keyPoints.map((point, index) => (
+                          <li key={index} className="flex items-start gap-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
+                            <span className="text-muted-foreground">{point}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {cumulativeData.supportingPercentage}%
+                      </div>
+                      <div className="text-sm text-muted-foreground">Supporting</div>
+                    </div>
+                    <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                        {cumulativeData.opposingPercentage}%
+                      </div>
+                      <div className="text-sm text-muted-foreground">Opposing</div>
+                    </div>
+                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
+                      <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                        {cumulativeData.neutralPercentage}%
+                      </div>
+                      <div className="text-sm text-muted-foreground">Neutral</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Based on {cumulativeData.totalOpinions} opinion{cumulativeData.totalOpinions !== 1 ? 's' : ''}</span>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${
+                        cumulativeData.confidence === 'high' ? 'bg-green-500' :
+                        cumulativeData.confidence === 'medium' ? 'bg-yellow-500' : 'bg-gray-500'
+                      }`} />
+                      <span className="capitalize">{cumulativeData.confidence} confidence</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : transformedOpinions.length > 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Zap className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">AI Analysis Available</h3>
+                <p className="text-muted-foreground mb-4">
+                  Generate an AI-powered synthesis of all opinions on this topic.
+                </p>
+                <Button 
+                  onClick={() => generateCumulativeMutation.mutate()}
+                  disabled={generateCumulativeMutation.isPending}
+                  data-testid="button-generate-synthesis-prompt"
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  Generate Analysis
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <MessageCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">No Opinions Yet</h3>
+                <p className="text-muted-foreground">
+                  AI synthesis will be available once opinions are shared on this topic.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
