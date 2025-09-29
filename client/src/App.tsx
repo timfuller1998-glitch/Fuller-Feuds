@@ -32,7 +32,7 @@ export default function App() {
           <div className="flex h-screen w-full">
             <AppSidebar
               currentUser={{
-                name: "Alex Johnson", // todo: remove mock functionality
+                name: "Kirk", // todo: remove mock functionality
                 isOnline: true
               }}
               onNavigate={(path) => console.log('Navigate to:', path)}
