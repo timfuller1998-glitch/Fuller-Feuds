@@ -7,7 +7,9 @@ import {
   insertTopicSchema, 
   insertOpinionSchema, 
   insertDebateRoomSchema,
-  insertLiveStreamSchema
+  insertLiveStreamSchema,
+  insertUserProfileSchema,
+  insertUserFollowSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -249,6 +251,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching live stream:", error);
       res.status(500).json({ message: "Failed to fetch live stream" });
+    }
+  });
+
+  // Profile routes
+  app.get('/api/profile/:userId', async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const profile = await storage.getUserProfile(req.params.userId);
+      const followerCount = profile?.followerCount || 0;
+      const followingCount = profile?.followingCount || 0;
+      
+      res.json({
+        user,
+        profile,
+        followerCount,
+        followingCount
+      });
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      res.status(500).json({ message: "Failed to fetch user profile" });
+    }
+  });
+
+  app.get('/api/profile/:userId/opinions', async (req, res) => {
+    try {
+      const { sortBy = 'recent', limit = 20 } = req.query;
+      const opinions = await storage.getUserOpinions(
+        req.params.userId, 
+        sortBy as 'recent' | 'popular' | 'controversial',
+        parseInt(limit as string)
+      );
+      res.json(opinions);
+    } catch (error) {
+      console.error("Error fetching user opinions:", error);
+      res.status(500).json({ message: "Failed to fetch user opinions" });
+    }
+  });
+
+  app.post('/api/profile/:userId/analyze', isAuthenticated, async (req: any, res) => {
+    try {
+      const targetUserId = req.params.userId;
+      const requestingUserId = req.user.claims.sub;
+      
+      // Only allow users to analyze their own profile
+      if (targetUserId !== requestingUserId) {
+        return res.status(403).json({ message: "Can only analyze your own profile" });
+      }
+      
+      const profile = await storage.analyzeUserPoliticalLeaning(targetUserId);
+      res.json(profile);
+    } catch (error) {
+      console.error("Error analyzing political leaning:", error);
+      res.status(500).json({ message: "Failed to analyze political leaning" });
+    }
+  });
+
+  app.patch('/api/profile/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const targetUserId = req.params.userId;
+      const requestingUserId = req.user.claims.sub;
+      
+      // Only allow users to update their own profile
+      if (targetUserId !== requestingUserId) {
+        return res.status(403).json({ message: "Can only update your own profile" });
+      }
+      
+      const validatedData = insertUserProfileSchema.parse(req.body);
+      const profile = await storage.upsertUserProfile(targetUserId, validatedData);
+      res.json(profile);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Following routes
+  app.post('/api/follow/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const followingId = req.params.userId;
+      const followerId = req.user.claims.sub;
+      
+      const follow = await storage.followUser(followerId, followingId);
+      res.status(201).json(follow);
+    } catch (error) {
+      console.error("Error following user:", error);
+      res.status(500).json({ message: "Failed to follow user" });
+    }
+  });
+
+  app.delete('/api/follow/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const followingId = req.params.userId;
+      const followerId = req.user.claims.sub;
+      
+      await storage.unfollowUser(followerId, followingId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error unfollowing user:", error);
+      res.status(500).json({ message: "Failed to unfollow user" });
+    }
+  });
+
+  app.get('/api/follow/:userId/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const followingId = req.params.userId;
+      const followerId = req.user.claims.sub;
+      
+      const isFollowing = await storage.isFollowing(followerId, followingId);
+      res.json({ isFollowing });
+    } catch (error) {
+      console.error("Error checking follow status:", error);
+      res.status(500).json({ message: "Failed to check follow status" });
+    }
+  });
+
+  app.get('/api/profile/:userId/followers', async (req, res) => {
+    try {
+      const { limit = 50 } = req.query;
+      const followers = await storage.getUserFollowers(
+        req.params.userId,
+        parseInt(limit as string)
+      );
+      res.json(followers);
+    } catch (error) {
+      console.error("Error fetching followers:", error);
+      res.status(500).json({ message: "Failed to fetch followers" });
+    }
+  });
+
+  app.get('/api/profile/:userId/following', async (req, res) => {
+    try {
+      const { limit = 50 } = req.query;
+      const following = await storage.getUserFollowing(
+        req.params.userId,
+        parseInt(limit as string)
+      );
+      res.json(following);
+    } catch (error) {
+      console.error("Error fetching following:", error);
+      res.status(500).json({ message: "Failed to fetch following" });
     }
   });
 

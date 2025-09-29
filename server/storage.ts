@@ -9,6 +9,8 @@ import {
   streamParticipants,
   streamChatMessages,
   opinionVotes,
+  userFollows,
+  userProfiles,
   type User,
   type UpsertUser,
   type Topic,
@@ -24,6 +26,10 @@ import {
   type StreamParticipant,
   type StreamChatMessage,
   type OpinionVote,
+  type UserFollow,
+  type InsertUserFollow,
+  type UserProfile,
+  type InsertUserProfile,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, count, ilike } from "drizzle-orm";
@@ -81,6 +87,20 @@ export interface IStorage {
   addStreamChatMessage(streamId: string, userId: string, content: string, type?: string): Promise<StreamChatMessage>;
   getStreamChatMessages(streamId: string, limit?: number): Promise<StreamChatMessage[]>;
   moderateStreamMessage(messageId: string, isModerated: boolean): Promise<void>;
+  
+  // User profiles
+  getUserProfile(userId: string): Promise<UserProfile | undefined>;
+  upsertUserProfile(userId: string, data: Partial<UserProfile>): Promise<UserProfile>;
+  analyzeUserPoliticalLeaning(userId: string): Promise<UserProfile>;
+  getUserOpinions(userId: string, sortBy?: 'recent' | 'popular' | 'controversial', limit?: number): Promise<Opinion[]>;
+  
+  // User following
+  followUser(followerId: string, followingId: string): Promise<UserFollow>;
+  unfollowUser(followerId: string, followingId: string): Promise<void>;
+  isFollowing(followerId: string, followingId: string): Promise<boolean>;
+  getUserFollowers(userId: string, limit?: number): Promise<User[]>;
+  getUserFollowing(userId: string, limit?: number): Promise<User[]>;
+  updateFollowCounts(userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -382,6 +402,198 @@ export class DatabaseStorage implements IStorage {
       .update(streamChatMessages)
       .set({ isModerated })
       .where(eq(streamChatMessages.id, messageId));
+  }
+
+  // User profiles
+  async getUserProfile(userId: string): Promise<UserProfile | undefined> {
+    const [profile] = await db
+      .select()
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, userId));
+    return profile;
+  }
+
+  async upsertUserProfile(userId: string, data: Partial<UserProfile>): Promise<UserProfile> {
+    const existing = await this.getUserProfile(userId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(userProfiles)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(userProfiles.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(userProfiles)
+        .values({ ...data, userId } as any)
+        .returning();
+      return created;
+    }
+  }
+
+  async analyzeUserPoliticalLeaning(userId: string): Promise<UserProfile> {
+    // Get user's opinions for analysis
+    const userOpinions = await this.getUserOpinions(userId, 'recent', 50);
+    
+    if (userOpinions.length === 0) {
+      // No opinions to analyze, return basic profile
+      return await this.upsertUserProfile(userId, {
+        politicalLeaning: 'unknown',
+        leaningScore: 0,
+        leaningConfidence: 'low',
+        totalOpinions: 0,
+        lastAnalyzedAt: new Date(),
+      });
+    }
+
+    // Use AI to analyze political leaning based on opinions
+    const analysis = await AIService.analyzePoliticalLeaning(userOpinions);
+    
+    // Update profile with analysis results
+    return await this.upsertUserProfile(userId, {
+      politicalLeaning: analysis.leaning,
+      leaningScore: analysis.score,
+      leaningConfidence: analysis.confidence,
+      totalOpinions: userOpinions.length,
+      lastAnalyzedAt: new Date(),
+    });
+  }
+
+  async getUserOpinions(userId: string, sortBy: 'recent' | 'popular' | 'controversial' = 'recent', limit = 20): Promise<Opinion[]> {
+    switch (sortBy) {
+      case 'recent':
+        return await db
+          .select()
+          .from(opinions)
+          .where(eq(opinions.userId, userId))
+          .orderBy(desc(opinions.createdAt))
+          .limit(limit);
+      case 'popular':
+        return await db
+          .select()
+          .from(opinions)
+          .where(eq(opinions.userId, userId))
+          .orderBy(desc(opinions.likesCount))
+          .limit(limit);
+      case 'controversial':
+        return await db
+          .select()
+          .from(opinions)
+          .where(eq(opinions.userId, userId))
+          .orderBy(desc(sql`${opinions.likesCount} + ${opinions.dislikesCount}`))
+          .limit(limit);
+      default:
+        return await db
+          .select()
+          .from(opinions)
+          .where(eq(opinions.userId, userId))
+          .orderBy(desc(opinions.createdAt))
+          .limit(limit);
+    }
+  }
+
+  // User following
+  async followUser(followerId: string, followingId: string): Promise<UserFollow> {
+    if (followerId === followingId) {
+      throw new Error("Users cannot follow themselves");
+    }
+
+    const [follow] = await db
+      .insert(userFollows)
+      .values({ followerId, followingId })
+      .onConflictDoNothing()
+      .returning();
+    
+    // Update follow counts for both users
+    await this.updateFollowCounts(followerId);
+    await this.updateFollowCounts(followingId);
+    
+    return follow;
+  }
+
+  async unfollowUser(followerId: string, followingId: string): Promise<void> {
+    await db
+      .delete(userFollows)
+      .where(
+        and(
+          eq(userFollows.followerId, followerId),
+          eq(userFollows.followingId, followingId)
+        )
+      );
+    
+    // Update follow counts for both users
+    await this.updateFollowCounts(followerId);
+    await this.updateFollowCounts(followingId);
+  }
+
+  async isFollowing(followerId: string, followingId: string): Promise<boolean> {
+    const [follow] = await db
+      .select()
+      .from(userFollows)
+      .where(
+        and(
+          eq(userFollows.followerId, followerId),
+          eq(userFollows.followingId, followingId)
+        )
+      );
+    return !!follow;
+  }
+
+  async getUserFollowers(userId: string, limit = 50): Promise<User[]> {
+    return await db
+      .select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
+      .from(userFollows)
+      .innerJoin(users, eq(userFollows.followerId, users.id))
+      .where(eq(userFollows.followingId, userId))
+      .orderBy(desc(userFollows.createdAt))
+      .limit(limit);
+  }
+
+  async getUserFollowing(userId: string, limit = 50): Promise<User[]> {
+    return await db
+      .select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
+      .from(userFollows)
+      .innerJoin(users, eq(userFollows.followingId, users.id))
+      .where(eq(userFollows.followerId, userId))
+      .orderBy(desc(userFollows.createdAt))
+      .limit(limit);
+  }
+
+  async updateFollowCounts(userId: string): Promise<void> {
+    // Get follower count
+    const [followerResult] = await db
+      .select({ count: count() })
+      .from(userFollows)
+      .where(eq(userFollows.followingId, userId));
+    
+    // Get following count
+    const [followingResult] = await db
+      .select({ count: count() })
+      .from(userFollows)
+      .where(eq(userFollows.followerId, userId));
+    
+    // Update user profile with counts
+    await this.upsertUserProfile(userId, {
+      followerCount: followerResult.count,
+      followingCount: followingResult.count,
+    });
   }
 }
 
