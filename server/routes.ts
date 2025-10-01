@@ -108,6 +108,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/opinions/:opinionId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const opinion = await storage.getOpinion(req.params.opinionId);
+      
+      if (!opinion) {
+        return res.status(404).json({ message: "Opinion not found" });
+      }
+      
+      if (opinion.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized to update this opinion" });
+      }
+      
+      const validatedData = insertOpinionSchema.omit({ topicId: true, userId: true }).parse(req.body);
+      const updatedOpinion = await storage.updateOpinion(req.params.opinionId, validatedData);
+      res.json(updatedOpinion);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating opinion:", error);
+      res.status(500).json({ message: "Failed to update opinion" });
+    }
+  });
+
   app.post('/api/opinions/:opinionId/vote', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

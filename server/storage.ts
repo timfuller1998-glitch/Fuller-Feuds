@@ -49,6 +49,7 @@ export interface IStorage {
   createOpinion(opinion: InsertOpinion): Promise<Opinion>;
   getOpinionsByTopic(topicId: string): Promise<Opinion[]>;
   getOpinion(id: string): Promise<Opinion | undefined>;
+  updateOpinion(opinionId: string, data: Partial<InsertOpinion>): Promise<Opinion>;
   updateOpinionCounts(opinionId: string, likesCount: number, dislikesCount: number): Promise<void>;
   
   // Opinion voting
@@ -174,6 +175,15 @@ export class DatabaseStorage implements IStorage {
   async getOpinion(id: string): Promise<Opinion | undefined> {
     const [opinion] = await db.select().from(opinions).where(eq(opinions.id, id));
     return opinion;
+  }
+
+  async updateOpinion(opinionId: string, data: Partial<InsertOpinion>): Promise<Opinion> {
+    const [updated] = await db
+      .update(opinions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(opinions.id, opinionId))
+      .returning();
+    return updated;
   }
 
   async updateOpinionCounts(opinionId: string, likesCount: number, dislikesCount: number): Promise<void> {

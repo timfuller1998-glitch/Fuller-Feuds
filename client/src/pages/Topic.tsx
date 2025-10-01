@@ -79,6 +79,9 @@ export default function Topic() {
   // Create opinion mutation
   const createOpinionMutation = useMutation({
     mutationFn: async (data: z.infer<typeof opinionFormSchema>) => {
+      if (userOpinion) {
+        return apiRequest('PATCH', `/api/opinions/${userOpinion.id}`, data);
+      }
       return apiRequest('POST', `/api/topics/${id}/opinions`, data);
     },
     onSuccess: () => {
@@ -87,11 +90,11 @@ export default function Topic() {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id] });
       opinionForm.reset();
       setShowOpinionForm(false);
-      toast({ title: "Opinion shared successfully!" });
+      toast({ title: userOpinion ? "Opinion updated successfully!" : "Opinion shared successfully!" });
     },
     onError: (error: any) => {
       toast({ 
-        title: "Failed to share opinion", 
+        title: userOpinion ? "Failed to update opinion" : "Failed to share opinion", 
         description: error.message,
         variant: "destructive" 
       });

@@ -333,7 +333,7 @@ export default function LiveStreamPage() {
               key={p.id}
               className="flex items-center gap-2 bg-black/70 px-3 py-2 rounded-lg"
             >
-              <UserAvatar name={p.name} size="sm" />
+              <UserAvatar name={p.name} userId={p.id} size="sm" />
               <div className="text-white">
                 <p className="text-sm font-medium">{p.name}</p>
                 <div className="flex items-center gap-1 text-xs text-white/70">
@@ -369,7 +369,7 @@ export default function LiveStreamPage() {
               <h3 className="font-semibold">Moderator</h3>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-              <UserAvatar name={stream.moderator.name} />
+              <UserAvatar name={stream.moderator.name} userId={stream.moderator.id} />
               <div>
                 <p className="font-medium" data-testid={`text-moderator-${stream.moderator.id}`}>{stream.moderator.name}</p>
                 <p className="text-sm text-muted-foreground">Moderating the discussion</p>
@@ -391,7 +391,7 @@ export default function LiveStreamPage() {
                   data-testid={`participant-${participant.id}`}
                 >
                   <div className="flex items-center gap-3">
-                    <UserAvatar name={participant.name} />
+                    <UserAvatar name={participant.name} userId={participant.id} />
                     <div>
                       <p className="font-medium">{participant.name}</p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
