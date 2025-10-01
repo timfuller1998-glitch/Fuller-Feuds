@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import {
   Users,
+  User,
   UserPlus,
   UserMinus,
   TrendingUp,
@@ -376,6 +377,26 @@ export default function Profile() {
             <div className="md:col-span-2 h-96 bg-muted rounded-lg"></div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // Check if user was found
+  if (!profileData.user) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardContent className="pt-6 text-center py-12">
+            <User className="w-16 h-16 mx-auto mb-4 opacity-50" />
+            <h2 className="text-2xl font-bold mb-2">User Not Found</h2>
+            <p className="text-muted-foreground mb-6">
+              The profile you're looking for doesn't exist or has been removed.
+            </p>
+            <Button onClick={() => navigate('/')} data-testid="button-back-home">
+              Back to Home
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
