@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
 import Profile from "@/pages/Profile";
+import Settings from "@/pages/Settings";
 import Topic from "@/pages/Topic";
 import Trending from "@/pages/Trending";
 import LiveDebates from "@/pages/LiveDebates";
@@ -43,6 +44,7 @@ function Router() {
           <Route path="/category/:category" component={CategoryPage} />
           <Route path="/topic/:id" component={Topic} />
           <Route path="/profile/:userId" component={Profile} />
+          <Route path="/settings" component={Settings} />
           <Route path="/live-stream/:id" component={LiveStreamPage} />
           <Route path="/debate-room/:id" component={DebateRoomPage} />
         </>

@@ -203,17 +203,16 @@ export default function AppSidebar({
           </div>
           
           <div className="flex gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="flex-1"
-              onClick={() => {
-                console.log('Settings clicked');
-              }}
-              data-testid="button-settings"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
+            <Link href="/settings" className="flex-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="w-full"
+                data-testid="button-settings"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </Link>
             <Button 
               variant="ghost" 
               size="sm" 
