@@ -626,15 +626,6 @@ export default function Home() {
             <TopicCard
               key={topic.id}
               {...topic}
-              onViewTopic={(id) => {
-                setSelectedTopic(id);
-                console.log('View topic:', id);
-              }}
-              onJoinDebate={(id) => console.log('Join debate:', id)}
-              onJoinLiveDebate={(id) => {
-                setViewingLiveDebate(id);
-                console.log('Join live debate:', id);
-              }}
             />
           ))}
         </div>
