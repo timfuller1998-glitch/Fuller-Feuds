@@ -87,9 +87,12 @@ const profileFormSchema = insertUserProfileSchema.extend({
   bio: z.string().max(500).optional(),
 });
 
-const streamFormSchema = insertLiveStreamSchema.extend({
-  scheduledAt: z.string().optional(),
-  description: z.string().max(500).optional(),
+const streamFormSchema = z.object({
+  topicId: z.string().min(1, "Please select a topic"),
+  title: z.string().min(1, "Title is required").max(200),
+  description: z.string().max(500).optional().or(z.literal("")),
+  participantSelectionMethod: z.enum(["open", "invite"]).default("open"),
+  scheduledAt: z.string().optional().or(z.literal("")),
 });
 
 export default function Profile() {
@@ -253,8 +256,8 @@ export default function Profile() {
         moderatorId: currentUser!.id,
         scheduledAt: data.scheduledAt ? new Date(data.scheduledAt).toISOString() : undefined,
       };
-      const response = await apiRequest('/api/streams', 'POST', payload);
-      return response;
+      const response = await apiRequest('POST', '/api/streams', payload);
+      return response.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/live-streams'] });
@@ -264,7 +267,7 @@ export default function Profile() {
         title: "Stream scheduled successfully!",
         description: "Your live debate stream has been created."
       });
-      navigate(`/live/${data.id}`);
+      navigate(`/live-stream/${data.id}`);
     },
     onError: () => {
       toast({ 
@@ -276,6 +279,8 @@ export default function Profile() {
   });
 
   const onStreamSubmit = (data: z.infer<typeof streamFormSchema>) => {
+    console.log('Stream form submitted with data:', data);
+    console.log('Form errors:', streamForm.formState.errors);
     createStreamMutation.mutate(data);
   };
 
