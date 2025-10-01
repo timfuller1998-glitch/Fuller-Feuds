@@ -14,8 +14,12 @@ import Landing from "@/pages/Landing";
 import Profile from "@/pages/Profile";
 import Topic from "@/pages/Topic";
 import Trending from "@/pages/Trending";
+import LiveDebates from "@/pages/LiveDebates";
+import HotDebates from "@/pages/HotDebates";
 import MyDebates from "@/pages/MyDebates";
 import Search from "@/pages/Search";
+import LiveStreamPage from "@/pages/LiveStreamPage";
+import DebateRoomPage from "@/pages/DebateRoomPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -30,9 +34,13 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/search" component={Search} />
           <Route path="/trending" component={Trending} />
+          <Route path="/live" component={LiveDebates} />
+          <Route path="/hot-debates" component={HotDebates} />
           <Route path="/debates" component={MyDebates} />
           <Route path="/topic/:id" component={Topic} />
           <Route path="/profile/:userId" component={Profile} />
+          <Route path="/live-stream/:id" component={LiveStreamPage} />
+          <Route path="/debate-room/:id" component={DebateRoomPage} />
         </>
       )}
       <Route component={NotFound} />

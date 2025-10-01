@@ -18,7 +18,9 @@ import UserAvatar from "./UserAvatar";
 import { 
   Home, 
   Search, 
-  TrendingUp, 
+  TrendingUp,
+  Radio,
+  Flame,
   MessageCircle,
   Globe,
   Briefcase,
@@ -62,6 +64,8 @@ export default function AppSidebar({
   const mainItems = [
     { title: "Home", icon: Home, path: "/" },
     { title: "Trending", icon: TrendingUp, path: "/trending" },
+    { title: "Live Debates", icon: Radio, path: "/live" },
+    { title: "Hot Debates", icon: Flame, path: "/hot-debates" },
     { title: "My Debates", icon: MessageCircle, path: "/debates" },
   ];
 
