@@ -50,6 +50,7 @@ function AuthenticatedApp() {
       <div className="flex h-screen w-full">
         <AppSidebar
           currentUser={{
+            id: user?.id || "",
             name: displayName,
             avatar: user?.profileImageUrl,
             isOnline: true

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link, useLocation } from "wouter";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -27,7 +28,8 @@ import {
   Cpu,
   Settings,
   LogOut,
-  Plus
+  Plus,
+  User
 } from "lucide-react";
 
 interface CategoryItem {
@@ -39,6 +41,7 @@ interface CategoryItem {
 
 interface AppSidebarProps {
   currentUser?: {
+    id: string;
     name: string;
     avatar?: string;
     isOnline: boolean;
@@ -54,13 +57,13 @@ export default function AppSidebar({
   onCreateTopic,
   onLogout 
 }: AppSidebarProps) {
-  const [activeItem, setActiveItem] = useState("home");
+  const [location] = useLocation();
 
   const mainItems = [
-    { title: "Home", icon: Home, id: "home" },
-    { title: "Search Topics", icon: Search, id: "search" },
-    { title: "Trending", icon: TrendingUp, id: "trending" },
-    { title: "My Debates", icon: MessageCircle, id: "debates" },
+    { title: "Home", icon: Home, path: "/" },
+    { title: "Search Topics", icon: Search, path: "/" },
+    { title: "Trending", icon: TrendingUp, path: "/" },
+    { title: "My Debates", icon: MessageCircle, path: "/" },
   ];
 
   const categories: CategoryItem[] = [
@@ -71,12 +74,6 @@ export default function AppSidebar({
     { title: "Education", icon: GraduationCap, count: 43 },
     { title: "Health", icon: Heart, count: 38 },
   ];
-
-  const handleItemClick = (id: string) => {
-    setActiveItem(id);
-    onNavigate?.(id);
-    console.log('Navigate to:', id);
-  };
 
   return (
     <Sidebar>
@@ -93,18 +90,33 @@ export default function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
+        {currentUser && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link href={`/profile/${currentUser.id}`} data-testid="link-user-profile">
+                      <User className="w-4 h-4" />
+                      <span>My Profile</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
-                <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton
-                    isActive={activeItem === item.id}
-                    onClick={() => handleItemClick(item.id)}
-                    data-testid={`button-nav-${item.id}`}
-                  >
-                    <item.icon className="w-4 h-4" />
-                    <span>{item.title}</span>
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={location === item.path}>
+                    <Link href={item.path} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.title}</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -132,15 +144,14 @@ export default function AppSidebar({
             <SidebarMenu>
               {categories.map((category) => (
                 <SidebarMenuItem key={category.title}>
-                  <SidebarMenuButton
-                    onClick={() => handleItemClick(`category-${category.title.toLowerCase()}`)}
-                    data-testid={`button-category-${category.title.toLowerCase()}`}
-                  >
-                    <category.icon className="w-4 h-4" />
-                    <span>{category.title}</span>
-                    <Badge variant="secondary" className="ml-auto text-xs">
-                      {category.count}
-                    </Badge>
+                  <SidebarMenuButton asChild>
+                    <Link href="/" data-testid={`link-category-${category.title.toLowerCase()}`}>
+                      <category.icon className="w-4 h-4" />
+                      <span>{category.title}</span>
+                      <Badge variant="secondary" className="ml-auto text-xs">
+                        {category.count}
+                      </Badge>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -173,7 +184,6 @@ export default function AppSidebar({
               size="sm" 
               className="flex-1"
               onClick={() => {
-                handleItemClick('settings');
                 console.log('Settings clicked');
               }}
               data-testid="button-settings"
