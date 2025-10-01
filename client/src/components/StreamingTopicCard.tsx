@@ -1,16 +1,12 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import UserAvatar from "./UserAvatar";
 import { 
-  MessageCircle, 
-  Users, 
   Clock, 
-  Play,
   Eye,
-  Calendar,
   Radio
 } from "lucide-react";
+import { useLocation } from "wouter";
 
 interface StreamingTopicCardProps {
   id: string;
@@ -32,23 +28,17 @@ interface StreamingTopicCardProps {
   viewerCount?: number;
   status: "live" | "scheduled" | "ended";
   duration?: string;
-  onWatchLive?: (id: string) => void;
-  onSetReminder?: (id: string) => void;
-  onViewRecording?: (id: string) => void;
 }
 
 const statusConfig = {
   live: {
-    badge: { text: "🔴 LIVE", className: "bg-red-500 text-white animate-pulse" },
-    button: { text: "Watch Live", icon: Eye, variant: "default" as const }
+    badge: { text: "🔴 LIVE", className: "bg-red-500 text-white animate-pulse" }
   },
   scheduled: {
-    badge: { text: "📅 Scheduled", className: "bg-blue-500 text-white" },
-    button: { text: "Set Reminder", icon: Calendar, variant: "outline" as const }
+    badge: { text: "📅 Scheduled", className: "bg-blue-500 text-white" }
   },
   ended: {
-    badge: { text: "🎬 Ended", className: "bg-gray-500 text-white" },
-    button: { text: "Watch Recording", icon: Play, variant: "secondary" as const }
+    badge: { text: "🎬 Ended", className: "bg-gray-500 text-white" }
   }
 };
 
@@ -64,31 +54,16 @@ export default function StreamingTopicCard({
   viewerCount,
   status,
   duration,
-  onWatchLive,
-  onSetReminder,
-  onViewRecording
 }: StreamingTopicCardProps) {
+  const [, setLocation] = useLocation();
   const config = statusConfig[status];
 
-  const handleAction = () => {
-    switch (status) {
-      case "live":
-        onWatchLive?.(id);
-        console.log('Watch live clicked:', id);
-        break;
-      case "scheduled":
-        onSetReminder?.(id);
-        console.log('Set reminder clicked:', id);
-        break;
-      case "ended":
-        onViewRecording?.(id);
-        console.log('View recording clicked:', id);
-        break;
-    }
-  };
-
   return (
-    <Card className="hover-elevate overflow-hidden group" data-testid={`card-streaming-topic-${id}`}>
+    <Card 
+      className="hover-elevate active-elevate-2 overflow-hidden group cursor-pointer" 
+      onClick={() => setLocation(`/topic/${id}`)}
+      data-testid={`card-streaming-topic-${id}`}
+    >
       <div className="aspect-video relative overflow-hidden">
         <img 
           src={imageUrl} 
@@ -178,17 +153,6 @@ export default function StreamingTopicCard({
           <UserAvatar name={moderator.name} imageUrl={moderator.avatar} size="sm" />
           <span className="font-medium">{moderator.name}</span>
         </div>
-        
-        {/* Action Button */}
-        <Button 
-          variant={config.button.variant}
-          className="w-full"
-          onClick={handleAction}
-          data-testid={`button-${status}-${id}`}
-        >
-          <config.button.icon className="w-4 h-4 mr-2" />
-          {config.button.text}
-        </Button>
       </CardContent>
     </Card>
   );

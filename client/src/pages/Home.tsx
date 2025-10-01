@@ -596,16 +596,6 @@ export default function Home() {
             <StreamingTopicCard
               key={topic.id}
               {...topic}
-              onWatchLive={(id) => {
-                setViewingLiveStream(id);
-                console.log('Watch live:', id);
-              }}
-              onSetReminder={(id) => {
-                console.log('Set reminder:', id);
-              }}
-              onViewRecording={(id) => {
-                console.log('View recording:', id);
-              }}
             />
           ))}
         </div>
