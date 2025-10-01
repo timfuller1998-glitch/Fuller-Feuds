@@ -17,7 +17,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertUserProfileSchema } from "@shared/schema";
+import { insertUserProfileSchema, insertLiveStreamSchema } from "@shared/schema";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -87,6 +87,11 @@ const profileFormSchema = insertUserProfileSchema.extend({
   bio: z.string().max(500).optional(),
 });
 
+const streamFormSchema = insertLiveStreamSchema.extend({
+  scheduledAt: z.string().optional(),
+  description: z.string().max(500).optional(),
+});
+
 export default function Profile() {
   const { userId } = useParams();
   const [, navigate] = useLocation();
@@ -132,6 +137,12 @@ export default function Profile() {
     queryKey: ['/api/profile', userId, 'following'],
     queryFn: () => fetch(`/api/profile/${userId}/following`, { credentials: 'include' }).then(res => res.json()),
     enabled: !!userId,
+  });
+
+  // Fetch topics for stream creation
+  const { data: topics = [] } = useQuery<any[]>({
+    queryKey: ['/api/topics'],
+    enabled: isOwnProfile && showScheduleStreamDialog,
   });
 
   // Follow/unfollow mutation
@@ -184,6 +195,18 @@ export default function Profile() {
     },
   });
 
+  // Stream schedule form
+  const streamForm = useForm<z.infer<typeof streamFormSchema>>({
+    resolver: zodResolver(streamFormSchema),
+    defaultValues: {
+      topicId: "",
+      title: "",
+      description: "",
+      participantSelectionMethod: "open",
+      scheduledAt: "",
+    },
+  });
+
   // Update form when profile data loads
   useEffect(() => {
     if (profileData?.profile?.bio) {
@@ -219,6 +242,41 @@ export default function Profile() {
   const onSubmit = (data: z.infer<typeof profileFormSchema>) => {
     console.log('Profile form submission:', data);
     updateProfileMutation.mutate(data);
+  };
+
+  // Stream creation mutation
+  const createStreamMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof streamFormSchema>) => {
+      const payload = {
+        ...data,
+        description: data.description || undefined,
+        moderatorId: currentUser!.id,
+        scheduledAt: data.scheduledAt ? new Date(data.scheduledAt).toISOString() : undefined,
+      };
+      const response = await apiRequest('/api/streams', 'POST', payload);
+      return response;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/live-streams'] });
+      setShowScheduleStreamDialog(false);
+      streamForm.reset();
+      toast({ 
+        title: "Stream scheduled successfully!",
+        description: "Your live debate stream has been created."
+      });
+      navigate(`/live/${data.id}`);
+    },
+    onError: () => {
+      toast({ 
+        title: "Failed to schedule stream", 
+        description: "Unable to create live stream.",
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const onStreamSubmit = (data: z.infer<typeof streamFormSchema>) => {
+    createStreamMutation.mutate(data);
   };
 
   // Helper functions
@@ -582,18 +640,166 @@ export default function Profile() {
                           Schedule Stream
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-[600px]">
+                      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle>Schedule Live Stream</DialogTitle>
                           <DialogDescription>
-                            Set up a live debate stream with moderation controls. Coming soon!
+                            Set up a live debate stream with moderation controls
                           </DialogDescription>
                         </DialogHeader>
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Video className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                          <p>Live stream scheduling will be available soon.</p>
-                          <p className="text-sm mt-2">This feature is under development.</p>
-                        </div>
+                        <Form {...streamForm}>
+                          <form onSubmit={streamForm.handleSubmit(onStreamSubmit)} className="space-y-4">
+                            <FormField
+                              control={streamForm.control}
+                              name="topicId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Topic</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-stream-topic">
+                                        <SelectValue placeholder="Select a debate topic" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {topics.map((topic: any) => (
+                                        <SelectItem key={topic.id} value={topic.id}>
+                                          {topic.title}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={streamForm.control}
+                              name="title"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Stream Title</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="e.g., Live Debate: Climate Change Solutions"
+                                      {...field}
+                                      data-testid="input-stream-title"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={streamForm.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Description (Optional)</FormLabel>
+                                  <FormControl>
+                                    <Textarea
+                                      placeholder="Describe what this debate will cover..."
+                                      className="resize-none"
+                                      maxLength={500}
+                                      {...field}
+                                      value={field.value || ""}
+                                      data-testid="input-stream-description"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={streamForm.control}
+                              name="scheduledAt"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Scheduled Time (Optional)</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="datetime-local"
+                                      {...field}
+                                      data-testid="input-stream-scheduled-time"
+                                    />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Leave empty to start immediately
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={streamForm.control}
+                              name="participantSelectionMethod"
+                              render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                  <FormLabel>Participant Selection</FormLabel>
+                                  <FormControl>
+                                    <RadioGroup
+                                      onValueChange={field.onChange}
+                                      value={field.value}
+                                      className="flex flex-col space-y-1"
+                                    >
+                                      <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="open" id="open" data-testid="radio-open-voting" />
+                                        <Label htmlFor="open" className="font-normal cursor-pointer">
+                                          <div className="font-medium">Open Voting</div>
+                                          <div className="text-sm text-muted-foreground">
+                                            Viewers can vote on who should speak
+                                          </div>
+                                        </Label>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="invite" id="invite" data-testid="radio-invite-only" />
+                                        <Label htmlFor="invite" className="font-normal cursor-pointer">
+                                          <div className="font-medium">Invite Only</div>
+                                          <div className="text-sm text-muted-foreground">
+                                            Only invited users can participate
+                                          </div>
+                                        </Label>
+                                      </div>
+                                    </RadioGroup>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <DialogFooter>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setShowScheduleStreamDialog(false)}
+                                disabled={createStreamMutation.isPending}
+                              >
+                                Cancel
+                              </Button>
+                              <Button 
+                                type="submit" 
+                                disabled={createStreamMutation.isPending}
+                                data-testid="button-submit-stream"
+                              >
+                                {createStreamMutation.isPending ? (
+                                  <>
+                                    <Clock className="w-4 h-4 mr-2 animate-spin" />
+                                    Creating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Video className="w-4 h-4 mr-2" />
+                                    Schedule Stream
+                                  </>
+                                )}
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        </Form>
                       </DialogContent>
                     </Dialog>
                   </CardContent>
