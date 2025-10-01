@@ -174,7 +174,7 @@ export default function LiveDebates() {
                   <Card
                     key={stream.id}
                     className="cursor-pointer hover-elevate active-elevate-2"
-                    onClick={() => setLocation(`/live-stream/${stream.id}`)}
+                    onClick={() => setLocation(`/topic/${stream.topicId}`)}
                     data-testid={`card-live-stream-${stream.id}`}
                   >
                     <CardContent className="pt-6">
@@ -228,7 +228,7 @@ export default function LiveDebates() {
                   <Card
                     key={room.id}
                     className="cursor-pointer hover-elevate active-elevate-2"
-                    onClick={() => setLocation(`/debate-room/${room.id}`)}
+                    onClick={() => setLocation(`/topic/${room.topicId}`)}
                     data-testid={`card-debate-room-${room.id}`}
                   >
                     <CardContent className="pt-6">
