@@ -414,34 +414,34 @@ export default function Home() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Hero Section */}
-      <div className="text-center space-y-6 py-8">
-        <div className="space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">
+      <div className="text-center space-y-4 sm:space-y-6 py-4 sm:py-8">
+        <div className="space-y-3 sm:space-y-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight px-4">
             Where Ideas Collide
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
             Join meaningful debates on topics that matter. Share your opinions, discover different perspectives, and engage in thoughtful discussions.
           </p>
         </div>
         
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto px-4">
           <SearchBar 
             onSearch={setSearchQuery}
             placeholder="Search for debate topics..."
           />
         </div>
         
-        <div className="flex items-center justify-center gap-4">
-          <Button data-testid="button-browse-topics">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
+          <Button data-testid="button-browse-topics" className="w-full sm:w-auto">
             <TrendingUp className="w-4 h-4 mr-2" />
             Browse Trending
           </Button>
           
           <Dialog open={showCreateTopic} onOpenChange={setShowCreateTopic}>
             <DialogTrigger asChild>
-              <Button variant="outline" data-testid="button-create-topic">
+              <Button variant="outline" data-testid="button-create-topic" className="w-full sm:w-auto">
                 <Plus className="w-4 h-4 mr-2" />
                 Start New Topic
               </Button>
@@ -542,40 +542,43 @@ export default function Home() {
       </div>
 
       {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="text-center p-6 rounded-lg bg-card border">
-          <div className="text-3xl font-bold text-primary mb-2">1,247</div>
-          <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
-            <MessageCircle className="w-4 h-4" />
-            Active Debates
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+        <div className="text-center p-3 sm:p-4 md:p-6 rounded-lg bg-card border">
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1 sm:mb-2">1,247</div>
+          <div className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center gap-1">
+            <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Active Debates</span>
+            <span className="sm:hidden">Debates</span>
           </div>
         </div>
-        <div className="text-center p-6 rounded-lg bg-card border">
-          <div className="text-3xl font-bold text-red-500 mb-2">3</div>
-          <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
-            <Radio className="w-4 h-4" />
-            Live Streams
+        <div className="text-center p-3 sm:p-4 md:p-6 rounded-lg bg-card border">
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-red-500 mb-1 sm:mb-2">3</div>
+          <div className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center gap-1">
+            <Radio className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Live Streams</span>
+            <span className="sm:hidden">Live</span>
           </div>
         </div>
-        <div className="text-center p-6 rounded-lg bg-card border">
-          <div className="text-3xl font-bold text-primary mb-2">8,923</div>
-          <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
-            <Users className="w-4 h-4" />
-            Total Participants
+        <div className="text-center p-3 sm:p-4 md:p-6 rounded-lg bg-card border">
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1 sm:mb-2">8,923</div>
+          <div className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center gap-1">
+            <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Total Participants</span>
+            <span className="sm:hidden">Users</span>
           </div>
         </div>
-        <div className="text-center p-6 rounded-lg bg-card border">
-          <div className="text-3xl font-bold text-primary mb-2">24</div>
-          <div className="text-sm text-muted-foreground">
+        <div className="text-center p-3 sm:p-4 md:p-6 rounded-lg bg-card border">
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1 sm:mb-2">24</div>
+          <div className="text-xs sm:text-sm text-muted-foreground">
             Categories
           </div>
         </div>
       </div>
 
       {/* Live Streaming Debates */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Live Streaming Debates</h2>
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-xl sm:text-2xl font-bold">Live Streaming Debates</h2>
           <div className="flex items-center gap-2">
             <Badge className="bg-red-500 text-white animate-pulse">
               <Radio className="w-3 h-3 mr-1" />
@@ -609,9 +612,9 @@ export default function Home() {
       </div>
 
       {/* Trending Topics */}
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Trending Topics</h2>
+          <h2 className="text-xl sm:text-2xl font-bold">Trending Topics</h2>
           <Badge variant="secondary" className="flex items-center gap-1">
             <TrendingUp className="w-3 h-3" />
             Live Updates

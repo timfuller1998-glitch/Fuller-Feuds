@@ -92,9 +92,9 @@ function AuthenticatedApp() {
           }}
         />
         <div className="flex flex-col flex-1">
-          <header className="flex items-center gap-4 p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <header className="flex items-center gap-2 sm:gap-4 p-2 sm:p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex-1 max-w-2xl mx-auto">
+            <div className="flex-1 max-w-2xl mx-auto px-2 sm:px-0">
               <SearchBar 
                 value={searchQuery}
                 onSearch={handleSearch}
@@ -104,7 +104,7 @@ function AuthenticatedApp() {
             </div>
             <ThemeToggle />
           </header>
-          <main className="flex-1 overflow-auto p-6">
+          <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
               <Router />
             </div>

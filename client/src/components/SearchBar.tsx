@@ -31,14 +31,14 @@ export default function SearchBar({
   };
 
   return (
-    <div className={`relative w-full max-w-2xl ${className}`}>
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div className={`relative w-full ${className}`}>
+      <Search className="absolute left-2 sm:left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         type="search"
         placeholder={placeholder}
         value={query}
         onChange={(e) => handleSearch(e.target.value)}
-        className="pl-10 h-12 text-base"
+        className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm sm:text-base"
         data-testid="input-search"
       />
     </div>
