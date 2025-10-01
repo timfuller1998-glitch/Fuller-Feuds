@@ -1,12 +1,16 @@
 import cron from 'node-cron';
 import { storage } from './storage';
+import { log } from './vite';
 
 export function startScheduledJobs() {
   cron.schedule('0 2 * * *', async () => {
-    console.log('[CRON] Starting daily AI summary refresh at 2 AM');
+    log('[CRON] Starting daily AI summary update at 2:00 AM');
     
     try {
       const topics = await storage.getTopics(1000);
+      let generated = 0;
+      let refreshed = 0;
+      let skipped = 0;
       
       for (const topic of topics) {
         try {
@@ -17,19 +21,28 @@ export function startScheduledJobs() {
             
             if (existingCumulative) {
               await storage.refreshCumulativeOpinion(topic.id);
-              console.log(`[CRON] Refreshed AI summary for topic: ${topic.title}`);
+              refreshed++;
+              log(`[CRON] Refreshed AI summary for topic: ${topic.title}`);
+            } else {
+              await storage.generateCumulativeOpinion(topic.id);
+              generated++;
+              log(`[CRON] Generated AI summary for topic: ${topic.title}`);
             }
+          } else {
+            skipped++;
           }
         } catch (error) {
-          console.error(`[CRON] Error refreshing summary for topic ${topic.id}:`, error);
+          log(`[CRON] Error processing topic ${topic.id}: ${error}`);
         }
       }
       
-      console.log('[CRON] Daily AI summary refresh completed');
+      log(`[CRON] Daily AI summary update completed - Generated: ${generated}, Refreshed: ${refreshed}, Skipped: ${skipped}`);
     } catch (error) {
-      console.error('[CRON] Error in scheduled job:', error);
+      log(`[CRON] Error in scheduled job: ${error}`);
     }
+  }, {
+    timezone: process.env.CRON_TZ || 'UTC'
   });
 
-  console.log('[CRON] Scheduled daily AI summary refresh at 2:00 AM');
+  log('[CRON] Scheduled daily AI summary update at 2:00 AM ' + (process.env.CRON_TZ || 'UTC'));
 }
