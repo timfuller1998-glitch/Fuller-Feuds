@@ -84,10 +84,6 @@ interface Opinion {
   createdAt: string;
 }
 
-const profileFormSchema = insertUserProfileSchema.extend({
-  bio: z.string().max(500).optional(),
-});
-
 const streamFormSchema = z.object({
   topicId: z.string().min(1, "Please select a topic"),
   title: z.string().min(1, "Title is required").max(200),
@@ -108,7 +104,6 @@ export default function Profile() {
   const [, navigate] = useLocation();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
-  const [isEditing, setIsEditing] = useState(false);
   const [opinionSortBy, setOpinionSortBy] = useState<'recent' | 'popular' | 'controversial'>('recent');
   const [showCreateDebateDialog, setShowCreateDebateDialog] = useState(false);
   const [showScheduleStreamDialog, setShowScheduleStreamDialog] = useState(false);
@@ -198,14 +193,6 @@ export default function Profile() {
     }
   });
 
-  // Profile update form
-  const form = useForm<z.infer<typeof profileFormSchema>>({
-    resolver: zodResolver(profileFormSchema),
-    defaultValues: {
-      bio: profileData?.profile?.bio || "",
-    },
-  });
-
   // Stream schedule form
   const streamForm = useForm<z.infer<typeof streamFormSchema>>({
     resolver: zodResolver(streamFormSchema),
@@ -228,43 +215,6 @@ export default function Profile() {
       participant2Stance: "opposing",
     },
   });
-
-  // Update form when profile data loads
-  useEffect(() => {
-    if (profileData?.profile?.bio) {
-      form.reset({
-        bio: profileData.profile.bio,
-      });
-    }
-  }, [profileData, form]);
-
-  // Profile update mutation
-  const updateProfileMutation = useMutation({
-    mutationFn: (data: z.infer<typeof profileFormSchema>) => 
-      fetch(`/api/profile/${userId}`, { 
-        method: 'PATCH', 
-        body: JSON.stringify(data),
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      }).then(res => res.json()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/profile', userId] });
-      setIsEditing(false);
-      toast({ title: "Profile updated successfully!" });
-    },
-    onError: () => {
-      toast({ 
-        title: "Update failed", 
-        description: "Unable to update profile.",
-        variant: "destructive" 
-      });
-    }
-  });
-
-  const onSubmit = (data: z.infer<typeof profileFormSchema>) => {
-    console.log('Profile form submission:', data);
-    updateProfileMutation.mutate(data);
-  };
 
   // Debate room creation mutation
   const createDebateMutation = useMutation({
@@ -460,26 +410,6 @@ export default function Profile() {
                   )}
                 </Button>
               )}
-              
-              {isOwnProfile && (
-                <Button
-                  onClick={() => setIsEditing(!isEditing)}
-                  variant="outline"
-                  data-testid="button-edit-profile"
-                >
-                  {isEditing ? (
-                    <>
-                      <X className="w-4 h-4 mr-2" />
-                      Cancel
-                    </>
-                  ) : (
-                    <>
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit Profile
-                    </>
-                  )}
-                </Button>
-              )}
             </div>
           </div>
           
@@ -504,50 +434,6 @@ export default function Profile() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Edit Profile Form */}
-      {isEditing && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Edit Profile</CardTitle>
-            <CardDescription>Update your profile information</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="bio"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bio</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Tell us about yourself..."
-                          className="resize-none"
-                          maxLength={500}
-                          {...field}
-                          data-testid="input-bio"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={updateProfileMutation.isPending} data-testid="button-save-profile">
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="opinions" className="space-y-6">
