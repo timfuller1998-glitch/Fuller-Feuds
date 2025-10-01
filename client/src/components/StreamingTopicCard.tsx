@@ -61,7 +61,7 @@ export default function StreamingTopicCard({
   return (
     <Card 
       className="hover-elevate active-elevate-2 overflow-hidden group cursor-pointer" 
-      onClick={() => setLocation(`/topic/${id}`)}
+      onClick={() => setLocation(`/live-stream/${id}`)}
       data-testid={`card-streaming-topic-${id}`}
     >
       <div className="aspect-video relative overflow-hidden">
