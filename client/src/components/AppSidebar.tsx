@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -34,6 +34,7 @@ import {
   User,
   Grid
 } from "lucide-react";
+import type { Topic } from "@shared/schema";
 
 interface CategoryItem {
   title: string;
@@ -62,6 +63,11 @@ export default function AppSidebar({
 }: AppSidebarProps) {
   const [location] = useLocation();
 
+  // Fetch all topics to calculate category counts
+  const { data: topics } = useQuery<Topic[]>({
+    queryKey: ["/api/topics"],
+  });
+
   const mainItems = [
     { title: "Home", icon: Home, path: "/" },
     { title: "Trending", icon: TrendingUp, path: "/trending" },
@@ -70,14 +76,20 @@ export default function AppSidebar({
     { title: "My Debates", icon: MessageCircle, path: "/debates" },
   ];
 
-  const categories: CategoryItem[] = [
-    { title: "Politics", icon: Gavel, count: 142 },
-    { title: "Technology", icon: Cpu, count: 89 },
-    { title: "Environment", icon: Globe, count: 76 },
-    { title: "Business", icon: Briefcase, count: 54 },
-    { title: "Education", icon: GraduationCap, count: 43 },
-    { title: "Health", icon: Heart, count: 38 },
+  // Calculate real counts for each category
+  const categoryDefinitions = [
+    { title: "Politics", icon: Gavel },
+    { title: "Technology", icon: Cpu },
+    { title: "Environment", icon: Globe },
+    { title: "Business", icon: Briefcase },
+    { title: "Education", icon: GraduationCap },
+    { title: "Health", icon: Heart },
   ];
+
+  const categories: CategoryItem[] = categoryDefinitions.map(cat => ({
+    ...cat,
+    count: topics?.filter(topic => topic.category === cat.title).length || 0
+  }));
 
   return (
     <Sidebar>
