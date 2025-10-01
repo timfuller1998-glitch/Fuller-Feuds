@@ -661,6 +661,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debate message routes
+  app.get('/api/debate-rooms/:roomId/messages', async (req, res) => {
+    try {
+      const messages = await storage.getDebateMessages(req.params.roomId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching debate messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  app.post('/api/debate-rooms/:roomId/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { content } = req.body;
+      
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+
+      const message = await storage.addDebateMessage(req.params.roomId, userId, content);
+      res.status(201).json(message);
+    } catch (error) {
+      console.error("Error adding debate message:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
   // Live stream routes
   app.get('/api/live-streams', async (req, res) => {
     try {
