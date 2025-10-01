@@ -222,6 +222,41 @@ export class ObjectStorageService {
     return normalizedPath;
   }
 
+  // Securely sets ACL policy for a user's uploaded object, verifying ownership
+  async setUploadedObjectAclPolicy(
+    objectId: string,
+    userId: string,
+    aclPolicy: ObjectAclPolicy
+  ): Promise<string> {
+    // Verify the object is in the uploads directory
+    const uploadsPath = `/objects/uploads/${objectId}`;
+    const objectFile = await this.getObjectEntityFile(uploadsPath);
+
+    // Check if file exists
+    const [exists] = await objectFile.exists();
+    if (!exists) {
+      throw new ObjectNotFoundError();
+    }
+
+    // Check current ACL policy to verify ownership
+    const currentAcl = await getObjectAclPolicy(objectFile);
+    
+    // Only allow setting ACL if:
+    // 1. No current owner exists (newly uploaded file)
+    // 2. Current owner is the requesting user
+    if (currentAcl?.owner && currentAcl.owner !== userId) {
+      throw new Error("Unauthorized: Cannot modify another user's object");
+    }
+
+    // Set the ACL policy with the requesting user as owner
+    await setObjectAclPolicy(objectFile, {
+      ...aclPolicy,
+      owner: userId, // Force owner to be the requesting user
+    });
+
+    return uploadsPath;
+  }
+
   // Checks if the user can access the object entity.
   async canAccessObjectEntity({
     userId,

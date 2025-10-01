@@ -64,18 +64,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.put("/api/profile-picture", isAuthenticated, async (req: any, res) => {
-    if (!req.body.profileImageUrl) {
-      return res.status(400).json({ error: "profileImageUrl is required" });
+    if (!req.body.objectId) {
+      return res.status(400).json({ error: "objectId is required" });
     }
 
     const userId = req.user?.claims?.sub;
 
     try {
       const objectStorageService = new ObjectStorageService();
-      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
-        req.body.profileImageUrl,
+      // Use secure method that verifies ownership
+      const objectPath = await objectStorageService.setUploadedObjectAclPolicy(
+        req.body.objectId,
+        userId,
         {
-          owner: userId,
           visibility: "public", // Profile pictures are public
         },
       );
@@ -88,6 +89,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error setting profile picture:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ error: "Object not found" });
+      }
+      if (error.message?.includes("Unauthorized")) {
+        return res.status(403).json({ error: error.message });
+      }
       res.status(500).json({ error: "Internal server error" });
     }
   });

@@ -123,8 +123,14 @@ export default function Settings() {
     if (result.successful && result.successful.length > 0) {
       const uploadedFile = result.successful[0];
       try {
+        // Extract object ID from the upload URL
+        // URL format: https://storage.googleapis.com/.../uploads/{objectId}?...
+        const url = new URL(uploadedFile.uploadURL);
+        const pathParts = url.pathname.split('/');
+        const objectId = pathParts[pathParts.length - 1]; // Get the last part (object ID)
+        
         await apiRequest("PUT", "/api/profile-picture", {
-          profileImageUrl: uploadedFile.uploadURL,
+          objectId: objectId,
         });
         queryClient.invalidateQueries({ queryKey: ['/api/profile', currentUser?.id] });
         queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
