@@ -54,24 +54,24 @@ export default function TopicCard({
         )}
       </div>
       
-      <CardHeader className="pb-2">
-        <h3 className="font-semibold text-lg leading-tight" data-testid={`text-topic-title-${id}`}>
+      <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
+        <h3 className="font-semibold text-base sm:text-lg leading-tight" data-testid={`text-topic-title-${id}`}>
           {title}
         </h3>
-        <p className="text-sm text-muted-foreground line-clamp-2">
+        <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
           {description}
         </p>
       </CardHeader>
       
-      <CardContent className="pt-0">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+      <CardContent className="pt-0 p-3 sm:p-6 sm:pt-0">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
-              <MessageCircle className="w-4 h-4" />
+              <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
               <span data-testid={`text-opinions-count-${id}`}>{opinionsCount}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Users className="w-4 h-4" />
+              <Users className="w-3 h-3 sm:w-4 sm:h-4" />
               <span data-testid={`text-participants-count-${id}`}>{participantCount}</span>
             </div>
           </div>

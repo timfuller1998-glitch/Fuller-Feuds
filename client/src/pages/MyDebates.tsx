@@ -61,67 +61,67 @@ export default function MyDebates() {
   const isLoading = topicsLoading || opinionsLoading;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Page Header */}
       <div className="flex items-center gap-3">
-        <div className="p-3 rounded-lg bg-primary/10">
-          <MessageCircle className="w-6 h-6 text-primary" />
+        <div className="p-2 sm:p-3 rounded-lg bg-primary/10">
+          <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold" data-testid="heading-my-debates">
+          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="heading-my-debates">
             My Debates
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Topics you've created and participated in
           </p>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-blue-500/10">
-                <FileText className="w-5 h-5 text-blue-500" />
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-lg bg-blue-500/10">
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold" data-testid="stat-created-topics">
+                <p className="text-xl sm:text-2xl font-bold" data-testid="stat-created-topics">
                   {createdTopics.length}
                 </p>
-                <p className="text-sm text-muted-foreground">Topics Created</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Topics Created</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-green-500/10">
-                <Users className="w-5 h-5 text-green-500" />
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-lg bg-green-500/10">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold" data-testid="stat-participated-topics">
+                <p className="text-xl sm:text-2xl font-bold" data-testid="stat-participated-topics">
                   {participatedTopics.length}
                 </p>
-                <p className="text-sm text-muted-foreground">Participated In</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Participated In</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-purple-500/10">
-                <MessageCircle className="w-5 h-5 text-purple-500" />
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-lg bg-purple-500/10">
+                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold" data-testid="stat-total-opinions">
+                <p className="text-xl sm:text-2xl font-bold" data-testid="stat-total-opinions">
                   {userOpinions?.length || 0}
                 </p>
-                <p className="text-sm text-muted-foreground">Total Opinions</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Opinions</p>
               </div>
             </div>
           </CardContent>
@@ -130,7 +130,7 @@ export default function MyDebates() {
 
       {/* Tabs for Created vs Participated */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="created" data-testid="tab-created">
             Created ({createdTopics.length})
           </TabsTrigger>
