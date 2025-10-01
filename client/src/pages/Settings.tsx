@@ -5,13 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Save, User, Monitor, Sun, Moon } from "lucide-react";
+import { Save, User, Monitor, Sun, Moon, Upload } from "lucide-react";
+import type { UploadResult } from "@uppy/core";
 
 const profileFormSchema = z.object({
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
@@ -107,6 +110,39 @@ export default function Settings() {
     });
   };
 
+  // Profile picture upload
+  const handleGetUploadParameters = async () => {
+    const response = await apiRequest("POST", "/api/objects/upload");
+    return {
+      method: "PUT" as const,
+      url: response.uploadURL,
+    };
+  };
+
+  const handleProfilePictureComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    if (result.successful && result.successful.length > 0) {
+      const uploadedFile = result.successful[0];
+      try {
+        await apiRequest("PUT", "/api/profile-picture", {
+          profileImageUrl: uploadedFile.uploadURL,
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/profile', currentUser?.id] });
+        queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+        toast({
+          title: "Profile picture updated",
+          description: "Your profile picture has been updated successfully."
+        });
+      } catch (error) {
+        console.error("Error updating profile picture:", error);
+        toast({
+          title: "Update failed",
+          description: "Failed to update profile picture.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
   // Profile update mutation
   const updateProfileMutation = useMutation({
     mutationFn: (data: z.infer<typeof profileFormSchema>) => 
@@ -161,6 +197,34 @@ export default function Settings() {
           <CardDescription>Update your profile bio and personal information</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Profile Picture Section */}
+          <div className="mb-6 pb-6 border-b">
+            <h3 className="text-sm font-medium mb-4">Profile Picture</h3>
+            <div className="flex items-center gap-6">
+              <Avatar className="w-24 h-24" data-testid="avatar-profile-picture">
+                <AvatarImage src={profileData?.user?.profileImageUrl} />
+                <AvatarFallback className="text-2xl">
+                  {profileData?.user?.firstName?.[0]?.toUpperCase() || profileData?.user?.email?.[0]?.toUpperCase() || '?'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-muted-foreground">
+                  Upload a new profile picture (max 10MB)
+                </p>
+                <ObjectUploader
+                  maxNumberOfFiles={1}
+                  maxFileSize={10485760}
+                  onGetUploadParameters={handleGetUploadParameters}
+                  onComplete={handleProfilePictureComplete}
+                  buttonVariant="outline"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Image
+                </ObjectUploader>
+              </div>
+            </div>
+          </div>
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
