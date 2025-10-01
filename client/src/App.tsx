@@ -15,6 +15,7 @@ import Profile from "@/pages/Profile";
 import Topic from "@/pages/Topic";
 import Trending from "@/pages/Trending";
 import MyDebates from "@/pages/MyDebates";
+import Search from "@/pages/Search";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -27,6 +28,7 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Home} />
+          <Route path="/search" component={Search} />
           <Route path="/trending" component={Trending} />
           <Route path="/debates" component={MyDebates} />
           <Route path="/topic/:id" component={Topic} />
