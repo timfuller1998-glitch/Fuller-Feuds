@@ -18,6 +18,7 @@ import LiveDebates from "@/pages/LiveDebates";
 import HotDebates from "@/pages/HotDebates";
 import MyDebates from "@/pages/MyDebates";
 import Search from "@/pages/Search";
+import AllCategoriesPage from "@/pages/AllCategoriesPage";
 import CategoryPage from "@/pages/CategoryPage";
 import LiveStreamPage from "@/pages/LiveStreamPage";
 import DebateRoomPage from "@/pages/DebateRoomPage";
@@ -38,6 +39,7 @@ function Router() {
           <Route path="/live" component={LiveDebates} />
           <Route path="/hot-debates" component={HotDebates} />
           <Route path="/debates" component={MyDebates} />
+          <Route path="/categories" component={AllCategoriesPage} />
           <Route path="/category/:category" component={CategoryPage} />
           <Route path="/topic/:id" component={Topic} />
           <Route path="/profile/:userId" component={Profile} />

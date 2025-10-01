@@ -31,7 +31,8 @@ import {
   Settings,
   LogOut,
   Plus,
-  User
+  User,
+  Grid
 } from "lucide-react";
 
 interface CategoryItem {
@@ -145,6 +146,14 @@ export default function AppSidebar({
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location === "/categories"}>
+                  <Link href="/categories" data-testid="link-browse-all-categories">
+                    <Grid className="w-4 h-4" />
+                    <span>Browse All</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               {categories.map((category) => (
                 <SidebarMenuItem key={category.title}>
                   <SidebarMenuButton asChild>

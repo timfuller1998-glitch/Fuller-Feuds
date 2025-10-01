@@ -23,8 +23,10 @@ export default function CategoryPage() {
   const category = params.category;
 
   // Fetch topics for this category using default fetcher
+  const queryParams = new URLSearchParams();
+  if (category) queryParams.append("category", category);
   const { data: apiTopics, isLoading, error } = useQuery<Topic[]>({
-    queryKey: ["/api/topics", { category }],
+    queryKey: [`/api/topics?${queryParams.toString()}`],
     enabled: !!category,
   });
 
