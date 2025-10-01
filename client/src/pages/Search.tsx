@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { useSearch } from "wouter/use-browser-location";
+import { useSearch, useLocation } from "wouter";
 import TopicCard from "@/components/TopicCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search as SearchIcon, History, Filter } from "lucide-react";
 import { type Topic } from "@shared/schema";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 
 type TopicWithCounts = Topic & {
@@ -17,6 +17,30 @@ export default function Search() {
   const searchParams = new URLSearchParams(useSearch());
   const searchQuery = searchParams.get("q") || "";
   const [activeTab, setActiveTab] = useState("all");
+  const [, setLocation] = useLocation();
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  // Get recent searches from localStorage
+  const getRecentSearches = () => {
+    try {
+      const history = localStorage.getItem("searchHistory");
+      return history ? JSON.parse(history) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Initialize recent searches and listen for updates
+  useEffect(() => {
+    setRecentSearches(getRecentSearches());
+    
+    const handleHistoryUpdate = () => {
+      setRecentSearches(getRecentSearches());
+    };
+    
+    window.addEventListener('searchHistoryUpdate', handleHistoryUpdate);
+    return () => window.removeEventListener('searchHistoryUpdate', handleHistoryUpdate);
+  }, []);
 
   // Fetch search results
   const { data: topics, isLoading } = useQuery<TopicWithCounts[]>({
@@ -36,18 +60,6 @@ export default function Search() {
   const filteredTopics = activeTab === "all" 
     ? topics 
     : topics?.filter(t => t.category === activeTab);
-
-  // Get recent searches from localStorage
-  const getRecentSearches = () => {
-    try {
-      const history = localStorage.getItem("searchHistory");
-      return history ? JSON.parse(history) : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const recentSearches = getRecentSearches();
 
   if (!searchQuery) {
     return (
@@ -80,7 +92,7 @@ export default function Search() {
                     variant="secondary" 
                     className="cursor-pointer hover-elevate"
                     onClick={() => {
-                      window.location.href = `/search?q=${encodeURIComponent(search)}`;
+                      setLocation(`/search?q=${encodeURIComponent(search)}`);
                     }}
                     data-testid={`badge-recent-search-${index}`}
                   >

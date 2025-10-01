@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, History, X } from "lucide-react";
+import { Search, History } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { type Topic } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useLocation } from "wouter";
 
 interface SearchBarProps {
   onSearch?: (query: string) => void;
@@ -20,8 +21,10 @@ export default function SearchBar({
   value: externalValue
 }: SearchBarProps) {
   const [query, setQuery] = useState(externalValue || "");
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const [, setLocation] = useLocation();
 
   // Sync internal state with external value (for controlled usage)
   useEffect(() => {
@@ -29,6 +32,14 @@ export default function SearchBar({
       setQuery(externalValue);
     }
   }, [externalValue]);
+
+  // Debounce query for API calls (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -41,18 +52,18 @@ export default function SearchBar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch topic suggestions when query changes
+  // Fetch topic suggestions when debounced query changes
   const { data: topics } = useQuery<Topic[]>({
-    queryKey: ["/api/topics", { search: query }],
+    queryKey: ["/api/topics", { search: debouncedQuery }],
     queryFn: async () => {
-      if (!query || query.length < 2) return [];
+      if (!debouncedQuery || debouncedQuery.length < 2) return [];
       const params = new URLSearchParams();
-      params.append("search", query);
+      params.append("search", debouncedQuery);
       const response = await fetch(`/api/topics?${params}`);
       if (!response.ok) return [];
       return response.json();
     },
-    enabled: query.length >= 2,
+    enabled: debouncedQuery.length >= 2,
   });
 
   // Get search history from localStorage
@@ -87,6 +98,8 @@ export default function SearchBar({
     try {
       localStorage.removeItem("searchHistory");
       setShowSuggestions(false);
+      // Notify other components that history was cleared
+      window.dispatchEvent(new CustomEvent('searchHistoryUpdate'));
     } catch (error) {
       console.error("Failed to clear search history:", error);
     }
@@ -104,8 +117,11 @@ export default function SearchBar({
     onSearch?.(searchTerm);
     setShowSuggestions(false);
     
-    // Navigate to search page
-    window.location.href = `/search?q=${encodeURIComponent(searchTerm)}`;
+    // Navigate to search page using wouter
+    setLocation(`/search?q=${encodeURIComponent(searchTerm)}`);
+    
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent('searchHistoryUpdate'));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -184,7 +200,8 @@ export default function SearchBar({
                 <button
                   key={topic.id}
                   onClick={() => {
-                    window.location.href = `/topic/${topic.id}`;
+                    setShowSuggestions(false);
+                    setLocation(`/topic/${topic.id}`);
                   }}
                   className="w-full text-left px-2 py-2 rounded hover-elevate text-sm"
                   data-testid={`suggestion-topic-${topic.id}`}
@@ -213,7 +230,8 @@ export default function SearchBar({
                     variant="outline"
                     className="cursor-pointer hover-elevate text-xs"
                     onClick={() => {
-                      window.location.href = `/?category=${encodeURIComponent(category)}`;
+                      setShowSuggestions(false);
+                      setLocation(`/?category=${encodeURIComponent(category)}`);
                     }}
                     data-testid={`suggestion-category-${category.toLowerCase()}`}
                   >
