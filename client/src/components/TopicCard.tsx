@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Users, TrendingUp, Mic } from "lucide-react";
+import { Link } from "wouter";
 
 interface TopicCardProps {
   id: string;
@@ -81,13 +82,12 @@ export default function TopicCard({
             variant="outline" 
             size="sm" 
             className="w-full"
-            onClick={() => {
-              onViewTopic?.(id);
-              console.log('View topic clicked:', id);
-            }}
+            asChild
             data-testid={`button-view-topic-${id}`}
           >
-            View Topic
+            <Link href={`/topic/${id}`}>
+              View Topic
+            </Link>
           </Button>
           <div className="flex gap-2">
             <Button 

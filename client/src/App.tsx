@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
 import Profile from "@/pages/Profile";
+import Topic from "@/pages/Topic";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Home} />
+          <Route path="/topic/:id" component={Topic} />
           <Route path="/profile/:userId" component={Profile} />
         </>
       )}
