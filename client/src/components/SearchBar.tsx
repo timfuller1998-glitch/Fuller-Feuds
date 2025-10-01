@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -6,14 +6,23 @@ interface SearchBarProps {
   onSearch?: (query: string) => void;
   placeholder?: string;
   className?: string;
+  value?: string;
 }
 
 export default function SearchBar({ 
   onSearch, 
   placeholder = "Search debate topics...", 
-  className = "" 
+  className = "",
+  value: externalValue
 }: SearchBarProps) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(externalValue || "");
+
+  // Sync internal state with external value (for controlled usage)
+  useEffect(() => {
+    if (externalValue !== undefined) {
+      setQuery(externalValue);
+    }
+  }, [externalValue]);
 
   const handleSearch = (value: string) => {
     setQuery(value);

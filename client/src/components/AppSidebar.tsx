@@ -61,9 +61,8 @@ export default function AppSidebar({
 
   const mainItems = [
     { title: "Home", icon: Home, path: "/" },
-    { title: "Search Topics", icon: Search, path: "/" },
-    { title: "Trending", icon: TrendingUp, path: "/" },
-    { title: "My Debates", icon: MessageCircle, path: "/" },
+    { title: "Trending", icon: TrendingUp, path: "/trending" },
+    { title: "My Debates", icon: MessageCircle, path: "/debates" },
   ];
 
   const categories: CategoryItem[] = [
@@ -145,7 +144,7 @@ export default function AppSidebar({
               {categories.map((category) => (
                 <SidebarMenuItem key={category.title}>
                   <SidebarMenuButton asChild>
-                    <Link href="/" data-testid={`link-category-${category.title.toLowerCase()}`}>
+                    <Link href={`/?category=${category.title}`} data-testid={`link-category-${category.title.toLowerCase()}`}>
                       <category.icon className="w-4 h-4" />
                       <span>{category.title}</span>
                       <Badge variant="secondary" className="ml-auto text-xs">
