@@ -85,6 +85,7 @@ export interface IStorage {
   addStreamParticipant(streamId: string, userId: string, stance: string): Promise<StreamParticipant>;
   getStreamParticipants(streamId: string): Promise<StreamParticipant[]>;
   updateParticipantStatus(streamId: string, userId: string, updates: Partial<StreamParticipant>): Promise<void>;
+  removeStreamParticipant(streamId: string, userId: string): Promise<void>;
   
   // Stream chat
   addStreamChatMessage(streamId: string, userId: string, content: string, type?: string): Promise<StreamChatMessage>;
@@ -390,6 +391,17 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(streamParticipants)
       .set(updates)
+      .where(
+        and(
+          eq(streamParticipants.streamId, streamId),
+          eq(streamParticipants.userId, userId)
+        )
+      );
+  }
+
+  async removeStreamParticipant(streamId: string, userId: string): Promise<void> {
+    await db
+      .delete(streamParticipants)
       .where(
         and(
           eq(streamParticipants.streamId, streamId),

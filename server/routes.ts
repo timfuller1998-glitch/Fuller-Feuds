@@ -279,6 +279,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Moderation routes
+  app.patch('/api/streams/:streamId/participants/:userId/mute', isAuthenticated, async (req: any, res) => {
+    try {
+      const { streamId, userId } = req.params;
+      const muteSchema = z.object({ mute: z.boolean() });
+      const { mute } = muteSchema.parse(req.body);
+      const requestingUserId = req.user.claims.sub;
+      
+      const stream = await storage.getLiveStream(streamId);
+      if (!stream) {
+        return res.status(404).json({ message: "Stream not found" });
+      }
+      
+      if (stream.moderatorId !== requestingUserId) {
+        return res.status(403).json({ message: "Only the moderator can mute participants" });
+      }
+      
+      await storage.updateParticipantStatus(streamId, userId, { isMuted: mute });
+      res.json({ message: "Participant mute status updated" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error updating participant mute status:", error);
+      res.status(500).json({ message: "Failed to update mute status" });
+    }
+  });
+
+  app.delete('/api/streams/:streamId/participants/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { streamId, userId } = req.params;
+      const requestingUserId = req.user.claims.sub;
+      
+      const stream = await storage.getLiveStream(streamId);
+      if (!stream) {
+        return res.status(404).json({ message: "Stream not found" });
+      }
+      
+      if (stream.moderatorId !== requestingUserId) {
+        return res.status(403).json({ message: "Only the moderator can remove participants" });
+      }
+      
+      await storage.removeStreamParticipant(streamId, userId);
+      res.json({ message: "Participant removed" });
+    } catch (error) {
+      console.error("Error removing participant:", error);
+      res.status(500).json({ message: "Failed to remove participant" });
+    }
+  });
+
+  app.patch('/api/streams/:streamId/end', isAuthenticated, async (req: any, res) => {
+    try {
+      const { streamId } = req.params;
+      const requestingUserId = req.user.claims.sub;
+      
+      const stream = await storage.getLiveStream(streamId);
+      if (!stream) {
+        return res.status(404).json({ message: "Stream not found" });
+      }
+      
+      if (stream.moderatorId !== requestingUserId) {
+        return res.status(403).json({ message: "Only the moderator can end the stream" });
+      }
+      
+      await storage.updateStreamStatus(streamId, 'ended');
+      res.json({ message: "Stream ended successfully" });
+    } catch (error) {
+      console.error("Error ending stream:", error);
+      res.status(500).json({ message: "Failed to end stream" });
+    }
+  });
+
   // Debate room routes
   app.post('/api/debates', isAuthenticated, async (req: any, res) => {
     try {

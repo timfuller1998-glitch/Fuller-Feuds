@@ -10,7 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserProfileSchema } from "@shared/schema";
@@ -35,7 +39,11 @@ import {
   Save,
   X,
   Filter,
-  ArrowUpDown
+  ArrowUpDown,
+  Swords,
+  Video,
+  Clock,
+  Plus
 } from "lucide-react";
 
 interface ProfileData {
@@ -86,6 +94,8 @@ export default function Profile() {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [opinionSortBy, setOpinionSortBy] = useState<'recent' | 'popular' | 'controversial'>('recent');
+  const [showCreateDebateDialog, setShowCreateDebateDialog] = useState(false);
+  const [showScheduleStreamDialog, setShowScheduleStreamDialog] = useState(false);
 
   const isOwnProfile = currentUser?.id === userId;
 
@@ -410,10 +420,14 @@ export default function Profile() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="opinions" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="opinions" data-testid="tab-opinions">
             <MessageSquare className="w-4 h-4 mr-2" />
             Opinions
+          </TabsTrigger>
+          <TabsTrigger value="debates" data-testid="tab-debates">
+            <Swords className="w-4 h-4 mr-2" />
+            Debates
           </TabsTrigger>
           <TabsTrigger value="leaning" data-testid="tab-leaning">
             <Brain className="w-4 h-4 mr-2" />
@@ -506,6 +520,110 @@ export default function Profile() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Debates Tab */}
+        <TabsContent value="debates">
+          <div className="space-y-6">
+            {isOwnProfile && (
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Create Debate Room Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Swords className="w-5 h-5" />
+                      Start a Debate
+                    </CardTitle>
+                    <CardDescription>
+                      Challenge someone to a one-on-one debate
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Dialog open={showCreateDebateDialog} onOpenChange={setShowCreateDebateDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full" data-testid="button-create-debate">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create Debate Room
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader>
+                          <DialogTitle>Create Debate Room</DialogTitle>
+                          <DialogDescription>
+                            Set up a one-on-one debate with another user. Coming soon!
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Swords className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                          <p>Debate room creation will be available soon.</p>
+                          <p className="text-sm mt-2">This feature is under development.</p>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </CardContent>
+                </Card>
+
+                {/* Schedule Live Stream Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Video className="w-5 h-5" />
+                      Schedule Live Stream
+                    </CardTitle>
+                    <CardDescription>
+                      Host a live debate with multiple participants
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Dialog open={showScheduleStreamDialog} onOpenChange={setShowScheduleStreamDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full" data-testid="button-schedule-stream">
+                          <Clock className="w-4 h-4 mr-2" />
+                          Schedule Stream
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[600px]">
+                        <DialogHeader>
+                          <DialogTitle>Schedule Live Stream</DialogTitle>
+                          <DialogDescription>
+                            Set up a live debate stream with moderation controls. Coming soon!
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Video className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                          <p>Live stream scheduling will be available soon.</p>
+                          <p className="text-sm mt-2">This feature is under development.</p>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* My Debates and Streams */}
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {isOwnProfile ? 'My Debates & Streams' : `${user.firstName}'s Debates & Streams`}
+                </CardTitle>
+                <CardDescription>
+                  Active debates and scheduled live streams
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-muted-foreground">
+                  <Swords className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No debates or streams yet</p>
+                  {isOwnProfile && (
+                    <p className="text-sm mt-2">
+                      Create your first debate or schedule a live stream!
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Political Leaning Tab */}

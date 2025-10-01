@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +29,9 @@ import {
   Mic,
   MicOff,
   Camera,
-  CameraOff
+  CameraOff,
+  Ban,
+  StopCircle
 } from "lucide-react";
 import climateImage from '@assets/generated_images/Climate_change_debate_thumbnail_3b0bbda7.png';
 import aiImage from '@assets/generated_images/AI_ethics_debate_thumbnail_98fa03cc.png';
@@ -82,7 +87,66 @@ const mockStreams: Record<string, any> = {
 export default function LiveStreamPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const streamId = params.id;
+
+  // Moderation mutations
+  const muteMutation = useMutation({
+    mutationFn: async ({ userId, mute }: { userId: string; mute: boolean }) => {
+      const response = await fetch(`/api/streams/${streamId}/participants/${userId}/mute`, {
+        method: 'PATCH',
+        body: JSON.stringify({ mute }),
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to update mute status');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/live-streams", streamId] });
+      toast({ title: "Participant mute status updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update mute status", variant: "destructive" });
+    }
+  });
+
+  const removeParticipantMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch(`/api/streams/${streamId}/participants/${userId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to remove participant');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/live-streams", streamId] });
+      toast({ title: "Participant removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove participant", variant: "destructive" });
+    }
+  });
+
+  const endStreamMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/streams/${streamId}/end`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to end stream');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/live-streams", streamId] });
+      toast({ title: "Stream ended successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to end stream", variant: "destructive" });
+    }
+  });
 
   // Try to fetch from API first, but gracefully fall back to mock data on any error
   const { data: apiStream, isLoading } = useQuery({
@@ -141,6 +205,7 @@ export default function LiveStreamPage() {
   const isLive = stream.status === "live";
   const isScheduled = stream.status === "scheduled";
   const isEnded = stream.status === "ended";
+  const isModerator = user?.id === stream.moderator.id;
 
   const videoRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -249,14 +314,27 @@ export default function LiveStreamPage() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <Button 
-          variant="outline" 
-          onClick={() => setLocation("/")}
-          data-testid="button-back-home"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setLocation("/")}
+            data-testid="button-back-home"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          {isModerator && isLive && (
+            <Button 
+              variant="destructive" 
+              onClick={() => endStreamMutation.mutate()}
+              disabled={endStreamMutation.isPending}
+              data-testid="button-end-stream"
+            >
+              <StopCircle className="w-4 h-4 mr-2" />
+              {endStreamMutation.isPending ? 'Ending...' : 'End Stream'}
+            </Button>
+          )}
+        </div>
         {isLive && (
           <Badge className="bg-red-500 text-white animate-pulse" data-testid="badge-live">
             <Radio className="w-3 h-3 mr-1" />
@@ -404,15 +482,43 @@ export default function LiveStreamPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    {participant.isMuted ? 
-                      <MicOff className="w-4 h-4 text-muted-foreground" /> : 
-                      <Mic className="w-4 h-4 text-green-500" />
-                    }
-                    {participant.isCameraOn ? 
-                      <Camera className="w-4 h-4 text-green-500" /> : 
-                      <CameraOff className="w-4 h-4 text-muted-foreground" />
-                    }
+                  <div className="flex gap-2 items-center">
+                    <div className="flex gap-1">
+                      {participant.isMuted ? 
+                        <MicOff className="w-4 h-4 text-muted-foreground" /> : 
+                        <Mic className="w-4 h-4 text-green-500" />
+                      }
+                      {participant.isCameraOn ? 
+                        <Camera className="w-4 h-4 text-green-500" /> : 
+                        <CameraOff className="w-4 h-4 text-muted-foreground" />
+                      }
+                    </div>
+                    {isModerator && isLive && (
+                      <div className="flex gap-1">
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-7 w-7"
+                          onClick={() => muteMutation.mutate({ userId: participant.id, mute: !participant.isMuted })}
+                          disabled={muteMutation.isPending}
+                          data-testid={`button-mute-${participant.id}`}
+                          title={participant.isMuted ? "Unmute participant" : "Mute participant"}
+                        >
+                          {participant.isMuted ? <Mic className="w-3 h-3" /> : <MicOff className="w-3 h-3" />}
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-7 w-7"
+                          onClick={() => removeParticipantMutation.mutate(participant.id)}
+                          disabled={removeParticipantMutation.isPending}
+                          data-testid={`button-remove-${participant.id}`}
+                          title="Remove participant"
+                        >
+                          <Ban className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
