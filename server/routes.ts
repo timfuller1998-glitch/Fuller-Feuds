@@ -401,6 +401,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debate room routes
+  app.get('/api/debate-rooms', async (req, res) => {
+    try {
+      const { status } = req.query;
+      // For now, return empty array since full implementation would need
+      // to query with joins to get participant info and topic details
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching debate rooms:", error);
+      res.status(500).json({ message: "Failed to fetch debate rooms" });
+    }
+  });
+
+  app.get('/api/debate-rooms/:id', async (req, res) => {
+    try {
+      const room = await storage.getDebateRoom(req.params.id);
+      if (!room) {
+        return res.status(404).json({ message: "Debate room not found" });
+      }
+      res.json(room);
+    } catch (error) {
+      console.error("Error fetching debate room:", error);
+      res.status(500).json({ message: "Failed to fetch debate room" });
+    }
+  });
+
+  app.post('/api/debate-rooms', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertDebateRoomSchema.parse({
+        ...req.body,
+        participant1Id: userId
+      });
+      
+      const room = await storage.createDebateRoom(validatedData);
+      res.status(201).json(room);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating debate room:", error);
+      res.status(500).json({ message: "Failed to create debate room" });
+    }
+  });
+
+  // Live stream routes
+  app.get('/api/live-streams', async (req, res) => {
+    try {
+      const { status } = req.query;
+      const streams = await storage.getLiveStreams(status as string);
+      res.json(streams);
+    } catch (error) {
+      console.error("Error fetching live streams:", error);
+      res.status(500).json({ message: "Failed to fetch live streams" });
+    }
+  });
+
+  app.get('/api/live-streams/:id', async (req, res) => {
+    try {
+      const stream = await storage.getLiveStream(req.params.id);
+      if (!stream) {
+        return res.status(404).json({ message: "Live stream not found" });
+      }
+      res.json(stream);
+    } catch (error) {
+      console.error("Error fetching live stream:", error);
+      res.status(500).json({ message: "Failed to fetch live stream" });
+    }
+  });
+
+  app.post('/api/live-streams', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertLiveStreamSchema.parse({
+        ...req.body,
+        moderatorId: userId
+      });
+      
+      const stream = await storage.createLiveStream(validatedData);
+      res.status(201).json(stream);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating live stream:", error);
+      res.status(500).json({ message: "Failed to create live stream" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time features following blueprint pattern
