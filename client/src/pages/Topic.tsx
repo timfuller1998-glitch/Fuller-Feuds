@@ -101,7 +101,7 @@ export default function Topic() {
   // Generate cumulative opinion mutation
   const generateCumulativeMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('POST', `/api/topics/${id}/cumulative`, {});
+      return apiRequest('POST', `/api/topics/${id}/cumulative/generate`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
@@ -110,6 +110,24 @@ export default function Topic() {
     onError: (error: any) => {
       toast({ 
         title: "Failed to generate summary", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Refresh cumulative opinion mutation
+  const refreshCumulativeMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('PATCH', `/api/topics/${id}/cumulative/refresh`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
+      toast({ title: "AI summary refreshed successfully!" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to refresh summary", 
         description: error.message,
         variant: "destructive" 
       });
@@ -226,12 +244,12 @@ export default function Topic() {
               <Button 
                 variant="outline"
                 size="sm"
-                onClick={() => generateCumulativeMutation.mutate()}
-                disabled={generateCumulativeMutation.isPending}
+                onClick={() => refreshCumulativeMutation.mutate()}
+                disabled={refreshCumulativeMutation.isPending}
                 data-testid="button-refresh-summary"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                {generateCumulativeMutation.isPending ? "Updating..." : "Refresh"}
+                {refreshCumulativeMutation.isPending ? "Updating..." : "Refresh"}
               </Button>
             )}
           </div>
@@ -290,7 +308,7 @@ export default function Topic() {
           <CardTitle>Share Your Opinion</CardTitle>
         </CardHeader>
         <CardContent>
-          {userOpinion ? (
+          {userOpinion && !showOpinionForm ? (
             <div className="space-y-4">
               <div className="p-4 bg-muted rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
@@ -303,7 +321,11 @@ export default function Topic() {
               </div>
               <Button 
                 variant="outline" 
-                onClick={() => setShowOpinionForm(!showOpinionForm)}
+                onClick={() => {
+                  opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
+                  opinionForm.setValue('content', userOpinion.content);
+                  setShowOpinionForm(true);
+                }}
                 data-testid="button-change-opinion"
               >
                 Update Opinion
@@ -318,7 +340,7 @@ export default function Topic() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Your Stance</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-stance">
                             <SelectValue placeholder="Select your stance" />
@@ -356,7 +378,10 @@ export default function Topic() {
                   <Button 
                     type="button" 
                     variant="outline" 
-                    onClick={() => setShowOpinionForm(false)}
+                    onClick={() => {
+                      opinionForm.reset();
+                      setShowOpinionForm(false);
+                    }}
                     data-testid="button-cancel-opinion"
                   >
                     Cancel
