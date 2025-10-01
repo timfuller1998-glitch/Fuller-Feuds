@@ -6,6 +6,7 @@ import {
   debateRooms,
   debateMessages,
   liveStreams,
+  streamInvitations,
   streamParticipants,
   streamChatMessages,
   opinionVotes,
@@ -23,6 +24,7 @@ import {
   type DebateMessage,
   type LiveStream,
   type InsertLiveStream,
+  type StreamInvitation,
   type StreamParticipant,
   type StreamChatMessage,
   type OpinionVote,
@@ -88,6 +90,13 @@ export interface IStorage {
   addStreamChatMessage(streamId: string, userId: string, content: string, type?: string): Promise<StreamChatMessage>;
   getStreamChatMessages(streamId: string, limit?: number): Promise<StreamChatMessage[]>;
   moderateStreamMessage(messageId: string, isModerated: boolean): Promise<void>;
+  
+  // Stream invitations
+  inviteUserToStream(streamId: string, userId: string): Promise<void>;
+  getStreamInvitations(streamId: string): Promise<any[]>;
+  respondToStreamInvitation(invitationId: string, userId: string, accept: boolean): Promise<void>;
+  getUserStreamInvitations(userId: string, status?: string): Promise<any[]>;
+  getUserStreams(userId: string, statusFilter?: string): Promise<LiveStream[]>;
   
   // User profiles
   getUserProfile(userId: string): Promise<UserProfile | undefined>;
@@ -412,6 +421,84 @@ export class DatabaseStorage implements IStorage {
       .update(streamChatMessages)
       .set({ isModerated })
       .where(eq(streamChatMessages.id, messageId));
+  }
+
+  // Stream invitations
+  async inviteUserToStream(streamId: string, userId: string): Promise<void> {
+    await db.insert(streamInvitations).values({
+      streamId,
+      userId,
+      status: 'pending',
+    });
+  }
+
+  async getStreamInvitations(streamId: string): Promise<any[]> {
+    const invites = await db
+      .select({
+        invitation: streamInvitations,
+        user: users,
+      })
+      .from(streamInvitations)
+      .leftJoin(users, eq(streamInvitations.userId, users.id))
+      .where(eq(streamInvitations.streamId, streamId));
+    
+    return invites.map(inv => ({
+      ...inv.invitation,
+      user: inv.user,
+    }));
+  }
+
+  async respondToStreamInvitation(invitationId: string, userId: string, accept: boolean): Promise<void> {
+    await db
+      .update(streamInvitations)
+      .set({
+        status: accept ? 'accepted' : 'declined',
+        respondedAt: new Date(),
+      })
+      .where(and(
+        eq(streamInvitations.id, invitationId),
+        eq(streamInvitations.userId, userId)
+      ));
+  }
+
+  async getUserStreamInvitations(userId: string, status?: string): Promise<any[]> {
+    let conditions = [eq(streamInvitations.userId, userId)];
+    
+    if (status) {
+      conditions.push(eq(streamInvitations.status, status));
+    }
+    
+    const invites = await db
+      .select({
+        invitation: streamInvitations,
+        stream: liveStreams,
+        topic: topics,
+      })
+      .from(streamInvitations)
+      .leftJoin(liveStreams, eq(streamInvitations.streamId, liveStreams.id))
+      .leftJoin(topics, eq(liveStreams.topicId, topics.id))
+      .where(and(...conditions))
+      .orderBy(desc(streamInvitations.invitedAt));
+    
+    return invites.map(inv => ({
+      ...inv.invitation,
+      stream: inv.stream,
+      topic: inv.topic,
+    }));
+  }
+
+  async getUserStreams(userId: string, statusFilter?: string): Promise<LiveStream[]> {
+    let conditions = [eq(liveStreams.moderatorId, userId)];
+    
+    if (statusFilter) {
+      conditions.push(eq(liveStreams.status, statusFilter));
+    }
+    
+    return await db
+      .select()
+      .from(liveStreams)
+      .where(and(...conditions))
+      .orderBy(desc(liveStreams.scheduledAt));
   }
 
   // User profiles

@@ -279,6 +279,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debate room routes
+  app.post('/api/debates', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertDebateRoomSchema.parse({
+        ...req.body,
+        participant1Id: userId
+      });
+      
+      const room = await storage.createDebateRoom(validatedData);
+      res.status(201).json(room);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating debate room:", error);
+      res.status(500).json({ message: "Failed to create debate room" });
+    }
+  });
+
+  app.get('/api/debates/user/:userId', async (req, res) => {
+    try {
+      const rooms = await storage.getUserDebateRooms(req.params.userId);
+      res.json(rooms);
+    } catch (error) {
+      console.error("Error fetching user debate rooms:", error);
+      res.status(500).json({ message: "Failed to fetch debate rooms" });
+    }
+  });
+
+  // Stream invitation routes
+  app.post('/api/streams/:streamId/invitations', isAuthenticated, async (req: any, res) => {
+    try {
+      const { streamId } = req.params;
+      const { userId } = req.body;
+      const requestingUserId = req.user.claims.sub;
+      
+      // Verify the requesting user is the moderator of the stream
+      const stream = await storage.getLiveStream(streamId);
+      if (!stream) {
+        return res.status(404).json({ message: "Stream not found" });
+      }
+      
+      if (stream.moderatorId !== requestingUserId) {
+        return res.status(403).json({ message: "Only the moderator can invite users" });
+      }
+      
+      await storage.inviteUserToStream(streamId, userId);
+      res.status(201).json({ message: "User invited successfully" });
+    } catch (error) {
+      console.error("Error inviting user to stream:", error);
+      res.status(500).json({ message: "Failed to invite user" });
+    }
+  });
+
+  app.get('/api/streams/:streamId/invitations', isAuthenticated, async (req: any, res) => {
+    try {
+      const { streamId } = req.params;
+      const requestingUserId = req.user.claims.sub;
+      
+      // Verify the requesting user is the moderator of the stream
+      const stream = await storage.getLiveStream(streamId);
+      if (!stream) {
+        return res.status(404).json({ message: "Stream not found" });
+      }
+      
+      if (stream.moderatorId !== requestingUserId) {
+        return res.status(403).json({ message: "Only the moderator can view invitations" });
+      }
+      
+      const invitations = await storage.getStreamInvitations(streamId);
+      res.json(invitations);
+    } catch (error) {
+      console.error("Error fetching stream invitations:", error);
+      res.status(500).json({ message: "Failed to fetch invitations" });
+    }
+  });
+
+  app.post('/api/stream-invitations/:invitationId/respond', isAuthenticated, async (req: any, res) => {
+    try {
+      const { invitationId } = req.params;
+      const { accept } = req.body;
+      const userId = req.user.claims.sub;
+      
+      await storage.respondToStreamInvitation(invitationId, userId, accept);
+      res.json({ message: accept ? "Invitation accepted" : "Invitation declined" });
+    } catch (error) {
+      console.error("Error responding to invitation:", error);
+      res.status(500).json({ message: "Failed to respond to invitation" });
+    }
+  });
+
+  app.get('/api/user/stream-invitations', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { status } = req.query;
+      
+      const invitations = await storage.getUserStreamInvitations(userId, status as string);
+      res.json(invitations);
+    } catch (error) {
+      console.error("Error fetching user stream invitations:", error);
+      res.status(500).json({ message: "Failed to fetch invitations" });
+    }
+  });
+
+  app.get('/api/user/streams', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { status } = req.query;
+      
+      const streams = await storage.getUserStreams(userId, status as string);
+      res.json(streams);
+    } catch (error) {
+      console.error("Error fetching user streams:", error);
+      res.status(500).json({ message: "Failed to fetch streams" });
+    }
+  });
+
   // Profile routes
   app.get('/api/profile/:userId', async (req, res) => {
     try {

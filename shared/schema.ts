@@ -107,12 +107,25 @@ export const liveStreams = pgTable("live_streams", {
   description: text("description"),
   moderatorId: varchar("moderator_id").notNull().references(() => users.id),
   status: varchar("status", { length: 20 }).default("scheduled"), // 'scheduled', 'live', 'ended'
+  participantSelectionMethod: varchar("participant_selection_method", { length: 20 }).default("open"), // 'invite', 'open'
   scheduledAt: timestamp("scheduled_at"),
   startedAt: timestamp("started_at"),
   endedAt: timestamp("ended_at"),
   viewerCount: integer("viewer_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Stream invitations for invite-only streams
+export const streamInvitations = pgTable("stream_invitations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  streamId: uuid("stream_id").notNull().references(() => liveStreams.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  status: varchar("status", { length: 20 }).default("pending"), // 'pending', 'accepted', 'declined'
+  invitedAt: timestamp("invited_at").defaultNow(),
+  respondedAt: timestamp("responded_at"),
+}, (table) => [
+  index("unique_stream_invitation").on(table.streamId, table.userId)
+]);
 
 // Participants in live streaming debates
 export const streamParticipants = pgTable("stream_participants", {
@@ -239,6 +252,7 @@ export type InsertDebateRoom = z.infer<typeof insertDebateRoomSchema>;
 export type DebateMessage = typeof debateMessages.$inferSelect;
 export type LiveStream = typeof liveStreams.$inferSelect;
 export type InsertLiveStream = z.infer<typeof insertLiveStreamSchema>;
+export type StreamInvitation = typeof streamInvitations.$inferSelect;
 export type StreamParticipant = typeof streamParticipants.$inferSelect;
 export type StreamChatMessage = typeof streamChatMessages.$inferSelect;
 export type OpinionVote = typeof opinionVotes.$inferSelect;
