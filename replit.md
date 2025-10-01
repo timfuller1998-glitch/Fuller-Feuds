@@ -41,7 +41,10 @@ Preferred communication style: Simple, everyday language.
 
 ### Design System
 - **Base**: Material Design 3 principles with Discord-inspired patterns
-- **Theme Support**: Light and dark mode with CSS custom properties
+- **Theme Support**: Light, dark, and time-based (auto) modes with CSS custom properties
+  - Theme preferences managed in Settings page
+  - Time-based mode switches between light (6 AM - 6 PM) and dark (6 PM - 6 AM)
+  - Preferences persist across sessions via localStorage
 - **Typography**: Inter font family for readability
 - **Color System**: HSL-based color tokens for consistent theming
 - **Spacing**: Tailwind spacing units with 8px base grid
