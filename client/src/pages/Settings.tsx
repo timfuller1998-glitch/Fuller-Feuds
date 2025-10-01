@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,16 +49,18 @@ export default function Settings() {
   const form = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      bio: profileData?.profile?.bio || "",
+      bio: "",
     },
   });
 
-  // Update form when profile data loads
-  if (profileData?.profile?.bio && !form.formState.isDirty) {
-    form.reset({
-      bio: profileData.profile.bio,
-    });
-  }
+  // Update form when profile data loads (only if not currently editing)
+  useEffect(() => {
+    if (profileData?.profile?.bio && !form.formState.isDirty) {
+      form.reset({
+        bio: profileData.profile.bio,
+      });
+    }
+  }, [profileData, form]);
 
   // Profile update mutation
   const updateProfileMutation = useMutation({
