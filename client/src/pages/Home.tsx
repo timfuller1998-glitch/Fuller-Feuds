@@ -301,6 +301,7 @@ export default function Home() {
   const recentOpinions = [
     {
       id: "opinion-1",
+      userId: "mock-user-1",
       userName: "Sarah Chen",
       content: "I believe that individual actions, while important, are not sufficient to address the scale of the climate crisis. We need systemic changes in policy and corporate behavior.",
       stance: "for" as const,
@@ -311,6 +312,7 @@ export default function Home() {
     },
     {
       id: "opinion-2",
+      userId: "mock-user-2",
       userName: "Marcus Rodriguez",
       content: "The focus on individual responsibility is actually counterproductive. It shifts blame away from the major corporations that have the real power to make a difference.",
       stance: "against" as const,
@@ -345,6 +347,7 @@ export default function Home() {
   // Transform API opinions for display
   const transformedOpinions = apiOpinions?.map(opinion => ({
     id: opinion.id,
+    userId: opinion.userId,
     userName: "User", // We'll need to join with users table later
     content: opinion.content,
     stance: opinion.stance as "for" | "against" | "neutral",

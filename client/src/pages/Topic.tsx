@@ -334,6 +334,7 @@ export default function Topic() {
                 <OpinionCard 
                   key={opinion.id}
                   id={opinion.id}
+                  userId={opinion.userId}
                   userName="User"
                   content={opinion.content}
                   stance={opinion.stance as "for" | "against" | "neutral"}
@@ -358,6 +359,7 @@ export default function Topic() {
                 <OpinionCard 
                   key={opinion.id}
                   id={opinion.id}
+                  userId={opinion.userId}
                   userName="User"
                   content={opinion.content}
                   stance={opinion.stance as "for" | "against" | "neutral"}
@@ -382,6 +384,7 @@ export default function Topic() {
                 <OpinionCard 
                   key={opinion.id}
                   id={opinion.id}
+                  userId={opinion.userId}
                   userName="User"
                   content={opinion.content}
                   stance={opinion.stance as "for" | "against" | "neutral"}

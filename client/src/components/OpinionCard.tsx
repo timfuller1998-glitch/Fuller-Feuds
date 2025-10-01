@@ -4,9 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import UserAvatar from "./UserAvatar";
 import { ThumbsUp, ThumbsDown, MessageCircle, Clock } from "lucide-react";
 import { useState } from "react";
+import { Link } from "wouter";
 
 interface OpinionCardProps {
   id: string;
+  userId?: string;
   userName: string;
   userAvatar?: string;
   content: string;
@@ -36,6 +38,7 @@ const stanceText = {
 
 export default function OpinionCard({
   id,
+  userId,
   userName,
   userAvatar,
   content,
@@ -91,18 +94,33 @@ export default function OpinionCard({
     <Card className="hover-elevate" data-testid={`card-opinion-${id}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <UserAvatar name={userName} imageUrl={userAvatar} size="sm" />
-            <div>
-              <h4 className="font-medium" data-testid={`text-opinion-author-${id}`}>
-                {userName}
-              </h4>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="w-3 h-3" />
-                <span>{timestamp}</span>
+          {userId ? (
+            <Link href={`/profile/${userId}`} className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-1 -m-1" data-testid={`link-profile-${userId}`}>
+              <UserAvatar name={userName} imageUrl={userAvatar} size="sm" />
+              <div>
+                <h4 className="font-medium" data-testid={`text-opinion-author-${id}`}>
+                  {userName}
+                </h4>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="w-3 h-3" />
+                  <span>{timestamp}</span>
+                </div>
+              </div>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-3">
+              <UserAvatar name={userName} imageUrl={userAvatar} size="sm" />
+              <div>
+                <h4 className="font-medium" data-testid={`text-opinion-author-${id}`}>
+                  {userName}
+                </h4>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="w-3 h-3" />
+                  <span>{timestamp}</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
           <Badge variant={stanceBadgeVariant[stance]}>
             {stanceText[stance]}
           </Badge>
