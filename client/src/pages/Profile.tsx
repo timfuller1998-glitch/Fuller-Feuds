@@ -95,6 +95,13 @@ const streamFormSchema = z.object({
   scheduledAt: z.string().optional().or(z.literal("")),
 });
 
+const debateFormSchema = z.object({
+  topicId: z.string().min(1, "Please select a topic"),
+  participant2Id: z.string().min(1, "Opponent ID is required"),
+  participant1Stance: z.enum(["supporting", "opposing", "neutral"]),
+  participant2Stance: z.enum(["supporting", "opposing", "neutral"]),
+});
+
 export default function Profile() {
   const { userId } = useParams();
   const [, navigate] = useLocation();
@@ -210,6 +217,17 @@ export default function Profile() {
     },
   });
 
+  // Debate room form
+  const debateForm = useForm<z.infer<typeof debateFormSchema>>({
+    resolver: zodResolver(debateFormSchema),
+    defaultValues: {
+      topicId: "",
+      participant2Id: "",
+      participant1Stance: "supporting",
+      participant2Stance: "opposing",
+    },
+  });
+
   // Update form when profile data loads
   useEffect(() => {
     if (profileData?.profile?.bio) {
@@ -245,6 +263,35 @@ export default function Profile() {
   const onSubmit = (data: z.infer<typeof profileFormSchema>) => {
     console.log('Profile form submission:', data);
     updateProfileMutation.mutate(data);
+  };
+
+  // Debate room creation mutation
+  const createDebateMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof debateFormSchema>) => {
+      const response = await apiRequest('POST', '/api/debate-rooms', data);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms'] });
+      setShowCreateDebateDialog(false);
+      debateForm.reset();
+      toast({ 
+        title: "Debate room created!",
+        description: "Your debate has been set up successfully."
+      });
+      navigate(`/debate-room/${data.id}`);
+    },
+    onError: () => {
+      toast({ 
+        title: "Failed to create debate", 
+        description: "Unable to create debate room.",
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const onDebateSubmit = (data: z.infer<typeof debateFormSchema>) => {
+    createDebateMutation.mutate(data);
   };
 
   // Stream creation mutation
@@ -609,18 +656,126 @@ export default function Profile() {
                           Create Debate Room
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-[500px]">
+                      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle>Create Debate Room</DialogTitle>
                           <DialogDescription>
-                            Set up a one-on-one debate with another user. Coming soon!
+                            Set up a one-on-one debate with another user
                           </DialogDescription>
                         </DialogHeader>
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Swords className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                          <p>Debate room creation will be available soon.</p>
-                          <p className="text-sm mt-2">This feature is under development.</p>
-                        </div>
+                        <Form {...debateForm}>
+                          <form onSubmit={debateForm.handleSubmit(onDebateSubmit)} className="space-y-4">
+                            <FormField
+                              control={debateForm.control}
+                              name="topicId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Topic</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-debate-topic">
+                                        <SelectValue placeholder="Select a debate topic" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {topics.map((topic: any) => (
+                                        <SelectItem key={topic.id} value={topic.id}>
+                                          {topic.title}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={debateForm.control}
+                              name="participant2Id"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Opponent User ID</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="Enter opponent's user ID" 
+                                      {...field}
+                                      data-testid="input-opponent-id"
+                                    />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Enter the user ID of the person you want to debate with
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={debateForm.control}
+                              name="participant1Stance"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Your Stance</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-my-stance">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="supporting">Supporting</SelectItem>
+                                      <SelectItem value="opposing">Opposing</SelectItem>
+                                      <SelectItem value="neutral">Neutral</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={debateForm.control}
+                              name="participant2Stance"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Opponent's Stance</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-opponent-stance">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="supporting">Supporting</SelectItem>
+                                      <SelectItem value="opposing">Opposing</SelectItem>
+                                      <SelectItem value="neutral">Neutral</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <DialogFooter>
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={() => setShowCreateDebateDialog(false)}
+                                data-testid="button-cancel-debate"
+                              >
+                                Cancel
+                              </Button>
+                              <Button 
+                                type="submit" 
+                                disabled={createDebateMutation.isPending}
+                                data-testid="button-submit-debate"
+                              >
+                                {createDebateMutation.isPending ? "Creating..." : "Create Debate"}
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        </Form>
                       </DialogContent>
                     </Dialog>
                   </CardContent>
