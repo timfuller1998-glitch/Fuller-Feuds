@@ -6,7 +6,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
-import ThemeToggle from "@/components/ThemeToggle";
 import SearchBar from "@/components/SearchBar";
 import { useAuth } from "@/hooks/useAuth";
 import Home from "@/pages/Home";
@@ -118,7 +117,6 @@ function AuthenticatedApp() {
                 className=""
               />
             </div>
-            <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
             <div className="max-w-7xl mx-auto">

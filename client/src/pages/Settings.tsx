@@ -1,16 +1,17 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Save, User } from "lucide-react";
+import { Save, User, Monitor, Sun, Moon } from "lucide-react";
 
 const profileFormSchema = z.object({
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
@@ -37,6 +38,7 @@ interface ProfileData {
 export default function Settings() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const [themePreference, setThemePreference] = useState<"light" | "dark" | "auto">("light");
 
   // Fetch current user's profile
   const { data: profileData, isLoading } = useQuery<ProfileData>({
@@ -61,6 +63,49 @@ export default function Settings() {
       });
     }
   }, [profileData, form]);
+
+  // Load theme preference from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("themePreference") as "light" | "dark" | "auto" || "auto";
+    setThemePreference(savedTheme);
+    applyTheme(savedTheme);
+  }, []);
+
+  // Apply theme based on preference
+  const applyTheme = (preference: "light" | "dark" | "auto") => {
+    const root = document.documentElement;
+    
+    if (preference === "auto") {
+      // Check system time (6 AM to 6 PM = light, otherwise dark)
+      const hour = new Date().getHours();
+      const isDay = hour >= 6 && hour < 18;
+      if (isDay) {
+        root.classList.remove("dark");
+      } else {
+        root.classList.add("dark");
+      }
+    } else if (preference === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+    
+    localStorage.setItem("themePreference", preference);
+    // Also save to old "theme" key for backward compatibility
+    if (preference !== "auto") {
+      localStorage.setItem("theme", preference);
+    }
+  };
+
+  // Handle theme preference change
+  const handleThemeChange = (value: "light" | "dark" | "auto") => {
+    setThemePreference(value);
+    applyTheme(value);
+    toast({
+      title: "Theme updated",
+      description: `Theme preference set to ${value === "auto" ? "time-based" : value} mode.`
+    });
+  };
 
   // Profile update mutation
   const updateProfileMutation = useMutation({
@@ -159,8 +204,41 @@ export default function Settings() {
           <CardTitle>Preferences</CardTitle>
           <CardDescription>Customize your Kirk experience</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Additional preferences coming soon...</p>
+        <CardContent className="space-y-6">
+          {/* Theme Preference */}
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-medium mb-1">Theme</h3>
+              <p className="text-sm text-muted-foreground">
+                Choose how Kirk looks to you
+              </p>
+            </div>
+            <Select value={themePreference} onValueChange={handleThemeChange}>
+              <SelectTrigger className="w-full sm:w-80" data-testid="select-theme">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">
+                  <div className="flex items-center gap-2">
+                    <Sun className="w-4 h-4" />
+                    <span>Light</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="dark">
+                  <div className="flex items-center gap-2">
+                    <Moon className="w-4 h-4" />
+                    <span>Dark</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="auto">
+                  <div className="flex items-center gap-2">
+                    <Monitor className="w-4 h-4" />
+                    <span>Time-based (6 AM - 6 PM light, rest dark)</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardContent>
       </Card>
     </div>
