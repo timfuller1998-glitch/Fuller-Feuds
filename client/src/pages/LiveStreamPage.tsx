@@ -164,26 +164,55 @@ export default function LiveStreamPage() {
   // Sync fullscreen state with actual fullscreen status
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(document.fullscreenElement === videoRef.current);
+      const fullscreenElement = document.fullscreenElement || 
+                               (document as any).webkitFullscreenElement || 
+                               (document as any).mozFullScreenElement;
+      setIsFullscreen(fullscreenElement === videoRef.current);
     };
 
+    // Listen to all fullscreen change events (for cross-browser support)
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
     };
   }, []);
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = async () => {
     if (!videoRef.current) return;
     
-    if (!isFullscreen) {
-      if (videoRef.current.requestFullscreen) {
-        videoRef.current.requestFullscreen();
+    try {
+      if (!isFullscreen) {
+        // Try different fullscreen methods for cross-browser support
+        const elem = videoRef.current as any;
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+          await elem.mozRequestFullScreen();
+        } else if (elem.msRequestFullscreen) {
+          await elem.msRequestFullscreen();
+        }
+      } else {
+        // Exit fullscreen
+        const doc = document as any;
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        } else if (doc.mozCancelFullScreen) {
+          await doc.mozCancelFullScreen();
+        } else if (doc.msExitFullscreen) {
+          await doc.msExitFullscreen();
+        }
       }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
+    } catch (error) {
+      console.error('Fullscreen error:', error);
     }
   };
 
@@ -285,11 +314,16 @@ export default function LiveStreamPage() {
         <Button
           size="icon"
           variant="ghost"
-          className="absolute top-4 right-4 bg-black/50 text-white hover:bg-black/70"
+          className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-black/50 text-white hover:bg-black/70 z-10"
+          style={{
+            top: isFullscreen ? 'calc(env(safe-area-inset-top) + 0.5rem)' : undefined,
+            right: isFullscreen ? 'calc(env(safe-area-inset-right) + 0.5rem)' : undefined,
+          }}
           onClick={toggleFullscreen}
           data-testid="button-fullscreen"
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         >
-          {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+          {isFullscreen ? <Minimize2 className="w-4 h-4 sm:w-5 sm:h-5" /> : <Maximize2 className="w-4 h-4 sm:w-5 sm:h-5" />}
         </Button>
 
         {/* Participant badges on video */}
