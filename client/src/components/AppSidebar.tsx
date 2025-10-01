@@ -148,7 +148,7 @@ export default function AppSidebar({
               {categories.map((category) => (
                 <SidebarMenuItem key={category.title}>
                   <SidebarMenuButton asChild>
-                    <Link href={`/?category=${category.title}`} data-testid={`link-category-${category.title.toLowerCase()}`}>
+                    <Link href={`/category/${category.title}`} data-testid={`link-category-${category.title.toLowerCase()}`}>
                       <category.icon className="w-4 h-4" />
                       <span>{category.title}</span>
                       <Badge variant="secondary" className="ml-auto text-xs">
