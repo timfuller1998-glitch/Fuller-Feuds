@@ -10,6 +10,18 @@ The application serves as a comprehensive discussion platform where ideas can "c
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### Search and Topic Creation Flow (October 2025)
+- **Streamlined Home Screen**: Removed dedicated search bar, trending button, and new topic button from hero section to simplify the UI
+- **Universal Search Enhancement**: Header search bar now displays "Create New Topic" button in dropdown when search returns no results
+- **Global Topic Creation**: Moved topic creation dialog to App.tsx with TopicCreationContext for global accessibility
+  - SearchBar and Search page both trigger the same global dialog
+  - Dialog title auto-fills with search query when opened from search
+- **Search Page Integration**: Added "Create New Topic" button to Search page for no-results scenarios
+- **Database Query Fix**: Updated topic filtering to use categories array with PostgreSQL array containment operator
+- **Router Updates**: Restructured Router to properly handle authenticated vs unauthenticated access to /search route
+
 ## System Architecture
 
 ### Frontend Architecture
