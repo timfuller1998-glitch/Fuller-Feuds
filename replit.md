@@ -12,6 +12,19 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Category System and Live Streams Integration (October 2025)
+- **Multi-Category Support**: Fixed category pages to work with multi-category topics
+  - CategoryPage.tsx now properly uses categories array instead of single category field
+  - AllCategoriesPage.tsx groups topics correctly, allowing topics to appear in multiple categories
+  - TopicCard component safely handles categories array with default values and optional chaining
+- **Live Streams in Categories**: Integrated live streams into the category system
+  - Added backend support for filtering live streams by category through their topic's categories
+  - CategoryPage now fetches and displays live streams for each category
+  - Live streams inherit categories from their associated topics via topicId
+  - Storage layer properly joins topics table when category filter is needed
+- **Mobile Sidebar Enhancement**: Sidebar now auto-closes on mobile when navigation links are clicked
+- **Database Query Optimization**: Backend uses PostgreSQL array containment operator for efficient category filtering
+
 ### Search and Topic Creation Flow (October 2025)
 - **Streamlined Home Screen**: Removed dedicated search bar, trending button, and new topic button from hero section to simplify the UI
 - **Universal Search Enhancement**: Header search bar now displays "Create New Topic" button in dropdown when search returns no results
