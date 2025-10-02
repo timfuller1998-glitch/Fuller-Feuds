@@ -14,6 +14,7 @@ import {
 import { z } from "zod";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
+import { AIService } from "./aiService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware from Replit Auth blueprint
@@ -145,12 +146,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/topics', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      
+      // Validate the data
       const validatedData = insertTopicSchema.parse({
         ...req.body,
         createdById: userId
       });
       
-      const topic = await storage.createTopic(validatedData);
+      // Generate AI image based on topic title
+      let imageUrl: string | undefined;
+      try {
+        imageUrl = await AIService.generateTopicImage(validatedData.title);
+      } catch (imageError) {
+        console.error("Error generating topic image, continuing without image:", imageError);
+        // Continue without image if generation fails
+      }
+      
+      // Create topic with generated image
+      const topic = await storage.createTopic({
+        ...validatedData,
+        imageUrl
+      });
+      
       res.status(201).json(topic);
     } catch (error) {
       if (error instanceof z.ZodError) {
