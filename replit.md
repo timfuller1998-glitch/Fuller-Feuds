@@ -20,6 +20,12 @@ Preferred communication style: Simple, everyday language.
   - Form includes title, description, and category management with real-time validation
   - Auto-fills title field with search query for faster topic creation
   - Users navigate directly to new topic page upon successful creation
+- **Auto-Generated Categories**: AI-powered category suggestions for new topics
+  - When creating a topic, 3 relevant categories are automatically generated using OpenAI GPT-4o-mini
+  - Categories are pre-selected in the creation form for convenience
+  - Users can still remove or add additional categories (up to 5 total)
+  - Fallback to generic categories if AI generation fails
+  - Backend endpoint: POST /api/topics/generate-categories
 - **Toast Notifications Removed**: Eliminated all toast notifications throughout the application
   - Replaced with silent success and instant UI updates
   - Actions now provide feedback through navigation and visual state changes

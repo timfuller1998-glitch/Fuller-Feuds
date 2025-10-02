@@ -143,6 +143,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/topics/generate-categories', isAuthenticated, async (req: any, res) => {
+    try {
+      const { title } = req.body;
+      if (!title || typeof title !== 'string') {
+        return res.status(400).json({ message: "Title is required" });
+      }
+      
+      const categories = await AIService.generateCategories(title);
+      res.json({ categories });
+    } catch (error) {
+      console.error("Error generating categories:", error);
+      res.status(500).json({ message: "Failed to generate categories" });
+    }
+  });
+
   app.post('/api/topics', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

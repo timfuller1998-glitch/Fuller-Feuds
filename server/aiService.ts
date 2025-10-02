@@ -23,6 +23,42 @@ interface PoliticalLeaningAnalysis {
 }
 
 export class AIService {
+  static async generateCategories(topicTitle: string): Promise<string[]> {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a debate categorization expert. Generate exactly 3 relevant category tags for debate topics. Return only a JSON array of strings, nothing else. Categories should be concise (1-2 words), relevant, and commonly understood."
+          },
+          {
+            role: "user",
+            content: `Generate exactly 3 relevant category tags for this debate topic: "${topicTitle}". Return ONLY a JSON array like ["Category1", "Category2", "Category3"]`
+          }
+        ],
+        temperature: 0.5,
+        max_tokens: 100
+      });
+
+      const responseContent = completion.choices[0]?.message?.content?.trim();
+      if (!responseContent) {
+        throw new Error("No response from OpenAI");
+      }
+
+      const categories = JSON.parse(responseContent);
+      if (!Array.isArray(categories) || categories.length !== 3) {
+        throw new Error("Invalid categories format from AI");
+      }
+
+      return categories.slice(0, 3);
+    } catch (error) {
+      console.error("Error generating categories:", error);
+      // Fallback to generic categories
+      return ["Politics", "Society", "General"];
+    }
+  }
+
   static async generateTopicImage(topicTitle: string): Promise<string> {
     try {
       const response = await openai.images.generate({

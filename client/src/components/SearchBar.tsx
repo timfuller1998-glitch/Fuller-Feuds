@@ -113,6 +113,22 @@ export default function SearchBar({
     }
   };
 
+  // Generate categories mutation
+  const generateCategoriesMutation = useMutation({
+    mutationFn: async (title: string) => {
+      const response = await apiRequest("POST", "/api/topics/generate-categories", { title });
+      return response.json();
+    },
+    onSuccess: (data: { categories: string[] }) => {
+      setTopicCategories(data.categories);
+    },
+    onError: (error) => {
+      console.error("Failed to generate categories:", error);
+      // Fallback to default categories
+      setTopicCategories(["Politics", "Society", "General"]);
+    },
+  });
+
   // Create topic mutation
   const createTopicMutation = useMutation({
     mutationFn: async (data: { title: string; description: string; categories: string[] }) => {
@@ -315,12 +331,15 @@ export default function SearchBar({
                 onClick={() => {
                   setShowCreateForm(true);
                   setTopicTitle(query);
+                  // Auto-generate 3 related categories
+                  generateCategoriesMutation.mutate(query);
                 }}
+                disabled={generateCategoriesMutation.isPending}
                 className="w-full"
                 data-testid="button-create-topic-from-search"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Create New Topic
+                {generateCategoriesMutation.isPending ? "Loading..." : "Create New Topic"}
               </Button>
             </div>
           )}
@@ -375,7 +394,7 @@ export default function SearchBar({
 
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                    Categories (1-5)
+                    Categories (1-5) {generateCategoriesMutation.isPending && <span className="text-xs text-muted-foreground">(Generating...)</span>}
                   </label>
                   {topicCategories.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-2">
