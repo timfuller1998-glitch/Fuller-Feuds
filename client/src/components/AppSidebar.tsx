@@ -10,7 +10,8 @@ import {
   SidebarMenuButton, 
   SidebarMenuItem,
   SidebarHeader,
-  SidebarFooter
+  SidebarFooter,
+  useSidebar
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,11 +63,19 @@ export default function AppSidebar({
   onLogout 
 }: AppSidebarProps) {
   const [location] = useLocation();
+  const { setOpenMobile, isMobile } = useSidebar();
 
   // Fetch all topics to calculate category counts
   const { data: topics } = useQuery<Topic[]>({
     queryKey: ["/api/topics"],
   });
+
+  // Close sidebar on mobile when link is clicked
+  const handleLinkClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   const mainItems = [
     { title: "Home", icon: Home, path: "/" },
@@ -88,7 +97,7 @@ export default function AppSidebar({
 
   const categories: CategoryItem[] = categoryDefinitions.map(cat => ({
     ...cat,
-    count: topics?.filter(topic => topic.category === cat.title).length || 0
+    count: topics?.filter(topic => topic.categories.includes(cat.title)).length || 0
   }));
 
   return (
@@ -112,7 +121,7 @@ export default function AppSidebar({
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <Link href={`/profile/${currentUser.id}`} data-testid="link-user-profile">
+                    <Link href={`/profile/${currentUser.id}`} onClick={handleLinkClick} data-testid="link-user-profile">
                       <User className="w-4 h-4" />
                       <span>My Profile</span>
                     </Link>
@@ -129,7 +138,7 @@ export default function AppSidebar({
               {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.path}>
-                    <Link href={item.path} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
+                    <Link href={item.path} onClick={handleLinkClick} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -148,6 +157,7 @@ export default function AppSidebar({
               variant="ghost" 
               className="h-6 w-6 p-0"
               onClick={() => {
+                handleLinkClick();
                 onCreateTopic?.();
                 console.log('Create topic clicked');
               }}
@@ -160,7 +170,7 @@ export default function AppSidebar({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={location === "/categories"}>
-                  <Link href="/categories" data-testid="link-browse-all-categories">
+                  <Link href="/categories" onClick={handleLinkClick} data-testid="link-browse-all-categories">
                     <Grid className="w-4 h-4" />
                     <span>Browse All</span>
                   </Link>
@@ -169,7 +179,7 @@ export default function AppSidebar({
               {categories.map((category) => (
                 <SidebarMenuItem key={category.title}>
                   <SidebarMenuButton asChild>
-                    <Link href={`/category/${category.title}`} data-testid={`link-category-${category.title.toLowerCase()}`}>
+                    <Link href={`/category/${category.title}`} onClick={handleLinkClick} data-testid={`link-category-${category.title.toLowerCase()}`}>
                       <category.icon className="w-4 h-4" />
                       <span>{category.title}</span>
                       <Badge variant="secondary" className="ml-auto text-xs">
@@ -203,7 +213,7 @@ export default function AppSidebar({
           </div>
           
           <div className="flex gap-2">
-            <Link href="/settings" className="flex-1">
+            <Link href="/settings" onClick={handleLinkClick} className="flex-1">
               <Button 
                 variant="ghost" 
                 size="sm" 
