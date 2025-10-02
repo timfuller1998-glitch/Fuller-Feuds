@@ -1,4 +1,4 @@
-# Design Guidelines: Kirk Debate Platform
+# Design Guidelines: Kirk Debates Platform
 
 ## Design Approach: Design System Based
 **Selected System**: Material Design 3 with refined Discord-inspired discussion patterns

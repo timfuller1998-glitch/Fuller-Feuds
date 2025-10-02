@@ -1,8 +1,8 @@
-# Kirk Debate Platform
+# Kirk Debates Platform
 
 ## Overview
 
-Kirk is a modern debate platform designed to facilitate meaningful discussions on important topics. The platform combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats including text debates, live streams, and structured debate rooms.
+Kirk Debates is a modern debate platform designed to facilitate meaningful discussions on important topics. The platform combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats including text debates, live streams, and structured debate rooms.
 
 The application serves as a comprehensive discussion platform where ideas can "collide" in a constructive environment, featuring AI-generated cumulative opinions that summarize community perspectives and track debate sentiment over time.
 
