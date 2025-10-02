@@ -32,7 +32,7 @@ const topicFormSchema = insertTopicSchema.omit({
 }).extend({
   title: z.string().min(1, "Title is required").max(200, "Title too long"),
   description: z.string().min(1, "Description is required").max(1000, "Description too long"),
-  category: z.string().min(1, "Category is required"),
+  categories: z.array(z.string()).min(1, "At least one category is required"),
 });
 
 const opinionFormSchema = insertOpinionSchema.omit({
@@ -190,10 +190,12 @@ export default function Home() {
     defaultValues: {
       title: "",
       description: "",
-      category: "",
-      imageUrl: "",
+      categories: [],
     },
   });
+
+  // State for category input
+  const [categoryInput, setCategoryInput] = useState("");
 
   const opinionForm = useForm<z.infer<typeof opinionFormSchema>>({
     resolver: zodResolver(opinionFormSchema),
@@ -471,24 +473,65 @@ export default function Home() {
                   
                   <FormField
                     control={topicForm.control}
-                    name="category"
+                    name="categories"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-topic-category">
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categories.map((category) => (
-                              <SelectItem key={category} value={category}>
-                                {category}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>Categories</FormLabel>
+                        <FormControl>
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <Input 
+                                placeholder="Type a category and press Enter..."
+                                value={categoryInput}
+                                onChange={(e) => setCategoryInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const trimmed = categoryInput.trim();
+                                    if (trimmed && !field.value.includes(trimmed)) {
+                                      field.onChange([...field.value, trimmed]);
+                                      setCategoryInput("");
+                                    }
+                                  }
+                                }}
+                                data-testid="input-topic-categories"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const trimmed = categoryInput.trim();
+                                  if (trimmed && !field.value.includes(trimmed)) {
+                                    field.onChange([...field.value, trimmed]);
+                                    setCategoryInput("");
+                                  }
+                                }}
+                                data-testid="button-add-category"
+                              >
+                                Add
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {field.value.map((category) => (
+                                <Badge 
+                                  key={category} 
+                                  variant="secondary"
+                                  className="cursor-pointer hover-elevate"
+                                  onClick={() => {
+                                    field.onChange(field.value.filter((c) => c !== category));
+                                  }}
+                                  data-testid={`badge-category-${category}`}
+                                >
+                                  {category} ×
+                                </Badge>
+                              ))}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Suggested: {categories.filter(c => !field.value.includes(c)).slice(0, 3).join(", ")}
+                            </p>
+                          </div>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -512,19 +555,9 @@ export default function Home() {
                     )}
                   />
                   
-                  <FormField
-                    control={topicForm.control}
-                    name="imageUrl"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Image URL (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://example.com/image.jpg" {...field} value={field.value || ""} data-testid="input-topic-image" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <p className="text-sm text-muted-foreground">
+                    An AI-generated image will be created automatically based on your topic title.
+                  </p>
                   
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setShowCreateTopic(false)}>
