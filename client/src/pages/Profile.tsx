@@ -21,7 +21,6 @@ import { insertUserProfileSchema, insertLiveStreamSchema } from "@shared/schema"
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
 import {
   Users,
   User,
@@ -103,7 +102,6 @@ export default function Profile() {
   const { userId } = useParams();
   const [, navigate] = useLocation();
   const { user: currentUser } = useAuth();
-  const { toast } = useToast();
   const [opinionSortBy, setOpinionSortBy] = useState<'recent' | 'popular' | 'controversial'>('recent');
   const [showCreateDebateDialog, setShowCreateDebateDialog] = useState(false);
   const [showScheduleStreamDialog, setShowScheduleStreamDialog] = useState(false);
@@ -160,17 +158,9 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/follow', userId, 'status'] });
       queryClient.invalidateQueries({ queryKey: ['/api/profile', userId] });
-      toast({ 
-        title: followStatus?.isFollowing ? "Unfollowed successfully" : "Following user",
-        description: followStatus?.isFollowing ? "You are no longer following this user." : "You are now following this user."
-      });
     },
-    onError: () => {
-      toast({ 
-        title: "Error", 
-        description: "Failed to update follow status.",
-        variant: "destructive"
-      });
+    onError: (error) => {
+      console.error("Failed to update follow status:", error);
     }
   });
 
@@ -179,17 +169,9 @@ export default function Profile() {
     mutationFn: () => fetch(`/api/profile/${userId}/analyze`, { method: 'POST', credentials: 'include' }).then(res => res.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/profile', userId] });
-      toast({ 
-        title: "Analysis Complete", 
-        description: "Your political leaning has been analyzed!"
-      });
     },
-    onError: () => {
-      toast({ 
-        title: "Analysis Failed", 
-        description: "Unable to analyze political leaning. Try again later.",
-        variant: "destructive"
-      });
+    onError: (error) => {
+      console.error("Political analysis failed:", error);
     }
   });
 
@@ -226,18 +208,10 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms'] });
       setShowCreateDebateDialog(false);
       debateForm.reset();
-      toast({ 
-        title: "Debate room created!",
-        description: "Your debate has been set up successfully."
-      });
       navigate(`/debate-room/${data.id}`);
     },
-    onError: () => {
-      toast({ 
-        title: "Failed to create debate", 
-        description: "Unable to create debate room.",
-        variant: "destructive" 
-      });
+    onError: (error) => {
+      console.error("Failed to create debate room:", error);
     }
   });
 
@@ -261,18 +235,10 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ['/api/live-streams'] });
       setShowScheduleStreamDialog(false);
       streamForm.reset();
-      toast({ 
-        title: "Stream scheduled successfully!",
-        description: "Your live debate stream has been created."
-      });
       navigate(`/live-stream/${data.id}`);
     },
-    onError: () => {
-      toast({ 
-        title: "Failed to schedule stream", 
-        description: "Unable to create live stream.",
-        variant: "destructive" 
-      });
+    onError: (error) => {
+      console.error("Failed to create stream:", error);
     }
   });
 

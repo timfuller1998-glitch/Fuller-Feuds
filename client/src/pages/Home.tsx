@@ -21,7 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye, RefreshCw, Zap, Mic } from "lucide-react";
 import { insertTopicSchema, insertOpinionSchema, type Topic, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import climateImage from '@assets/generated_images/Climate_change_debate_thumbnail_3b0bbda7.png';
 import aiImage from '@assets/generated_images/AI_ethics_debate_thumbnail_98fa03cc.png';
 import educationImage from '@assets/generated_images/Education_reform_debate_thumbnail_a88506ee.png';
@@ -50,7 +49,6 @@ export default function Home() {
   const [viewingLiveDebate, setViewingLiveDebate] = useState<string | null>(null);
   const [showCreateTopic, setShowCreateTopic] = useState(false);
   const [showCreateOpinion, setShowCreateOpinion] = useState(false);
-  const { toast } = useToast();
 
   // Fetch real topics from API
   const { data: apiTopics, isLoading: topicsLoading } = useQuery<Topic[]>({
@@ -100,14 +98,9 @@ export default function Home() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
       setShowCreateTopic(false);
-      toast({ title: "Topic created successfully!" });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to create topic", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      console.error("Failed to create topic:", error);
     },
   });
 
@@ -120,14 +113,9 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "opinions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "cumulative"] });
       setShowCreateOpinion(false);
-      toast({ title: "Opinion shared successfully!" });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to share opinion", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      console.error("Failed to share opinion:", error);
     },
   });
 
@@ -138,14 +126,9 @@ export default function Home() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "opinions"] });
-      toast({ title: "Vote recorded!" });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to vote", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      console.error("Failed to vote:", error);
     },
   });
 
@@ -156,14 +139,9 @@ export default function Home() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "cumulative"] });
-      toast({ title: "AI analysis generated successfully!" });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to generate analysis", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      console.error("Failed to generate analysis:", error);
     },
   });
 
@@ -173,14 +151,9 @@ export default function Home() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "cumulative"] });
-      toast({ title: "AI analysis refreshed successfully!" });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to refresh analysis", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      console.error("Failed to refresh analysis:", error);
     },
   });
 

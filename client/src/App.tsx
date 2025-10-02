@@ -18,7 +18,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertTopicSchema } from "@shared/schema";
-import { useToast } from "@/hooks/use-toast";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
 import Profile from "@/pages/Profile";
@@ -101,7 +100,6 @@ function AuthenticatedApp() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateTopic, setShowCreateTopic] = useState(false);
   const [categoryInput, setCategoryInput] = useState("");
-  const { toast } = useToast();
   
   // Initialize search query from URL on mount and location change
   useEffect(() => {
@@ -158,11 +156,7 @@ function AuthenticatedApp() {
       setLocation(`/topic/${newTopic.id}`);
     },
     onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      console.error("Failed to create topic:", error);
     },
   });
 
@@ -370,7 +364,6 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AppContent />
-        <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
   );

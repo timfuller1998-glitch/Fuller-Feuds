@@ -14,7 +14,6 @@ import { ArrowLeft, MessageCircle, Users, TrendingUp, RefreshCw, Video, Calendar
 import { Link } from "wouter";
 import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 
 const opinionFormSchema = insertOpinionSchema.omit({
@@ -29,7 +28,6 @@ export default function Topic() {
   const { id } = useParams();
   const { user } = useAuth();
   const [showOpinionForm, setShowOpinionForm] = useState(false);
-  const { toast } = useToast();
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -90,14 +88,9 @@ export default function Topic() {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id] });
       opinionForm.reset();
       setShowOpinionForm(false);
-      toast({ title: userOpinion ? "Opinion updated successfully!" : "Opinion shared successfully!" });
     },
     onError: (error: any) => {
-      toast({ 
-        title: userOpinion ? "Failed to update opinion" : "Failed to share opinion", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      console.error("Failed to save opinion:", error);
     },
   });
 
@@ -108,14 +101,9 @@ export default function Topic() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
-      toast({ title: "AI summary generated successfully!" });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to generate summary", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      console.error("Failed to generate summary:", error);
     },
   });
 
@@ -126,14 +114,9 @@ export default function Topic() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
-      toast({ title: "AI summary refreshed successfully!" });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to refresh summary", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      console.error("Failed to refresh summary:", error);
     },
   });
 

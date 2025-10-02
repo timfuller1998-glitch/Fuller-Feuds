@@ -10,7 +10,6 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageSquare, Send, LogOut, Swords, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface DebateRoom {
@@ -52,7 +51,6 @@ export default function DebateRoomPage() {
   const roomId = params.id;
   const [, navigate] = useLocation();
   const { user: currentUser } = useAuth();
-  const { toast } = useToast();
   const [messageInput, setMessageInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -96,11 +94,8 @@ export default function DebateRoomPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId, "messages"] });
       setMessageInput("");
     },
-    onError: () => {
-      toast({
-        title: "Failed to send message",
-        variant: "destructive",
-      });
+    onError: (error) => {
+      console.error("Failed to send message:", error);
     },
   });
 
@@ -112,17 +107,10 @@ export default function DebateRoomPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
-      toast({
-        title: "Debate ended",
-        description: "The debate has been concluded.",
-      });
       navigate("/debates");
     },
-    onError: () => {
-      toast({
-        title: "Failed to end debate",
-        variant: "destructive",
-      });
+    onError: (error) => {
+      console.error("Failed to end debate:", error);
     },
   });
 

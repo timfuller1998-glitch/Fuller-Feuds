@@ -12,7 +12,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
 import { Save, User, Monitor, Sun, Moon, Upload } from "lucide-react";
 import type { UploadResult } from "@uppy/core";
 
@@ -40,7 +39,6 @@ interface ProfileData {
 
 export default function Settings() {
   const { user: currentUser } = useAuth();
-  const { toast } = useToast();
   const [themePreference, setThemePreference] = useState<"light" | "dark" | "auto">("light");
 
   // Fetch current user's profile
@@ -104,10 +102,6 @@ export default function Settings() {
   const handleThemeChange = (value: "light" | "dark" | "auto") => {
     setThemePreference(value);
     applyTheme(value);
-    toast({
-      title: "Theme updated",
-      description: `Theme preference set to ${value === "auto" ? "time-based" : value} mode.`
-    });
   };
 
   // Profile picture upload
@@ -134,17 +128,8 @@ export default function Settings() {
         });
         queryClient.invalidateQueries({ queryKey: ['/api/profile', currentUser?.id] });
         queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-        toast({
-          title: "Profile picture updated",
-          description: "Your profile picture has been updated successfully."
-        });
       } catch (error) {
         console.error("Error updating profile picture:", error);
-        toast({
-          title: "Update failed",
-          description: "Failed to update profile picture.",
-          variant: "destructive"
-        });
       }
     }
   };
@@ -160,14 +145,9 @@ export default function Settings() {
       }).then(res => res.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/profile', currentUser?.id] });
-      toast({ title: "Profile updated successfully!" });
     },
-    onError: () => {
-      toast({ 
-        title: "Update failed", 
-        description: "Unable to update profile.",
-        variant: "destructive" 
-      });
+    onError: (error) => {
+      console.error("Failed to update profile:", error);
     }
   });
 

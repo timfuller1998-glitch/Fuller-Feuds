@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,7 +87,6 @@ export default function LiveStreamPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const { toast } = useToast();
   const streamId = params.id;
 
   // Moderation mutations
@@ -105,10 +103,9 @@ export default function LiveStreamPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/live-streams", streamId] });
-      toast({ title: "Participant mute status updated" });
     },
-    onError: () => {
-      toast({ title: "Failed to update mute status", variant: "destructive" });
+    onError: (error) => {
+      console.error("Failed to update mute status:", error);
     }
   });
 
@@ -123,10 +120,9 @@ export default function LiveStreamPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/live-streams", streamId] });
-      toast({ title: "Participant removed" });
     },
-    onError: () => {
-      toast({ title: "Failed to remove participant", variant: "destructive" });
+    onError: (error) => {
+      console.error("Failed to remove participant:", error);
     }
   });
 
@@ -141,10 +137,9 @@ export default function LiveStreamPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/live-streams", streamId] });
-      toast({ title: "Stream ended successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to end stream", variant: "destructive" });
+    onError: (error) => {
+      console.error("Failed to end stream:", error);
     }
   });
 
