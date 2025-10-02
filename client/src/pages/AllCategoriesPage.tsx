@@ -147,10 +147,10 @@ export default function AllCategoriesPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-full overflow-hidden">
       {/* Page Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold mb-2" data-testid="text-page-title">
             Browse All Categories
           </h1>
@@ -160,7 +160,7 @@ export default function AllCategoriesPage() {
         </div>
         
         {/* Sort Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
           <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
             <SelectTrigger className="w-[180px]" data-testid="select-sort-categories">
@@ -234,14 +234,14 @@ export default function AllCategoriesPage() {
 
                 {/* Horizontal Scrolling Topics */}
                 {topics.length > 0 && (
-                  <div className="relative">
+                  <div className="relative -mx-4 sm:mx-0">
                     <div 
-                      className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
+                      className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 px-4 sm:px-0 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
                       style={{ scrollbarWidth: 'thin' }}
                       data-testid={`scroll-topics-${category.name.toLowerCase()}`}
                     >
                       {topics.map((topic) => (
-                        <div key={topic.id} className="flex-none w-[300px]">
+                        <div key={topic.id} className="flex-none w-[280px] sm:w-[300px] snap-start">
                           <TopicCard
                             id={topic.id}
                             title={topic.title}
@@ -255,7 +255,7 @@ export default function AllCategoriesPage() {
                         </div>
                       ))}
                       {category.totalCount > 6 && (
-                        <div className="flex-none w-[300px]">
+                        <div className="flex-none w-[280px] sm:w-[300px] snap-start">
                           <Card className="h-full hover-elevate active-elevate-2 transition-all">
                             <CardContent className="flex flex-col items-center justify-center h-full min-h-[200px] p-6">
                               <CategoryIcon className="w-12 h-12 text-muted-foreground mb-4" />
