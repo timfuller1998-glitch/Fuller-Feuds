@@ -83,20 +83,47 @@ export default function AppSidebar({
     { title: "My Debates", icon: MessageCircle, path: "/debates" },
   ];
 
-  // Calculate real counts for each category
-  const categoryDefinitions = [
-    { title: "Politics", icon: Gavel },
-    { title: "Technology", icon: Cpu },
-    { title: "Environment", icon: Globe },
-    { title: "Business", icon: Briefcase },
-    { title: "Education", icon: GraduationCap },
-    { title: "Health", icon: Heart },
-  ];
+  // Get icon for category (with fallback)
+  const getCategoryIcon = (categoryName: string) => {
+    const iconMap: Record<string, any> = {
+      'Politics': Gavel,
+      'Technology': Cpu,
+      'Environment': Globe,
+      'Business': Briefcase,
+      'Education': GraduationCap,
+      'Health': Heart,
+      'Science': Cpu,
+      'Sports': TrendingUp,
+      'Entertainment': Radio,
+      'Law': Gavel,
+      'Economics': Briefcase,
+      'Energy': Flame,
+      'Climate': Globe,
+      'Society': MessageCircle,
+      'General': Grid,
+    };
+    return iconMap[categoryName] || MessageCircle; // Default icon
+  };
 
-  const categories: CategoryItem[] = categoryDefinitions.map(cat => ({
-    ...cat,
-    count: topics?.filter(topic => topic.categories.includes(cat.title)).length || 0
-  }));
+  // Extract all unique categories from all topics with their counts
+  const categories: CategoryItem[] = topics
+    ? Array.from(
+        topics.reduce((acc, topic) => {
+          topic.categories.forEach(cat => {
+            if (!acc.has(cat)) {
+              acc.set(cat, { title: cat, count: 0 });
+            }
+            acc.get(cat)!.count++;
+          });
+          return acc;
+        }, new Map<string, { title: string; count: number }>())
+      )
+      .map(([_, data]) => ({
+        ...data,
+        icon: getCategoryIcon(data.title),
+      }))
+      .sort((a, b) => b.count - a.count) // Sort by count descending
+    : [];
 
   return (
     <Sidebar>
