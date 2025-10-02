@@ -40,7 +40,7 @@ export const topics = pgTable("topics", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  category: varchar("category", { length: 100 }).notNull(),
+  categories: text("categories").array().notNull().default(sql`ARRAY[]::text[]`),
   imageUrl: varchar("image_url"),
   createdById: varchar("created_by_id").notNull().references(() => users.id),
   isActive: boolean("is_active").default(true),
