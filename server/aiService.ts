@@ -23,6 +23,28 @@ interface PoliticalLeaningAnalysis {
 }
 
 export class AIService {
+  static async generateTopicImage(topicTitle: string): Promise<string> {
+    try {
+      const response = await openai.images.generate({
+        model: "dall-e-3",
+        prompt: `Create a professional, abstract visual representation for a debate topic titled: "${topicTitle}". The image should be thought-provoking, balanced, and suitable for a serious discussion platform. Style: modern, clean, conceptual art with symbolic elements related to the topic.`,
+        size: "1024x1024",
+        quality: "standard",
+        n: 1,
+      });
+
+      const imageUrl = response.data[0]?.url;
+      if (!imageUrl) {
+        throw new Error("No image URL returned from DALL-E");
+      }
+
+      return imageUrl;
+    } catch (error) {
+      console.error("Error generating topic image:", error);
+      throw error;
+    }
+  }
+
   static async generateCumulativeOpinion(
     topic: Topic,
     opinions: Opinion[]
