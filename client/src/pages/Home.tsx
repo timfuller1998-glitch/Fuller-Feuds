@@ -289,7 +289,7 @@ export default function Home() {
       title: "Traditional vs. Progressive Education",
       description: "Recent debate on educational methodologies and their effectiveness.",
       imageUrl: educationImage,
-      category: "Education",
+      categories: ["Education", "Social Issues"],
       participants: [
         { id: "p5", name: "Prof. Lisa Anderson", stance: "for" as const },
         { id: "p6", name: "Dr. Michael Brown", stance: "against" as const }
