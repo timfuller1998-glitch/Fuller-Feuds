@@ -418,161 +418,140 @@ export default function Home() {
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Hero Section */}
-      <div className="text-center space-y-4 sm:space-y-6 py-4 sm:py-8">
-        <div className="space-y-3 sm:space-y-4">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight px-4">
-            Where Ideas Collide
-          </h1>
-          <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
-            Join meaningful debates on topics that matter. Share your opinions, discover different perspectives, and engage in thoughtful discussions.
-          </p>
-        </div>
-        
-        <div className="max-w-2xl mx-auto px-4">
-          <SearchBar 
-            onSearch={setSearchQuery}
-            placeholder="Search for debate topics..."
-          />
-        </div>
-        
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
-          <Button data-testid="button-browse-topics" className="w-full sm:w-auto">
-            <TrendingUp className="w-4 h-4 mr-2" />
-            Browse Trending
-          </Button>
-          
-          <Dialog open={showCreateTopic} onOpenChange={setShowCreateTopic}>
-            <DialogTrigger asChild>
-              <Button variant="outline" data-testid="button-create-topic" className="w-full sm:w-auto">
-                <Plus className="w-4 h-4 mr-2" />
-                Start New Topic
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Create New Topic</DialogTitle>
-                <DialogDescription>
-                  Start a new debate topic for the community to discuss.
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...topicForm}>
-                <form onSubmit={topicForm.handleSubmit((data) => createTopicMutation.mutate(data))} className="space-y-4">
-                  <FormField
-                    control={topicForm.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Title</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter debate topic..." {...field} data-testid="input-topic-title" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={topicForm.control}
-                    name="categories"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Categories</FormLabel>
-                        <FormControl>
-                          <div className="space-y-2">
-                            <div className="flex gap-2">
-                              <Input 
-                                placeholder="Type a category and press Enter..."
-                                value={categoryInput}
-                                onChange={(e) => setCategoryInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    const trimmed = categoryInput.trim();
-                                    if (trimmed && !field.value.includes(trimmed)) {
-                                      field.onChange([...field.value, trimmed]);
-                                      setCategoryInput("");
-                                    }
-                                  }
-                                }}
-                                data-testid="input-topic-categories"
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const trimmed = categoryInput.trim();
-                                  if (trimmed && !field.value.includes(trimmed)) {
-                                    field.onChange([...field.value, trimmed]);
-                                    setCategoryInput("");
-                                  }
-                                }}
-                                data-testid="button-add-category"
-                              >
-                                Add
-                              </Button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {field.value.map((category) => (
-                                <Badge 
-                                  key={category} 
-                                  variant="secondary"
-                                  className="cursor-pointer hover-elevate"
-                                  onClick={() => {
-                                    field.onChange(field.value.filter((c) => c !== category));
-                                  }}
-                                  data-testid={`badge-category-${category}`}
-                                >
-                                  {category} ×
-                                </Badge>
-                              ))}
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              Suggested: {categories.filter(c => !field.value.includes(c)).slice(0, 3).join(", ")}
-                            </p>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={topicForm.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Provide more details about this topic..." 
-                            {...field} 
-                            data-testid="textarea-topic-description"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <p className="text-sm text-muted-foreground">
-                    An AI-generated image will be created automatically based on your topic title.
-                  </p>
-                  
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setShowCreateTopic(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={createTopicMutation.isPending} data-testid="button-submit-topic">
-                      {createTopicMutation.isPending ? "Creating..." : "Create Topic"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
+      <div className="text-center space-y-3 sm:space-y-4 py-4 sm:py-8">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight px-4">
+          Where Ideas Collide
+        </h1>
+        <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
+          Join meaningful debates on topics that matter. Share your opinions, discover different perspectives, and engage in thoughtful discussions.
+        </p>
       </div>
+      
+      {/* Topic Creation Dialog - now triggered from SearchBar */}
+      <Dialog open={showCreateTopic} onOpenChange={setShowCreateTopic}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create New Topic</DialogTitle>
+            <DialogDescription>
+              Start a new debate topic for the community to discuss.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...topicForm}>
+            <form onSubmit={topicForm.handleSubmit((data) => createTopicMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={topicForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter debate topic..." {...field} data-testid="input-topic-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={topicForm.control}
+                name="categories"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categories</FormLabel>
+                    <FormControl>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input 
+                            placeholder="Type a category and press Enter..."
+                            value={categoryInput}
+                            onChange={(e) => setCategoryInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const trimmed = categoryInput.trim();
+                                if (trimmed && !field.value.includes(trimmed)) {
+                                  field.onChange([...field.value, trimmed]);
+                                  setCategoryInput("");
+                                }
+                              }
+                            }}
+                            data-testid="input-topic-categories"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const trimmed = categoryInput.trim();
+                              if (trimmed && !field.value.includes(trimmed)) {
+                                field.onChange([...field.value, trimmed]);
+                                setCategoryInput("");
+                              }
+                            }}
+                            data-testid="button-add-category"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {field.value.map((category) => (
+                            <Badge 
+                              key={category} 
+                              variant="secondary"
+                              className="cursor-pointer hover-elevate"
+                              onClick={() => {
+                                field.onChange(field.value.filter((c) => c !== category));
+                              }}
+                              data-testid={`badge-category-${category}`}
+                            >
+                              {category} ×
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Suggested: {categories.filter(c => !field.value.includes(c)).slice(0, 3).join(", ")}
+                        </p>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={topicForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Provide more details about this topic..." 
+                        {...field} 
+                        data-testid="textarea-topic-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <p className="text-sm text-muted-foreground">
+                An AI-generated image will be created automatically based on your topic title.
+              </p>
+              
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setShowCreateTopic(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createTopicMutation.isPending} data-testid="button-submit-topic">
+                  {createTopicMutation.isPending ? "Creating..." : "Create Topic"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       {/* Stats Section */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
