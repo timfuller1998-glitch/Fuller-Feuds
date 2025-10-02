@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation, useSearch } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useState, createContext, useContext } from "react";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -35,30 +35,47 @@ import LiveStreamPage from "@/pages/LiveStreamPage";
 import DebateRoomPage from "@/pages/DebateRoomPage";
 import NotFound from "@/pages/not-found";
 
+interface TopicCreationContextType {
+  openTopicCreation: (prefillTitle?: string) => void;
+}
+
+const TopicCreationContext = createContext<TopicCreationContextType | null>(null);
+
+export const useTopicCreation = () => {
+  const context = useContext(TopicCreationContext);
+  if (!context) {
+    return { openTopicCreation: () => console.warn('Topic creation not available') };
+  }
+  return context;
+};
+
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  if (isLoading || !isAuthenticated) {
+    return (
+      <Switch>
+        <Route path="/" component={Landing} />
+        <Route component={Landing} />
+      </Switch>
+    );
+  }
+
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
-      ) : (
-        <>
-          <Route path="/" component={Home} />
-          <Route path="/search" component={Search} />
-          <Route path="/trending" component={Trending} />
-          <Route path="/live" component={LiveDebates} />
-          <Route path="/hot-debates" component={HotDebates} />
-          <Route path="/debates" component={MyDebates} />
-          <Route path="/categories" component={AllCategoriesPage} />
-          <Route path="/category/:category" component={CategoryPage} />
-          <Route path="/topic/:id" component={Topic} />
-          <Route path="/profile/:userId" component={Profile} />
-          <Route path="/settings" component={Settings} />
-          <Route path="/live-stream/:id" component={LiveStreamPage} />
-          <Route path="/debate-room/:id" component={DebateRoomPage} />
-        </>
-      )}
+      <Route path="/" component={Home} />
+      <Route path="/search" component={Search} />
+      <Route path="/trending" component={Trending} />
+      <Route path="/live" component={LiveDebates} />
+      <Route path="/hot-debates" component={HotDebates} />
+      <Route path="/debates" component={MyDebates} />
+      <Route path="/categories" component={AllCategoriesPage} />
+      <Route path="/category/:category" component={CategoryPage} />
+      <Route path="/topic/:id" component={Topic} />
+      <Route path="/profile/:userId" component={Profile} />
+      <Route path="/settings" component={Settings} />
+      <Route path="/live-stream/:id" component={LiveStreamPage} />
+      <Route path="/debate-room/:id" component={DebateRoomPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -189,7 +206,9 @@ function AuthenticatedApp() {
           </header>
           <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
-              <Router />
+              <TopicCreationContext.Provider value={{ openTopicCreation: handleCreateTopic }}>
+                <Router />
+              </TopicCreationContext.Provider>
             </div>
           </main>
         </div>
