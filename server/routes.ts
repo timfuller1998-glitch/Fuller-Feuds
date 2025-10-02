@@ -793,8 +793,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Live stream routes
   app.get('/api/live-streams', async (req, res) => {
     try {
-      const { status } = req.query;
-      const streams = await storage.getLiveStreams(status as string);
+      const { status, category } = req.query;
+      const streams = await storage.getLiveStreams(status as string, category as string);
       res.json(streams);
     } catch (error) {
       console.error("Error fetching live streams:", error);

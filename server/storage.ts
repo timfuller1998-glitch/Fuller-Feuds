@@ -77,7 +77,7 @@ export interface IStorage {
   
   // Live streams
   createLiveStream(stream: InsertLiveStream): Promise<LiveStream>;
-  getLiveStreams(status?: string): Promise<LiveStream[]>;
+  getLiveStreams(status?: string, category?: string): Promise<LiveStream[]>;
   getLiveStream(id: string): Promise<LiveStream | undefined>;
   updateStreamStatus(id: string, status: string): Promise<void>;
   updateViewerCount(id: string, count: number): Promise<void>;
@@ -344,7 +344,44 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getLiveStreams(status?: string): Promise<LiveStream[]> {
+  async getLiveStreams(status?: string, category?: string): Promise<LiveStream[]> {
+    // If category filter is needed, we must join with topics
+    if (category) {
+      let conditions = [];
+      
+      // Add status filter if provided
+      if (status) {
+        conditions.push(eq(liveStreams.status, status));
+      }
+      
+      // Add category filter
+      conditions.push(sql`${category} = ANY(${topics.categories})`);
+      
+      // Join with topics to filter by category
+      const streamsWithCategory = await db
+        .select({
+          id: liveStreams.id,
+          topicId: liveStreams.topicId,
+          title: liveStreams.title,
+          description: liveStreams.description,
+          moderatorId: liveStreams.moderatorId,
+          status: liveStreams.status,
+          participantSelectionMethod: liveStreams.participantSelectionMethod,
+          scheduledAt: liveStreams.scheduledAt,
+          startedAt: liveStreams.startedAt,
+          endedAt: liveStreams.endedAt,
+          viewerCount: liveStreams.viewerCount,
+          createdAt: liveStreams.createdAt,
+        })
+        .from(liveStreams)
+        .innerJoin(topics, eq(liveStreams.topicId, topics.id))
+        .where(and(...conditions))
+        .orderBy(desc(liveStreams.createdAt));
+      
+      return streamsWithCategory;
+    }
+    
+    // No category filter - just filter by status if provided
     if (status) {
       return await db
         .select()
@@ -353,6 +390,7 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(liveStreams.createdAt));
     }
     
+    // No filters at all
     return await db
       .select()
       .from(liveStreams)

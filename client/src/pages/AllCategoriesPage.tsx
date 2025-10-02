@@ -29,21 +29,23 @@ export default function AllCategoriesPage() {
     queryKey: ["/api/topics"],
   });
 
-  // Group topics by category
+  // Group topics by category (topics can appear in multiple categories)
   const topicsByCategory = apiTopics?.reduce((acc, topic) => {
-    const category = topic.category || "Other";
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    acc[category].push({
-      id: topic.id,
-      title: topic.title,
-      description: topic.description,
-      imageUrl: topic.imageUrl || "",
-      category: topic.category,
-      participantCount: 0,
-      opinionsCount: 0,
-      isActive: topic.isActive ?? true
+    // A topic can have multiple categories, add it to each one
+    topic.categories.forEach(category => {
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push({
+        id: topic.id,
+        title: topic.title,
+        description: topic.description,
+        imageUrl: topic.imageUrl || "",
+        categories: topic.categories,
+        participantCount: 0,
+        opinionsCount: 0,
+        isActive: topic.isActive ?? true
+      });
     });
     return acc;
   }, {} as Record<string, any[]>);

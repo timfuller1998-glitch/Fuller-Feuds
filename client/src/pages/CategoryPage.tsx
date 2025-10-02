@@ -1,10 +1,11 @@
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import TopicCard from "@/components/TopicCard";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Folder } from "lucide-react";
-import { type Topic } from "@shared/schema";
+import { Folder, Radio, Eye, Clock, Users } from "lucide-react";
+import { type Topic, type LiveStream } from "@shared/schema";
+import { formatDistanceToNow } from "date-fns";
 
 // Map category names to their icons
 import { Gavel, Cpu, Globe, Briefcase, GraduationCap, Heart } from "lucide-react";
@@ -21,12 +22,21 @@ const categoryIcons: Record<string, any> = {
 export default function CategoryPage() {
   const params = useParams<{ category: string }>();
   const category = params.category;
+  const [, setLocation] = useLocation();
 
   // Fetch topics for this category using default fetcher
   const queryParams = new URLSearchParams();
   if (category) queryParams.append("category", category);
-  const { data: apiTopics, isLoading, error } = useQuery<Topic[]>({
+  const { data: apiTopics, isLoading: topicsLoading, error: topicsError } = useQuery<Topic[]>({
     queryKey: [`/api/topics?${queryParams.toString()}`],
+    enabled: !!category,
+  });
+
+  // Fetch live streams for this category
+  const streamQueryParams = new URLSearchParams();
+  if (category) streamQueryParams.append("category", category);
+  const { data: liveStreams, isLoading: streamsLoading } = useQuery<LiveStream[]>({
+    queryKey: [`/api/live-streams?${streamQueryParams.toString()}`],
     enabled: !!category,
   });
 
@@ -36,11 +46,14 @@ export default function CategoryPage() {
     title: topic.title,
     description: topic.description,
     imageUrl: topic.imageUrl || "",
-    category: topic.category,
+    categories: topic.categories,
     participantCount: 0, // TODO: Calculate from debate rooms
     opinionsCount: 0, // TODO: Calculate from opinions count
     isActive: topic.isActive ?? true
   }));
+
+  const isLoading = topicsLoading || streamsLoading;
+  const error = topicsError;
 
   const CategoryIcon = categoryIcons[category || ""] || Folder;
 
@@ -69,6 +82,15 @@ export default function CategoryPage() {
     );
   }
 
+  const getTimeSince = (dateString: string | null) => {
+    if (!dateString) return "Unknown";
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch {
+      return "Unknown";
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Category Header */}
@@ -89,24 +111,81 @@ export default function CategoryPage() {
         </Badge>
       </div>
 
-      {/* Topics Grid */}
-      {topics && topics.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {topics.map((topic) => (
-            <TopicCard key={topic.id} {...topic} />
-          ))}
+      {/* Live Streams Section */}
+      {liveStreams && liveStreams.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Radio className="w-5 h-5 text-red-500" />
+            <h2 className="text-xl font-semibold">Live Streams</h2>
+            <Badge variant="destructive" className="ml-2 animate-pulse">
+              {liveStreams.length} LIVE
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            {liveStreams.map((stream) => (
+              <Card
+                key={stream.id}
+                className="cursor-pointer hover-elevate active-elevate-2"
+                onClick={() => setLocation(`/live-stream/${stream.id}`)}
+                data-testid={`card-live-stream-${stream.id}`}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="destructive" className="animate-pulse">
+                          <Radio className="w-3 h-3 mr-1" />
+                          LIVE
+                        </Badge>
+                      </div>
+                      <h3 className="text-lg font-semibold">{stream.title}</h3>
+                      {stream.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {stream.description}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Eye className="w-4 h-4" />
+                          <span>{stream.viewerCount || 0} viewers</span>
+                        </div>
+                        {stream.startedAt && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{getTimeSince(stream.startedAt)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
-      ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <CategoryIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-lg font-medium mb-2">No debates yet</p>
-            <p className="text-muted-foreground">
-              Be the first to start a debate in {category}
-            </p>
-          </CardContent>
-        </Card>
       )}
+
+      {/* Topics Grid */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Topics</h2>
+        {topics && topics.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {topics.map((topic) => (
+              <TopicCard key={topic.id} {...topic} />
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <CategoryIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-lg font-medium mb-2">No debates yet</p>
+              <p className="text-muted-foreground">
+                Be the first to start a debate in {category}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
