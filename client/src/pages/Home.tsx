@@ -217,7 +217,7 @@ export default function Home() {
       title: "Climate Change: Individual vs. Systemic Action",
       description: "Should we focus on individual lifestyle changes or systemic policy reforms to address climate change effectively?",
       imageUrl: climateImage,
-      category: "Environment",
+      categories: ["Environment", "Politics"],
       participantCount: 247,
       opinionsCount: 1832,
       isActive: true
@@ -227,7 +227,7 @@ export default function Home() {
       title: "AI in Decision Making: Progress or Problem?",
       description: "Are AI systems making our lives better or creating new forms of bias and discrimination in important decisions?",
       imageUrl: aiImage,
-      category: "Technology",
+      categories: ["Technology", "Ethics"],
       participantCount: 156,
       opinionsCount: 923,
       isActive: true
@@ -237,7 +237,7 @@ export default function Home() {
       title: "Traditional vs. Progressive Education Methods",
       description: "Which approach better prepares students for the modern world: structured traditional education or flexible progressive methods?",
       imageUrl: educationImage,
-      category: "Education",
+      categories: ["Education", "Social Issues"],
       participantCount: 189,
       opinionsCount: 1247,
       isActive: false
@@ -247,7 +247,7 @@ export default function Home() {
       title: "Universal Healthcare: Right or Privilege?",
       description: "Should healthcare be guaranteed as a universal right or remain a service based on individual responsibility and choice?",
       imageUrl: healthcareImage,
-      category: "Politics",
+      categories: ["Politics", "Healthcare"],
       participantCount: 298,
       opinionsCount: 2156,
       isActive: true
@@ -261,7 +261,7 @@ export default function Home() {
       title: "Climate Change: Individual vs. Systemic Action",
       description: "Live debate featuring climate experts discussing the most effective approaches to environmental action.",
       imageUrl: climateImage,
-      category: "Environment",
+      categories: ["Environment", "Politics"],
       participants: [
         { id: "p1", name: "Dr. Sarah Chen", stance: "for" as const },
         { id: "p2", name: "Prof. Marcus Rodriguez", stance: "against" as const }
@@ -275,7 +275,7 @@ export default function Home() {
       title: "AI Ethics in Healthcare Decisions",
       description: "Scheduled debate on the role of AI in making critical healthcare decisions.",
       imageUrl: aiImage,
-      category: "Technology",
+      categories: ["Technology", "Healthcare", "Ethics"],
       scheduledTime: "Today 3:00 PM",
       participants: [
         { id: "p3", name: "Dr. Emily Watson", stance: "for" as const },
@@ -332,7 +332,7 @@ export default function Home() {
       title: topic.title,
       description: topic.description,
       imageUrl: topic.imageUrl || climateImage, // Use default image if none provided
-      category: topic.category,
+      categories: topic.categories,
       participantCount: 0, // We'll calculate this later
       opinionsCount: 0, // We'll calculate this later
       isActive: topic.isActive || false
@@ -343,7 +343,7 @@ export default function Home() {
   const filteredTopics = combinedTopics.filter(topic =>
     topic.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     topic.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    topic.category.toLowerCase().includes(searchQuery.toLowerCase())
+    topic.categories.some(cat => cat.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Transform API opinions for display

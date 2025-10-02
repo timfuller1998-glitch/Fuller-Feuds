@@ -8,7 +8,7 @@ interface TopicCardProps {
   title: string;
   description: string;
   imageUrl: string;
-  category: string;
+  categories: string[];
   participantCount: number;
   opinionsCount: number;
   isActive: boolean;
@@ -19,7 +19,7 @@ export default function TopicCard({
   title,
   description,
   imageUrl,
-  category,
+  categories,
   participantCount,
   opinionsCount,
   isActive,
@@ -38,10 +38,17 @@ export default function TopicCard({
           alt={title}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
-        <div className="absolute top-2 left-2">
-          <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
-            {category}
-          </Badge>
+        <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
+          {categories.slice(0, 2).map((category) => (
+            <Badge key={category} variant="secondary" className="bg-background/80 backdrop-blur-sm">
+              {category}
+            </Badge>
+          ))}
+          {categories.length > 2 && (
+            <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
+              +{categories.length - 2}
+            </Badge>
+          )}
         </div>
         {isActive && (
           <div className="absolute top-2 right-2">
