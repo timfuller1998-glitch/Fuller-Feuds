@@ -236,12 +236,21 @@ export default function AllCategoriesPage() {
                 {topics.length > 0 && (
                   <div className="relative -mx-4 sm:mx-0">
                     <div 
-                      className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 px-4 sm:px-0 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
-                      style={{ scrollbarWidth: 'thin' }}
+                      className="flex gap-4 sm:gap-4 overflow-x-auto pb-4 px-4 sm:px-0 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
+                      style={{ 
+                        scrollbarWidth: 'thin',
+                        scrollSnapType: 'x mandatory',
+                        scrollPaddingLeft: '1rem',
+                        scrollPaddingRight: '1rem'
+                      }}
                       data-testid={`scroll-topics-${category.name.toLowerCase()}`}
                     >
                       {topics.map((topic) => (
-                        <div key={topic.id} className="flex-none w-[280px] sm:w-[300px] snap-start">
+                        <div 
+                          key={topic.id} 
+                          className="flex-none w-[calc(100vw-4rem)] sm:w-[300px]"
+                          style={{ scrollSnapAlign: 'center' }}
+                        >
                           <TopicCard
                             id={topic.id}
                             title={topic.title}
@@ -255,7 +264,10 @@ export default function AllCategoriesPage() {
                         </div>
                       ))}
                       {category.totalCount > 6 && (
-                        <div className="flex-none w-[280px] sm:w-[300px] snap-start">
+                        <div 
+                          className="flex-none w-[calc(100vw-4rem)] sm:w-[300px]"
+                          style={{ scrollSnapAlign: 'center' }}
+                        >
                           <Card className="h-full hover-elevate active-elevate-2 transition-all">
                             <CardContent className="flex flex-col items-center justify-center h-full min-h-[200px] p-6">
                               <CategoryIcon className="w-12 h-12 text-muted-foreground mb-4" />
