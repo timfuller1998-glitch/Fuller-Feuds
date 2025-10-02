@@ -147,17 +147,15 @@ function AuthenticatedApp() {
   // Create topic mutation
   const createTopicMutation = useMutation({
     mutationFn: async (data: z.infer<typeof topicFormSchema>) => {
-      return apiRequest('POST', '/api/topics', data);
+      const response = await apiRequest('POST', '/api/topics', data);
+      return response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Topic created!",
-        description: "Your debate topic has been created successfully.",
-      });
+    onSuccess: (newTopic: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
       setShowCreateTopic(false);
       topicForm.reset();
       setCategoryInput("");
+      setLocation(`/topic/${newTopic.id}`);
     },
     onError: (error: Error) => {
       toast({
@@ -169,9 +167,12 @@ function AuthenticatedApp() {
   });
 
   const handleCreateTopic = (searchQuery?: string) => {
-    if (searchQuery) {
-      topicForm.setValue("title", searchQuery);
-    }
+    topicForm.reset({
+      title: searchQuery || "",
+      description: "",
+      categories: [],
+    });
+    setCategoryInput("");
     setShowCreateTopic(true);
   };
 
