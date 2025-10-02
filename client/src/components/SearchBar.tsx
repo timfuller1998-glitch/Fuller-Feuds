@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, History } from "lucide-react";
+import { Search, History, Plus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useQuery } from "@tanstack/react-query";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { type Topic } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface SearchBarProps {
   onSearch?: (query: string) => void;
   placeholder?: string;
   className?: string;
   value?: string;
-  onCreateTopic?: (query: string) => void;
 }
 
 export default function SearchBar({ 
@@ -20,11 +22,15 @@ export default function SearchBar({
   placeholder = "Search debate topics...", 
   className = "",
   value: externalValue,
-  onCreateTopic
 }: SearchBarProps) {
   const [query, setQuery] = useState(externalValue || "");
   const [debouncedQuery, setDebouncedQuery] = useState(query);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [topicTitle, setTopicTitle] = useState("");
+  const [topicDescription, setTopicDescription] = useState("");
+  const [topicCategories, setTopicCategories] = useState<string[]>([]);
+  const [categoryInput, setCategoryInput] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
 
@@ -105,6 +111,51 @@ export default function SearchBar({
     } catch (error) {
       console.error("Failed to clear search history:", error);
     }
+  };
+
+  // Create topic mutation
+  const createTopicMutation = useMutation({
+    mutationFn: async (data: { title: string; description: string; categories: string[] }) => {
+      const response = await apiRequest("POST", "/api/topics", data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
+      setShowSuggestions(false);
+      setShowCreateForm(false);
+      setTopicTitle("");
+      setTopicDescription("");
+      setTopicCategories([]);
+      setCategoryInput("");
+      setLocation(`/topic/${data.id}`);
+    },
+    onError: (error) => {
+      console.error("Failed to create topic:", error);
+    },
+  });
+
+  // Handle category addition
+  const handleAddCategory = (category: string) => {
+    const trimmed = category.trim();
+    if (trimmed && !topicCategories.includes(trimmed) && topicCategories.length < 5) {
+      setTopicCategories([...topicCategories, trimmed]);
+      setCategoryInput("");
+    }
+  };
+
+  // Handle category removal
+  const handleRemoveCategory = (category: string) => {
+    setTopicCategories(topicCategories.filter(c => c !== category));
+  };
+
+  // Handle form submission
+  const handleCreateTopic = () => {
+    if (!topicTitle.trim() || topicCategories.length === 0) return;
+    createTopicMutation.mutate({
+      title: topicTitle,
+      description: topicDescription,
+      categories: topicCategories,
+    });
   };
 
   const handleSearch = (value: string) => {
@@ -255,21 +306,137 @@ export default function SearchBar({
           )}
 
           {/* No Results - Create New Topic */}
-          {hasNoResults && onCreateTopic && (
+          {hasNoResults && !showCreateForm && (
             <div className="p-4 text-center space-y-3">
               <div className="text-sm text-muted-foreground">
                 No debates found for "{query}"
               </div>
-              <button
+              <Button
                 onClick={() => {
-                  onCreateTopic(query);
-                  setShowSuggestions(false);
+                  setShowCreateForm(true);
+                  setTopicTitle(query);
                 }}
-                className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover-elevate active-elevate-2 text-sm font-medium"
+                className="w-full"
                 data-testid="button-create-topic-from-search"
               >
+                <Plus className="w-4 h-4 mr-2" />
                 Create New Topic
-              </button>
+              </Button>
+            </div>
+          )}
+
+          {/* Inline Topic Creation Form */}
+          {hasNoResults && showCreateForm && (
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold">Create New Topic</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setShowCreateForm(false);
+                    setTopicTitle("");
+                    setTopicDescription("");
+                    setTopicCategories([]);
+                    setCategoryInput("");
+                  }}
+                  data-testid="button-close-create-form"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Title
+                  </label>
+                  <Input
+                    value={topicTitle}
+                    onChange={(e) => setTopicTitle(e.target.value)}
+                    placeholder="Enter topic title..."
+                    className="h-9 text-sm"
+                    data-testid="input-topic-title"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Description
+                  </label>
+                  <Textarea
+                    value={topicDescription}
+                    onChange={(e) => setTopicDescription(e.target.value)}
+                    placeholder="Describe the debate topic..."
+                    className="min-h-[80px] text-sm resize-none"
+                    data-testid="input-topic-description"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Categories (1-5)
+                  </label>
+                  {topicCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {topicCategories.map((cat) => (
+                        <Badge
+                          key={cat}
+                          variant="secondary"
+                          className="text-xs gap-1"
+                          data-testid={`badge-category-${cat.toLowerCase()}`}
+                        >
+                          {cat}
+                          <button
+                            onClick={() => handleRemoveCategory(cat)}
+                            className="hover:text-foreground"
+                            data-testid={`button-remove-category-${cat.toLowerCase()}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      value={categoryInput}
+                      onChange={(e) => setCategoryInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddCategory(categoryInput);
+                        }
+                      }}
+                      placeholder="Add category..."
+                      className="h-9 text-sm flex-1"
+                      disabled={topicCategories.length >= 5}
+                      data-testid="input-topic-category"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAddCategory(categoryInput)}
+                      disabled={!categoryInput.trim() || topicCategories.length >= 5}
+                      data-testid="button-add-category"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Press Enter or click + to add
+                  </p>
+                </div>
+
+                <Button
+                  onClick={handleCreateTopic}
+                  disabled={!topicTitle.trim() || topicCategories.length === 0 || createTopicMutation.isPending}
+                  className="w-full"
+                  data-testid="button-submit-create-topic"
+                >
+                  {createTopicMutation.isPending ? "Creating..." : "Create Topic"}
+                </Button>
+              </div>
             </div>
           )}
         </Card>

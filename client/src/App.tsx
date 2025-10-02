@@ -1,23 +1,12 @@
 import { Switch, Route, useLocation, useSearch } from "wouter";
-import { useEffect, useState, createContext, useContext } from "react";
-import { queryClient, apiRequest } from "./lib/queryClient";
-import { QueryClientProvider, useMutation } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
+import { useEffect, useState } from "react";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
 import SearchBar from "@/components/SearchBar";
 import { useAuth } from "@/hooks/useAuth";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { insertTopicSchema } from "@shared/schema";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
 import Profile from "@/pages/Profile";
@@ -33,20 +22,6 @@ import CategoryPage from "@/pages/CategoryPage";
 import LiveStreamPage from "@/pages/LiveStreamPage";
 import DebateRoomPage from "@/pages/DebateRoomPage";
 import NotFound from "@/pages/not-found";
-
-interface TopicCreationContextType {
-  openTopicCreation: (prefillTitle?: string) => void;
-}
-
-const TopicCreationContext = createContext<TopicCreationContextType | null>(null);
-
-export const useTopicCreation = () => {
-  const context = useContext(TopicCreationContext);
-  if (!context) {
-    return { openTopicCreation: () => console.warn('Topic creation not available') };
-  }
-  return context;
-};
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -80,26 +55,11 @@ function Router() {
   );
 }
 
-const topicFormSchema = insertTopicSchema.omit({
-  createdById: true,  // Server will set this from authenticated user
-}).extend({
-  title: z.string().min(1, "Title is required").max(200, "Title too long"),
-  description: z.string().min(1, "Description is required"),
-  categories: z.array(z.string()).min(1, "At least one category is required"),
-});
-
-const categories = [
-  "Politics", "Technology", "Science", "Economics", "Social Issues", 
-  "Environment", "Education", "Healthcare", "Ethics", "Culture"
-];
-
 function AuthenticatedApp() {
   const { user } = useAuth();
   const [location, setLocation] = useLocation();
   const searchParams = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
-  const [showCreateTopic, setShowCreateTopic] = useState(false);
-  const [categoryInput, setCategoryInput] = useState("");
   
   // Initialize search query from URL on mount and location change
   useEffect(() => {
@@ -132,44 +92,6 @@ function AuthenticatedApp() {
     setLocation(`${basePath}${newSearch ? `?${newSearch}` : ""}`);
   };
 
-  // Topic creation form
-  const topicForm = useForm<z.infer<typeof topicFormSchema>>({
-    resolver: zodResolver(topicFormSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      categories: [],
-    },
-  });
-
-  // Create topic mutation
-  const createTopicMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof topicFormSchema>) => {
-      const response = await apiRequest('POST', '/api/topics', data);
-      return response.json();
-    },
-    onSuccess: (newTopic: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
-      setShowCreateTopic(false);
-      topicForm.reset();
-      setCategoryInput("");
-      setLocation(`/topic/${newTopic.id}`);
-    },
-    onError: (error: Error) => {
-      console.error("Failed to create topic:", error);
-    },
-  });
-
-  const handleCreateTopic = (searchQuery?: string) => {
-    topicForm.reset({
-      title: searchQuery || "",
-      description: "",
-      categories: [],
-    });
-    setCategoryInput("");
-    setShowCreateTopic(true);
-  };
-
   return (
     <SidebarProvider style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
@@ -181,7 +103,6 @@ function AuthenticatedApp() {
             isOnline: true
           }}
           onNavigate={(path) => console.log('Navigate to:', path)}
-          onCreateTopic={() => handleCreateTopic()}
           onLogout={() => {
             window.location.href = "/api/logout";
           }}
@@ -193,7 +114,6 @@ function AuthenticatedApp() {
               <SearchBar 
                 value={searchQuery}
                 onSearch={handleSearch}
-                onCreateTopic={handleCreateTopic}
                 placeholder="Search debate topics..."
                 className=""
               />
@@ -201,139 +121,11 @@ function AuthenticatedApp() {
           </header>
           <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
-              <TopicCreationContext.Provider value={{ openTopicCreation: handleCreateTopic }}>
-                <Router />
-              </TopicCreationContext.Provider>
+              <Router />
             </div>
           </main>
         </div>
       </div>
-
-      {/* Global Topic Creation Dialog */}
-      <Dialog open={showCreateTopic} onOpenChange={setShowCreateTopic}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Create New Topic</DialogTitle>
-            <DialogDescription>
-              Start a new debate topic for the community to discuss.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...topicForm}>
-            <form onSubmit={topicForm.handleSubmit((data) => createTopicMutation.mutate(data))} className="space-y-4">
-              <FormField
-                control={topicForm.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter debate topic..." {...field} data-testid="input-topic-title" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={topicForm.control}
-                name="categories"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Categories</FormLabel>
-                    <FormControl>
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <Input 
-                            placeholder="Type a category and press Enter..."
-                            value={categoryInput}
-                            onChange={(e) => setCategoryInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const trimmed = categoryInput.trim();
-                                if (trimmed && !field.value.includes(trimmed)) {
-                                  field.onChange([...field.value, trimmed]);
-                                  setCategoryInput("");
-                                }
-                              }
-                            }}
-                            data-testid="input-topic-categories"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const trimmed = categoryInput.trim();
-                              if (trimmed && !field.value.includes(trimmed)) {
-                                field.onChange([...field.value, trimmed]);
-                                setCategoryInput("");
-                              }
-                            }}
-                            data-testid="button-add-category"
-                          >
-                            Add
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {field.value.map((category) => (
-                            <Badge 
-                              key={category} 
-                              variant="secondary"
-                              className="cursor-pointer hover-elevate"
-                              onClick={() => {
-                                field.onChange(field.value.filter((c) => c !== category));
-                              }}
-                              data-testid={`badge-category-${category}`}
-                            >
-                              {category} ×
-                            </Badge>
-                          ))}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Suggested: {categories.filter(c => !field.value.includes(c)).slice(0, 3).join(", ")}
-                        </p>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={topicForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Provide more details about this topic..." 
-                        {...field} 
-                        data-testid="textarea-topic-description"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <p className="text-sm text-muted-foreground">
-                An AI-generated image will be created automatically based on your topic title.
-              </p>
-              
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setShowCreateTopic(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createTopicMutation.isPending} data-testid="button-submit-topic">
-                  {createTopicMutation.isPending ? "Creating..." : "Create Topic"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
     </SidebarProvider>
   );
 }

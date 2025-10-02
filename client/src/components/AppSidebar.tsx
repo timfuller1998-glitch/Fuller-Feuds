@@ -52,14 +52,12 @@ interface AppSidebarProps {
     isOnline: boolean;
   };
   onNavigate?: (path: string) => void;
-  onCreateTopic?: () => void;
   onLogout?: () => void;
 }
 
 export default function AppSidebar({ 
   currentUser,
   onNavigate, 
-  onCreateTopic,
   onLogout 
 }: AppSidebarProps) {
   const [location] = useLocation();
@@ -150,21 +148,8 @@ export default function AppSidebar({
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel className="flex items-center justify-between">
+          <SidebarGroupLabel>
             Categories
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="h-6 w-6 p-0"
-              onClick={() => {
-                handleLinkClick();
-                onCreateTopic?.();
-                console.log('Create topic clicked');
-              }}
-              data-testid="button-create-topic"
-            >
-              <Plus className="w-3 h-3" />
-            </Button>
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>

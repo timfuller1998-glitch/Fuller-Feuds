@@ -3,12 +3,10 @@ import { useSearch, useLocation } from "wouter";
 import TopicCard from "@/components/TopicCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search as SearchIcon, History, Filter, Plus } from "lucide-react";
+import { Search as SearchIcon, History, Filter } from "lucide-react";
 import { type Topic } from "@shared/schema";
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useTopicCreation } from "@/App";
 
 type TopicWithCounts = Topic & {
   opinionsCount?: number;
@@ -21,7 +19,6 @@ export default function Search() {
   const [activeTab, setActiveTab] = useState("all");
   const [, setLocation] = useLocation();
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const { openTopicCreation } = useTopicCreation();
 
   // Get recent searches from localStorage
   const getRecentSearches = () => {
@@ -198,17 +195,9 @@ export default function Search() {
             <div>
               <p className="text-lg font-medium mb-2">No results found</p>
               <p className="text-muted-foreground">
-                No debates found for "{searchQuery}"
+                No debates found for "{searchQuery}". Try creating a new topic using the search bar above.
               </p>
             </div>
-            <Button
-              onClick={() => openTopicCreation(searchQuery)}
-              className="mx-auto"
-              data-testid="button-create-topic-from-search"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create New Topic
-            </Button>
           </CardContent>
         </Card>
       )}
