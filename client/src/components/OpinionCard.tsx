@@ -4,10 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import UserAvatar from "./UserAvatar";
 import { ThumbsUp, ThumbsDown, MessageCircle, Clock } from "lucide-react";
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 interface OpinionCardProps {
   id: string;
+  topicId: string;
   userId?: string;
   userName: string;
   userAvatar?: string;
@@ -38,6 +39,7 @@ const stanceText = {
 
 export default function OpinionCard({
   id,
+  topicId,
   userId,
   userName,
   userAvatar,
@@ -53,6 +55,7 @@ export default function OpinionCard({
   onDislike,
   onReply
 }: OpinionCardProps) {
+  const [, setLocation] = useLocation();
   const [liked, setLiked] = useState(isLiked);
   const [disliked, setDisliked] = useState(isDisliked);
   const [currentLikes, setCurrentLikes] = useState(likesCount);
@@ -91,11 +94,20 @@ export default function OpinionCard({
   };
 
   return (
-    <Card className="hover-elevate" data-testid={`card-opinion-${id}`}>
+    <Card 
+      className="hover-elevate active-elevate-2 cursor-pointer" 
+      onClick={() => setLocation(`/topic/${topicId}`)}
+      data-testid={`card-opinion-${id}`}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           {userId ? (
-            <Link href={`/profile/${userId}`} className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-1 -m-1" data-testid={`link-profile-${userId}`}>
+            <Link 
+              href={`/profile/${userId}`} 
+              className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-1 -m-1" 
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`link-profile-${userId}`}
+            >
               <UserAvatar name={userName} imageUrl={userAvatar} size="sm" />
               <div>
                 <h4 className="font-medium" data-testid={`text-opinion-author-${id}`}>
@@ -138,7 +150,10 @@ export default function OpinionCard({
               variant={liked ? "default" : "ghost"}
               size="sm"
               className="h-8 px-3"
-              onClick={handleLike}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLike();
+              }}
               data-testid={`button-like-${id}`}
             >
               <ThumbsUp className="w-3 h-3 mr-1" />
@@ -149,7 +164,10 @@ export default function OpinionCard({
               variant={disliked ? "destructive" : "ghost"}
               size="sm"
               className="h-8 px-3"
-              onClick={handleDislike}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDislike();
+              }}
               data-testid={`button-dislike-${id}`}
             >
               <ThumbsDown className="w-3 h-3 mr-1" />
@@ -161,7 +179,8 @@ export default function OpinionCard({
             variant="ghost"
             size="sm"
             className="h-8 px-3"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               onReply?.(id);
               console.log('Reply clicked for opinion:', id);
             }}

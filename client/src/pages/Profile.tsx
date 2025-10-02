@@ -507,7 +507,12 @@ export default function Profile() {
               ) : (
                 <div className="space-y-4">
                   {opinions.map((opinion) => (
-                    <div key={opinion.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors" data-testid={`opinion-${opinion.id}`}>
+                    <div 
+                      key={opinion.id} 
+                      className="border rounded-lg p-4 hover:bg-muted/30 transition-colors cursor-pointer active-elevate-2" 
+                      onClick={() => navigate(`/topic/${opinion.topicId}`)}
+                      data-testid={`opinion-${opinion.id}`}
+                    >
                       <div className="flex items-start justify-between mb-2">
                         <Badge variant={
                           opinion.stance === 'for' ? 'default' : 
