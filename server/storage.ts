@@ -157,7 +157,8 @@ export class DatabaseStorage implements IStorage {
     let conditions = [eq(topics.isActive, true)];
     
     if (category) {
-      conditions.push(eq(topics.category, category));
+      // Check if the category is in the categories array
+      conditions.push(sql`${category} = ANY(${topics.categories})`);
     }
     
     if (search) {

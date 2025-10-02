@@ -12,13 +12,15 @@ interface SearchBarProps {
   placeholder?: string;
   className?: string;
   value?: string;
+  onCreateTopic?: (query: string) => void;
 }
 
 export default function SearchBar({ 
   onSearch, 
   placeholder = "Search debate topics...", 
   className = "",
-  value: externalValue
+  value: externalValue,
+  onCreateTopic
 }: SearchBarProps) {
   const [query, setQuery] = useState(externalValue || "");
   const [debouncedQuery, setDebouncedQuery] = useState(query);
@@ -133,12 +135,15 @@ export default function SearchBar({
   };
 
   const searchHistory = getSearchHistory();
-  const categories = Array.from(new Set(topics?.map(t => t.category) || []));
+  const categories = Array.from(new Set(topics?.flatMap(t => t.categories) || []));
   
   // Show suggestions if we have query OR history, and field is focused
-  const hasSuggestions = (query.length >= 2 && topics && topics.length > 0) || 
+  const hasResults = topics && topics.length > 0;
+  const hasNoResults = query.length >= 2 && topics !== undefined && topics.length === 0;
+  const hasSuggestions = (query.length >= 2 && hasResults) || 
                          (query.length === 0 && searchHistory.length > 0) ||
-                         (query.length >= 2 && categories.length > 0);
+                         (query.length >= 2 && categories.length > 0) ||
+                         hasNoResults;
 
   return (
     <div ref={wrapperRef} className={`relative w-full ${className}`}>
@@ -207,10 +212,17 @@ export default function SearchBar({
                   data-testid={`suggestion-topic-${topic.id}`}
                 >
                   <div className="font-medium line-clamp-1">{topic.title}</div>
-                  <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
-                    <Badge variant="secondary" className="text-xs px-1 py-0">
-                      {topic.category}
-                    </Badge>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                    {topic.categories.slice(0, 2).map((cat) => (
+                      <Badge key={cat} variant="secondary" className="text-xs px-1 py-0">
+                        {cat}
+                      </Badge>
+                    ))}
+                    {topic.categories.length > 2 && (
+                      <Badge variant="secondary" className="text-xs px-1 py-0">
+                        +{topic.categories.length - 2}
+                      </Badge>
+                    )}
                   </div>
                 </button>
               ))}
@@ -218,7 +230,7 @@ export default function SearchBar({
           )}
 
           {/* Category Suggestions */}
-          {query.length >= 2 && categories.length > 0 && (
+          {query.length >= 2 && categories.length > 0 && !hasNoResults && (
             <div>
               <div className="px-2 py-1 mb-1">
                 <span className="text-xs font-semibold text-muted-foreground">Categories</span>
@@ -239,6 +251,25 @@ export default function SearchBar({
                   </Badge>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* No Results - Create New Topic */}
+          {hasNoResults && onCreateTopic && (
+            <div className="p-4 text-center space-y-3">
+              <div className="text-sm text-muted-foreground">
+                No debates found for "{query}"
+              </div>
+              <button
+                onClick={() => {
+                  onCreateTopic(query);
+                  setShowSuggestions(false);
+                }}
+                className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover-elevate active-elevate-2 text-sm font-medium"
+                data-testid="button-create-topic-from-search"
+              >
+                Create New Topic
+              </button>
             </div>
           )}
         </Card>
