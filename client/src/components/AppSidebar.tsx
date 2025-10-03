@@ -76,7 +76,6 @@ export default function AppSidebar({
   };
 
   const mainItems = [
-    { title: "Home", icon: Home, path: "/" },
     { title: "Trending", icon: TrendingUp, path: "/trending" },
     { title: "Live Debates", icon: Radio, path: "/live" },
     { title: "Hot Debates", icon: Flame, path: "/hot-debates" },
@@ -128,35 +127,20 @@ export default function AppSidebar({
   return (
     <Sidebar>
       <SidebarHeader className="border-b p-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary text-primary-foreground">
-            <MessageCircle className="w-5 h-5" />
+        <Link href="/" onClick={handleLinkClick} data-testid="link-home-logo">
+          <div className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2 transition-colors">
+            <div className="p-2 rounded-lg bg-primary text-primary-foreground">
+              <MessageCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-bold text-lg">Kirk Debates</h2>
+              <p className="text-xs text-muted-foreground">Where Ideas Collide</p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-bold text-lg">Kirk Debates</h2>
-            <p className="text-xs text-muted-foreground">Where Ideas Collide</p>
-          </div>
-        </div>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent>
-        {currentUser && (
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href={`/profile/${currentUser.id}`} onClick={handleLinkClick} data-testid="link-user-profile">
-                      <User className="w-4 h-4" />
-                      <span>My Profile</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -208,21 +192,23 @@ export default function AppSidebar({
 
       {currentUser && (
         <SidebarFooter className="border-t p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <UserAvatar 
-              name={currentUser.name} 
-              imageUrl={currentUser.avatar}
-              size="sm"
-              showOnlineStatus
-              isOnline={currentUser.isOnline}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm truncate">{currentUser.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {currentUser.isOnline ? "Online" : "Offline"}
-              </p>
+          <Link href={`/profile/${currentUser.id}`} onClick={handleLinkClick} data-testid="link-user-profile">
+            <div className="flex items-center gap-3 mb-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2 transition-colors">
+              <UserAvatar 
+                name={currentUser.name} 
+                imageUrl={currentUser.avatar}
+                size="sm"
+                showOnlineStatus
+                isOnline={currentUser.isOnline}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate">{currentUser.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {currentUser.isOnline ? "Online" : "Offline"}
+                </p>
+              </div>
             </div>
-          </div>
+          </Link>
           
           <div className="flex gap-2">
             <Link href="/settings" onClick={handleLinkClick} className="flex-1">
