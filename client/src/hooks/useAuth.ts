@@ -21,7 +21,7 @@ export function useAuth() {
       return await res.json();
     },
     retry: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    // No staleTime - refetch immediately when invalidated (e.g., after profile picture upload)
   });
 
   return {
