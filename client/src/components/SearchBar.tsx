@@ -31,6 +31,7 @@ export default function SearchBar({
   const [initialOpinion, setInitialOpinion] = useState("");
   const [topicCategories, setTopicCategories] = useState<string[]>([]);
   const [categoryInput, setCategoryInput] = useState("");
+  const [pendingEnterKey, setPendingEnterKey] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
 
@@ -48,6 +49,24 @@ export default function SearchBar({
     }, 300);
     return () => clearTimeout(timer);
   }, [query]);
+
+  // Auto-show create form when Enter is pressed and search completes with no results
+  useEffect(() => {
+    if (pendingEnterKey && debouncedQuery === pendingEnterKey && hasNoResults) {
+      setTopicTitle(pendingEnterKey);
+      setShowCreateForm(true);
+      generateCategoriesMutation.mutate(pendingEnterKey);
+      setPendingEnterKey(null);
+    } else if (pendingEnterKey && debouncedQuery === pendingEnterKey && topics && topics.length > 0) {
+      // Has results, navigate to search page
+      saveToHistory(pendingEnterKey);
+      onSearch?.(pendingEnterKey);
+      setShowSuggestions(false);
+      setLocation(`/search?q=${encodeURIComponent(pendingEnterKey)}`);
+      window.dispatchEvent(new CustomEvent('searchHistoryUpdate'));
+      setPendingEnterKey(null);
+    }
+  }, [pendingEnterKey, debouncedQuery, hasNoResults, topics]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -182,15 +201,6 @@ export default function SearchBar({
   const handleSubmit = (searchTerm: string) => {
     if (!searchTerm.trim()) return;
     
-    // Check if there are no results - if so, show create form instead of navigating
-    if (hasNoResults) {
-      setTopicTitle(searchTerm);
-      setShowCreateForm(true);
-      // Generate categories for the new topic
-      generateCategoriesMutation.mutate(searchTerm);
-      return;
-    }
-    
     saveToHistory(searchTerm);
     onSearch?.(searchTerm);
     setShowSuggestions(false);
@@ -204,10 +214,16 @@ export default function SearchBar({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
-      handleSubmit(query);
+      if (!query.trim()) return;
+      
+      // Immediately flush debounce and mark as pending
+      setDebouncedQuery(query);
+      setPendingEnterKey(query);
+      setShowSuggestions(true); // Keep dropdown open to show create form
     } else if (e.key === "Escape") {
       setShowSuggestions(false);
       setShowCreateForm(false);
+      setPendingEnterKey(null);
     }
   };
 
