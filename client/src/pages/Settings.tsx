@@ -6,15 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ObjectUploader } from "@/components/ObjectUploader";
+import { ProfilePictureUpload } from "@/components/ProfilePictureUpload";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { Save, User, Monitor, Sun, Moon, Upload } from "lucide-react";
-import type { UploadResult } from "@uppy/core";
+import { Save, User, Monitor, Sun, Moon } from "lucide-react";
 
 const profileFormSchema = z.object({
   displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
@@ -117,35 +115,7 @@ export default function Settings() {
     applyTheme(value);
   };
 
-  // Profile picture upload
-  const handleGetUploadParameters = async () => {
-    const response = await apiRequest("POST", "/api/objects/upload");
-    return {
-      method: "PUT" as const,
-      url: response.uploadURL,
-    };
-  };
-
-  const handleProfilePictureComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful && result.successful.length > 0) {
-      const uploadedFile = result.successful[0];
-      try {
-        // Extract object ID from the upload URL
-        // URL format: https://storage.googleapis.com/.../uploads/{objectId}?...
-        const url = new URL(uploadedFile.uploadURL);
-        const pathParts = url.pathname.split('/');
-        const objectId = pathParts[pathParts.length - 1]; // Get the last part (object ID)
-        
-        await apiRequest("PUT", "/api/profile-picture", {
-          objectId: objectId,
-        });
-        queryClient.invalidateQueries({ queryKey: ['/api/profile', currentUser?.id] });
-        queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-      } catch (error) {
-        console.error("Error updating profile picture:", error);
-      }
-    }
-  };
+  // Profile picture upload is now handled by ProfilePictureUpload component
 
   // Profile update mutation
   const updateProfileMutation = useMutation({
@@ -199,29 +169,11 @@ export default function Settings() {
           {/* Profile Picture Section */}
           <div className="mb-6 pb-6 border-b">
             <h3 className="text-sm font-medium mb-4">Profile Picture</h3>
-            <div className="flex items-center gap-6">
-              <Avatar className="w-24 h-24" data-testid="avatar-profile-picture">
-                <AvatarImage src={profileData?.user?.profileImageUrl} />
-                <AvatarFallback className="text-2xl">
-                  {profileData?.user?.firstName?.[0]?.toUpperCase() || profileData?.user?.email?.[0]?.toUpperCase() || '?'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col gap-2">
-                <p className="text-sm text-muted-foreground">
-                  Upload a new profile picture (max 10MB)
-                </p>
-                <ObjectUploader
-                  maxNumberOfFiles={1}
-                  maxFileSize={10485760}
-                  onGetUploadParameters={handleGetUploadParameters}
-                  onComplete={handleProfilePictureComplete}
-                  buttonVariant="outline"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload Image
-                </ObjectUploader>
-              </div>
-            </div>
+            <ProfilePictureUpload
+              currentImageUrl={profileData?.user?.profileImageUrl}
+              userId={currentUser?.id || ''}
+              fallbackInitial={profileData?.user?.firstName?.[0]?.toUpperCase() || profileData?.user?.email?.[0]?.toUpperCase() || '?'}
+            />
           </div>
 
           <Form {...form}>
