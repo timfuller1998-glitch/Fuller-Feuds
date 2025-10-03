@@ -176,6 +176,8 @@ export const userProfiles = pgTable("user_profiles", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
   bio: text("bio"),
+  displayFirstName: varchar("display_first_name"),
+  displayLastName: varchar("display_last_name"),
   politicalLeaning: varchar("political_leaning", { length: 50 }), // 'progressive', 'moderate', 'conservative', etc.
   leaningScore: integer("leaning_score").default(0), // -100 (very progressive) to +100 (very conservative)
   leaningConfidence: varchar("leaning_confidence", { length: 20 }).default("low"), // 'high', 'medium', 'low'

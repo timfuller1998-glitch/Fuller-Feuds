@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +17,8 @@ import { Save, User, Monitor, Sun, Moon, Upload } from "lucide-react";
 import type { UploadResult } from "@uppy/core";
 
 const profileFormSchema = z.object({
+  displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
+  displayLastName: z.string().max(50, "Last name must be 50 characters or less").optional().or(z.literal("")),
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
 });
 
@@ -32,6 +35,8 @@ interface ProfileData {
     id: string;
     userId: string;
     bio?: string;
+    displayFirstName?: string;
+    displayLastName?: string;
     politicalLeaning?: number;
     politicalLeaningLabel?: string;
   };
@@ -52,15 +57,19 @@ export default function Settings() {
   const form = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
+      displayFirstName: "",
+      displayLastName: "",
       bio: "",
     },
   });
 
   // Update form when profile data loads (only if not currently editing)
   useEffect(() => {
-    if (profileData?.profile?.bio && !form.formState.isDirty) {
+    if (profileData?.profile && !form.formState.isDirty) {
       form.reset({
-        bio: profileData.profile.bio,
+        displayFirstName: profileData.profile.displayFirstName || "",
+        displayLastName: profileData.profile.displayLastName || "",
+        bio: profileData.profile.bio || "",
       });
     }
   }, [profileData, form]);
@@ -213,6 +222,49 @@ export default function Settings() {
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="displayFirstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display First Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter your first name"
+                          data-testid="input-display-first-name"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        This name will be displayed on your profile
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="displayLastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Last Name (Optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter your last name"
+                          data-testid="input-display-last-name"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Optional last name
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
                 name="bio"

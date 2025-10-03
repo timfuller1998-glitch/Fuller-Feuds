@@ -58,6 +58,8 @@ interface ProfileData {
     id: string;
     userId: string;
     bio?: string;
+    displayFirstName?: string;
+    displayLastName?: string;
     politicalLeaning?: string;
     leaningScore: number;
     leaningConfidence: string;
@@ -362,7 +364,7 @@ export default function Profile() {
               <div className="space-y-3 flex-1 min-w-0">
                 <div className="space-y-1">
                   <h1 className="text-2xl sm:text-3xl font-bold break-words" data-testid="profile-name">
-                    {user.firstName} {user.lastName}
+                    {profile?.displayFirstName != null ? profile.displayFirstName : user.firstName}{profile?.displayFirstName != null ? (profile?.displayLastName ? ` ${profile.displayLastName}` : '') : (user.lastName ? ` ${user.lastName}` : '')}
                   </h1>
                   {profile && profile.politicalLeaning && (
                     <p className="text-sm text-muted-foreground" data-testid="political-leaning-label">
