@@ -68,12 +68,12 @@ export default function Settings() {
 
   // Update form when profile data loads (only if not currently editing)
   useEffect(() => {
-    if (profileData?.profile && !form.formState.isDirty) {
+    if (profileData && !form.formState.isDirty) {
       form.reset({
-        displayFirstName: profileData.profile.displayFirstName || "",
-        displayLastName: profileData.profile.displayLastName || "",
-        bio: profileData.profile.bio || "",
-        opinionSortPreference: (profileData.profile.opinionSortPreference || "newest") as "newest" | "oldest" | "most_liked",
+        displayFirstName: profileData.profile?.displayFirstName || profileData.user?.firstName || "",
+        displayLastName: profileData.profile?.displayLastName || profileData.user?.lastName || "",
+        bio: profileData.profile?.bio || "",
+        opinionSortPreference: (profileData.profile?.opinionSortPreference || "newest") as "newest" | "oldest" | "most_liked",
       });
     }
   }, [profileData, form]);
