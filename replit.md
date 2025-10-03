@@ -12,6 +12,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### Profile Page Redesign (October 2025)
+- **Clickable Stats Navigation**: Removed tab buttons - stats (Opinions, Debates, Followers, Following) are now clickable and control content display
+  - Replaced "Likes" stat with "Debates" count showing user's debate room participation
+  - Active section highlighted with subtle background color (bg-primary/10)
+- **Political Leaning Display**: Moved from separate tab to header badge next to profile picture
+  - Displays as a compact badge with icon, label, confidence indicator, and color dot
+  - Positioned between user info and bio for better visibility
+  - No longer a separate content section
+- **Auto-Updating Political Analysis**: Political leaning updates automatically when users add opinions
+  - Removed manual "Update Analysis" button
+  - Analysis runs asynchronously after opinion creation without blocking response
+  - Ensures political leaning stays current with user's latest opinions
+- **Backend Updates**:
+  - New endpoint: GET /api/profile/:userId/debate-rooms (fetches user's debate room participation)
+  - Storage method: getUserDebateRooms() using OR condition for participant matching
+  - Auto-analysis trigger in opinion creation endpoint
+
 ### UX Improvements - Inline Topic Creation & Toast Removal (October 2025)
 - **Inline Topic Creation**: Completely redesigned topic creation experience
   - Removed modal dialog popup that grayed out the screen

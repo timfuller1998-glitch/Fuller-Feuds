@@ -214,6 +214,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const opinion = await storage.createOpinion(validatedData);
+      
+      // Auto-update political leaning analysis after creating opinion
+      // Do this asynchronously without blocking the response
+      storage.analyzeUserPoliticalLeaning(userId).catch(err => {
+        console.error("Error auto-analyzing political leaning:", err);
+      });
+      
       res.status(201).json(opinion);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -729,6 +736,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching following:", error);
       res.status(500).json({ message: "Failed to fetch following" });
+    }
+  });
+
+  app.get('/api/profile/:userId/debate-rooms', async (req, res) => {
+    try {
+      const debateRooms = await storage.getUserDebateRooms(req.params.userId);
+      res.json(debateRooms);
+    } catch (error) {
+      console.error("Error fetching debate rooms:", error);
+      res.status(500).json({ message: "Failed to fetch debate rooms" });
     }
   });
 

@@ -34,7 +34,7 @@ import {
   type InsertUserProfile,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, count, ilike } from "drizzle-orm";
+import { eq, desc, and, sql, count, ilike, or } from "drizzle-orm";
 import { AIService } from "./aiService";
 
 export interface IStorage {
@@ -113,6 +113,9 @@ export interface IStorage {
   getUserFollowers(userId: string, limit?: number): Promise<User[]>;
   getUserFollowing(userId: string, limit?: number): Promise<User[]>;
   updateFollowCounts(userId: string): Promise<void>;
+  
+  // User debate rooms
+  getUserDebateRooms(userId: string): Promise<DebateRoom[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -309,7 +312,10 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(debateRooms)
       .where(
-        sql`${debateRooms.participant1Id} = ${userId} OR ${debateRooms.participant2Id} = ${userId}`
+        or(
+          eq(debateRooms.participant1Id, userId),
+          eq(debateRooms.participant2Id, userId)
+        )
       )
       .orderBy(desc(debateRooms.startedAt));
   }

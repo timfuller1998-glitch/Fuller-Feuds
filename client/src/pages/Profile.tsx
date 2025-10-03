@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -105,6 +104,7 @@ export default function Profile() {
   const [opinionSortBy, setOpinionSortBy] = useState<'recent' | 'popular' | 'controversial'>('recent');
   const [showCreateDebateDialog, setShowCreateDebateDialog] = useState(false);
   const [showScheduleStreamDialog, setShowScheduleStreamDialog] = useState(false);
+  const [activeSection, setActiveSection] = useState<'opinions' | 'debates' | 'followers' | 'following'>('opinions');
 
   const isOwnProfile = currentUser?.id === userId;
 
@@ -140,6 +140,13 @@ export default function Profile() {
   const { data: following = [] } = useQuery<any[]>({
     queryKey: ['/api/profile', userId, 'following'],
     queryFn: () => fetch(`/api/profile/${userId}/following`, { credentials: 'include' }).then(res => res.json()),
+    enabled: !!userId,
+  });
+
+  // Fetch debate rooms count
+  const { data: debateRooms = [] } = useQuery<any[]>({
+    queryKey: ['/api/profile', userId, 'debate-rooms'],
+    queryFn: () => fetch(`/api/profile/${userId}/debate-rooms`, { credentials: 'include' }).then(res => res.json()),
     enabled: !!userId,
   });
 
@@ -325,8 +332,8 @@ export default function Profile() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-6">
-              <Avatar className="h-24 w-24">
+            <div className="flex items-start gap-6">
+              <Avatar className="h-24 w-24 flex-shrink-0">
                 <AvatarImage src={user.profileImageUrl} />
                 <AvatarFallback className="text-2xl">
                   {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
@@ -346,6 +353,22 @@ export default function Profile() {
                     Joined {formatJoinDate(user.createdAt)}
                   </p>
                 </div>
+
+                {/* Political Leaning Badge */}
+                {profile && profile.politicalLeaning && (
+                  <div className="flex items-center gap-2" data-testid="political-leaning-badge">
+                    <Badge variant="outline" className="flex items-center gap-1.5">
+                      <Brain className="w-3.5 h-3.5" />
+                      <span>{profile.politicalLeaning}</span>
+                      <div className={`w-2 h-2 rounded-full ${getPoliticalLeaningColor(profile.politicalLeaning)}`} />
+                    </Badge>
+                    {profile.leaningConfidence && (
+                      <span className="text-xs text-muted-foreground">
+                        {profile.leaningConfidence} confidence
+                      </span>
+                    )}
+                  </div>
+                )}
                 
                 {profile?.bio && (
                   <p className="text-sm max-w-md" data-testid="profile-bio">
@@ -379,55 +402,48 @@ export default function Profile() {
             </div>
           </div>
           
-          {/* Stats */}
-          <div className="flex items-center gap-6 mt-6 pt-6 border-t">
-            <div className="text-center" data-testid="stat-opinions">
+          {/* Stats - Now Clickable */}
+          <div className="flex items-center gap-4 mt-6 pt-6 border-t">
+            <button 
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-4 py-2 transition-colors ${activeSection === 'opinions' ? 'bg-primary/10' : ''}`}
+              onClick={() => setActiveSection('opinions')}
+              data-testid="stat-opinions"
+            >
               <div className="text-2xl font-bold">{profile?.totalOpinions || 0}</div>
               <div className="text-sm text-muted-foreground">Opinions</div>
-            </div>
-            <div className="text-center" data-testid="stat-followers">
+            </button>
+            <button 
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-4 py-2 transition-colors ${activeSection === 'debates' ? 'bg-primary/10' : ''}`}
+              onClick={() => setActiveSection('debates')}
+              data-testid="stat-debates"
+            >
+              <div className="text-2xl font-bold">{debateRooms?.length || 0}</div>
+              <div className="text-sm text-muted-foreground">Debates</div>
+            </button>
+            <button 
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-4 py-2 transition-colors ${activeSection === 'followers' ? 'bg-primary/10' : ''}`}
+              onClick={() => setActiveSection('followers')}
+              data-testid="stat-followers"
+            >
               <div className="text-2xl font-bold">{profile?.followerCount || 0}</div>
               <div className="text-sm text-muted-foreground">Followers</div>
-            </div>
-            <div className="text-center" data-testid="stat-following">
+            </button>
+            <button 
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-4 py-2 transition-colors ${activeSection === 'following' ? 'bg-primary/10' : ''}`}
+              onClick={() => setActiveSection('following')}
+              data-testid="stat-following"
+            >
               <div className="text-2xl font-bold">{profile?.followingCount || 0}</div>
               <div className="text-sm text-muted-foreground">Following</div>
-            </div>
-            <div className="text-center" data-testid="stat-likes">
-              <div className="text-2xl font-bold text-green-600">{profile?.totalLikes || 0}</div>
-              <div className="text-sm text-muted-foreground">Likes</div>
-            </div>
+            </button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Main Content Tabs */}
-      <Tabs defaultValue="opinions" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="opinions" data-testid="tab-opinions">
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Opinions
-          </TabsTrigger>
-          <TabsTrigger value="debates" data-testid="tab-debates">
-            <Swords className="w-4 h-4 mr-2" />
-            Debates
-          </TabsTrigger>
-          <TabsTrigger value="leaning" data-testid="tab-leaning">
-            <Brain className="w-4 h-4 mr-2" />
-            Political Leaning
-          </TabsTrigger>
-          <TabsTrigger value="followers" data-testid="tab-followers">
-            <Users className="w-4 h-4 mr-2" />
-            Followers
-          </TabsTrigger>
-          <TabsTrigger value="following" data-testid="tab-following">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Following
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Opinions Tab */}
-        <TabsContent value="opinions">
+      {/* Main Content - No Tabs, controlled by stat clicks */}
+      <div className="space-y-6">
+        {/* Opinions Section */}
+        {activeSection === 'opinions' && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -508,10 +524,10 @@ export default function Profile() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
-        {/* Debates Tab */}
-        <TabsContent value="debates">
+        {/* Debates Section */}
+        {activeSection === 'debates' && (
           <div className="space-y-6">
             {isOwnProfile && (
               <div className="grid gap-6 md:grid-cols-2">
@@ -868,110 +884,10 @@ export default function Profile() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
+        )}
 
-        {/* Political Leaning Tab */}
-        <TabsContent value="leaning">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Political Leaning Analysis</CardTitle>
-                  <CardDescription>
-                    AI-powered analysis based on expressed opinions
-                  </CardDescription>
-                </div>
-                {isOwnProfile && (
-                  <Button
-                    onClick={() => analyzeMutation.mutate()}
-                    disabled={analyzeMutation.isPending}
-                    data-testid="button-analyze-leaning"
-                  >
-                    <Brain className="w-4 h-4 mr-2" />
-                    {analyzeMutation.isPending ? 'Analyzing...' : 'Analyze Leaning'}
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {profile?.politicalLeaning ? (
-                <div className="space-y-6">
-                  {/* Leaning Overview */}
-                  <div className="text-center space-y-4">
-                    <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full ${getPoliticalLeaningColor(profile.politicalLeaning)} text-white text-2xl font-bold`}>
-                      {profile.politicalLeaning.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold capitalize" data-testid="political-leaning">
-                        {profile.politicalLeaning.replace('-', ' ')}
-                      </h3>
-                      <p className="text-muted-foreground">{getLeaningDescription(profile.leaningScore)}</p>
-                    </div>
-                  </div>
-
-                  {/* Score Visualization */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-blue-600">Progressive</span>
-                      <span className="text-red-600">Conservative</span>
-                    </div>
-                    <div className="relative">
-                      <Progress 
-                        value={((profile.leaningScore + 100) / 200) * 100} 
-                        className="h-3"
-                      />
-                      <div 
-                        className="absolute top-0 w-1 h-3 bg-black rounded"
-                        style={{ left: '50%', transform: 'translateX(-50%)' }}
-                      />
-                    </div>
-                    <div className="text-center">
-                      <span className="text-lg font-semibold" data-testid="leaning-score">
-                        {profile.leaningScore > 0 ? '+' : ''}{profile.leaningScore}
-                      </span>
-                      <span className="text-sm text-muted-foreground ml-2">
-                        ({profile.leaningConfidence} confidence)
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Analysis Details */}
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="text-center p-4 bg-muted rounded-lg">
-                      <div className="text-2xl font-bold">{profile.totalOpinions}</div>
-                      <div className="text-sm text-muted-foreground">Opinions Analyzed</div>
-                    </div>
-                    <div className="text-center p-4 bg-muted rounded-lg">
-                      <div className="text-2xl font-bold capitalize">{profile.leaningConfidence}</div>
-                      <div className="text-sm text-muted-foreground">Confidence Level</div>
-                    </div>
-                  </div>
-
-                  {profile.lastAnalyzedAt && (
-                    <p className="text-xs text-muted-foreground text-center">
-                      Last analyzed: {new Date(profile.lastAnalyzedAt).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 space-y-4">
-                  <Brain className="w-12 h-12 mx-auto opacity-50" />
-                  <div>
-                    <h3 className="text-lg font-medium">No Analysis Available</h3>
-                    <p className="text-muted-foreground">
-                      {isOwnProfile 
-                        ? "Share some opinions first, then analyze your political leaning!"
-                        : "This user hasn't analyzed their political leaning yet."}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Followers Tab */}
-        <TabsContent value="followers">
+        {/* Followers Section */}
+        {activeSection === 'followers' && (
           <Card>
             <CardHeader>
               <CardTitle>Followers ({followers.length})</CardTitle>
@@ -1013,10 +929,10 @@ export default function Profile() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
-        {/* Following Tab */}
-        <TabsContent value="following">
+        {/* Following Section */}
+        {activeSection === 'following' && (
           <Card>
             <CardHeader>
               <CardTitle>Following ({following.length})</CardTitle>
@@ -1058,8 +974,8 @@ export default function Profile() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
     </div>
   );
 }
