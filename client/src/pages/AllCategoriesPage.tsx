@@ -214,9 +214,9 @@ export default function AllCategoriesPage() {
 
                 {/* Horizontal Scrolling Topics */}
                 {topics.length > 0 && (
-                  <div className="relative overflow-hidden w-full">
+                  <div className="relative overflow-hidden w-full min-w-0">
                     <div 
-                      className="flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden pb-2 sm:pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent max-w-full"
+                      className="flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden pb-2 sm:pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent w-full min-w-0"
                       style={{ 
                         scrollbarWidth: 'thin',
                         scrollSnapType: 'x mandatory'
@@ -226,8 +226,11 @@ export default function AllCategoriesPage() {
                       {topics.map((topic) => (
                         <div 
                           key={topic.id} 
-                          className="flex-none w-[280px] sm:w-[300px]"
-                          style={{ scrollSnapAlign: 'start' }}
+                          className="flex-none sm:w-[300px]"
+                          style={{ 
+                            width: 'clamp(260px, calc(100vw - 6rem), 300px)',
+                            scrollSnapAlign: 'start'
+                          }}
                         >
                           <TopicCard
                             id={topic.id}
@@ -243,8 +246,11 @@ export default function AllCategoriesPage() {
                       ))}
                       {category.totalCount > 5 && (
                         <div 
-                          className="flex-none w-[280px] sm:w-[300px]"
-                          style={{ scrollSnapAlign: 'start' }}
+                          className="flex-none sm:w-[300px]"
+                          style={{ 
+                            width: 'clamp(260px, calc(100vw - 6rem), 300px)',
+                            scrollSnapAlign: 'start'
+                          }}
                         >
                           <Card className="h-full hover-elevate active-elevate-2 transition-all">
                             <CardContent className="flex flex-col items-center justify-center h-full min-h-[160px] sm:min-h-[200px] p-4 sm:p-6">
