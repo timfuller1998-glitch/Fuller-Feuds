@@ -11,8 +11,13 @@ import {
   Zap,
   Globe
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Landing() {
+  // Fetch platform statistics
+  const { data: stats } = useQuery({
+    queryKey: ['/api/stats/platform'],
+  });
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       {/* Header */}
@@ -164,28 +169,28 @@ export default function Landing() {
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-4xl font-bold text-primary mb-2">1,247</div>
+              <div className="text-4xl font-bold text-primary mb-2">{stats?.totalTopics || 0}</div>
               <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
                 <MessageCircle className="w-4 h-4" />
                 Active Debates
               </div>
             </div>
             <div>
-              <div className="text-4xl font-bold text-red-500 mb-2">3</div>
+              <div className="text-4xl font-bold text-red-500 mb-2">{stats?.liveStreams || 0}</div>
               <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
                 <Radio className="w-4 h-4" />
                 Live Streams
               </div>
             </div>
             <div>
-              <div className="text-4xl font-bold text-primary mb-2">8,923</div>
+              <div className="text-4xl font-bold text-primary mb-2">{stats?.totalParticipants || 0}</div>
               <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
                 <Users className="w-4 h-4" />
                 Total Participants
               </div>
             </div>
             <div>
-              <div className="text-4xl font-bold text-primary mb-2">24</div>
+              <div className="text-4xl font-bold text-primary mb-2">{stats?.totalCategories || 0}</div>
               <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
                 <Globe className="w-4 h-4" />
                 Categories

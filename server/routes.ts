@@ -114,6 +114,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Platform statistics endpoint
+  app.get('/api/stats/platform', async (req, res) => {
+    try {
+      const [topics, liveStreams, categories] = await Promise.all([
+        storage.getTopics(),
+        storage.getLiveStreams(),
+        storage.getCategories()
+      ]);
+
+      // Get all opinions to count unique participants
+      const allOpinionsPromises = topics.map((topic: any) => storage.getOpinionsByTopic(topic.id));
+      const allOpinionsArrays = await Promise.all(allOpinionsPromises);
+      const allOpinions = allOpinionsArrays.flat();
+
+      // Count unique participants (users who have posted opinions)
+      const uniqueParticipants = new Set(allOpinions.map((o: any) => o.userId)).size;
+
+      res.json({
+        totalTopics: topics.length,
+        liveStreams: liveStreams.filter((s: any) => s.status === 'live').length,
+        totalParticipants: uniqueParticipants,
+        totalCategories: categories.length
+      });
+    } catch (error) {
+      console.error("Error fetching platform stats:", error);
+      res.status(500).json({ message: "Failed to fetch platform statistics" });
+    }
+  });
+
   // Topic routes
   app.get('/api/topics', async (req, res) => {
     try {
