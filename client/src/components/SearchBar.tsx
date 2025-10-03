@@ -182,6 +182,15 @@ export default function SearchBar({
   const handleSubmit = (searchTerm: string) => {
     if (!searchTerm.trim()) return;
     
+    // Check if there are no results - if so, show create form instead of navigating
+    if (hasNoResults) {
+      setTopicTitle(searchTerm);
+      setShowCreateForm(true);
+      // Generate categories for the new topic
+      generateCategoriesMutation.mutate(searchTerm);
+      return;
+    }
+    
     saveToHistory(searchTerm);
     onSearch?.(searchTerm);
     setShowSuggestions(false);
@@ -198,6 +207,7 @@ export default function SearchBar({
       handleSubmit(query);
     } else if (e.key === "Escape") {
       setShowSuggestions(false);
+      setShowCreateForm(false);
     }
   };
 

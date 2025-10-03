@@ -13,9 +13,16 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
+interface PlatformStats {
+  totalTopics: number;
+  liveStreams: number;
+  totalParticipants: number;
+  totalCategories: number;
+}
+
 export default function Landing() {
   // Fetch platform statistics
-  const { data: stats } = useQuery({
+  const { data: stats } = useQuery<PlatformStats>({
     queryKey: ['/api/stats/platform'],
   });
   return (
