@@ -32,7 +32,19 @@ Preferred communication style: Simple, everyday language.
   - Improved UX by removing disruptive popup messages
   - Error handling now uses console logging for debugging without user-facing toasts
 
-### Category System and Live Streams Integration (October 2025)
+### Category System Enhancements (October 2025)
+- **Dynamic Categories in Sidebar**: Sidebar categories are now fully dynamic
+  - Shows all categories from database (not hardcoded preset list)
+  - Categories sorted by popularity with accurate topic counts
+  - Smart icon mapping for common categories
+- **Dynamic All Categories Page with Sorting**: Complete redesign of All Categories page
+  - Shows all categories dynamically from database
+  - 4 sorting options: Most Popular, Alphabetical, Most Recent, Oldest First
+  - Compact mobile layout: smaller spacing, icons, and text
+  - Shows 5 topic cards per category (not 6)
+  - "View All" button moved from header to last card in horizontal scroll
+  - Fixed-width cards (280px) prevent horizontal page scrolling
+  - Individual category sections scroll horizontally for cards
 - **Multi-Category Support**: Fixed category pages to work with multi-category topics
   - CategoryPage.tsx now properly uses categories array instead of single category field
   - AllCategoriesPage.tsx groups topics correctly, allowing topics to appear in multiple categories
