@@ -12,14 +12,32 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### Profile Page Redesign (October 2025)
+### Sidebar Navigation Cleanup (October 2025)
+- **Logo as Home Button**: Kirk Debates logo in sidebar header now links to home page
+  - Removed redundant "Home" link from navigation list
+  - Logo has hover and active states for better interactivity
+- **Profile in Footer**: User avatar and name in sidebar footer now link to profile page
+  - Removed redundant "My Profile" link from navigation list
+  - Footer profile area has hover and active states
+- **Cleaner Navigation**: Removed duplicate navigation items for streamlined UX
+
+### Profile Page Redesign & Mobile Optimization (October 2025)
 - **Clickable Stats Navigation**: Removed tab buttons - stats (Opinions, Debates, Followers, Following) are now clickable and control content display
   - Replaced "Likes" stat with "Debates" count showing user's debate room participation
   - Active section highlighted with subtle background color (bg-primary/10)
-- **Political Leaning Display**: Moved from separate tab to header badge next to profile picture
-  - Displays as a compact badge with icon, label, confidence indicator, and color dot
-  - Positioned between user info and bio for better visibility
-  - No longer a separate content section
+  - Mobile layout: 2-column grid for stats on small screens, horizontal row on desktop
+- **Political Leaning Display**: Redesigned as colored ring around profile avatar
+  - Colored border (4px) based on political leaning score
+  - Colors: Blue (progressive), Purple (moderate), Red (conservative)
+  - Political position and confidence displayed as text under user's name
+  - Format: "{position} • {confidence} confidence" (e.g., "Progressive • high confidence")
+  - Removed slider and badge designs in favor of cleaner visual approach
+- **Mobile Layout Optimization**: Profile header fully responsive
+  - Header stacks vertically on mobile, horizontal on desktop
+  - Avatar: 80px mobile, 96px desktop
+  - Text sizes scale appropriately across breakpoints
+  - Email truncates with ellipsis to prevent overflow
+  - All content fits properly within mobile viewport
 - **Auto-Updating Political Analysis**: Political leaning updates automatically when users add opinions
   - Removed manual "Update Analysis" button
   - Analysis runs asynchronously after opinion creation without blocking response
