@@ -267,19 +267,27 @@ export default function Profile() {
     switch (leaning?.toLowerCase()) {
       case 'progressive':
       case 'moderate-progressive':
-        return 'bg-blue-500';
+        return '#3b82f6'; // blue-500
       case 'conservative':
       case 'moderate-conservative':
-        return 'bg-red-500';
+        return '#ef4444'; // red-500
       case 'moderate':
-        return 'bg-purple-500';
+        return '#a855f7'; // purple-500
       case 'libertarian':
-        return 'bg-yellow-500';
+        return '#eab308'; // yellow-500
       case 'populist':
-        return 'bg-orange-500';
+        return '#f97316'; // orange-500
       default:
-        return 'bg-gray-500';
+        return '#6b7280'; // gray-500
     }
+  };
+
+  const getPoliticalLeaningColorFromScore = (score: number) => {
+    if (score < -50) return '#3b82f6'; // Very Progressive - blue
+    if (score < -20) return '#3b82f6'; // Progressive - blue
+    if (score <= 20) return '#a855f7'; // Moderate - purple
+    if (score <= 50) return '#ef4444'; // Conservative - red
+    return '#ef4444'; // Very Conservative - red
   };
 
   const getLeaningDescription = (score: number) => {
@@ -331,54 +339,57 @@ export default function Profile() {
       {/* Profile Header */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-6">
-              <Avatar className="h-24 w-24 flex-shrink-0">
-                <AvatarImage src={user.profileImageUrl} />
-                <AvatarFallback className="text-2xl">
-                  {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 w-full">
+              <div className="relative flex-shrink-0">
+                <Avatar className="h-20 w-20 sm:h-24 sm:w-24">
+                  <AvatarImage src={user.profileImageUrl} />
+                  <AvatarFallback className="text-2xl">
+                    {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                {profile && profile.politicalLeaning && (
+                  <div 
+                    className="absolute inset-0 rounded-full border-4 pointer-events-none"
+                    style={{ 
+                      borderColor: getPoliticalLeaningColorFromScore(profile.leaningScore),
+                    }}
+                    data-testid="political-leaning-ring"
+                  />
+                )}
+              </div>
               
-              <div className="space-y-2">
-                <div>
-                  <h1 className="text-3xl font-bold" data-testid="profile-name">
+              <div className="space-y-3 flex-1 min-w-0">
+                <div className="space-y-1">
+                  <h1 className="text-2xl sm:text-3xl font-bold break-words" data-testid="profile-name">
                     {user.firstName} {user.lastName}
                   </h1>
-                  <p className="text-muted-foreground" data-testid="profile-email">
+                  {profile && profile.politicalLeaning && (
+                    <p className="text-sm text-muted-foreground" data-testid="political-leaning-label">
+                      {getLeaningDescription(profile.leaningScore)}
+                      {profile.leaningConfidence && (
+                        <span className="text-xs"> • {profile.leaningConfidence} confidence</span>
+                      )}
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground truncate" data-testid="profile-email">
                     {user.email}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4 inline mr-1" />
+                  <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                     Joined {formatJoinDate(user.createdAt)}
                   </p>
                 </div>
-
-                {/* Political Leaning Badge */}
-                {profile && profile.politicalLeaning && (
-                  <div className="flex items-center gap-2" data-testid="political-leaning-badge">
-                    <Badge variant="outline" className="flex items-center gap-1.5">
-                      <Brain className="w-3.5 h-3.5" />
-                      <span>{profile.politicalLeaning}</span>
-                      <div className={`w-2 h-2 rounded-full ${getPoliticalLeaningColor(profile.politicalLeaning)}`} />
-                    </Badge>
-                    {profile.leaningConfidence && (
-                      <span className="text-xs text-muted-foreground">
-                        {profile.leaningConfidence} confidence
-                      </span>
-                    )}
-                  </div>
-                )}
                 
                 {profile?.bio && (
-                  <p className="text-sm max-w-md" data-testid="profile-bio">
+                  <p className="text-sm break-words" data-testid="profile-bio">
                     {profile.bio}
                   </p>
                 )}
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 sm:flex-shrink-0">
               {!isOwnProfile && currentUser && (
                 <Button
                   onClick={() => followMutation.mutate(followStatus?.isFollowing ? 'unfollow' : 'follow')}
@@ -403,38 +414,38 @@ export default function Profile() {
           </div>
           
           {/* Stats - Now Clickable */}
-          <div className="flex items-center gap-4 mt-6 pt-6 border-t">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 mt-6 pt-6 border-t">
             <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-4 py-2 transition-colors ${activeSection === 'opinions' ? 'bg-primary/10' : ''}`}
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'opinions' ? 'bg-primary/10' : ''}`}
               onClick={() => setActiveSection('opinions')}
               data-testid="stat-opinions"
             >
-              <div className="text-2xl font-bold">{profile?.totalOpinions || 0}</div>
-              <div className="text-sm text-muted-foreground">Opinions</div>
+              <div className="text-lg sm:text-2xl font-bold">{profile?.totalOpinions || 0}</div>
+              <div className="text-xs text-muted-foreground">Opinions</div>
             </button>
             <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-4 py-2 transition-colors ${activeSection === 'debates' ? 'bg-primary/10' : ''}`}
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'debates' ? 'bg-primary/10' : ''}`}
               onClick={() => setActiveSection('debates')}
               data-testid="stat-debates"
             >
-              <div className="text-2xl font-bold">{debateRooms?.length || 0}</div>
-              <div className="text-sm text-muted-foreground">Debates</div>
+              <div className="text-lg sm:text-2xl font-bold">{debateRooms?.length || 0}</div>
+              <div className="text-xs text-muted-foreground">Debates</div>
             </button>
             <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-4 py-2 transition-colors ${activeSection === 'followers' ? 'bg-primary/10' : ''}`}
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'followers' ? 'bg-primary/10' : ''}`}
               onClick={() => setActiveSection('followers')}
               data-testid="stat-followers"
             >
-              <div className="text-2xl font-bold">{profile?.followerCount || 0}</div>
-              <div className="text-sm text-muted-foreground">Followers</div>
+              <div className="text-lg sm:text-2xl font-bold">{profile?.followerCount || 0}</div>
+              <div className="text-xs text-muted-foreground">Followers</div>
             </button>
             <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-4 py-2 transition-colors ${activeSection === 'following' ? 'bg-primary/10' : ''}`}
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'following' ? 'bg-primary/10' : ''}`}
               onClick={() => setActiveSection('following')}
               data-testid="stat-following"
             >
-              <div className="text-2xl font-bold">{profile?.followingCount || 0}</div>
-              <div className="text-sm text-muted-foreground">Following</div>
+              <div className="text-lg sm:text-2xl font-bold">{profile?.followingCount || 0}</div>
+              <div className="text-xs text-muted-foreground">Following</div>
             </button>
           </div>
         </CardContent>
