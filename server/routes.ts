@@ -161,11 +161,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/topics', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const { initialOpinion, ...topicData } = req.body;
       
-      // Validate the data
+      // Validate the topic data
       const validatedData = insertTopicSchema.parse({
-        ...req.body,
-        createdById: userId
+        ...topicData,
+        createdById: userId,
+        description: '' // Set empty description for backward compatibility
       });
       
       // Generate AI image based on topic title
@@ -182,6 +184,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData,
         imageUrl
       });
+      
+      // Create initial opinion if provided
+      if (initialOpinion && initialOpinion.trim()) {
+        try {
+          await storage.createOpinion({
+            topicId: topic.id,
+            userId: userId,
+            content: initialOpinion.trim(),
+            stance: 'neutral' // Default stance, user can change later
+          });
+        } catch (opinionError) {
+          console.error("Error creating initial opinion:", opinionError);
+          // Continue even if opinion creation fails
+        }
+      }
       
       res.status(201).json(topic);
     } catch (error) {

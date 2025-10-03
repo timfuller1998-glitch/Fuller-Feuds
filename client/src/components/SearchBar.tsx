@@ -28,7 +28,7 @@ export default function SearchBar({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [topicTitle, setTopicTitle] = useState("");
-  const [topicDescription, setTopicDescription] = useState("");
+  const [initialOpinion, setInitialOpinion] = useState("");
   const [topicCategories, setTopicCategories] = useState<string[]>([]);
   const [categoryInput, setCategoryInput] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -131,7 +131,7 @@ export default function SearchBar({
 
   // Create topic mutation
   const createTopicMutation = useMutation({
-    mutationFn: async (data: { title: string; description: string; categories: string[] }) => {
+    mutationFn: async (data: { title: string; initialOpinion: string; categories: string[] }) => {
       const response = await apiRequest("POST", "/api/topics", data);
       return response.json();
     },
@@ -140,7 +140,7 @@ export default function SearchBar({
       setShowSuggestions(false);
       setShowCreateForm(false);
       setTopicTitle("");
-      setTopicDescription("");
+      setInitialOpinion("");
       setTopicCategories([]);
       setCategoryInput("");
       setLocation(`/topic/${data.id}`);
@@ -169,7 +169,7 @@ export default function SearchBar({
     if (!topicTitle.trim() || topicCategories.length === 0) return;
     createTopicMutation.mutate({
       title: topicTitle,
-      description: topicDescription,
+      initialOpinion: initialOpinion,
       categories: topicCategories,
     });
   };
@@ -355,7 +355,7 @@ export default function SearchBar({
                   onClick={() => {
                     setShowCreateForm(false);
                     setTopicTitle("");
-                    setTopicDescription("");
+                    setInitialOpinion("");
                     setTopicCategories([]);
                     setCategoryInput("");
                   }}
@@ -381,14 +381,14 @@ export default function SearchBar({
 
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                    Description
+                    Your Initial Opinion
                   </label>
                   <Textarea
-                    value={topicDescription}
-                    onChange={(e) => setTopicDescription(e.target.value)}
-                    placeholder="Describe the debate topic..."
+                    value={initialOpinion}
+                    onChange={(e) => setInitialOpinion(e.target.value)}
+                    placeholder="Share your thoughts on this topic..."
                     className="min-h-[80px] text-sm resize-none"
-                    data-testid="input-topic-description"
+                    data-testid="input-initial-opinion"
                   />
                 </div>
 
