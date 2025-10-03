@@ -5,8 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import SearchBar from "@/components/SearchBar";
 import TopicCard from "@/components/TopicCard";
-import StreamingTopicCard from "@/components/StreamingTopicCard";
-import LiveStreamDebate from "@/components/LiveStreamDebate";
 import LiveDebateRoom from "@/components/LiveDebateRoom";
 import OpinionCard from "@/components/OpinionCard";
 import CumulativeOpinion from "@/components/CumulativeOpinion";
@@ -22,9 +20,6 @@ import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye, RefreshCw, Zap, Mic
 import { insertTopicSchema, insertOpinionSchema, type Topic, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import climateImage from '@assets/generated_images/Climate_change_debate_thumbnail_3b0bbda7.png';
-import aiImage from '@assets/generated_images/AI_ethics_debate_thumbnail_98fa03cc.png';
-import educationImage from '@assets/generated_images/Education_reform_debate_thumbnail_a88506ee.png';
-import healthcareImage from '@assets/generated_images/Healthcare_policy_debate_thumbnail_269685b7.png';
 
 const topicFormSchema = insertTopicSchema.omit({
   createdById: true,  // Server will set this from authenticated user
@@ -195,137 +190,17 @@ export default function Home() {
     "Environment", "Education", "Healthcare", "Ethics", "Culture"
   ];
 
-  // todo: remove mock functionality
-  const trendingTopics = [
-    {
-      id: "climate-change",
-      title: "Climate Change: Individual vs. Systemic Action",
-      description: "Should we focus on individual lifestyle changes or systemic policy reforms to address climate change effectively?",
-      imageUrl: climateImage,
-      categories: ["Environment", "Politics"],
-      participantCount: 247,
-      opinionsCount: 1832,
-      isActive: true
-    },
-    {
-      id: "ai-ethics",
-      title: "AI in Decision Making: Progress or Problem?",
-      description: "Are AI systems making our lives better or creating new forms of bias and discrimination in important decisions?",
-      imageUrl: aiImage,
-      categories: ["Technology", "Ethics"],
-      participantCount: 156,
-      opinionsCount: 923,
-      isActive: true
-    },
-    {
-      id: "education-reform",
-      title: "Traditional vs. Progressive Education Methods",
-      description: "Which approach better prepares students for the modern world: structured traditional education or flexible progressive methods?",
-      imageUrl: educationImage,
-      categories: ["Education", "Social Issues"],
-      participantCount: 189,
-      opinionsCount: 1247,
-      isActive: false
-    },
-    {
-      id: "healthcare-policy",
-      title: "Universal Healthcare: Right or Privilege?",
-      description: "Should healthcare be guaranteed as a universal right or remain a service based on individual responsibility and choice?",
-      imageUrl: healthcareImage,
-      categories: ["Politics", "Healthcare"],
-      participantCount: 298,
-      opinionsCount: 2156,
-      isActive: true
-    }
-  ];
-
-  // todo: remove mock functionality
-  const liveStreamingTopics = [
-    {
-      id: "live-climate",
-      title: "Climate Change: Individual vs. Systemic Action",
-      description: "Live debate featuring climate experts discussing the most effective approaches to environmental action.",
-      imageUrl: climateImage,
-      categories: ["Environment", "Politics"],
-      participants: [
-        { id: "p1", name: "Dr. Sarah Chen", stance: "for" as const },
-        { id: "p2", name: "Prof. Marcus Rodriguez", stance: "against" as const }
-      ],
-      moderator: { name: "Alex Thompson" },
-      viewerCount: 1247,
-      status: "live" as const
-    },
-    {
-      id: "scheduled-ai",
-      title: "AI Ethics in Healthcare Decisions",
-      description: "Scheduled debate on the role of AI in making critical healthcare decisions.",
-      imageUrl: aiImage,
-      categories: ["Technology", "Healthcare", "Ethics"],
-      scheduledTime: "Today 3:00 PM",
-      participants: [
-        { id: "p3", name: "Dr. Emily Watson", stance: "for" as const },
-        { id: "p4", name: "Prof. David Kim", stance: "against" as const }
-      ],
-      moderator: { name: "Jordan Martinez" },
-      status: "scheduled" as const
-    },
-    {
-      id: "ended-education",
-      title: "Traditional vs. Progressive Education",
-      description: "Recent debate on educational methodologies and their effectiveness.",
-      imageUrl: educationImage,
-      categories: ["Education", "Social Issues"],
-      participants: [
-        { id: "p5", name: "Prof. Lisa Anderson", stance: "for" as const },
-        { id: "p6", name: "Dr. Michael Brown", stance: "against" as const }
-      ],
-      moderator: { name: "Sam Taylor" },
-      status: "ended" as const,
-      duration: "1h 23m"
-    }
-  ];
-
-  const recentOpinions = [
-    {
-      id: "opinion-1",
-      topicId: "climate-change",
-      userId: "mock-user-1",
-      userName: "Sarah Chen",
-      content: "I believe that individual actions, while important, are not sufficient to address the scale of the climate crisis. We need systemic changes in policy and corporate behavior.",
-      stance: "for" as const,
-      timestamp: "2 hours ago",
-      likesCount: 24,
-      dislikesCount: 3,
-      repliesCount: 8
-    },
-    {
-      id: "opinion-2",
-      topicId: "climate-change",
-      userId: "mock-user-2",
-      userName: "Marcus Rodriguez",
-      content: "The focus on individual responsibility is actually counterproductive. It shifts blame away from the major corporations that have the real power to make a difference.",
-      stance: "against" as const,
-      timestamp: "4 hours ago",
-      likesCount: 18,
-      dislikesCount: 12,
-      repliesCount: 15
-    }
-  ];
-
-  // Combine API topics with mock topics for display
-  const combinedTopics = [
-    ...(apiTopics?.map(topic => ({
-      id: topic.id,
-      title: topic.title,
-      description: topic.description,
-      imageUrl: topic.imageUrl || climateImage, // Use default image if none provided
-      categories: topic.categories,
-      participantCount: 0, // We'll calculate this later
-      opinionsCount: 0, // We'll calculate this later
-      isActive: topic.isActive || false
-    })) || []),
-    ...trendingTopics
-  ];
+  // Use only real API topics - no mock data
+  const combinedTopics = apiTopics?.map(topic => ({
+    id: topic.id,
+    title: topic.title,
+    description: topic.description,
+    imageUrl: topic.imageUrl || climateImage, // Use default image if none provided
+    categories: topic.categories,
+    participantCount: 0, // We'll calculate this later
+    opinionsCount: 0, // We'll calculate this later
+    isActive: topic.isActive || false
+  })) || [];
 
   const filteredTopics = combinedTopics.filter(topic =>
     topic.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -361,47 +236,7 @@ export default function Home() {
     }
   }
 
-  // If viewing a live stream, show the full streaming interface
-  if (viewingLiveStream) {
-    const streamTopic = liveStreamingTopics.find(topic => topic.id === viewingLiveStream);
-    if (streamTopic) {
-      return (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <Button 
-              variant="outline" 
-              onClick={() => setViewingLiveStream(null)}
-              data-testid="button-back-to-topics"
-            >
-              ← Back to Topics
-            </Button>
-            <Badge className="bg-red-500 text-white">
-              🔴 LIVE
-            </Badge>
-          </div>
-          
-          <LiveStreamDebate
-            topicId={streamTopic.id}
-            title={streamTopic.title}
-            viewerCount={streamTopic.viewerCount || 0}
-            duration="24:15"
-            participants={streamTopic.participants.map(p => ({
-              ...p,
-              isSpeaking: p.id === "p1",
-              isMuted: false,
-              isCameraOn: true
-            }))}
-            moderator={{ id: "mod-1", name: streamTopic.moderator.name }}
-            currentUserId="current-user"
-            isLive={streamTopic.status === "live"}
-            onJoinAsViewer={() => console.log('Join as viewer')}
-            onRequestToSpeak={() => console.log('Request to speak')}
-            onModerateChat={(msgId, action) => console.log('Moderate:', msgId, action)}
-          />
-        </div>
-      );
-    }
-  }
+  // Live stream viewing removed - no mock data
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -449,29 +284,24 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Live Streaming Debates */}
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h2 className="text-xl sm:text-2xl font-bold">Live Streaming Debates</h2>
-          {stats && stats.liveStreams > 0 && (
+      {/* Live Streaming Debates - only show when there are actual live streams */}
+      {stats && stats.liveStreams > 0 && (
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-xl sm:text-2xl font-bold">Live Streaming Debates</h2>
             <div className="flex items-center gap-2">
               <Badge className="bg-red-500 text-white animate-pulse">
                 <Radio className="w-3 h-3 mr-1" />
                 Live Now
               </Badge>
             </div>
-          )}
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Live streams will be fetched from API when available */}
+          </div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {liveStreamingTopics.map((topic) => (
-            <StreamingTopicCard
-              key={topic.id}
-              {...topic}
-            />
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Trending Topics */}
       <div className="space-y-4 sm:space-y-6">
@@ -722,16 +552,10 @@ export default function Home() {
               </Button>
             </div>
           ) : (
-            /* Show mock opinions when no specific topic is selected */
-            recentOpinions.map((opinion) => (
-              <OpinionCard
-                key={opinion.id}
-                {...opinion}
-                onLike={(id) => console.log('Liked:', id)}
-                onDislike={(id) => console.log('Disliked:', id)}
-                onReply={(id) => console.log('Reply to:', id)}
-              />
-            ))
+            <div className="text-center py-8">
+              <MessageCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">Select a topic to view opinions.</p>
+            </div>
           )}
         </div>
         
