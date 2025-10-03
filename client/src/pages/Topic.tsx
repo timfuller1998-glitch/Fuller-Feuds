@@ -131,6 +131,7 @@ export default function Topic() {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/platform"] });
       opinionForm.reset();
       setShowOpinionForm(false);
     },

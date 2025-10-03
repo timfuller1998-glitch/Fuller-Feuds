@@ -50,6 +50,16 @@ export default function Home() {
   const [showCreateTopic, setShowCreateTopic] = useState(false);
   const [showCreateOpinion, setShowCreateOpinion] = useState(false);
 
+  // Fetch platform statistics
+  const { data: stats } = useQuery<{
+    totalTopics: number;
+    liveStreams: number;
+    totalParticipants: number;
+    totalCategories: number;
+  }>({
+    queryKey: ['/api/stats/platform'],
+  });
+
   // Fetch real topics from API
   const { data: apiTopics, isLoading: topicsLoading } = useQuery<Topic[]>({
     queryKey: ["/api/topics", { search: searchQuery }],
@@ -97,6 +107,7 @@ export default function Home() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/platform"] });
       setShowCreateTopic(false);
     },
     onError: (error: any) => {
@@ -112,6 +123,7 @@ export default function Home() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "opinions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "cumulative"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/platform"] });
       setShowCreateOpinion(false);
     },
     onError: (error: any) => {
@@ -406,7 +418,7 @@ export default function Home() {
       {/* Stats Section */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
         <div className="text-center p-3 sm:p-4 md:p-6 rounded-lg bg-card border">
-          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1 sm:mb-2">1,247</div>
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1 sm:mb-2">{stats?.totalTopics || 0}</div>
           <div className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center gap-1">
             <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">Active Debates</span>
@@ -414,7 +426,7 @@ export default function Home() {
           </div>
         </div>
         <div className="text-center p-3 sm:p-4 md:p-6 rounded-lg bg-card border">
-          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-red-500 mb-1 sm:mb-2">3</div>
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-red-500 mb-1 sm:mb-2">{stats?.liveStreams || 0}</div>
           <div className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center gap-1">
             <Radio className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">Live Streams</span>
@@ -422,7 +434,7 @@ export default function Home() {
           </div>
         </div>
         <div className="text-center p-3 sm:p-4 md:p-6 rounded-lg bg-card border">
-          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1 sm:mb-2">8,923</div>
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1 sm:mb-2">{stats?.totalParticipants || 0}</div>
           <div className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center gap-1">
             <Users className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">Total Participants</span>
@@ -430,7 +442,7 @@ export default function Home() {
           </div>
         </div>
         <div className="text-center p-3 sm:p-4 md:p-6 rounded-lg bg-card border">
-          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1 sm:mb-2">24</div>
+          <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1 sm:mb-2">{stats?.totalCategories || 0}</div>
           <div className="text-xs sm:text-sm text-muted-foreground">
             Categories
           </div>
@@ -441,16 +453,14 @@ export default function Home() {
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h2 className="text-xl sm:text-2xl font-bold">Live Streaming Debates</h2>
-          <div className="flex items-center gap-2">
-            <Badge className="bg-red-500 text-white animate-pulse">
-              <Radio className="w-3 h-3 mr-1" />
-              Live Now
-            </Badge>
-            <Badge variant="secondary">
-              <Eye className="w-3 h-3 mr-1" />
-              1,247 watching
-            </Badge>
-          </div>
+          {stats && stats.liveStreams > 0 && (
+            <div className="flex items-center gap-2">
+              <Badge className="bg-red-500 text-white animate-pulse">
+                <Radio className="w-3 h-3 mr-1" />
+                Live Now
+              </Badge>
+            </div>
+          )}
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

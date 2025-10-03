@@ -160,6 +160,7 @@ export default function SearchBar({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/platform"] });
       setShowSuggestions(false);
       setShowCreateForm(false);
       setTopicTitle("");
