@@ -166,10 +166,10 @@ export default function SearchBar({
 
   // Handle form submission
   const handleCreateTopic = () => {
-    if (!topicTitle.trim() || topicCategories.length === 0) return;
+    if (!topicTitle.trim() || !initialOpinion.trim() || topicCategories.length === 0) return;
     createTopicMutation.mutate({
       title: topicTitle,
-      initialOpinion: initialOpinion,
+      initialOpinion: initialOpinion.trim(),
       categories: topicCategories,
     });
   };
@@ -386,9 +386,10 @@ export default function SearchBar({
                   <Textarea
                     value={initialOpinion}
                     onChange={(e) => setInitialOpinion(e.target.value)}
-                    placeholder="Share your thoughts on this topic..."
+                    placeholder="Share your thoughts on this topic... (required)"
                     className="min-h-[80px] text-sm resize-none"
                     data-testid="input-initial-opinion"
+                    required
                   />
                 </div>
 
@@ -449,7 +450,7 @@ export default function SearchBar({
 
                 <Button
                   onClick={handleCreateTopic}
-                  disabled={!topicTitle.trim() || topicCategories.length === 0 || createTopicMutation.isPending}
+                  disabled={!topicTitle.trim() || !initialOpinion.trim() || topicCategories.length === 0 || createTopicMutation.isPending}
                   className="w-full"
                   data-testid="button-submit-create-topic"
                 >

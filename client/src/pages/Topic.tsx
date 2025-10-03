@@ -10,6 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { ArrowLeft, MessageCircle, Users, TrendingUp, RefreshCw, Video, Calendar, Clock, Eye } from "lucide-react";
 import { Link } from "wouter";
 import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
@@ -65,6 +68,19 @@ export default function Topic() {
     enabled: !!id,
   });
 
+  // Fetch user's profile for opinion sort preference
+  const { data: userProfile } = useQuery<{ opinionSortPreference?: string }>({
+    queryKey: ["/api/profile", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const response = await fetch(`/api/profile/${user.id}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.profile;
+    },
+    enabled: !!user?.id,
+  });
+
   // Fetch live streams for this topic
   const { data: liveStreams } = useQuery<any[]>({
     queryKey: ["/api/live-streams", { topicId: id }],
@@ -73,6 +89,35 @@ export default function Topic() {
 
   // Get user's opinion on this topic to determine stance
   const userOpinion = opinions?.find(o => o.userId === user?.id);
+
+  // Sort opinions based on user preference
+  const sortOpinions = (opinionList: Opinion[]) => {
+    const sortPref = userProfile?.opinionSortPreference || 'newest';
+    const sorted = [...opinionList];
+    
+    switch (sortPref) {
+      case 'oldest':
+        return sorted.sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return aTime - bTime;
+        });
+      case 'most_liked':
+        return sorted.sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
+      case 'newest':
+      default:
+        return sorted.sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+    }
+  };
+
+  // Filter opinions by stance
+  const supportingOpinions = sortOpinions(opinions?.filter(o => o.stance === 'for' && o.userId !== user?.id) || []);
+  const neutralOpinions = sortOpinions(opinions?.filter(o => o.stance === 'neutral' && o.userId !== user?.id) || []);
+  const opposingOpinions = sortOpinions(opinions?.filter(o => o.stance === 'against' && o.userId !== user?.id) || []);
 
   // Create opinion mutation
   const createOpinionMutation = useMutation({
@@ -184,7 +229,9 @@ export default function Topic() {
       {/* Topic Title Above Image */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <Badge variant="secondary">{topic.category}</Badge>
+          {topic.categories.map((cat) => (
+            <Badge key={cat} variant="secondary">{cat}</Badge>
+          ))}
           {topic.isActive && (
             <Badge className="bg-chart-1 text-white">
               <TrendingUp className="w-3 h-3 mr-1" />
@@ -192,12 +239,9 @@ export default function Topic() {
             </Badge>
           )}
         </div>
-        <h1 className="text-4xl font-bold mb-2" data-testid="text-topic-title">
+        <h1 className="text-4xl font-bold mb-4" data-testid="text-topic-title">
           {topic.title}
         </h1>
-        <p className="text-muted-foreground text-lg mb-2">
-          {topic.description}
-        </p>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
             <MessageCircle className="w-4 h-4" />
@@ -288,109 +332,195 @@ export default function Topic() {
         </CardContent>
       </Card>
 
-      {/* Add Your Opinion Section */}
+      {/* Opinions Section with Tabs */}
       <Card>
         <CardHeader>
-          <CardTitle>Share Your Opinion</CardTitle>
+          <CardTitle>Opinions</CardTitle>
         </CardHeader>
         <CardContent>
-          {userOpinion && !showOpinionForm ? (
-            <div className="space-y-4">
-              <div className="p-4 bg-muted rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant={userOpinion.stance === 'for' ? 'default' : userOpinion.stance === 'against' ? 'destructive' : 'secondary'}>
-                    {userOpinion.stance}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">Your current opinion</span>
-                </div>
-                <p className="text-sm">{userOpinion.content}</p>
-              </div>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
-                  opinionForm.setValue('content', userOpinion.content);
-                  setShowOpinionForm(true);
-                }}
-                data-testid="button-change-opinion"
-              >
-                Update Opinion
-              </Button>
-            </div>
-          ) : showOpinionForm ? (
-            <Form {...opinionForm}>
-              <form onSubmit={opinionForm.handleSubmit(onSubmitOpinion)} className="space-y-4">
-                <FormField
-                  control={opinionForm.control}
-                  name="stance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Your Stance</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-stance">
-                            <SelectValue placeholder="Select your stance" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="for">For</SelectItem>
-                          <SelectItem value="against">Against</SelectItem>
-                          <SelectItem value="neutral">Neutral</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={opinionForm.control}
-                  name="content"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Your Opinion</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Share your thoughts..."
-                          className="min-h-[120px]"
-                          data-testid="input-opinion-content"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="flex gap-2">
+          <Tabs defaultValue="your-opinion" className="w-full">
+            <TabsList className="grid w-full grid-cols-4 mb-4">
+              <TabsTrigger value="your-opinion" data-testid="tab-your-opinion">Your Opinion</TabsTrigger>
+              <TabsTrigger value="supporting" data-testid="tab-supporting">
+                Supporting ({supportingOpinions.length})
+              </TabsTrigger>
+              <TabsTrigger value="neutral" data-testid="tab-neutral">
+                Neutral ({neutralOpinions.length})
+              </TabsTrigger>
+              <TabsTrigger value="opposing" data-testid="tab-opposing">
+                Opposing ({opposingOpinions.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="your-opinion" className="space-y-4">
+              {userOpinion && !showOpinionForm ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-muted rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant={userOpinion.stance === 'for' ? 'default' : userOpinion.stance === 'against' ? 'destructive' : 'secondary'}>
+                        {userOpinion.stance}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">Your current opinion</span>
+                    </div>
+                    <p className="text-sm">{userOpinion.content}</p>
+                  </div>
                   <Button 
-                    type="button" 
                     variant="outline" 
                     onClick={() => {
-                      opinionForm.reset();
-                      setShowOpinionForm(false);
+                      opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
+                      opinionForm.setValue('content', userOpinion.content);
+                      setShowOpinionForm(true);
                     }}
-                    data-testid="button-cancel-opinion"
+                    data-testid="button-change-opinion"
                   >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={createOpinionMutation.isPending}
-                    data-testid="button-submit-opinion"
-                  >
-                    {createOpinionMutation.isPending ? "Sharing..." : "Share Opinion"}
+                    Update Opinion
                   </Button>
                 </div>
-              </form>
-            </Form>
-          ) : (
-            <Button 
-              onClick={() => setShowOpinionForm(true)}
-              data-testid="button-add-opinion"
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Add Your Opinion
-            </Button>
-          )}
+              ) : showOpinionForm ? (
+                <Form {...opinionForm}>
+                  <form onSubmit={opinionForm.handleSubmit(onSubmitOpinion)} className="space-y-4">
+                    <FormField
+                      control={opinionForm.control}
+                      name="stance"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Your Stance</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-stance">
+                                <SelectValue placeholder="Select your stance" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="for">For</SelectItem>
+                              <SelectItem value="against">Against</SelectItem>
+                              <SelectItem value="neutral">Neutral</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={opinionForm.control}
+                      name="content"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Your Opinion</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Share your thoughts..."
+                              className="min-h-[120px]"
+                              data-testid="input-opinion-content"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex gap-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => {
+                          opinionForm.reset();
+                          setShowOpinionForm(false);
+                        }}
+                        data-testid="button-cancel-opinion"
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={createOpinionMutation.isPending}
+                        data-testid="button-submit-opinion"
+                      >
+                        {createOpinionMutation.isPending ? "Sharing..." : "Share Opinion"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              ) : (
+                <Button 
+                  onClick={() => setShowOpinionForm(true)}
+                  data-testid="button-add-opinion"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Add Your Opinion
+                </Button>
+              )}
+            </TabsContent>
+
+            <TabsContent value="supporting" className="space-y-3">
+              {supportingOpinions.length > 0 ? (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {supportingOpinions.map((opinion) => (
+                    <div key={opinion.id} className="p-4 border rounded-lg space-y-2" data-testid={`opinion-${opinion.id}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="default" className="text-xs">For</Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <ThumbsUp className="w-4 h-4" />
+                          <span>{opinion.likesCount || 0}</span>
+                        </div>
+                      </div>
+                      <p className="text-sm">{opinion.content}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">No supporting opinions yet</p>
+              )}
+            </TabsContent>
+
+            <TabsContent value="neutral" className="space-y-3">
+              {neutralOpinions.length > 0 ? (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {neutralOpinions.map((opinion) => (
+                    <div key={opinion.id} className="p-4 border rounded-lg space-y-2" data-testid={`opinion-${opinion.id}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">Neutral</Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <ThumbsUp className="w-4 h-4" />
+                          <span>{opinion.likesCount || 0}</span>
+                        </div>
+                      </div>
+                      <p className="text-sm">{opinion.content}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">No neutral opinions yet</p>
+              )}
+            </TabsContent>
+
+            <TabsContent value="opposing" className="space-y-3">
+              {opposingOpinions.length > 0 ? (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {opposingOpinions.map((opinion) => (
+                    <div key={opinion.id} className="p-4 border rounded-lg space-y-2" data-testid={`opinion-${opinion.id}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="destructive" className="text-xs">Against</Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <ThumbsUp className="w-4 h-4" />
+                          <span>{opinion.likesCount || 0}</span>
+                        </div>
+                      </div>
+                      <p className="text-sm">{opinion.content}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">No opposing opinions yet</p>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 

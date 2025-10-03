@@ -20,6 +20,7 @@ const profileFormSchema = z.object({
   displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
   displayLastName: z.string().max(50, "Last name must be 50 characters or less").optional().or(z.literal("")),
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
+  opinionSortPreference: z.enum(["newest", "oldest", "most_liked"]).optional(),
 });
 
 interface ProfileData {
@@ -37,6 +38,7 @@ interface ProfileData {
     bio?: string;
     displayFirstName?: string;
     displayLastName?: string;
+    opinionSortPreference?: string;
     politicalLeaning?: number;
     politicalLeaningLabel?: string;
   };
@@ -60,6 +62,7 @@ export default function Settings() {
       displayFirstName: "",
       displayLastName: "",
       bio: "",
+      opinionSortPreference: "newest",
     },
   });
 
@@ -70,6 +73,7 @@ export default function Settings() {
         displayFirstName: profileData.profile.displayFirstName || "",
         displayLastName: profileData.profile.displayLastName || "",
         bio: profileData.profile.bio || "",
+        opinionSortPreference: (profileData.profile.opinionSortPreference || "newest") as "newest" | "oldest" | "most_liked",
       });
     }
   }, [profileData, form]);
@@ -281,6 +285,32 @@ export default function Settings() {
                     </FormControl>
                     <FormDescription>
                       A brief description about yourself (max 500 characters)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="opinionSortPreference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Opinion Sorting Preference</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-opinion-sort">
+                          <SelectValue placeholder="Select sorting preference" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="newest" data-testid="option-sort-newest">Newest First</SelectItem>
+                        <SelectItem value="oldest" data-testid="option-sort-oldest">Oldest First</SelectItem>
+                        <SelectItem value="most_liked" data-testid="option-sort-most-liked">Most Liked</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Choose how opinions are sorted when viewing topics
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
