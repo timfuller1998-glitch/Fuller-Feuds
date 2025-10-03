@@ -50,24 +50,6 @@ export default function SearchBar({
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Auto-show create form when Enter is pressed and search completes with no results
-  useEffect(() => {
-    if (pendingEnterKey && debouncedQuery === pendingEnterKey && hasNoResults) {
-      setTopicTitle(pendingEnterKey);
-      setShowCreateForm(true);
-      generateCategoriesMutation.mutate(pendingEnterKey);
-      setPendingEnterKey(null);
-    } else if (pendingEnterKey && debouncedQuery === pendingEnterKey && topics && topics.length > 0) {
-      // Has results, navigate to search page
-      saveToHistory(pendingEnterKey);
-      onSearch?.(pendingEnterKey);
-      setShowSuggestions(false);
-      setLocation(`/search?q=${encodeURIComponent(pendingEnterKey)}`);
-      window.dispatchEvent(new CustomEvent('searchHistoryUpdate'));
-      setPendingEnterKey(null);
-    }
-  }, [pendingEnterKey, debouncedQuery, hasNoResults, topics]);
-
   // Close suggestions when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -92,6 +74,28 @@ export default function SearchBar({
     },
     enabled: debouncedQuery.length >= 2,
   });
+
+  // Calculate search state variables (must be before useEffect that uses them)
+  const hasResults = topics && topics.length > 0;
+  const hasNoResults = query.length >= 2 && topics !== undefined && topics.length === 0;
+
+  // Auto-show create form when Enter is pressed and search completes with no results
+  useEffect(() => {
+    if (pendingEnterKey && debouncedQuery === pendingEnterKey && hasNoResults) {
+      setTopicTitle(pendingEnterKey);
+      setShowCreateForm(true);
+      generateCategoriesMutation.mutate(pendingEnterKey);
+      setPendingEnterKey(null);
+    } else if (pendingEnterKey && debouncedQuery === pendingEnterKey && topics && topics.length > 0) {
+      // Has results, navigate to search page
+      saveToHistory(pendingEnterKey);
+      onSearch?.(pendingEnterKey);
+      setShowSuggestions(false);
+      setLocation(`/search?q=${encodeURIComponent(pendingEnterKey)}`);
+      window.dispatchEvent(new CustomEvent('searchHistoryUpdate'));
+      setPendingEnterKey(null);
+    }
+  }, [pendingEnterKey, debouncedQuery, hasNoResults, topics]);
 
   // Get search history from localStorage
   const getSearchHistory = (): string[] => {
@@ -231,8 +235,6 @@ export default function SearchBar({
   const categories = Array.from(new Set(topics?.flatMap(t => t.categories) || []));
   
   // Show suggestions if we have query OR history, and field is focused
-  const hasResults = topics && topics.length > 0;
-  const hasNoResults = query.length >= 2 && topics !== undefined && topics.length === 0;
   const hasSuggestions = (query.length >= 2 && hasResults) || 
                          (query.length === 0 && searchHistory.length > 0) ||
                          (query.length >= 2 && categories.length > 0) ||
