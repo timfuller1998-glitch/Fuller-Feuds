@@ -339,17 +339,40 @@ export default function Topic() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="your-opinion" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4">
-              <TabsTrigger value="your-opinion" data-testid="tab-your-opinion">Your Opinion</TabsTrigger>
-              <TabsTrigger value="supporting" data-testid="tab-supporting">
-                Supporting ({supportingOpinions.length})
-              </TabsTrigger>
-              <TabsTrigger value="neutral" data-testid="tab-neutral">
-                Neutral ({neutralOpinions.length})
-              </TabsTrigger>
-              <TabsTrigger value="opposing" data-testid="tab-opposing">
-                Opposing ({opposingOpinions.length})
-              </TabsTrigger>
+            <TabsList className="w-full h-auto p-0 bg-transparent border-b rounded-none mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 w-full gap-0">
+                <TabsTrigger 
+                  value="your-opinion" 
+                  data-testid="tab-your-opinion"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2 sm:px-4 py-3 text-xs sm:text-sm"
+                >
+                  <span className="hidden sm:inline">Your Opinion</span>
+                  <span className="sm:hidden">Yours</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="supporting" 
+                  data-testid="tab-supporting"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2 sm:px-4 py-3 text-xs sm:text-sm"
+                >
+                  <span className="hidden sm:inline">Supporting ({supportingOpinions.length})</span>
+                  <span className="sm:hidden">For ({supportingOpinions.length})</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="neutral" 
+                  data-testid="tab-neutral"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2 sm:px-4 py-3 text-xs sm:text-sm"
+                >
+                  Neutral ({neutralOpinions.length})
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="opposing" 
+                  data-testid="tab-opposing"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2 sm:px-4 py-3 text-xs sm:text-sm"
+                >
+                  <span className="hidden sm:inline">Opposing ({opposingOpinions.length})</span>
+                  <span className="sm:hidden">Against ({opposingOpinions.length})</span>
+                </TabsTrigger>
+              </div>
             </TabsList>
 
             <TabsContent value="your-opinion" className="space-y-4">
