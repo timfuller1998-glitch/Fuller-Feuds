@@ -544,7 +544,7 @@ export default function Topic() {
                         voteType: 'dislike',
                         currentVote: opinion.userVote?.voteType 
                       })}
-                      onReply={(id) => console.log('Reply to:', id)}
+                      onReply={(id) => {}}
                       onChallenge={(id) => setChallengingOpinionId(id)}
                     />
                   ))}
@@ -583,7 +583,7 @@ export default function Topic() {
                         voteType: 'dislike',
                         currentVote: opinion.userVote?.voteType 
                       })}
-                      onReply={(id) => console.log('Reply to:', id)}
+                      onReply={(id) => {}}
                       onChallenge={(id) => setChallengingOpinionId(id)}
                     />
                   ))}
@@ -622,7 +622,7 @@ export default function Topic() {
                         voteType: 'dislike',
                         currentVote: opinion.userVote?.voteType 
                       })}
-                      onReply={(id) => console.log('Reply to:', id)}
+                      onReply={(id) => {}}
                       onChallenge={(id) => setChallengingOpinionId(id)}
                     />
                   ))}
@@ -784,15 +784,16 @@ export default function Topic() {
       )}
 
       {/* Challenge Dialog */}
-      {challengingOpinionId && (
-        <ChallengeDialog
-          opinionId={challengingOpinionId}
-          onClose={() => setChallengingOpinionId(null)}
-          onSubmit={(context) => {
+      <ChallengeDialog
+        open={!!challengingOpinionId}
+        onOpenChange={(open) => !open && setChallengingOpinionId(null)}
+        onSubmit={(context) => {
+          if (challengingOpinionId) {
             challengeMutation.mutate({ opinionId: challengingOpinionId, context });
-          }}
-        />
-      )}
+          }
+        }}
+        isPending={challengeMutation.isPending}
+      />
     </div>
   );
 }

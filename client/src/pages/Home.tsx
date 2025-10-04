@@ -570,7 +570,7 @@ export default function Home() {
                   voteType: 'dislike',
                   currentVote: opinion.userVote?.voteType 
                 })}
-                onReply={(id) => console.log('Reply to:', id)}
+                onReply={(id) => {}}
                 onChallenge={(id) => setChallengingOpinionId(id)}
               />
             ))

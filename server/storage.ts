@@ -196,11 +196,50 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOpinionsByTopic(topicId: string): Promise<Opinion[]> {
-    return await db
+    const baseOpinions = await db
       .select()
       .from(opinions)
       .where(eq(opinions.topicId, topicId))
       .orderBy(desc(opinions.createdAt));
+
+    // Enrich each opinion with vote and challenge counts
+    const enrichedOpinions = await Promise.all(
+      baseOpinions.map(async (opinion) => {
+        // Count likes
+        const likesResult = await db
+          .select({ count: count() })
+          .from(opinionVotes)
+          .where(and(
+            eq(opinionVotes.opinionId, opinion.id),
+            eq(opinionVotes.voteType, 'like')
+          ));
+        
+        // Count dislikes
+        const dislikesResult = await db
+          .select({ count: count() })
+          .from(opinionVotes)
+          .where(and(
+            eq(opinionVotes.opinionId, opinion.id),
+            eq(opinionVotes.voteType, 'dislike')
+          ));
+        
+        // Count challenges
+        const challengesResult = await db
+          .select({ count: count() })
+          .from(opinionChallenges)
+          .where(eq(opinionChallenges.opinionId, opinion.id));
+
+        return {
+          ...opinion,
+          likesCount: Number(likesResult[0]?.count || 0),
+          dislikesCount: Number(dislikesResult[0]?.count || 0),
+          repliesCount: 0,
+          challengesCount: Number(challengesResult[0]?.count || 0),
+        };
+      })
+    );
+
+    return enrichedOpinions as Opinion[];
   }
 
   async getOpinion(id: string): Promise<Opinion | undefined> {

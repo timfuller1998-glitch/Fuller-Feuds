@@ -189,7 +189,6 @@ export default function OpinionCard({
               onClick={(e) => {
                 e.stopPropagation();
                 onReply?.(id);
-                console.log('Reply clicked for opinion:', id);
               }}
               data-testid={`button-reply-${id}`}
             >
