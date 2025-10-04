@@ -8,6 +8,7 @@ import TopicCard from "@/components/TopicCard";
 import LiveDebateRoom from "@/components/LiveDebateRoom";
 import OpinionCard from "@/components/OpinionCard";
 import CumulativeOpinion from "@/components/CumulativeOpinion";
+import ChallengeDialog from "@/components/ChallengeDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,6 +45,7 @@ export default function Home() {
   const [viewingLiveDebate, setViewingLiveDebate] = useState<string | null>(null);
   const [showCreateTopic, setShowCreateTopic] = useState(false);
   const [showCreateOpinion, setShowCreateOpinion] = useState(false);
+  const [challengingOpinionId, setChallengingOpinionId] = useState<string | null>(null);
 
   // Fetch platform statistics
   const { data: stats } = useQuery<{
@@ -136,6 +138,19 @@ export default function Home() {
     },
     onError: (error: any) => {
       console.error("Failed to vote:", error);
+    },
+  });
+
+  const challengeMutation = useMutation({
+    mutationFn: async ({ opinionId, context }: { opinionId: string; context: string }) => {
+      return apiRequest('POST', `/api/opinions/${opinionId}/challenge`, { context });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "opinions"] });
+      setChallengingOpinionId(null);
+    },
+    onError: (error: any) => {
+      console.error("Failed to challenge opinion:", error);
     },
   });
 
@@ -538,9 +553,11 @@ export default function Home() {
               <OpinionCard
                 key={opinion.id}
                 {...opinion}
+                challengesCount={opinion.challengesCount || 0}
                 onLike={(id) => voteMutation.mutate({ opinionId: id, voteType: 'like' })}
                 onDislike={(id) => voteMutation.mutate({ opinionId: id, voteType: 'dislike' })}
                 onReply={(id) => console.log('Reply to:', id)}
+                onChallenge={(id) => setChallengingOpinionId(id)}
               />
             ))
           ) : selectedTopic ? (
@@ -567,6 +584,18 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Challenge Dialog */}
+      <ChallengeDialog
+        open={!!challengingOpinionId}
+        onOpenChange={(open) => !open && setChallengingOpinionId(null)}
+        onSubmit={(context) => {
+          if (challengingOpinionId) {
+            challengeMutation.mutate({ opinionId: challengingOpinionId, context });
+          }
+        }}
+        isPending={challengeMutation.isPending}
+      />
     </div>
   );
 }
