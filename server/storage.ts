@@ -10,6 +10,7 @@ import {
   streamParticipants,
   streamChatMessages,
   opinionVotes,
+  opinionChallenges,
   userFollows,
   userProfiles,
   type User,
@@ -28,6 +29,7 @@ import {
   type StreamParticipant,
   type StreamChatMessage,
   type OpinionVote,
+  type OpinionChallenge,
   type UserFollow,
   type InsertUserFollow,
   type UserProfile,
@@ -58,6 +60,10 @@ export interface IStorage {
   // Opinion voting
   voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike'): Promise<void>;
   getUserVoteOnOpinion(opinionId: string, userId: string): Promise<OpinionVote | undefined>;
+  
+  // Opinion challenges
+  challengeOpinion(opinionId: string, userId: string, context: string): Promise<void>;
+  getOpinionChallenges(opinionId: string): Promise<any[]>;
   
   // Cumulative opinions
   getCumulativeOpinion(topicId: string): Promise<CumulativeOpinion | undefined>;
@@ -235,6 +241,41 @@ export class DatabaseStorage implements IStorage {
       .from(opinionVotes)
       .where(and(eq(opinionVotes.opinionId, opinionId), eq(opinionVotes.userId, userId)));
     return vote;
+  }
+
+  // Opinion challenges
+  async challengeOpinion(opinionId: string, userId: string, context: string): Promise<void> {
+    await db
+      .insert(opinionChallenges)
+      .values({ opinionId, userId, context });
+    
+    // Increment challenges count
+    await db
+      .update(opinions)
+      .set({ challengesCount: sql`${opinions.challengesCount} + 1` })
+      .where(eq(opinions.id, opinionId));
+  }
+
+  async getOpinionChallenges(opinionId: string): Promise<any[]> {
+    const challenges = await db
+      .select({
+        id: opinionChallenges.id,
+        context: opinionChallenges.context,
+        createdAt: opinionChallenges.createdAt,
+        userId: opinionChallenges.userId,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        }
+      })
+      .from(opinionChallenges)
+      .leftJoin(users, eq(opinionChallenges.userId, users.id))
+      .where(eq(opinionChallenges.opinionId, opinionId))
+      .orderBy(desc(opinionChallenges.createdAt));
+    
+    return challenges;
   }
 
   // Cumulative opinions

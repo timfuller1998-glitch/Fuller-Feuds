@@ -331,6 +331,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/opinions/:opinionId/my-vote', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vote = await storage.getUserVoteOnOpinion(req.params.opinionId, userId);
+      res.json(vote || null);
+    } catch (error) {
+      console.error("Error fetching user vote:", error);
+      res.status(500).json({ message: "Failed to fetch user vote" });
+    }
+  });
+
+  app.post('/api/opinions/:opinionId/challenge', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { context } = req.body;
+      
+      if (!context || context.trim().length === 0) {
+        return res.status(400).json({ message: "Challenge context is required" });
+      }
+      
+      await storage.challengeOpinion(req.params.opinionId, userId, context.trim());
+      res.json({ message: "Challenge added" });
+    } catch (error) {
+      console.error("Error challenging opinion:", error);
+      res.status(500).json({ message: "Failed to challenge opinion" });
+    }
+  });
+
+  app.get('/api/opinions/:opinionId/challenges', async (req, res) => {
+    try {
+      const challenges = await storage.getOpinionChallenges(req.params.opinionId);
+      res.json(challenges);
+    } catch (error) {
+      console.error("Error fetching challenges:", error);
+      res.status(500).json({ message: "Failed to fetch challenges" });
+    }
+  });
+
   // Cumulative opinion routes
   app.get('/api/topics/:topicId/cumulative', async (req, res) => {
     try {
