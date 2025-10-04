@@ -252,9 +252,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Opinion routes
-  app.get('/api/topics/:topicId/opinions', async (req, res) => {
+  app.get('/api/topics/:topicId/opinions', async (req: any, res) => {
     try {
       const opinions = await storage.getOpinionsByTopic(req.params.topicId);
+      
+      // If user is authenticated, include their vote for each opinion
+      if (req.user?.claims?.sub) {
+        const userId = req.user.claims.sub;
+        const opinionsWithVotes = await Promise.all(
+          opinions.map(async (opinion) => {
+            const userVote = await storage.getUserVoteOnOpinion(opinion.id, userId);
+            return {
+              ...opinion,
+              userVote: userVote ? { voteType: userVote.voteType } : null
+            };
+          })
+        );
+        return res.json(opinionsWithVotes);
+      }
+      
       res.json(opinions);
     } catch (error) {
       console.error("Error fetching opinions:", error);
@@ -319,12 +335,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { voteType } = req.body;
       
-      if (!['like', 'dislike'].includes(voteType)) {
+      if (voteType !== null && !['like', 'dislike'].includes(voteType)) {
         return res.status(400).json({ message: "Invalid vote type" });
       }
       
       await storage.voteOnOpinion(req.params.opinionId, userId, voteType);
-      res.json({ message: "Vote recorded" });
+      res.json({ message: voteType === null ? "Vote removed" : "Vote recorded" });
     } catch (error) {
       console.error("Error voting on opinion:", error);
       res.status(500).json({ message: "Failed to vote on opinion" });

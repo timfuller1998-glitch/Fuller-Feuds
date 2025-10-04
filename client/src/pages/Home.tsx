@@ -130,8 +130,10 @@ export default function Home() {
 
   // Vote mutation
   const voteMutation = useMutation({
-    mutationFn: async ({ opinionId, voteType }: { opinionId: string; voteType: 'like' | 'dislike' }) => {
-      return apiRequest('POST', `/api/opinions/${opinionId}/vote`, { voteType });
+    mutationFn: async ({ opinionId, voteType, currentVote }: { opinionId: string; voteType: 'like' | 'dislike'; currentVote?: 'like' | 'dislike' | null }) => {
+      // If clicking the same vote type, remove it. Otherwise, set new vote type
+      const newVoteType = currentVote === voteType ? null : voteType;
+      return apiRequest('POST', `/api/opinions/${opinionId}/vote`, { voteType: newVoteType });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "opinions"] });
@@ -224,7 +226,7 @@ export default function Home() {
   );
 
   // Transform API opinions for display
-  const transformedOpinions = apiOpinions?.map(opinion => ({
+  const transformedOpinions = apiOpinions?.map((opinion: any) => ({
     id: opinion.id,
     topicId: opinion.topicId,
     userId: opinion.userId,
@@ -234,7 +236,9 @@ export default function Home() {
     timestamp: new Date(opinion.createdAt!).toLocaleDateString(),
     likesCount: opinion.likesCount || 0,
     dislikesCount: opinion.dislikesCount || 0,
-    repliesCount: opinion.repliesCount || 0
+    repliesCount: opinion.repliesCount || 0,
+    challengesCount: opinion.challengesCount || 0,
+    userVote: opinion.userVote || null
   })) || [];
 
   // If viewing a live debate room, show the full debate interface
@@ -554,8 +558,18 @@ export default function Home() {
                 key={opinion.id}
                 {...opinion}
                 challengesCount={opinion.challengesCount || 0}
-                onLike={(id) => voteMutation.mutate({ opinionId: id, voteType: 'like' })}
-                onDislike={(id) => voteMutation.mutate({ opinionId: id, voteType: 'dislike' })}
+                isLiked={opinion.userVote?.voteType === 'like'}
+                isDisliked={opinion.userVote?.voteType === 'dislike'}
+                onLike={(id) => voteMutation.mutate({ 
+                  opinionId: id, 
+                  voteType: 'like',
+                  currentVote: opinion.userVote?.voteType 
+                })}
+                onDislike={(id) => voteMutation.mutate({ 
+                  opinionId: id, 
+                  voteType: 'dislike',
+                  currentVote: opinion.userVote?.voteType 
+                })}
                 onReply={(id) => console.log('Reply to:', id)}
                 onChallenge={(id) => setChallengingOpinionId(id)}
               />

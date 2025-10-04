@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   index,
+  uniqueIndex,
   jsonb,
   pgTable,
   timestamp,
@@ -159,7 +160,7 @@ export const opinionVotes = pgTable("opinion_votes", {
   voteType: varchar("vote_type", { length: 20 }).notNull(), // 'like', 'dislike'
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
-  index("unique_opinion_user_vote").on(table.opinionId, table.userId)
+  uniqueIndex("unique_opinion_user_vote").on(table.opinionId, table.userId)
 ]);
 
 // Opinion challenges - for adding context when users misrepresent data
@@ -178,7 +179,7 @@ export const userFollows = pgTable("user_follows", {
   followingId: varchar("following_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
-  index("unique_follow_relationship").on(table.followerId, table.followingId)
+  uniqueIndex("unique_follow_relationship").on(table.followerId, table.followingId)
 ]);
 
 // User profile analytics and political leaning

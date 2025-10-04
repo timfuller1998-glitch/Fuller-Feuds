@@ -58,7 +58,7 @@ export interface IStorage {
   updateOpinionCounts(opinionId: string, likesCount: number, dislikesCount: number): Promise<void>;
   
   // Opinion voting
-  voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike'): Promise<void>;
+  voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike' | null): Promise<void>;
   getUserVoteOnOpinion(opinionId: string, userId: string): Promise<OpinionVote | undefined>;
   
   // Opinion challenges
@@ -225,14 +225,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Opinion voting
-  async voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike'): Promise<void> {
-    await db
-      .insert(opinionVotes)
-      .values({ opinionId, userId, voteType })
-      .onConflictDoUpdate({
-        target: [opinionVotes.opinionId, opinionVotes.userId],
-        set: { voteType, createdAt: new Date() },
-      });
+  async voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike' | null): Promise<void> {
+    if (voteType === null) {
+      // Remove vote
+      await db
+        .delete(opinionVotes)
+        .where(and(eq(opinionVotes.opinionId, opinionId), eq(opinionVotes.userId, userId)));
+    } else {
+      // Add or update vote
+      await db
+        .insert(opinionVotes)
+        .values({ opinionId, userId, voteType })
+        .onConflictDoUpdate({
+          target: [opinionVotes.opinionId, opinionVotes.userId],
+          set: { voteType, createdAt: new Date() },
+        });
+    }
   }
 
   async getUserVoteOnOpinion(opinionId: string, userId: string): Promise<OpinionVote | undefined> {

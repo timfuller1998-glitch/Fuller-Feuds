@@ -63,10 +63,6 @@ export default function OpinionCard({
   onChallenge
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
-  const [liked, setLiked] = useState(isLiked);
-  const [disliked, setDisliked] = useState(isDisliked);
-  const [currentLikes, setCurrentLikes] = useState(likesCount);
-  const [currentDislikes, setCurrentDislikes] = useState(dislikesCount);
   const [showChallenges, setShowChallenges] = useState(false);
 
   // Fetch challenges when expanded
@@ -75,36 +71,18 @@ export default function OpinionCard({
     enabled: showChallenges && challengesCount > 0,
   });
 
+  // Use props directly - no local state for vote counts
+  const liked = isLiked;
+  const disliked = isDisliked;
+  const currentLikes = likesCount;
+  const currentDislikes = dislikesCount;
+
   const handleLike = () => {
-    if (liked) {
-      setLiked(false);
-      setCurrentLikes(prev => prev - 1);
-    } else {
-      setLiked(true);
-      setCurrentLikes(prev => prev + 1);
-      if (disliked) {
-        setDisliked(false);
-        setCurrentDislikes(prev => prev - 1);
-      }
-    }
     onLike?.(id);
-    console.log('Like clicked for opinion:', id);
   };
 
   const handleDislike = () => {
-    if (disliked) {
-      setDisliked(false);
-      setCurrentDislikes(prev => prev - 1);
-    } else {
-      setDisliked(true);
-      setCurrentDislikes(prev => prev + 1);
-      if (liked) {
-        setLiked(false);
-        setCurrentLikes(prev => prev - 1);
-      }
-    }
     onDislike?.(id);
-    console.log('Dislike clicked for opinion:', id);
   };
 
   return (
