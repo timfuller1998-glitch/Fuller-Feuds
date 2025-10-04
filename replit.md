@@ -47,6 +47,26 @@ Preferred communication style: Simple, everyday language.
   - Storage method: getUserDebateRooms() using OR condition for participant matching
   - Auto-analysis trigger in opinion creation endpoint
 
+### Opinion Voting & Challenge System (October 2025)
+- **Like/Dislike Voting**: Users can vote on opinions with thumbs up/down
+  - Vote toggle: clicking same vote type removes it (sends null to backend)
+  - Vote switch: clicking different type changes the vote
+  - Backend: POST /api/opinions/:opinionId/vote with {voteType: 'like'|'dislike'|null}
+  - Database: uniqueIndex on (opinionId, userId) ensures one vote per user
+  - Real-time updates via React Query cache invalidation
+- **Challenge System**: Users can add context when opinions misrepresent data
+  - Challenge button opens dialog with context textarea
+  - Challenges displayed in collapsible section under opinions
+  - Shows challenge author, timestamp, and context text
+  - Backend: POST /api/opinions/:opinionId/challenge with {context: string}
+- **User Vote State**: GET /api/topics/:topicId/opinions includes userVote when authenticated
+  - Frontend receives current user's vote state with each opinion
+  - OpinionCard uses props directly (no local state) for perfect server sync
+- **Known Limitations**:
+  - Voting only implemented on Home page OpinionCard components
+  - Topic detail page uses inline opinion display without voting (backlog item)
+  - Future: Batch getUserVoteOnOpinion queries for better performance
+
 ### UX Improvements - Inline Topic Creation & Toast Removal (October 2025)
 - **Inline Topic Creation**: Completely redesigned topic creation experience
   - Removed modal dialog popup that grayed out the screen
