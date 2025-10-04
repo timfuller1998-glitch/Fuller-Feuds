@@ -108,6 +108,12 @@ export default function Topic() {
         });
       case 'most_liked':
         return sorted.sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
+      case 'most_controversial':
+        return sorted.sort((a, b) => {
+          const aTotalVotes = (a.likesCount || 0) + (a.dislikesCount || 0);
+          const bTotalVotes = (b.likesCount || 0) + (b.dislikesCount || 0);
+          return bTotalVotes - aTotalVotes;
+        });
       case 'newest':
       default:
         return sorted.sort((a, b) => {

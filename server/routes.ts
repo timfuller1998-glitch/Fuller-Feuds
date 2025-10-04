@@ -733,7 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sortBy = 'recent', limit = 20 } = req.query;
       const opinions = await storage.getUserOpinions(
         req.params.userId, 
-        sortBy as 'recent' | 'popular' | 'controversial',
+        sortBy as 'recent' | 'oldest' | 'popular' | 'controversial',
         parseInt(limit as string)
       );
       res.json(opinions);

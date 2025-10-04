@@ -18,7 +18,8 @@ const profileFormSchema = z.object({
   displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
   displayLastName: z.string().max(50, "Last name must be 50 characters or less").optional().or(z.literal("")),
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
-  opinionSortPreference: z.enum(["newest", "oldest", "most_liked"]).optional(),
+  opinionSortPreference: z.enum(["newest", "oldest", "most_liked", "most_controversial"]).optional(),
+  categorySortPreference: z.enum(["popular", "alphabetical", "newest", "oldest"]).optional(),
 });
 
 interface ProfileData {
@@ -37,6 +38,7 @@ interface ProfileData {
     displayFirstName?: string;
     displayLastName?: string;
     opinionSortPreference?: string;
+    categorySortPreference?: string;
     politicalLeaning?: number;
     politicalLeaningLabel?: string;
   };
@@ -61,6 +63,7 @@ export default function Settings() {
       displayLastName: "",
       bio: "",
       opinionSortPreference: "newest",
+      categorySortPreference: "popular",
     },
   });
 
@@ -71,7 +74,8 @@ export default function Settings() {
         displayFirstName: profileData.profile?.displayFirstName || profileData.user?.firstName || "",
         displayLastName: profileData.profile?.displayLastName || profileData.user?.lastName || "",
         bio: profileData.profile?.bio || "",
-        opinionSortPreference: (profileData.profile?.opinionSortPreference || "newest") as "newest" | "oldest" | "most_liked",
+        opinionSortPreference: (profileData.profile?.opinionSortPreference || "newest") as "newest" | "oldest" | "most_liked" | "most_controversial",
+        categorySortPreference: (profileData.profile?.categorySortPreference || "popular") as "popular" | "alphabetical" | "newest" | "oldest",
       });
     }
   }, [profileData, form]);
@@ -259,10 +263,38 @@ export default function Settings() {
                         <SelectItem value="newest" data-testid="option-sort-newest">Newest First</SelectItem>
                         <SelectItem value="oldest" data-testid="option-sort-oldest">Oldest First</SelectItem>
                         <SelectItem value="most_liked" data-testid="option-sort-most-liked">Most Liked</SelectItem>
+                        <SelectItem value="most_controversial" data-testid="option-sort-controversial">Most Controversial</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Choose how opinions are sorted when viewing topics
+                      Choose how opinions are sorted when viewing topics and profiles
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="categorySortPreference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category Sorting Preference</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-category-sort">
+                          <SelectValue placeholder="Select sorting preference" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="popular" data-testid="option-sort-popular">Most Popular</SelectItem>
+                        <SelectItem value="alphabetical" data-testid="option-sort-alphabetical">Alphabetical</SelectItem>
+                        <SelectItem value="newest" data-testid="option-sort-cat-newest">Newest First</SelectItem>
+                        <SelectItem value="oldest" data-testid="option-sort-cat-oldest">Oldest First</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Choose how categories are sorted on the Browse All page
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

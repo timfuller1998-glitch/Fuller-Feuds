@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,8 @@ interface ProfileData {
     followerCount: number;
     followingCount: number;
     lastAnalyzedAt?: string;
+    opinionSortPreference?: string;
+    categorySortPreference?: string;
   };
   followerCount: number;
   followingCount: number;
@@ -103,7 +105,6 @@ export default function Profile() {
   const { userId } = useParams();
   const [, navigate] = useLocation();
   const { user: currentUser } = useAuth();
-  const [opinionSortBy, setOpinionSortBy] = useState<'recent' | 'popular' | 'controversial'>('recent');
   const [showCreateDebateDialog, setShowCreateDebateDialog] = useState(false);
   const [showScheduleStreamDialog, setShowScheduleStreamDialog] = useState(false);
   const [activeSection, setActiveSection] = useState<'opinions' | 'debates' | 'followers' | 'following'>('opinions');
@@ -116,6 +117,23 @@ export default function Profile() {
     queryFn: () => fetch(`/api/profile/${userId}`, { credentials: 'include' }).then(res => res.json()),
     enabled: !!userId,
   });
+
+  // Map opinion sort preference from settings to API parameter
+  const mapSortPreference = (pref?: string): 'recent' | 'oldest' | 'popular' | 'controversial' => {
+    switch (pref) {
+      case 'oldest':
+        return 'oldest';
+      case 'most_liked':
+        return 'popular';
+      case 'most_controversial':
+        return 'controversial';
+      case 'newest':
+      default:
+        return 'recent';
+    }
+  };
+
+  const opinionSortBy = mapSortPreference(profileData?.profile?.opinionSortPreference);
 
   // Fetch user opinions
   const { data: opinions = [], isLoading: opinionsLoading } = useQuery<Opinion[]>({
@@ -466,17 +484,12 @@ export default function Profile() {
                     All opinions shared by {isOwnProfile ? 'you' : `${user.firstName}`}
                   </CardDescription>
                 </div>
-                <Select value={opinionSortBy} onValueChange={(value: any) => setOpinionSortBy(value)}>
-                  <SelectTrigger className="w-48" data-testid="select-sort-opinions">
+                <Link href="/settings">
+                  <Button variant="outline" size="sm" data-testid="button-sort-settings">
                     <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="recent">Most Recent</SelectItem>
-                    <SelectItem value="popular">Most Popular</SelectItem>
-                    <SelectItem value="controversial">Most Controversial</SelectItem>
-                  </SelectContent>
-                </Select>
+                    Sort: {profileData?.profile?.opinionSortPreference === 'most_liked' ? 'Most Liked' : profileData?.profile?.opinionSortPreference === 'most_controversial' ? 'Most Controversial' : profileData?.profile?.opinionSortPreference === 'oldest' ? 'Oldest First' : 'Newest First'}
+                  </Button>
+                </Link>
               </div>
             </CardHeader>
             <CardContent>

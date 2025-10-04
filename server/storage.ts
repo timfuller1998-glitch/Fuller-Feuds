@@ -36,7 +36,7 @@ import {
   type InsertUserProfile,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql, count, ilike, or } from "drizzle-orm";
+import { eq, desc, asc, and, sql, count, ilike, or } from "drizzle-orm";
 import { AIService } from "./aiService";
 
 export interface IStorage {
@@ -674,7 +674,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getUserOpinions(userId: string, sortBy: 'recent' | 'popular' | 'controversial' = 'recent', limit = 20): Promise<Opinion[]> {
+  async getUserOpinions(userId: string, sortBy: 'recent' | 'oldest' | 'popular' | 'controversial' = 'recent', limit = 20): Promise<Opinion[]> {
     switch (sortBy) {
       case 'recent':
         return await db
@@ -682,6 +682,13 @@ export class DatabaseStorage implements IStorage {
           .from(opinions)
           .where(eq(opinions.userId, userId))
           .orderBy(desc(opinions.createdAt))
+          .limit(limit);
+      case 'oldest':
+        return await db
+          .select()
+          .from(opinions)
+          .where(eq(opinions.userId, userId))
+          .orderBy(asc(opinions.createdAt))
           .limit(limit);
       case 'popular':
         return await db

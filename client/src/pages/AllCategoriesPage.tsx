@@ -1,10 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TopicCard from "@/components/TopicCard";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   Gavel, 
   Cpu, 
@@ -55,7 +54,16 @@ interface CategoryData {
 }
 
 export default function AllCategoriesPage() {
-  const [sortBy, setSortBy] = useState<SortOption>('popular');
+  const { user } = useAuth();
+
+  // Fetch user profile for sort preference
+  const { data: userProfile } = useQuery<any>({
+    queryKey: ['/api/profile', user?.id],
+    queryFn: () => fetch(`/api/profile/${user?.id}`, { credentials: 'include' }).then(res => res.json()),
+    enabled: !!user?.id,
+  });
+
+  const sortBy = (userProfile?.profile?.categorySortPreference || 'popular') as SortOption;
 
   // Fetch all topics
   const { data: apiTopics, isLoading, error } = useQuery<Topic[]>({
@@ -162,17 +170,12 @@ export default function AllCategoriesPage() {
         {/* Sort Controls */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <ArrowUpDown className="w-4 h-4 text-muted-foreground hidden sm:block" />
-          <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-            <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-sort-categories">
-              <SelectValue placeholder="Sort by..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="popular" data-testid="option-sort-popular">Most Popular</SelectItem>
-              <SelectItem value="alphabetical" data-testid="option-sort-alphabetical">Alphabetical</SelectItem>
-              <SelectItem value="recent" data-testid="option-sort-recent">Most Recent</SelectItem>
-              <SelectItem value="oldest" data-testid="option-sort-oldest">Oldest First</SelectItem>
-            </SelectContent>
-          </Select>
+          <Link href="/settings">
+            <Button variant="outline" size="sm" data-testid="button-category-sort-settings">
+              <ArrowUpDown className="w-4 h-4 mr-2" />
+              Sort: {sortBy === 'popular' ? 'Most Popular' : sortBy === 'alphabetical' ? 'Alphabetical' : sortBy === 'recent' ? 'Most Recent' : 'Oldest First'}
+            </Button>
+          </Link>
         </div>
       </div>
 
