@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import UserAvatar from "./UserAvatar";
-import { ThumbsUp, ThumbsDown, MessageCircle, Clock } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MessageCircle, Clock, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -18,11 +18,13 @@ interface OpinionCardProps {
   likesCount: number;
   dislikesCount: number;
   repliesCount: number;
+  challengesCount: number;
   isLiked?: boolean;
   isDisliked?: boolean;
   onLike?: (id: string) => void;
   onDislike?: (id: string) => void;
   onReply?: (id: string) => void;
+  onChallenge?: (id: string) => void;
 }
 
 const stanceBadgeVariant = {
@@ -49,11 +51,13 @@ export default function OpinionCard({
   likesCount,
   dislikesCount,
   repliesCount,
+  challengesCount,
   isLiked = false,
   isDisliked = false,
   onLike,
   onDislike,
-  onReply
+  onReply,
+  onChallenge
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
   const [liked, setLiked] = useState(isLiked);
@@ -144,7 +148,7 @@ export default function OpinionCard({
           {content}
         </p>
         
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Button
               variant={liked ? "default" : "ghost"}
@@ -175,20 +179,36 @@ export default function OpinionCard({
             </Button>
           </div>
           
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-3"
-            onClick={(e) => {
-              e.stopPropagation();
-              onReply?.(id);
-              console.log('Reply clicked for opinion:', id);
-            }}
-            data-testid={`button-reply-${id}`}
-          >
-            <MessageCircle className="w-3 h-3 mr-1" />
-            {repliesCount}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChallenge?.(id);
+              }}
+              data-testid={`button-challenge-${id}`}
+            >
+              <AlertTriangle className="w-3 h-3 mr-1" />
+              {challengesCount > 0 && challengesCount}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReply?.(id);
+                console.log('Reply clicked for opinion:', id);
+              }}
+              data-testid={`button-reply-${id}`}
+            >
+              <MessageCircle className="w-3 h-3 mr-1" />
+              {repliesCount}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
