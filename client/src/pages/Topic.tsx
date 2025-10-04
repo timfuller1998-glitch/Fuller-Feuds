@@ -18,6 +18,9 @@ import { Link } from "wouter";
 import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import OpinionCard from "@/components/OpinionCard";
+import ChallengeDialog from "@/components/ChallengeDialog";
+import { formatDistanceToNow } from "date-fns";
 
 const opinionFormSchema = insertOpinionSchema.omit({
   topicId: true,
@@ -31,6 +34,7 @@ export default function Topic() {
   const { id } = useParams();
   const { user } = useAuth();
   const [showOpinionForm, setShowOpinionForm] = useState(false);
+  const [challengingOpinionId, setChallengingOpinionId] = useState<string | null>(null);
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -163,6 +167,35 @@ export default function Topic() {
     },
     onError: (error: any) => {
       console.error("Failed to refresh summary:", error);
+    },
+  });
+
+  // Vote mutation
+  const voteMutation = useMutation({
+    mutationFn: async ({ opinionId, voteType, currentVote }: { opinionId: string; voteType: 'like' | 'dislike'; currentVote?: 'like' | 'dislike' | null }) => {
+      // If clicking the same vote type, remove it. Otherwise, set new vote type
+      const newVoteType = currentVote === voteType ? null : voteType;
+      return apiRequest('POST', `/api/opinions/${opinionId}/vote`, { voteType: newVoteType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
+    },
+    onError: (error: any) => {
+      console.error("Failed to vote:", error);
+    },
+  });
+
+  // Challenge mutation
+  const challengeMutation = useMutation({
+    mutationFn: async ({ opinionId, context }: { opinionId: string; context: string }) => {
+      return apiRequest('POST', `/api/opinions/${opinionId}/challenge`, { context });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
+      setChallengingOpinionId(null);
+    },
+    onError: (error: any) => {
+      console.error("Failed to challenge opinion:", error);
     },
   });
 
@@ -479,19 +512,35 @@ export default function Topic() {
             <TabsContent value="supporting" className="space-y-3">
               {supportingOpinions.length > 0 ? (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {supportingOpinions.map((opinion) => (
-                    <div key={opinion.id} className="p-4 border rounded-lg space-y-2" data-testid={`opinion-${opinion.id}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="default" className="text-xs">For</Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <ThumbsUp className="w-4 h-4" />
-                          <span>{opinion.likesCount || 0}</span>
-                        </div>
-                      </div>
-                      <p className="text-sm">{opinion.content}</p>
-                    </div>
+                  {supportingOpinions.map((opinion: any) => (
+                    <OpinionCard
+                      key={opinion.id}
+                      id={opinion.id}
+                      topicId={opinion.topicId}
+                      userId={opinion.userId}
+                      userName="User"
+                      content={opinion.content}
+                      stance={opinion.stance}
+                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
+                      likesCount={opinion.likesCount || 0}
+                      dislikesCount={opinion.dislikesCount || 0}
+                      repliesCount={opinion.repliesCount || 0}
+                      challengesCount={opinion.challengesCount || 0}
+                      isLiked={opinion.userVote?.voteType === 'like'}
+                      isDisliked={opinion.userVote?.voteType === 'dislike'}
+                      onLike={(id) => voteMutation.mutate({ 
+                        opinionId: id, 
+                        voteType: 'like',
+                        currentVote: opinion.userVote?.voteType 
+                      })}
+                      onDislike={(id) => voteMutation.mutate({ 
+                        opinionId: id, 
+                        voteType: 'dislike',
+                        currentVote: opinion.userVote?.voteType 
+                      })}
+                      onReply={(id) => console.log('Reply to:', id)}
+                      onChallenge={(id) => setChallengingOpinionId(id)}
+                    />
                   ))}
                 </div>
               ) : (
@@ -502,19 +551,35 @@ export default function Topic() {
             <TabsContent value="neutral" className="space-y-3">
               {neutralOpinions.length > 0 ? (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {neutralOpinions.map((opinion) => (
-                    <div key={opinion.id} className="p-4 border rounded-lg space-y-2" data-testid={`opinion-${opinion.id}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs">Neutral</Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <ThumbsUp className="w-4 h-4" />
-                          <span>{opinion.likesCount || 0}</span>
-                        </div>
-                      </div>
-                      <p className="text-sm">{opinion.content}</p>
-                    </div>
+                  {neutralOpinions.map((opinion: any) => (
+                    <OpinionCard
+                      key={opinion.id}
+                      id={opinion.id}
+                      topicId={opinion.topicId}
+                      userId={opinion.userId}
+                      userName="User"
+                      content={opinion.content}
+                      stance={opinion.stance}
+                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
+                      likesCount={opinion.likesCount || 0}
+                      dislikesCount={opinion.dislikesCount || 0}
+                      repliesCount={opinion.repliesCount || 0}
+                      challengesCount={opinion.challengesCount || 0}
+                      isLiked={opinion.userVote?.voteType === 'like'}
+                      isDisliked={opinion.userVote?.voteType === 'dislike'}
+                      onLike={(id) => voteMutation.mutate({ 
+                        opinionId: id, 
+                        voteType: 'like',
+                        currentVote: opinion.userVote?.voteType 
+                      })}
+                      onDislike={(id) => voteMutation.mutate({ 
+                        opinionId: id, 
+                        voteType: 'dislike',
+                        currentVote: opinion.userVote?.voteType 
+                      })}
+                      onReply={(id) => console.log('Reply to:', id)}
+                      onChallenge={(id) => setChallengingOpinionId(id)}
+                    />
                   ))}
                 </div>
               ) : (
@@ -525,19 +590,35 @@ export default function Topic() {
             <TabsContent value="opposing" className="space-y-3">
               {opposingOpinions.length > 0 ? (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {opposingOpinions.map((opinion) => (
-                    <div key={opinion.id} className="p-4 border rounded-lg space-y-2" data-testid={`opinion-${opinion.id}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="destructive" className="text-xs">Against</Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <ThumbsUp className="w-4 h-4" />
-                          <span>{opinion.likesCount || 0}</span>
-                        </div>
-                      </div>
-                      <p className="text-sm">{opinion.content}</p>
-                    </div>
+                  {opposingOpinions.map((opinion: any) => (
+                    <OpinionCard
+                      key={opinion.id}
+                      id={opinion.id}
+                      topicId={opinion.topicId}
+                      userId={opinion.userId}
+                      userName="User"
+                      content={opinion.content}
+                      stance={opinion.stance}
+                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
+                      likesCount={opinion.likesCount || 0}
+                      dislikesCount={opinion.dislikesCount || 0}
+                      repliesCount={opinion.repliesCount || 0}
+                      challengesCount={opinion.challengesCount || 0}
+                      isLiked={opinion.userVote?.voteType === 'like'}
+                      isDisliked={opinion.userVote?.voteType === 'dislike'}
+                      onLike={(id) => voteMutation.mutate({ 
+                        opinionId: id, 
+                        voteType: 'like',
+                        currentVote: opinion.userVote?.voteType 
+                      })}
+                      onDislike={(id) => voteMutation.mutate({ 
+                        opinionId: id, 
+                        voteType: 'dislike',
+                        currentVote: opinion.userVote?.voteType 
+                      })}
+                      onReply={(id) => console.log('Reply to:', id)}
+                      onChallenge={(id) => setChallengingOpinionId(id)}
+                    />
                   ))}
                 </div>
               ) : (
@@ -694,6 +775,17 @@ export default function Topic() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Challenge Dialog */}
+      {challengingOpinionId && (
+        <ChallengeDialog
+          opinionId={challengingOpinionId}
+          onClose={() => setChallengingOpinionId(null)}
+          onSubmit={(context) => {
+            challengeMutation.mutate({ opinionId: challengingOpinionId, context });
+          }}
+        />
       )}
     </div>
   );

@@ -62,9 +62,9 @@ Preferred communication style: Simple, everyday language.
 - **User Vote State**: GET /api/topics/:topicId/opinions includes userVote when authenticated
   - Frontend receives current user's vote state with each opinion
   - OpinionCard uses props directly (no local state) for perfect server sync
-- **Known Limitations**:
-  - Voting only implemented on Home page OpinionCard components
-  - Topic detail page uses inline opinion display without voting (backlog item)
+- **Implemented Everywhere**: Voting and challenges now work on both Home page and Topic detail pages
+  - Topic page now uses OpinionCard component for consistent UX
+  - All opinion displays have like/dislike/challenge functionality
   - Future: Batch getUserVoteOnOpinion queries for better performance
 
 ### UX Improvements - Inline Topic Creation & Toast Removal (October 2025)
