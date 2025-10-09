@@ -15,10 +15,20 @@ import { z } from "zod";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { AIService } from "./aiService";
+import { 
+  attachUserRole,
+  requireAuth,
+  requireModerator,
+  requireAdmin,
+  requireActiveAccount
+} from "./middleware/permissions";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware from Replit Auth blueprint
   await setupAuth(app);
+
+  // Attach user role to all requests
+  app.use(attachUserRole);
 
   // Auth routes from Replit Auth blueprint
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
