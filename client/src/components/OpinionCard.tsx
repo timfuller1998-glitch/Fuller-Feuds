@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import UserAvatar from "./UserAvatar";
-import { ThumbsUp, ThumbsDown, MessageCircle, Clock, AlertTriangle, ChevronDown } from "lucide-react";
+import { ThumbsUp, ThumbsDown, UserPlus, Clock, AlertTriangle, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -20,13 +20,12 @@ interface OpinionCardProps {
   timestamp: string;
   likesCount: number;
   dislikesCount: number;
-  repliesCount: number;
   challengesCount: number;
   isLiked?: boolean;
   isDisliked?: boolean;
   onLike?: (id: string) => void;
   onDislike?: (id: string) => void;
-  onReply?: (id: string) => void;
+  onAdopt?: (id: string) => void;
   onChallenge?: (id: string) => void;
 }
 
@@ -53,13 +52,12 @@ export default function OpinionCard({
   timestamp,
   likesCount,
   dislikesCount,
-  repliesCount,
   challengesCount,
   isLiked = false,
   isDisliked = false,
   onLike,
   onDislike,
-  onReply,
+  onAdopt,
   onChallenge
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
@@ -188,12 +186,12 @@ export default function OpinionCard({
               className="h-8 px-3"
               onClick={(e) => {
                 e.stopPropagation();
-                onReply?.(id);
+                onAdopt?.(id);
               }}
-              data-testid={`button-reply-${id}`}
+              data-testid={`button-adopt-${id}`}
             >
-              <MessageCircle className="w-3 h-3 mr-1" />
-              {repliesCount}
+              <UserPlus className="w-3 h-3 mr-1" />
+              <span className="hidden sm:inline">Adopt</span>
             </Button>
           </div>
         </div>
