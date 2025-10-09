@@ -33,9 +33,11 @@ import {
   LogOut,
   Plus,
   User,
-  Grid
+  Grid,
+  Shield
 } from "lucide-react";
 import type { Topic } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 
 interface CategoryItem {
   title: string;
@@ -62,6 +64,7 @@ export default function AppSidebar({
 }: AppSidebarProps) {
   const [location] = useLocation();
   const { setOpenMobile, isMobile } = useSidebar();
+  const { user } = useAuth();
 
   // Fetch all topics to calculate category counts
   const { data: topics } = useQuery<Topic[]>({
@@ -81,6 +84,9 @@ export default function AppSidebar({
     { title: "Hot Debates", icon: Flame, path: "/hot-debates" },
     { title: "My Debates", icon: MessageCircle, path: "/debates" },
   ];
+
+  // Check if user is admin or moderator
+  const isAdminOrModerator = user?.role === 'admin' || user?.role === 'moderator';
 
   // Get icon for category (with fallback)
   const getCategoryIcon = (categoryName: string) => {
@@ -154,6 +160,16 @@ export default function AppSidebar({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {isAdminOrModerator && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/admin"}>
+                    <Link href="/admin" onClick={handleLinkClick} data-testid="link-nav-admin-dashboard">
+                      <Shield className="w-4 h-4" />
+                      <span>Admin Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -21,6 +21,7 @@ import AllCategoriesPage from "@/pages/AllCategoriesPage";
 import CategoryPage from "@/pages/CategoryPage";
 import LiveStreamPage from "@/pages/LiveStreamPage";
 import DebateRoomPage from "@/pages/DebateRoomPage";
+import AdminDashboard from "@/pages/AdminDashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/settings" component={Settings} />
       <Route path="/live-stream/:id" component={LiveStreamPage} />
       <Route path="/debate-room/:id" component={DebateRoomPage} />
+      <Route path="/admin" component={AdminDashboard} />
       <Route component={NotFound} />
     </Switch>
   );
