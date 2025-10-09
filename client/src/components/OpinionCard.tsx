@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import UserAvatar from "./UserAvatar";
-import { ThumbsUp, ThumbsDown, UserPlus, Clock, AlertTriangle, ChevronDown } from "lucide-react";
+import { ThumbsUp, ThumbsDown, UserPlus, Clock, AlertTriangle, ChevronDown, Flag } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -27,6 +27,7 @@ interface OpinionCardProps {
   onDislike?: (id: string) => void;
   onAdopt?: (id: string) => void;
   onChallenge?: (id: string) => void;
+  onFlag?: (id: string) => void;
 }
 
 const stanceBadgeVariant = {
@@ -58,7 +59,8 @@ export default function OpinionCard({
   onLike,
   onDislike,
   onAdopt,
-  onChallenge
+  onChallenge,
+  onFlag
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
   const [showChallenges, setShowChallenges] = useState(false);
@@ -192,6 +194,20 @@ export default function OpinionCard({
             >
               <UserPlus className="w-3 h-3 mr-1" />
               <span className="hidden sm:inline">Adopt</span>
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFlag?.(id);
+              }}
+              data-testid={`button-flag-${id}`}
+            >
+              <Flag className="w-3 h-3 mr-1" />
+              <span className="hidden sm:inline">Flag</span>
             </Button>
           </div>
         </div>
