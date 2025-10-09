@@ -303,6 +303,54 @@ export class DatabaseStorage implements IStorage {
       .where(eq(opinions.id, opinionId));
   }
 
+  // Adopt opinion - creates a new opinion for the user with same content and stance
+  async adoptOpinion(opinionId: string, userId: string): Promise<Opinion> {
+    // Get the original opinion
+    const [original] = await db
+      .select()
+      .from(opinions)
+      .where(eq(opinions.id, opinionId));
+    
+    if (!original) {
+      throw new Error('Opinion not found');
+    }
+
+    // Check if user already has an opinion on this topic
+    const [existing] = await db
+      .select()
+      .from(opinions)
+      .where(and(
+        eq(opinions.topicId, original.topicId),
+        eq(opinions.userId, userId)
+      ));
+
+    if (existing) {
+      // Update existing opinion to match the adopted one
+      const [updated] = await db
+        .update(opinions)
+        .set({
+          content: original.content,
+          stance: original.stance,
+          updatedAt: new Date()
+        })
+        .where(eq(opinions.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      // Create new opinion with same content and stance
+      const [created] = await db
+        .insert(opinions)
+        .values({
+          topicId: original.topicId,
+          userId,
+          content: original.content,
+          stance: original.stance,
+        })
+        .returning();
+      return created;
+    }
+  }
+
   async getOpinionChallenges(opinionId: string): Promise<any[]> {
     const challenges = await db
       .select({

@@ -375,6 +375,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/opinions/:opinionId/adopt', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const adoptedOpinion = await storage.adoptOpinion(req.params.opinionId, userId);
+      res.json(adoptedOpinion);
+    } catch (error) {
+      console.error("Error adopting opinion:", error);
+      res.status(500).json({ message: "Failed to adopt opinion" });
+    }
+  });
+
   app.get('/api/opinions/:opinionId/challenges', async (req, res) => {
     try {
       const challenges = await storage.getOpinionChallenges(req.params.opinionId);
