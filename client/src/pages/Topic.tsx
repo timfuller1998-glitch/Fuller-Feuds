@@ -205,6 +205,19 @@ export default function Topic() {
     },
   });
 
+  // Adopt opinion mutation
+  const adoptMutation = useMutation({
+    mutationFn: async (opinionId: string) => {
+      return apiRequest('POST', `/api/opinions/${opinionId}/adopt`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
+    },
+    onError: (error: any) => {
+      console.error("Failed to adopt opinion:", error);
+    },
+  });
+
   const opinionForm = useForm<z.infer<typeof opinionFormSchema>>({
     resolver: zodResolver(opinionFormSchema),
     defaultValues: {
@@ -530,7 +543,6 @@ export default function Topic() {
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
-                      repliesCount={opinion.repliesCount || 0}
                       challengesCount={opinion.challengesCount || 0}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
@@ -544,7 +556,7 @@ export default function Topic() {
                         voteType: 'dislike',
                         currentVote: opinion.userVote?.voteType 
                       })}
-                      onReply={(id) => {}}
+                      onAdopt={(id) => adoptMutation.mutate(id)}
                       onChallenge={(id) => setChallengingOpinionId(id)}
                     />
                   ))}
@@ -569,7 +581,6 @@ export default function Topic() {
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
-                      repliesCount={opinion.repliesCount || 0}
                       challengesCount={opinion.challengesCount || 0}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
@@ -583,7 +594,7 @@ export default function Topic() {
                         voteType: 'dislike',
                         currentVote: opinion.userVote?.voteType 
                       })}
-                      onReply={(id) => {}}
+                      onAdopt={(id) => adoptMutation.mutate(id)}
                       onChallenge={(id) => setChallengingOpinionId(id)}
                     />
                   ))}
@@ -608,7 +619,6 @@ export default function Topic() {
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
-                      repliesCount={opinion.repliesCount || 0}
                       challengesCount={opinion.challengesCount || 0}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
@@ -622,7 +632,7 @@ export default function Topic() {
                         voteType: 'dislike',
                         currentVote: opinion.userVote?.voteType 
                       })}
-                      onReply={(id) => {}}
+                      onAdopt={(id) => adoptMutation.mutate(id)}
                       onChallenge={(id) => setChallengingOpinionId(id)}
                     />
                   ))}
