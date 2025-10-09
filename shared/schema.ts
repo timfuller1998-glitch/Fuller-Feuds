@@ -32,6 +32,8 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  role: varchar("role", { length: 20 }).default("user"), // 'user', 'moderator', 'admin'
+  status: varchar("status", { length: 20 }).default("active"), // 'active', 'suspended', 'banned'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -45,6 +47,7 @@ export const topics = pgTable("topics", {
   imageUrl: varchar("image_url"),
   createdById: varchar("created_by_id").notNull().references(() => users.id),
   isActive: boolean("is_active").default(true),
+  status: varchar("status", { length: 20 }).default("active"), // 'active', 'hidden', 'archived'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -56,6 +59,7 @@ export const opinions = pgTable("opinions", {
   userId: varchar("user_id").notNull().references(() => users.id),
   content: text("content").notNull(),
   stance: varchar("stance", { length: 20 }).notNull(), // 'for', 'against', 'neutral'
+  status: varchar("status", { length: 20 }).default("approved"), // 'pending', 'approved', 'flagged', 'hidden'
   likesCount: integer("likes_count").default(0),
   dislikesCount: integer("dislikes_count").default(0),
   repliesCount: integer("replies_count").default(0),
@@ -169,6 +173,29 @@ export const opinionChallenges = pgTable("opinion_challenges", {
   opinionId: uuid("opinion_id").notNull().references(() => opinions.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id),
   context: text("context").notNull(), // The challenge/context being added
+  status: varchar("status", { length: 20 }).default("pending"), // 'pending', 'approved', 'rejected'
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Opinion flags - for reporting inappropriate content
+export const opinionFlags = pgTable("opinion_flags", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  opinionId: uuid("opinion_id").notNull().references(() => opinions.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  reason: text("reason").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_opinion_flag").on(table.opinionId, table.userId)
+]);
+
+// Moderation actions log - tracks all admin/moderator actions
+export const moderationActions = pgTable("moderation_actions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  moderatorId: varchar("moderator_id").notNull().references(() => users.id),
+  actionType: varchar("action_type", { length: 50 }).notNull(), // 'approve_opinion', 'hide_opinion', 'suspend_user', 'ban_user', etc.
+  targetType: varchar("target_type", { length: 50 }).notNull(), // 'opinion', 'user', 'topic', 'challenge'
+  targetId: varchar("target_id").notNull(),
+  reason: text("reason"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -279,6 +306,7 @@ export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
 
 export const insertOpinionChallengeSchema = createInsertSchema(opinionChallenges).omit({
   id: true,
+  status: true,
   createdAt: true,
 });
 export type InsertOpinionChallenge = z.infer<typeof insertOpinionChallengeSchema>;
@@ -289,3 +317,17 @@ export const insertOpinionVoteSchema = createInsertSchema(opinionVotes).omit({
   createdAt: true,
 });
 export type InsertOpinionVote = z.infer<typeof insertOpinionVoteSchema>;
+
+export const insertOpinionFlagSchema = createInsertSchema(opinionFlags).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertOpinionFlag = z.infer<typeof insertOpinionFlagSchema>;
+export type OpinionFlag = typeof opinionFlags.$inferSelect;
+
+export const insertModerationActionSchema = createInsertSchema(moderationActions).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertModerationAction = z.infer<typeof insertModerationActionSchema>;
+export type ModerationAction = typeof moderationActions.$inferSelect;
