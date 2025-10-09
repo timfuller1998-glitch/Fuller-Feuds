@@ -156,6 +156,18 @@ export default function Home() {
     },
   });
 
+  const adoptMutation = useMutation({
+    mutationFn: async (opinionId: string) => {
+      return apiRequest('POST', `/api/opinions/${opinionId}/adopt`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "opinions"] });
+    },
+    onError: (error: any) => {
+      console.error("Failed to adopt opinion:", error);
+    },
+  });
+
   // AI synthesis mutations
   const generateCumulativeMutation = useMutation({
     mutationFn: async () => {
@@ -570,7 +582,7 @@ export default function Home() {
                   voteType: 'dislike',
                   currentVote: opinion.userVote?.voteType 
                 })}
-                onReply={(id) => {}}
+                onAdopt={(id) => adoptMutation.mutate(id)}
                 onChallenge={(id) => setChallengingOpinionId(id)}
               />
             ))
