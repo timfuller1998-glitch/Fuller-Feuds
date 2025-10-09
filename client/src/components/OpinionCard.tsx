@@ -222,7 +222,7 @@ export default function OpinionCard({
                       <UserAvatar 
                         name={`${challenge.user.firstName || ''} ${challenge.user.lastName || ''}`.trim() || 'Anonymous'} 
                         imageUrl={challenge.user.profileImageUrl} 
-                        size="xs" 
+                        size="sm" 
                       />
                     )}
                     <div className="flex-1 min-w-0">
