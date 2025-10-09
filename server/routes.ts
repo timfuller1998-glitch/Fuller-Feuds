@@ -406,6 +406,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Moderation routes - Flag opinion
+  app.post('/api/opinions/:opinionId/flag', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      if (!reason || typeof reason !== 'string') {
+        return res.status(400).json({ error: 'Reason is required' });
+      }
+      
+      await storage.flagOpinion(req.params.opinionId, userId, reason);
+      res.status(200).json({ message: 'Opinion flagged successfully' });
+    } catch (error) {
+      console.error("Error flagging opinion:", error);
+      res.status(500).json({ message: "Failed to flag opinion" });
+    }
+  });
+
+  // Admin routes - Get flagged opinions
+  app.get('/api/admin/flagged-opinions', requireModerator, async (req, res) => {
+    try {
+      const flagged = await storage.getFlaggedOpinions();
+      res.json(flagged);
+    } catch (error) {
+      console.error("Error fetching flagged opinions:", error);
+      res.status(500).json({ message: "Failed to fetch flagged opinions" });
+    }
+  });
+
+  // Admin routes - Approve opinion
+  app.post('/api/admin/opinions/:opinionId/approve', requireModerator, async (req: any, res) => {
+    try {
+      const moderatorId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      await storage.approveOpinion(req.params.opinionId, moderatorId, reason);
+      res.status(200).json({ message: 'Opinion approved' });
+    } catch (error) {
+      console.error("Error approving opinion:", error);
+      res.status(500).json({ message: "Failed to approve opinion" });
+    }
+  });
+
+  // Admin routes - Hide opinion
+  app.post('/api/admin/opinions/:opinionId/hide', requireModerator, async (req: any, res) => {
+    try {
+      const moderatorId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      await storage.hideOpinion(req.params.opinionId, moderatorId, reason);
+      res.status(200).json({ message: 'Opinion hidden' });
+    } catch (error) {
+      console.error("Error hiding opinion:", error);
+      res.status(500).json({ message: "Failed to hide opinion" });
+    }
+  });
+
+  // Admin routes - Get pending challenges
+  app.get('/api/admin/pending-challenges', requireModerator, async (req, res) => {
+    try {
+      const pending = await storage.getPendingChallenges();
+      res.json(pending);
+    } catch (error) {
+      console.error("Error fetching pending challenges:", error);
+      res.status(500).json({ message: "Failed to fetch pending challenges" });
+    }
+  });
+
+  // Admin routes - Approve challenge
+  app.post('/api/admin/challenges/:challengeId/approve', requireModerator, async (req: any, res) => {
+    try {
+      const moderatorId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      await storage.approveChallenge(req.params.challengeId, moderatorId, reason);
+      res.status(200).json({ message: 'Challenge approved' });
+    } catch (error) {
+      console.error("Error approving challenge:", error);
+      res.status(500).json({ message: "Failed to approve challenge" });
+    }
+  });
+
+  // Admin routes - Reject challenge
+  app.post('/api/admin/challenges/:challengeId/reject', requireModerator, async (req: any, res) => {
+    try {
+      const moderatorId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      await storage.rejectChallenge(req.params.challengeId, moderatorId, reason);
+      res.status(200).json({ message: 'Challenge rejected' });
+    } catch (error) {
+      console.error("Error rejecting challenge:", error);
+      res.status(500).json({ message: "Failed to reject challenge" });
+    }
+  });
+
+  // Admin routes - User moderation
+  app.post('/api/admin/users/:userId/suspend', requireModerator, async (req: any, res) => {
+    try {
+      const moderatorId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      await storage.suspendUser(req.params.userId, moderatorId, reason);
+      res.status(200).json({ message: 'User suspended' });
+    } catch (error) {
+      console.error("Error suspending user:", error);
+      res.status(500).json({ message: "Failed to suspend user" });
+    }
+  });
+
+  app.post('/api/admin/users/:userId/ban', requireModerator, async (req: any, res) => {
+    try {
+      const moderatorId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      await storage.banUser(req.params.userId, moderatorId, reason);
+      res.status(200).json({ message: 'User banned' });
+    } catch (error) {
+      console.error("Error banning user:", error);
+      res.status(500).json({ message: "Failed to ban user" });
+    }
+  });
+
+  app.post('/api/admin/users/:userId/reinstate', requireModerator, async (req: any, res) => {
+    try {
+      const moderatorId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      await storage.reinstateUser(req.params.userId, moderatorId, reason);
+      res.status(200).json({ message: 'User reinstated' });
+    } catch (error) {
+      console.error("Error reinstating user:", error);
+      res.status(500).json({ message: "Failed to reinstate user" });
+    }
+  });
+
+  // Admin routes - Topic moderation
+  app.post('/api/admin/topics/:topicId/hide', requireModerator, async (req: any, res) => {
+    try {
+      const moderatorId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      await storage.hideTopic(req.params.topicId, moderatorId, reason);
+      res.status(200).json({ message: 'Topic hidden' });
+    } catch (error) {
+      console.error("Error hiding topic:", error);
+      res.status(500).json({ message: "Failed to hide topic" });
+    }
+  });
+
+  app.post('/api/admin/topics/:topicId/archive', requireModerator, async (req: any, res) => {
+    try {
+      const moderatorId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      await storage.archiveTopic(req.params.topicId, moderatorId, reason);
+      res.status(200).json({ message: 'Topic archived' });
+    } catch (error) {
+      console.error("Error archiving topic:", error);
+      res.status(500).json({ message: "Failed to archive topic" });
+    }
+  });
+
+  app.post('/api/admin/topics/:topicId/restore', requireModerator, async (req: any, res) => {
+    try {
+      const moderatorId = req.user.claims.sub;
+      const { reason } = req.body;
+      
+      await storage.restoreTopic(req.params.topicId, moderatorId, reason);
+      res.status(200).json({ message: 'Topic restored' });
+    } catch (error) {
+      console.error("Error restoring topic:", error);
+      res.status(500).json({ message: "Failed to restore topic" });
+    }
+  });
+
   // Cumulative opinion routes
   app.get('/api/topics/:topicId/cumulative', async (req, res) => {
     try {

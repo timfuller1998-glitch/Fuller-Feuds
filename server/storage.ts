@@ -11,6 +11,8 @@ import {
   streamChatMessages,
   opinionVotes,
   opinionChallenges,
+  opinionFlags,
+  moderationActions,
   userFollows,
   userProfiles,
   type User,
@@ -122,6 +124,21 @@ export interface IStorage {
   
   // User debate rooms
   getUserDebateRooms(userId: string): Promise<DebateRoom[]>;
+  
+  // Moderation operations
+  flagOpinion(opinionId: string, userId: string, reason: string): Promise<void>;
+  getFlaggedOpinions(): Promise<any[]>;
+  approveOpinion(opinionId: string, moderatorId: string, reason?: string): Promise<void>;
+  hideOpinion(opinionId: string, moderatorId: string, reason?: string): Promise<void>;
+  approveChallenge(challengeId: string, moderatorId: string, reason?: string): Promise<void>;
+  rejectChallenge(challengeId: string, moderatorId: string, reason?: string): Promise<void>;
+  getPendingChallenges(): Promise<any[]>;
+  suspendUser(userId: string, moderatorId: string, reason?: string): Promise<void>;
+  banUser(userId: string, moderatorId: string, reason?: string): Promise<void>;
+  reinstateUser(userId: string, moderatorId: string, reason?: string): Promise<void>;
+  hideTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
+  archiveTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
+  restoreTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -926,6 +943,158 @@ export class DatabaseStorage implements IStorage {
     await this.upsertUserProfile(userId, {
       followerCount: followerResult.count,
       followingCount: followingResult.count,
+    });
+  }
+
+  // Moderation operations
+  async flagOpinion(opinionId: string, userId: string, reason: string): Promise<void> {
+    await db.insert(opinionFlags).values({ opinionId, userId, reason }).onConflictDoNothing();
+    await db.update(opinions).set({ status: 'flagged' }).where(eq(opinions.id, opinionId));
+  }
+
+  async getFlaggedOpinions(): Promise<any[]> {
+    const flagged = await db
+      .select({
+        opinion: opinions,
+        topic: topics,
+        author: users,
+        flags: opinionFlags,
+      })
+      .from(opinions)
+      .innerJoin(topics, eq(opinions.topicId, topics.id))
+      .innerJoin(users, eq(opinions.userId, users.id))
+      .innerJoin(opinionFlags, eq(opinions.id, opinionFlags.opinionId))
+      .where(eq(opinions.status, 'flagged'))
+      .orderBy(desc(opinions.createdAt));
+    
+    return flagged;
+  }
+
+  async approveOpinion(opinionId: string, moderatorId: string, reason?: string): Promise<void> {
+    await db.update(opinions).set({ status: 'approved' }).where(eq(opinions.id, opinionId));
+    await db.insert(moderationActions).values({
+      moderatorId,
+      actionType: 'approve_opinion',
+      targetType: 'opinion',
+      targetId: opinionId,
+      reason: reason || 'Opinion approved after review',
+    });
+  }
+
+  async hideOpinion(opinionId: string, moderatorId: string, reason?: string): Promise<void> {
+    await db.update(opinions).set({ status: 'hidden' }).where(eq(opinions.id, opinionId));
+    await db.insert(moderationActions).values({
+      moderatorId,
+      actionType: 'hide_opinion',
+      targetType: 'opinion',
+      targetId: opinionId,
+      reason: reason || 'Opinion hidden by moderator',
+    });
+  }
+
+  async approveChallenge(challengeId: string, moderatorId: string, reason?: string): Promise<void> {
+    await db.update(opinionChallenges).set({ status: 'approved' }).where(eq(opinionChallenges.id, challengeId));
+    await db.insert(moderationActions).values({
+      moderatorId,
+      actionType: 'approve_challenge',
+      targetType: 'challenge',
+      targetId: challengeId,
+      reason: reason || 'Challenge approved',
+    });
+  }
+
+  async rejectChallenge(challengeId: string, moderatorId: string, reason?: string): Promise<void> {
+    await db.update(opinionChallenges).set({ status: 'rejected' }).where(eq(opinionChallenges.id, challengeId));
+    await db.insert(moderationActions).values({
+      moderatorId,
+      actionType: 'reject_challenge',
+      targetType: 'challenge',
+      targetId: challengeId,
+      reason: reason || 'Challenge rejected',
+    });
+  }
+
+  async getPendingChallenges(): Promise<any[]> {
+    const pending = await db
+      .select({
+        challenge: opinionChallenges,
+        opinion: opinions,
+        topic: topics,
+        author: users,
+      })
+      .from(opinionChallenges)
+      .innerJoin(opinions, eq(opinionChallenges.opinionId, opinions.id))
+      .innerJoin(topics, eq(opinions.topicId, topics.id))
+      .innerJoin(users, eq(opinionChallenges.userId, users.id))
+      .where(eq(opinionChallenges.status, 'pending'))
+      .orderBy(desc(opinionChallenges.createdAt));
+    
+    return pending;
+  }
+
+  async suspendUser(userId: string, moderatorId: string, reason?: string): Promise<void> {
+    await db.update(users).set({ status: 'suspended' }).where(eq(users.id, userId));
+    await db.insert(moderationActions).values({
+      moderatorId,
+      actionType: 'suspend_user',
+      targetType: 'user',
+      targetId: userId,
+      reason: reason || 'User suspended',
+    });
+  }
+
+  async banUser(userId: string, moderatorId: string, reason?: string): Promise<void> {
+    await db.update(users).set({ status: 'banned' }).where(eq(users.id, userId));
+    await db.insert(moderationActions).values({
+      moderatorId,
+      actionType: 'ban_user',
+      targetType: 'user',
+      targetId: userId,
+      reason: reason || 'User banned',
+    });
+  }
+
+  async reinstateUser(userId: string, moderatorId: string, reason?: string): Promise<void> {
+    await db.update(users).set({ status: 'active' }).where(eq(users.id, userId));
+    await db.insert(moderationActions).values({
+      moderatorId,
+      actionType: 'reinstate_user',
+      targetType: 'user',
+      targetId: userId,
+      reason: reason || 'User reinstated',
+    });
+  }
+
+  async hideTopic(topicId: string, moderatorId: string, reason?: string): Promise<void> {
+    await db.update(topics).set({ status: 'hidden' }).where(eq(topics.id, topicId));
+    await db.insert(moderationActions).values({
+      moderatorId,
+      actionType: 'hide_topic',
+      targetType: 'topic',
+      targetId: topicId,
+      reason: reason || 'Topic hidden',
+    });
+  }
+
+  async archiveTopic(topicId: string, moderatorId: string, reason?: string): Promise<void> {
+    await db.update(topics).set({ status: 'archived' }).where(eq(topics.id, topicId));
+    await db.insert(moderationActions).values({
+      moderatorId,
+      actionType: 'archive_topic',
+      targetType: 'topic',
+      targetId: topicId,
+      reason: reason || 'Topic archived',
+    });
+  }
+
+  async restoreTopic(topicId: string, moderatorId: string, reason?: string): Promise<void> {
+    await db.update(topics).set({ status: 'active' }).where(eq(topics.id, topicId));
+    await db.insert(moderationActions).values({
+      moderatorId,
+      actionType: 'restore_topic',
+      targetType: 'topic',
+      targetId: topicId,
+      reason: reason || 'Topic restored',
     });
   }
 }
