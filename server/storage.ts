@@ -52,7 +52,7 @@ export interface IStorage {
   
   // Opinion operations
   createOpinion(opinion: InsertOpinion): Promise<Opinion>;
-  getOpinionsByTopic(topicId: string): Promise<Opinion[]>;
+  getOpinionsByTopic(topicId: string, userRole?: string): Promise<Opinion[]>;
   getOpinion(id: string): Promise<Opinion | undefined>;
   updateOpinion(opinionId: string, data: Partial<InsertOpinion>): Promise<Opinion>;
   updateOpinionCounts(opinionId: string, likesCount: number, dislikesCount: number): Promise<void>;
@@ -63,7 +63,7 @@ export interface IStorage {
   
   // Opinion challenges
   challengeOpinion(opinionId: string, userId: string, context: string): Promise<void>;
-  getOpinionChallenges(opinionId: string): Promise<any[]>;
+  getOpinionChallenges(opinionId: string, userRole?: string): Promise<any[]>;
   
   // Cumulative opinions
   getCumulativeOpinion(topicId: string): Promise<CumulativeOpinion | undefined>;
@@ -195,11 +195,21 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getOpinionsByTopic(topicId: string): Promise<Opinion[]> {
+  async getOpinionsByTopic(topicId: string, userRole?: string): Promise<Opinion[]> {
+    const isModOrAdmin = userRole === 'admin' || userRole === 'moderator';
+    
+    // Build where conditions
+    const whereConditions = [eq(opinions.topicId, topicId)];
+    
+    // Regular users only see approved opinions
+    if (!isModOrAdmin) {
+      whereConditions.push(eq(opinions.status, 'approved'));
+    }
+    
     const baseOpinions = await db
       .select()
       .from(opinions)
-      .where(eq(opinions.topicId, topicId))
+      .where(and(...whereConditions))
       .orderBy(desc(opinions.createdAt));
 
     // Enrich each opinion with vote and challenge counts
@@ -351,11 +361,22 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getOpinionChallenges(opinionId: string): Promise<any[]> {
+  async getOpinionChallenges(opinionId: string, userRole?: string): Promise<any[]> {
+    const isModOrAdmin = userRole === 'admin' || userRole === 'moderator';
+    
+    // Build where conditions
+    const whereConditions = [eq(opinionChallenges.opinionId, opinionId)];
+    
+    // Regular users only see approved challenges
+    if (!isModOrAdmin) {
+      whereConditions.push(eq(opinionChallenges.status, 'approved'));
+    }
+    
     const challenges = await db
       .select({
         id: opinionChallenges.id,
         context: opinionChallenges.context,
+        status: opinionChallenges.status,
         createdAt: opinionChallenges.createdAt,
         userId: opinionChallenges.userId,
         user: {
@@ -367,7 +388,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(opinionChallenges)
       .leftJoin(users, eq(opinionChallenges.userId, users.id))
-      .where(eq(opinionChallenges.opinionId, opinionId))
+      .where(and(...whereConditions))
       .orderBy(desc(opinionChallenges.createdAt));
     
     return challenges;
@@ -856,6 +877,8 @@ export class DatabaseStorage implements IStorage {
         firstName: users.firstName,
         lastName: users.lastName,
         profileImageUrl: users.profileImageUrl,
+        role: users.role,
+        status: users.status,
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
       })
@@ -874,6 +897,8 @@ export class DatabaseStorage implements IStorage {
         firstName: users.firstName,
         lastName: users.lastName,
         profileImageUrl: users.profileImageUrl,
+        role: users.role,
+        status: users.status,
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
       })

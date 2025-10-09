@@ -141,7 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Get all opinions to count unique participants
-      const allOpinionsPromises = topics.map((topic: any) => storage.getOpinionsByTopic(topic.id));
+      const allOpinionsPromises = topics.map((topic: any) => storage.getOpinionsByTopic(topic.id, req.userRole));
       const allOpinionsArrays = await Promise.all(allOpinionsPromises);
       const allOpinions = allOpinionsArrays.flat();
 
@@ -264,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Opinion routes
   app.get('/api/topics/:topicId/opinions', async (req: any, res) => {
     try {
-      const opinions = await storage.getOpinionsByTopic(req.params.topicId);
+      const opinions = await storage.getOpinionsByTopic(req.params.topicId, req.userRole);
       
       // If user is authenticated, include their vote for each opinion
       if (req.user?.claims?.sub) {
@@ -396,9 +396,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/opinions/:opinionId/challenges', async (req, res) => {
+  app.get('/api/opinions/:opinionId/challenges', async (req: any, res) => {
     try {
-      const challenges = await storage.getOpinionChallenges(req.params.opinionId);
+      const challenges = await storage.getOpinionChallenges(req.params.opinionId, req.userRole);
       res.json(challenges);
     } catch (error) {
       console.error("Error fetching challenges:", error);
