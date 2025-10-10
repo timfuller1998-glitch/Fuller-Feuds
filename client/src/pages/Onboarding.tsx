@@ -49,13 +49,16 @@ export default function Onboarding() {
     queryKey: ['/api/auth/user'],
   });
 
-  const { data: categories = [] } = useQuery<string[]>({
-    queryKey: ['/api/categories'],
-  });
-
   const { data: topics = [] } = useQuery<Topic[]>({
     queryKey: ['/api/topics'],
   });
+
+  // Derive unique categories from topics
+  const categories = Array.from(
+    new Set(
+      topics.flatMap(topic => topic.categories || [])
+    )
+  ).sort();
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
