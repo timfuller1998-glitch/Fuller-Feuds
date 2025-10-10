@@ -93,7 +93,10 @@ export default function Onboarding() {
   // Create opinion mutation
   const createOpinionMutation = useMutation({
     mutationFn: async (data: { topicId: string; content: string; stance: string }) => {
-      return await apiRequest('POST', '/api/opinions', data);
+      return await apiRequest('POST', `/api/topics/${data.topicId}/opinions`, {
+        content: data.content,
+        stance: data.stance
+      });
     },
     onSuccess: (_, variables) => {
       setCreatedOpinions(prev => new Set([...prev, variables.topicId]));
@@ -111,7 +114,8 @@ export default function Onboarding() {
         setCanProceed(selectedCategories.length >= 3);
         break;
       case 3:
-        setCanProceed(createdOpinions.size > 0);
+        // Opinions are encouraged but not required
+        setCanProceed(true);
         break;
       case 4:
         setCanProceed(true);
@@ -120,6 +124,13 @@ export default function Onboarding() {
         setCanProceed(false);
     }
   }, [currentStep, firstName, lastName, selectedCategories, createdOpinions]);
+
+  // Redirect users who have already completed onboarding
+  useEffect(() => {
+    if (user && user.onboardingComplete) {
+      navigate("/");
+    }
+  }, [user, navigate]);
 
   // Pre-fill user data if available
   useEffect(() => {
@@ -170,6 +181,9 @@ export default function Onboarding() {
       step: 4,
       complete: true
     });
+    // Wait for user data to refresh before navigating
+    await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    await queryClient.refetchQueries({ queryKey: ['/api/auth/user'] });
     navigate("/");
   };
 
@@ -178,6 +192,9 @@ export default function Onboarding() {
       step: currentStep,
       complete: true
     });
+    // Wait for user data to refresh before navigating
+    await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    await queryClient.refetchQueries({ queryKey: ['/api/auth/user'] });
     navigate("/");
   };
 
