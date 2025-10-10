@@ -7,12 +7,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProfilePictureUpload } from "@/components/ProfilePictureUpload";
+import { ThemeEditorDialog } from "@/components/ThemeEditorDialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { Save, User, Cloudy, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Save, User, Cloudy, Sun, Moon, Palette, Edit, Trash2, Plus, Heart, TrendingUp, Check } from "lucide-react";
+import type { Theme } from "@shared/schema";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const profileFormSchema = z.object({
   displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
@@ -46,12 +51,25 @@ interface ProfileData {
 
 export default function Settings() {
   const { user: currentUser } = useAuth();
+  const { toast } = useToast();
+  const { currentTheme, applyTheme: applyCustomTheme } = useTheme();
   const [themePreference, setThemePreference] = useState<"light" | "medium" | "dark">("light");
+  const [themeEditorOpen, setThemeEditorOpen] = useState(false);
+  const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [themeToDelete, setThemeToDelete] = useState<Theme | null>(null);
 
   // Fetch current user's profile
   const { data: profileData, isLoading } = useQuery<ProfileData>({
     queryKey: ['/api/profile', currentUser?.id],
     queryFn: () => fetch(`/api/profile/${currentUser?.id}`, { credentials: 'include' }).then(res => res.json()),
+    enabled: !!currentUser?.id,
+  });
+
+  // Fetch user's custom themes
+  const { data: userThemes = [], isLoading: themesLoading } = useQuery<Theme[]>({
+    queryKey: ['/api/themes/my-themes'],
+    queryFn: () => fetch('/api/themes/my-themes', { credentials: 'include' }).then(res => res.json()),
     enabled: !!currentUser?.id,
   });
 
@@ -127,8 +145,78 @@ export default function Settings() {
     }
   });
 
+  // Delete theme mutation
+  const deleteThemeMutation = useMutation({
+    mutationFn: (themeId: string) => 
+      apiRequest('DELETE', `/api/themes/${themeId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/themes/my-themes'] });
+      toast({
+        title: "Theme deleted",
+        description: "Your theme has been deleted successfully.",
+      });
+      setDeleteDialogOpen(false);
+      setThemeToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete theme",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Apply theme mutation
+  const applyThemeMutation = useMutation({
+    mutationFn: (themeId: string) => 
+      apiRequest('POST', `/api/themes/${themeId}/apply`),
+    onSuccess: (_, themeId) => {
+      const theme = userThemes.find(t => t.id === themeId);
+      if (theme) {
+        applyCustomTheme(theme);
+        toast({
+          title: "Theme applied",
+          description: `"${theme.name}" has been applied successfully.`,
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to apply theme",
+        variant: "destructive",
+      });
+    }
+  });
+
   const onSubmit = (data: z.infer<typeof profileFormSchema>) => {
     updateProfileMutation.mutate(data);
+  };
+
+  const handleCreateTheme = () => {
+    setEditingTheme(null);
+    setThemeEditorOpen(true);
+  };
+
+  const handleEditTheme = (theme: Theme) => {
+    setEditingTheme(theme);
+    setThemeEditorOpen(true);
+  };
+
+  const handleDeleteClick = (theme: Theme) => {
+    setThemeToDelete(theme);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (themeToDelete) {
+      deleteThemeMutation.mutate(themeToDelete.id);
+    }
+  };
+
+  const handleApplyTheme = (theme: Theme) => {
+    applyThemeMutation.mutate(theme.id);
   };
 
   if (isLoading) {
@@ -346,6 +434,157 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Custom Themes */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="w-5 h-5" />
+            Custom Themes
+          </CardTitle>
+          <CardDescription>Create and manage your own custom color themes</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button
+            onClick={handleCreateTheme}
+            className="w-full sm:w-auto"
+            data-testid="button-create-theme"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create New Theme
+          </Button>
+
+          {themesLoading ? (
+            <div className="grid grid-cols-1 gap-4">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />
+              ))}
+            </div>
+          ) : userThemes.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Palette className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No custom themes yet</p>
+              <p className="text-sm">Create your first theme to get started</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {userThemes.map((theme) => {
+                const colors = theme.colors as any;
+                const isApplied = currentTheme?.id === theme.id;
+                
+                return (
+                  <Card key={theme.id} className={isApplied ? "border-primary" : ""} data-testid={`card-theme-${theme.id}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          {/* Color preview swatch */}
+                          <div
+                            className="w-12 h-12 rounded-md border flex-shrink-0"
+                            style={{
+                              backgroundColor: colors.background 
+                                ? `hsl(${colors.background.h}, ${colors.background.s}%, ${colors.background.l}%)`
+                                : '#ffffff'
+                            }}
+                            data-testid={`swatch-theme-${theme.id}`}
+                          />
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold truncate" data-testid={`text-theme-name-${theme.id}`}>
+                                {theme.name}
+                              </h4>
+                              {isApplied && (
+                                <Check className="w-4 h-4 text-primary flex-shrink-0" data-testid={`icon-applied-${theme.id}`} />
+                              )}
+                            </div>
+                            {theme.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                                {theme.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Heart className="w-3 h-3" />
+                                {theme.likesCount || 0}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <TrendingUp className="w-3 h-3" />
+                                {theme.usageCount || 0}
+                              </span>
+                              <span className="capitalize">{theme.visibility}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {!isApplied && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleApplyTheme(theme)}
+                              disabled={applyThemeMutation.isPending}
+                              data-testid={`button-apply-theme-${theme.id}`}
+                            >
+                              Apply
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditTheme(theme)}
+                            data-testid={`button-edit-theme-${theme.id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteClick(theme)}
+                            disabled={deleteThemeMutation.isPending}
+                            data-testid={`button-delete-theme-${theme.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Theme Editor Dialog */}
+      <ThemeEditorDialog
+        open={themeEditorOpen}
+        onOpenChange={setThemeEditorOpen}
+        editingTheme={editingTheme}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Theme</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{themeToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
