@@ -12,7 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { Save, User, Monitor, Sun, Moon } from "lucide-react";
+import { Save, User, Cloudy, Sun, Moon } from "lucide-react";
 
 const profileFormSchema = z.object({
   displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
@@ -46,7 +46,7 @@ interface ProfileData {
 
 export default function Settings() {
   const { user: currentUser } = useAuth();
-  const [themePreference, setThemePreference] = useState<"light" | "dark" | "auto">("light");
+  const [themePreference, setThemePreference] = useState<"light" | "medium" | "dark">("light");
 
   // Fetch current user's profile
   const { data: profileData, isLoading } = useQuery<ProfileData>({
@@ -82,39 +82,28 @@ export default function Settings() {
 
   // Load theme preference from localStorage
   useEffect(() => {
-    const savedTheme = localStorage.getItem("themePreference") as "light" | "dark" | "auto" || "auto";
+    const savedTheme = (localStorage.getItem("theme") as "light" | "medium" | "dark") || "light";
     setThemePreference(savedTheme);
     applyTheme(savedTheme);
   }, []);
 
   // Apply theme based on preference
-  const applyTheme = (preference: "light" | "dark" | "auto") => {
+  const applyTheme = (preference: "light" | "medium" | "dark") => {
     const root = document.documentElement;
     
-    if (preference === "auto") {
-      // Check system time (6 AM to 6 PM = light, otherwise dark)
-      const hour = new Date().getHours();
-      const isDay = hour >= 6 && hour < 18;
-      if (isDay) {
-        root.classList.remove("dark");
-      } else {
-        root.classList.add("dark");
-      }
-    } else if (preference === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
+    // Remove all theme classes
+    root.classList.remove("light", "medium", "dark");
+    
+    // Add the new theme class (except for light which is default)
+    if (preference !== "light") {
+      root.classList.add(preference);
     }
     
-    localStorage.setItem("themePreference", preference);
-    // Also save to old "theme" key for backward compatibility
-    if (preference !== "auto") {
-      localStorage.setItem("theme", preference);
-    }
+    localStorage.setItem("theme", preference);
   };
 
   // Handle theme preference change
-  const handleThemeChange = (value: "light" | "dark" | "auto") => {
+  const handleThemeChange = (value: "light" | "medium" | "dark") => {
     setThemePreference(value);
     applyTheme(value);
   };
@@ -334,22 +323,22 @@ export default function Settings() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="light">
+                <SelectItem value="light" data-testid="option-theme-light">
                   <div className="flex items-center gap-2">
                     <Sun className="w-4 h-4" />
                     <span>Light</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="dark">
+                <SelectItem value="medium" data-testid="option-theme-medium">
+                  <div className="flex items-center gap-2">
+                    <Cloudy className="w-4 h-4" />
+                    <span>Medium</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="dark" data-testid="option-theme-dark">
                   <div className="flex items-center gap-2">
                     <Moon className="w-4 h-4" />
                     <span>Dark</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="auto">
-                  <div className="flex items-center gap-2">
-                    <Monitor className="w-4 h-4" />
-                    <span>Time-based (6 AM - 6 PM light, rest dark)</span>
                   </div>
                 </SelectItem>
               </SelectContent>
