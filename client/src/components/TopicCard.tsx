@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Users, TrendingUp } from "lucide-react";
 import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
 
 interface TopicCardProps {
   id: string;
@@ -25,6 +26,14 @@ export default function TopicCard({
   isActive,
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Reset image state when imageUrl changes to allow recovery
+  useEffect(() => {
+    setImageError(false);
+    setImageLoaded(false);
+  }, [imageUrl]);
 
   return (
     <Card 
@@ -32,12 +41,22 @@ export default function TopicCard({
       onClick={() => setLocation(`/topic/${id}`)}
       data-testid={`card-topic-${id}`}
     >
-      <div className="aspect-video relative overflow-hidden">
-        <img 
-          src={imageUrl} 
-          alt={title}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+      <div className="aspect-video relative overflow-hidden bg-primary/10">
+        {imageUrl && !imageError ? (
+          <img 
+            src={imageUrl} 
+            alt={title}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={() => setImageError(true)}
+            onLoad={() => setImageLoaded(true)}
+            style={{ display: imageLoaded ? 'block' : 'none' }}
+          />
+        ) : null}
+        {(!imageUrl || imageError || !imageLoaded) && (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+            <MessageCircle className="w-16 h-16 text-primary/30" />
+          </div>
+        )}
         <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
           {categories?.slice(0, 2).map((category) => (
             <Badge key={category} variant="secondary" className="bg-background/80 backdrop-blur-sm">
