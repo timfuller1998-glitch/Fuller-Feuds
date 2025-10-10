@@ -1,12 +1,12 @@
 // Color palette generation utilities for creating harmonious themes
 
-interface HSL {
+export interface HSL {
   h: number; // Hue: 0-360
   s: number; // Saturation: 0-100
   l: number; // Lightness: 0-100
 }
 
-interface ThemeColors {
+export interface ThemeColors {
   background: HSL;
   foreground: HSL;
   card: HSL;
