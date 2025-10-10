@@ -1100,6 +1100,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Theme routes
+  app.post('/api/themes', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { insertThemeSchema } = await import("@shared/schema");
+      const validatedData = insertThemeSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      const theme = await storage.createTheme(validatedData);
+      res.status(201).json(theme);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating theme:", error);
+      res.status(500).json({ message: "Failed to create theme" });
+    }
+  });
+
+  app.get('/api/themes', async (req, res) => {
+    try {
+      const { userId, visibility, limit, search } = req.query;
+      const themes = await storage.getThemes({
+        userId: userId as string,
+        visibility: visibility as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+        search: search as string,
+      });
+      res.json(themes);
+    } catch (error) {
+      console.error("Error fetching themes:", error);
+      res.status(500).json({ message: "Failed to fetch themes" });
+    }
+  });
+
+  app.get('/api/themes/public', async (req, res) => {
+    try {
+      const { limit = 50, search } = req.query;
+      const themes = await storage.getPublicThemes(
+        parseInt(limit as string),
+        search as string
+      );
+      res.json(themes);
+    } catch (error) {
+      console.error("Error fetching public themes:", error);
+      res.status(500).json({ message: "Failed to fetch public themes" });
+    }
+  });
+
+  app.get('/api/themes/my-themes', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const themes = await storage.getUserThemes(userId);
+      res.json(themes);
+    } catch (error) {
+      console.error("Error fetching user themes:", error);
+      res.status(500).json({ message: "Failed to fetch user themes" });
+    }
+  });
+
+  app.get('/api/themes/:themeId', async (req, res) => {
+    try {
+      const theme = await storage.getTheme(req.params.themeId);
+      if (!theme) {
+        return res.status(404).json({ message: "Theme not found" });
+      }
+      res.json(theme);
+    } catch (error) {
+      console.error("Error fetching theme:", error);
+      res.status(500).json({ message: "Failed to fetch theme" });
+    }
+  });
+
+  app.patch('/api/themes/:themeId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { themeId } = req.params;
+      
+      const theme = await storage.updateTheme(themeId, userId, req.body);
+      res.json(theme);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error.message === 'Theme not found or unauthorized') {
+        return res.status(404).json({ message: error.message });
+      }
+      console.error("Error updating theme:", error);
+      res.status(500).json({ message: "Failed to update theme" });
+    }
+  });
+
+  app.delete('/api/themes/:themeId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { themeId } = req.params;
+      
+      await storage.deleteTheme(themeId, userId);
+      res.json({ message: "Theme deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting theme:", error);
+      res.status(500).json({ message: "Failed to delete theme" });
+    }
+  });
+
+  app.post('/api/themes/:themeId/fork', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { themeId } = req.params;
+      const { name, description } = req.body;
+      
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ message: "Theme name is required" });
+      }
+      
+      const forkedTheme = await storage.forkTheme(themeId, userId, name, description);
+      res.status(201).json(forkedTheme);
+    } catch (error) {
+      if (error.message === 'Theme not found') {
+        return res.status(404).json({ message: error.message });
+      }
+      console.error("Error forking theme:", error);
+      res.status(500).json({ message: "Failed to fork theme" });
+    }
+  });
+
+  app.post('/api/themes/:themeId/like', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { themeId } = req.params;
+      
+      await storage.likeTheme(themeId, userId);
+      res.json({ message: "Theme liked successfully" });
+    } catch (error) {
+      console.error("Error liking theme:", error);
+      res.status(500).json({ message: "Failed to like theme" });
+    }
+  });
+
+  app.delete('/api/themes/:themeId/like', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { themeId } = req.params;
+      
+      await storage.unlikeTheme(themeId, userId);
+      res.json({ message: "Theme unliked successfully" });
+    } catch (error) {
+      console.error("Error unliking theme:", error);
+      res.status(500).json({ message: "Failed to unlike theme" });
+    }
+  });
+
+  app.get('/api/themes/:themeId/liked', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { themeId } = req.params;
+      
+      const liked = await storage.isThemeLiked(themeId, userId);
+      res.json({ liked });
+    } catch (error) {
+      console.error("Error checking theme like status:", error);
+      res.status(500).json({ message: "Failed to check like status" });
+    }
+  });
+
+  app.post('/api/themes/:themeId/apply', isAuthenticated, async (req: any, res) => {
+    try {
+      const { themeId } = req.params;
+      
+      await storage.incrementThemeUsage(themeId);
+      res.json({ message: "Theme applied successfully" });
+    } catch (error) {
+      console.error("Error applying theme:", error);
+      res.status(500).json({ message: "Failed to apply theme" });
+    }
+  });
+
   // Debate room routes
   app.get('/api/debate-rooms', async (req, res) => {
     try {
