@@ -52,6 +52,29 @@ interface ThemeEditorDialogProps {
   editingTheme?: Theme | null;
 }
 
+// Helper function to find which variation best matches saved theme colors
+function findBestMatchingVariation(savedColors: any, variations: ThemeColors[]): number {
+  // Compare primary hue as the key differentiator between variations
+  const savedPrimaryHue = savedColors.primary?.h ?? 0;
+  
+  let bestMatchIndex = 0;
+  let smallestDiff = Infinity;
+  
+  variations.forEach((variation, index) => {
+    const variationPrimaryHue = variation.primary.h;
+    // Calculate hue difference (accounting for circular nature of hue: 0-360)
+    let diff = Math.abs(savedPrimaryHue - variationPrimaryHue);
+    if (diff > 180) diff = 360 - diff;
+    
+    if (diff < smallestDiff) {
+      smallestDiff = diff;
+      bestMatchIndex = index;
+    }
+  });
+  
+  return bestMatchIndex;
+}
+
 // ThemePreview component - shows a miniature version of debate platform UI
 function ThemePreview({ colors }: { colors: ThemeColors }) {
   const bg = `hsl(${formatHSL(colors.background)})`;
@@ -228,6 +251,20 @@ export function ThemeEditorDialog({ open, onOpenChange, editingTheme }: ThemeEdi
         visibility: editingTheme.visibility as "public" | "private",
         backgroundColor: hex,
       });
+      
+      // Generate variations and find the matching one
+      const bgHSL = hexToHSL(hex);
+      const variations = generatePaletteVariations(bgHSL);
+      setPaletteVariations(variations);
+      
+      // Find which variation best matches the saved theme
+      const matchIndex = findBestMatchingVariation(colors, variations);
+      setSelectedVariationIndex(matchIndex);
+      
+      // Update carousel to show the correct variation
+      if (carouselApi) {
+        carouselApi.scrollTo(matchIndex, false);
+      }
     } else if (!editingTheme && open) {
       // Reset for create mode
       setBackgroundColor("#ffffff");
@@ -239,7 +276,7 @@ export function ThemeEditorDialog({ open, onOpenChange, editingTheme }: ThemeEdi
         backgroundColor: "#ffffff",
       });
     }
-  }, [editingTheme, open, form]);
+  }, [editingTheme, open, form, carouselApi]);
 
   // Update palette variations when background color changes
   useEffect(() => {
