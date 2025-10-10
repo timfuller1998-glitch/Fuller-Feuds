@@ -25,6 +25,7 @@ import LiveStreamPage from "@/pages/LiveStreamPage";
 import DebateRoomPage from "@/pages/DebateRoomPage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Onboarding from "@/pages/Onboarding";
+import ThemeGallery from "@/pages/ThemeGallery";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -56,6 +57,7 @@ function Router() {
       <Route path="/live-stream/:id" component={LiveStreamPage} />
       <Route path="/debate-room/:id" component={DebateRoomPage} />
       <Route path="/admin" component={AdminDashboard} />
+      <Route path="/themes" component={ThemeGallery} />
       <Route component={NotFound} />
     </Switch>
   );

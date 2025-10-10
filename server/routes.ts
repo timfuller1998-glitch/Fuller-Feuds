@@ -1137,12 +1137,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/themes/public', async (req, res) => {
+  app.get('/api/themes/public', async (req: any, res) => {
     try {
       const { limit = 50, search } = req.query;
+      const userId = req.user?.claims?.sub;
       const themes = await storage.getPublicThemes(
         parseInt(limit as string),
-        search as string
+        search as string,
+        userId
       );
       res.json(themes);
     } catch (error) {

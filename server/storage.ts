@@ -1203,12 +1203,53 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(themes.createdAt));
   }
 
-  async getPublicThemes(limit: number = 50, search?: string): Promise<Theme[]> {
-    return await this.getThemes({ 
-      visibility: 'public', 
-      limit, 
-      search 
-    });
+  async getPublicThemes(limit: number = 50, search?: string, userId?: string): Promise<any[]> {
+    let query = db
+      .select({
+        id: themes.id,
+        userId: themes.userId,
+        name: themes.name,
+        description: themes.description,
+        visibility: themes.visibility,
+        baseTheme: themes.baseTheme,
+        colors: themes.colors,
+        forkedFromThemeId: themes.forkedFromThemeId,
+        likesCount: themes.likesCount,
+        usageCount: themes.usageCount,
+        createdAt: themes.createdAt,
+        updatedAt: themes.updatedAt,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+        liked: userId ? sql<boolean>`EXISTS(
+          SELECT 1 FROM ${themeLikes} 
+          WHERE ${themeLikes.themeId} = ${themes.id} 
+          AND ${themeLikes.userId} = ${userId}
+        )` : sql<boolean>`false`,
+      })
+      .from(themes)
+      .leftJoin(users, eq(themes.userId, users.id))
+      .where(eq(themes.visibility, 'public'));
+
+    if (search) {
+      query = query.where(
+        and(
+          eq(themes.visibility, 'public'),
+          or(
+            ilike(themes.name, `%${search}%`),
+            ilike(themes.description, `%${search}%`)
+          )
+        )
+      ) as any;
+    }
+
+    query = query.orderBy(desc(themes.createdAt)) as any;
+
+    if (limit) {
+      query = query.limit(limit) as any;
+    }
+
+    return await query;
   }
 
   async updateTheme(themeId: string, userId: string, data: Partial<InsertTheme>): Promise<Theme> {
