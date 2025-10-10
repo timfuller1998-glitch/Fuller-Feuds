@@ -336,3 +336,47 @@ export const insertModerationActionSchema = createInsertSchema(moderationActions
 });
 export type InsertModerationAction = z.infer<typeof insertModerationActionSchema>;
 export type ModerationAction = typeof moderationActions.$inferSelect;
+
+// User-created themes
+export const themes = pgTable("themes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  visibility: varchar("visibility", { length: 20 }).default("private").notNull(), // 'private', 'public'
+  baseTheme: varchar("base_theme", { length: 20 }).notNull(), // 'light', 'medium', 'dark'
+  colors: jsonb("colors").notNull(), // Stores HSL values for all CSS custom properties
+  forkedFromThemeId: uuid("forked_from_theme_id"),
+  likesCount: integer("likes_count").default(0),
+  usageCount: integer("usage_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Theme likes - tracks which users liked which themes
+export const themeLikes = pgTable("theme_likes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  themeId: uuid("theme_id").notNull().references(() => themes.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_theme_like").on(table.themeId, table.userId)
+]);
+
+export const insertThemeSchema = createInsertSchema(themes).omit({
+  id: true,
+  likesCount: true,
+  usageCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertThemeLikeSchema = createInsertSchema(themeLikes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Theme = typeof themes.$inferSelect;
+export type InsertTheme = z.infer<typeof insertThemeSchema>;
+export type ThemeLike = typeof themeLikes.$inferSelect;
+export type InsertThemeLike = z.infer<typeof insertThemeLikeSchema>;
