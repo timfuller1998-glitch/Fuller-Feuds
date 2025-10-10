@@ -15,6 +15,8 @@ import {
   moderationActions,
   userFollows,
   userProfiles,
+  themes,
+  themeLikes,
   type User,
   type UpsertUser,
   type Topic,
@@ -36,6 +38,10 @@ import {
   type InsertUserFollow,
   type UserProfile,
   type InsertUserProfile,
+  type Theme,
+  type InsertTheme,
+  type ThemeLike,
+  type InsertThemeLike,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, sql, count, ilike, or } from "drizzle-orm";
@@ -142,6 +148,20 @@ export interface IStorage {
   hideTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
   archiveTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
   restoreTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
+  
+  // Theme operations
+  createTheme(theme: InsertTheme): Promise<Theme>;
+  getTheme(id: string): Promise<Theme | undefined>;
+  getThemes(options?: { userId?: string; visibility?: string; limit?: number; search?: string }): Promise<Theme[]>;
+  getUserThemes(userId: string): Promise<Theme[]>;
+  getPublicThemes(limit?: number, search?: string): Promise<Theme[]>;
+  updateTheme(themeId: string, userId: string, data: Partial<InsertTheme>): Promise<Theme>;
+  deleteTheme(themeId: string, userId: string): Promise<void>;
+  forkTheme(themeId: string, userId: string, newName: string, newDescription?: string): Promise<Theme>;
+  likeTheme(themeId: string, userId: string): Promise<void>;
+  unlikeTheme(themeId: string, userId: string): Promise<void>;
+  isThemeLiked(themeId: string, userId: string): Promise<boolean>;
+  incrementThemeUsage(themeId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1130,6 +1150,147 @@ export class DatabaseStorage implements IStorage {
       targetId: topicId,
       reason: reason || 'Topic restored',
     });
+  }
+
+  // Theme operations
+  async createTheme(theme: InsertTheme): Promise<Theme> {
+    const [newTheme] = await db.insert(themes).values(theme).returning();
+    return newTheme;
+  }
+
+  async getTheme(id: string): Promise<Theme | undefined> {
+    const [theme] = await db.select().from(themes).where(eq(themes.id, id));
+    return theme;
+  }
+
+  async getThemes(options?: { userId?: string; visibility?: string; limit?: number; search?: string }): Promise<Theme[]> {
+    let query = db.select().from(themes);
+    
+    const conditions = [];
+    if (options?.userId) {
+      conditions.push(eq(themes.userId, options.userId));
+    }
+    if (options?.visibility) {
+      conditions.push(eq(themes.visibility, options.visibility));
+    }
+    if (options?.search) {
+      conditions.push(
+        or(
+          ilike(themes.name, `%${options.search}%`),
+          ilike(themes.description, `%${options.search}%`)
+        )
+      );
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(conditions.length === 1 ? conditions[0] : and(...conditions)) as any;
+    }
+    
+    query = query.orderBy(desc(themes.createdAt)) as any;
+    
+    if (options?.limit) {
+      query = query.limit(options.limit) as any;
+    }
+    
+    return await query;
+  }
+
+  async getUserThemes(userId: string): Promise<Theme[]> {
+    return await db
+      .select()
+      .from(themes)
+      .where(eq(themes.userId, userId))
+      .orderBy(desc(themes.createdAt));
+  }
+
+  async getPublicThemes(limit: number = 50, search?: string): Promise<Theme[]> {
+    return await this.getThemes({ 
+      visibility: 'public', 
+      limit, 
+      search 
+    });
+  }
+
+  async updateTheme(themeId: string, userId: string, data: Partial<InsertTheme>): Promise<Theme> {
+    const [updated] = await db
+      .update(themes)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(themes.id, themeId), eq(themes.userId, userId)))
+      .returning();
+    
+    if (!updated) {
+      throw new Error('Theme not found or unauthorized');
+    }
+    
+    return updated;
+  }
+
+  async deleteTheme(themeId: string, userId: string): Promise<void> {
+    await db
+      .delete(themes)
+      .where(and(eq(themes.id, themeId), eq(themes.userId, userId)));
+  }
+
+  async forkTheme(themeId: string, userId: string, newName: string, newDescription?: string): Promise<Theme> {
+    const [originalTheme] = await db.select().from(themes).where(eq(themes.id, themeId));
+    
+    if (!originalTheme) {
+      throw new Error('Theme not found');
+    }
+    
+    const [forkedTheme] = await db.insert(themes).values({
+      userId,
+      name: newName,
+      description: newDescription || `Forked from ${originalTheme.name}`,
+      visibility: 'private',
+      baseTheme: originalTheme.baseTheme,
+      colors: originalTheme.colors,
+      forkedFromThemeId: themeId,
+    }).returning();
+    
+    return forkedTheme;
+  }
+
+  async likeTheme(themeId: string, userId: string): Promise<void> {
+    try {
+      await db.insert(themeLikes).values({ themeId, userId });
+      await db
+        .update(themes)
+        .set({ likesCount: sql`${themes.likesCount} + 1` })
+        .where(eq(themes.id, themeId));
+    } catch (error) {
+      // Ignore duplicate like errors
+    }
+  }
+
+  async unlikeTheme(themeId: string, userId: string): Promise<void> {
+    await db
+      .delete(themeLikes)
+      .where(and(eq(themeLikes.themeId, themeId), eq(themeLikes.userId, userId)));
+    
+    await db
+      .update(themes)
+      .set({ likesCount: sql`GREATEST(${themes.likesCount} - 1, 0)` })
+      .where(eq(themes.id, themeId));
+  }
+
+  async isThemeLiked(themeId: string, userId: string): Promise<boolean> {
+    const [like] = await db
+      .select()
+      .from(themeLikes)
+      .where(and(eq(themeLikes.themeId, themeId), eq(themeLikes.userId, userId)));
+    
+    return !!like;
+  }
+
+  async incrementThemeUsage(themeId: string): Promise<void> {
+    await db
+      .update(themes)
+      .set({ usageCount: sql`${themes.usageCount} + 1` })
+      .where(eq(themes.id, themeId));
   }
 }
 
