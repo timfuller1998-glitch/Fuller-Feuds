@@ -22,6 +22,7 @@ import CategoryPage from "@/pages/CategoryPage";
 import LiveStreamPage from "@/pages/LiveStreamPage";
 import DebateRoomPage from "@/pages/DebateRoomPage";
 import AdminDashboard from "@/pages/AdminDashboard";
+import Onboarding from "@/pages/Onboarding";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -38,6 +39,7 @@ function Router() {
 
   return (
     <Switch>
+      <Route path="/onboarding" component={Onboarding} />
       <Route path="/" component={Home} />
       <Route path="/search" component={Search} />
       <Route path="/trending" component={Trending} />
@@ -62,6 +64,13 @@ function AuthenticatedApp() {
   const [location, setLocation] = useLocation();
   const searchParams = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Redirect to onboarding if not completed
+  useEffect(() => {
+    if (user && !user.onboardingComplete && location !== "/onboarding") {
+      setLocation("/onboarding");
+    }
+  }, [user, location, setLocation]);
   
   // Initialize search query from URL on mount and location change
   useEffect(() => {
