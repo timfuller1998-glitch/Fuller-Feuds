@@ -295,6 +295,160 @@ export function generatePalette(backgroundColor: HSL): ThemeColors {
 }
 
 /**
+ * Generate 5 palette variations from a base background color using different color harmonies
+ */
+export function generatePaletteVariations(backgroundColor: HSL): ThemeColors[] {
+  const variations: ThemeColors[] = [];
+  const themeType = getThemeType(backgroundColor);
+  const isLight = themeType === 'light';
+  
+  // Variation 1: Complementary (default)
+  variations.push(generatePalette(backgroundColor));
+  
+  // Variation 2: Analogous (30° apart)
+  variations.push(generatePaletteWithPrimaryHue(backgroundColor, (backgroundColor.h + 30) % 360));
+  
+  // Variation 3: Triadic (120° apart)
+  variations.push(generatePaletteWithPrimaryHue(backgroundColor, (backgroundColor.h + 120) % 360));
+  
+  // Variation 4: Split-Complementary (150° apart)
+  variations.push(generatePaletteWithPrimaryHue(backgroundColor, (backgroundColor.h + 150) % 360));
+  
+  // Variation 5: Double Complementary (60° from complementary)
+  variations.push(generatePaletteWithPrimaryHue(backgroundColor, (backgroundColor.h + 240) % 360));
+  
+  return variations;
+}
+
+/**
+ * Generate palette with custom primary hue for variations
+ */
+function generatePaletteWithPrimaryHue(backgroundColor: HSL, primaryHue: number): ThemeColors {
+  const themeType = getThemeType(backgroundColor);
+  const isLight = themeType === 'light';
+  
+  const background = backgroundColor;
+  const card: HSL = {
+    h: background.h,
+    s: Math.max(0, background.s - 2),
+    l: isLight ? Math.min(100, background.l + 2) : Math.max(0, background.l + 4),
+  };
+  
+  const popover: HSL = {
+    h: background.h,
+    s: Math.max(0, background.s - 1),
+    l: isLight ? Math.min(100, background.l + 3) : Math.max(0, background.l + 6),
+  };
+  
+  const foreground: HSL = isLight
+    ? { h: background.h, s: Math.min(15, background.s), l: 20 }
+    : { h: background.h, s: Math.min(8, background.s), l: 90 };
+  
+  const cardForeground = ensureContrast({ ...foreground }, card);
+  const popoverForeground = ensureContrast({ ...foreground }, popover);
+  
+  // Use custom primary hue
+  const primary: HSL = {
+    h: primaryHue,
+    s: isLight ? 70 : 65,
+    l: isLight ? 45 : 55,
+  };
+  
+  const primaryForeground: HSL = {
+    h: primaryHue,
+    s: 5,
+    l: isLight ? 98 : 10,
+  };
+  
+  const secondaryHue = (primaryHue + 30) % 360;
+  const secondary: HSL = {
+    h: secondaryHue,
+    s: isLight ? 25 : 20,
+    l: isLight ? 92 : 28,
+  };
+  
+  const secondaryForeground = ensureContrast(
+    { h: secondaryHue, s: 10, l: isLight ? 20 : 90 },
+    secondary
+  );
+  
+  const muted: HSL = {
+    h: background.h,
+    s: Math.max(0, background.s - 5),
+    l: isLight ? Math.max(0, background.l - 8) : Math.min(100, background.l + 12),
+  };
+  
+  const mutedForeground = ensureContrast(
+    { h: background.h, s: 8, l: isLight ? 50 : 70 },
+    muted
+  );
+  
+  const accentHue = (primaryHue + 90) % 360;
+  const accent: HSL = {
+    h: accentHue,
+    s: isLight ? 30 : 25,
+    l: isLight ? 90 : 30,
+  };
+  
+  const accentForeground = ensureContrast(
+    { h: accentHue, s: 10, l: isLight ? 20 : 90 },
+    accent
+  );
+  
+  const destructive: HSL = {
+    h: 0,
+    s: isLight ? 75 : 70,
+    l: isLight ? 50 : 55,
+  };
+  
+  const destructiveForeground: HSL = {
+    h: 0,
+    s: 5,
+    l: isLight ? 98 : 10,
+  };
+  
+  const border: HSL = {
+    h: background.h,
+    s: Math.max(0, background.s - 3),
+    l: isLight ? Math.max(0, background.l - 15) : Math.min(100, background.l + 15),
+  };
+  
+  const input: HSL = {
+    h: background.h,
+    s: Math.max(0, background.s - 3),
+    l: isLight ? Math.max(0, background.l - 12) : Math.min(100, background.l + 12),
+  };
+  
+  const ring: HSL = {
+    h: primary.h,
+    s: primary.s,
+    l: primary.l,
+  };
+  
+  return {
+    background,
+    foreground,
+    card,
+    cardForeground,
+    popover,
+    popoverForeground,
+    primary,
+    primaryForeground,
+    secondary,
+    secondaryForeground,
+    muted,
+    mutedForeground,
+    accent,
+    accentForeground,
+    destructive,
+    destructiveForeground,
+    border,
+    input,
+    ring,
+  };
+}
+
+/**
  * Validate that a theme has acceptable contrast ratios
  */
 export function validateTheme(theme: ThemeColors): { valid: boolean; issues: string[] } {
