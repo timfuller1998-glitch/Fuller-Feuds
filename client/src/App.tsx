@@ -103,6 +103,11 @@ function AuthenticatedApp() {
     setLocation(`${basePath}${newSearch ? `?${newSearch}` : ""}`);
   };
 
+  // Onboarding page doesn't need sidebar
+  if (location === "/onboarding") {
+    return <Router />;
+  }
+
   return (
     <SidebarProvider style={style as React.CSSProperties}>
       <div className="flex h-screen w-full overflow-x-hidden">

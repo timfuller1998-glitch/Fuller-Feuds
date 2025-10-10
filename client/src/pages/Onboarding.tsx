@@ -60,10 +60,7 @@ export default function Onboarding() {
   // Update profile mutation
   const updateProfileMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest('/api/onboarding/profile', {
-        method: 'PUT',
-        body: data
-      });
+      return await apiRequest('PUT', '/api/onboarding/profile', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
@@ -73,10 +70,7 @@ export default function Onboarding() {
   // Update categories mutation
   const updateCategoriesMutation = useMutation({
     mutationFn: async (categories: string[]) => {
-      return await apiRequest('/api/onboarding/categories', {
-        method: 'PUT',
-        body: { categories }
-      });
+      return await apiRequest('PUT', '/api/onboarding/categories', { categories });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
@@ -86,10 +80,7 @@ export default function Onboarding() {
   // Update onboarding progress mutation
   const updateProgressMutation = useMutation({
     mutationFn: async ({ step, complete }: { step: number; complete: boolean }) => {
-      return await apiRequest('/api/onboarding/progress', {
-        method: 'PUT',
-        body: { step, complete }
-      });
+      return await apiRequest('PUT', '/api/onboarding/progress', { step, complete });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
@@ -99,10 +90,7 @@ export default function Onboarding() {
   // Create opinion mutation
   const createOpinionMutation = useMutation({
     mutationFn: async (data: { topicId: string; content: string; stance: string }) => {
-      return await apiRequest('/api/opinions', {
-        method: 'POST',
-        body: data
-      });
+      return await apiRequest('POST', '/api/opinions', data);
     },
     onSuccess: (_, variables) => {
       setCreatedOpinions(prev => new Set([...prev, variables.topicId]));
