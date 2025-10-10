@@ -110,6 +110,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Onboarding routes
+  app.put("/api/onboarding/profile", isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub;
+    try {
+      await storage.updateUserProfile(userId, req.body);
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  app.put("/api/onboarding/categories", isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub;
+    const { categories } = req.body;
+    
+    if (!Array.isArray(categories)) {
+      return res.status(400).json({ error: "categories must be an array" });
+    }
+
+    try {
+      await storage.updateFollowedCategories(userId, categories);
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error updating categories:", error);
+      res.status(500).json({ error: "Failed to update categories" });
+    }
+  });
+
+  app.put("/api/onboarding/progress", isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub;
+    const { step, complete } = req.body;
+
+    try {
+      await storage.updateOnboardingProgress(userId, step, complete);
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error updating onboarding progress:", error);
+      res.status(500).json({ error: "Failed to update onboarding progress" });
+    }
+  });
+
   // User routes
   app.get('/api/users/:id', async (req, res) => {
     try {

@@ -46,6 +46,9 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserProfileImage(userId: string, profileImageUrl: string): Promise<void>;
+  updateUserProfile(userId: string, data: { firstName?: string; lastName?: string; bio?: string; location?: string; profileImageUrl?: string }): Promise<void>;
+  updateFollowedCategories(userId: string, categories: string[]): Promise<void>;
+  updateOnboardingProgress(userId: string, step: number, complete: boolean): Promise<void>;
   
   // Topic operations
   createTopic(topic: InsertTopic): Promise<Topic>;
@@ -168,6 +171,37 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ 
         profileImageUrl,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async updateUserProfile(userId: string, data: { firstName?: string; lastName?: string; bio?: string; location?: string; profileImageUrl?: string }): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async updateFollowedCategories(userId: string, categories: string[]): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        followedCategories: categories,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async updateOnboardingProgress(userId: string, step: number, complete: boolean): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        onboardingStep: step,
+        onboardingComplete: complete,
         updatedAt: new Date()
       })
       .where(eq(users.id, userId));
