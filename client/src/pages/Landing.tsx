@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import {
   Globe
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { LoginDialog } from "@/components/LoginDialog";
 
 interface PlatformStats {
   totalTopics: number;
@@ -21,12 +23,18 @@ interface PlatformStats {
 }
 
 export default function Landing() {
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+
   // Fetch platform statistics
   const { data: stats } = useQuery<PlatformStats>({
     queryKey: ['/api/stats/platform'],
   });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      {/* Login Dialog */}
+      <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} />
+
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -41,7 +49,7 @@ export default function Landing() {
           </div>
           
           <Button 
-            onClick={() => window.location.href = "/api/login"}
+            onClick={() => setLoginDialogOpen(true)}
             data-testid="button-login"
           >
             Sign In
@@ -70,7 +78,7 @@ export default function Landing() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
               size="lg" 
-              onClick={() => window.location.href = "/api/login"}
+              onClick={() => setLoginDialogOpen(true)}
               data-testid="button-get-started"
             >
               Get Started
@@ -216,7 +224,7 @@ export default function Landing() {
           </p>
           <Button 
             size="lg" 
-            onClick={() => window.location.href = "/api/login"}
+            onClick={() => setLoginDialogOpen(true)}
             data-testid="button-cta-signin"
           >
             Sign In to Get Started
