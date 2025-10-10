@@ -32,6 +32,11 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  bio: text("bio"),
+  location: varchar("location"),
+  followedCategories: text("followed_categories").array().default(sql`ARRAY[]::text[]`),
+  onboardingStep: integer("onboarding_step").default(0),
+  onboardingComplete: boolean("onboarding_complete").default(false),
   role: varchar("role", { length: 20 }).default("user"), // 'user', 'moderator', 'admin'
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'suspended', 'banned'
   createdAt: timestamp("created_at").defaultNow(),
