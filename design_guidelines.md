@@ -1,116 +1,169 @@
 # Design Guidelines: Kirk Debates Platform
 
-## Design Approach: Design System Based
-**Selected System**: Material Design 3 with refined Discord-inspired discussion patterns
-**Justification**: Utility-focused platform requiring excellent readability, clear information hierarchy, and established interaction patterns for multi-format discussions (text, live streams, one-on-one debates).
+## Design Approach: Reference-Based (Linear/Vercel Aesthetic)
+**Selected References**: Linear, Vercel, Arc Browser
+**Justification**: Modern SaaS platforms that balance sophisticated dark aesthetics with exceptional utility. These references excel at creating depth through subtle elevation, refined color usage, and glass morphism effects while maintaining outstanding readability and user focus.
 
 ## Core Design Elements
 
 ### Color Palette
-**Light Mode:**
-- Primary: 220 70% 50% (Professional blue for trust and authority)
-- Background: 0 0% 98% (Clean, readable background)
-- Surface: 0 0% 100% (Card backgrounds)
-- Surface Elevated: 220 5% 96% (Live stream panels, moderation tools)
+
+**Dark Mode (Primary):**
+- Background Base: 220 15% 9%
+- Surface: 220 12% 13%
+- Surface Elevated: 220 10% 16%
+- Surface Overlay (glass): 220 15% 18% with 60% opacity + backdrop blur
+- Primary Accent: 220 75% 58%
+- Text Primary: 220 8% 95%
+- Text Secondary: 220 8% 65%
+- Text Tertiary: 220 6% 45%
+- Border Subtle: 220 10% 22%
+- Border Default: 220 10% 28%
+
+**Light Mode (Secondary):**
+- Background Base: 220 15% 98%
+- Surface: 0 0% 100%
+- Surface Elevated: 220 10% 96%
+- Primary Accent: 220 75% 52%
 - Text Primary: 220 15% 15%
 - Text Secondary: 220 10% 45%
+- Border Subtle: 220 10% 88%
 
-**Dark Mode:**
-- Primary: 220 70% 60% (Slightly lighter for contrast)
-- Background: 220 15% 8% (Deep, comfortable dark)
-- Surface: 220 12% 12% (Elevated surfaces)
-- Surface Elevated: 220 15% 16% (Live stream panels, moderation tools)
-- Text Primary: 220 15% 90%
-- Text Secondary: 220 10% 70%
-
-**Accent Colors:**
-- Success (agreements): 120 60% 45%
-- Warning (active debates): 35 80% 55%
-- Live indicator: 0 85% 60% (Bright red for live streams)
-- AI-generated: 280 60% 65% (Purple for AI cumulative opinions)
+**Semantic Colors:**
+- Success: 142 70% 45%
+- Warning: 35 85% 55%
+- Live Indicator: 0 85% 58%
+- AI Purple: 270 65% 62%
+- Danger: 0 75% 55%
 
 ### Typography
-**Font Family**: Inter via Google Fonts CDN
-- Headlines: 600 weight, 1.5rem-2.5rem
-- Body text: 400 weight, 1rem, 1.6 line height for readability
-- Debate text: 400 weight, 1.125rem, 1.7 line height (enhanced readability)
-- Captions/metadata: 400 weight, 0.875rem
-- Code/quotes: JetBrains Mono, 400 weight
+**Font Family**: Inter (primary), JetBrains Mono (code/technical)
+
+**Hierarchy:**
+- Display (hero titles): 700 weight, 3rem (48px), -0.03em tracking, 1.1 line-height
+- H1 (page titles): 700 weight, 2.25rem (36px), -0.02em tracking
+- H2 (section headers): 600 weight, 1.5rem (24px), -0.01em tracking
+- H3 (card headers): 600 weight, 1.125rem (18px)
+- Body Large: 400 weight, 1.125rem (18px), 1.7 line-height
+- Body Default: 400 weight, 1rem (16px), 1.6 line-height
+- Body Small: 400 weight, 0.875rem (14px), 1.5 line-height
+- Caption: 500 weight, 0.75rem (12px), 0.02em tracking, uppercase
 
 ### Layout System
-**Spacing Units**: Tailwind spacing - primary units of 2, 4, 6, 8, 12, 16
-- Micro spacing: p-2, m-2 (8px)
-- Standard spacing: p-4, m-4 (16px) 
-- Component spacing: p-6, m-6 (24px)
-- Section spacing: p-8, m-8 (32px)
-- Large spacing: p-12, m-12 (48px)
-- Hero/Major: p-16, m-16 (64px)
+**Spacing Primitives**: 2, 4, 6, 8, 12, 16, 20, 24
+- Micro: 2, 4 (inline elements, tight groupings)
+- Standard: 6, 8 (component padding, list spacing)
+- Section: 12, 16 (card spacing, section gaps)
+- Large: 20, 24 (page sections, major divisions)
+
+**Container System:**
+- Max-width: 1440px (7xl)
+- Content max-width: 1280px (6xl)
+- Prose max-width: 720px
+
+### Visual Depth & Elevation
+
+**Shadows:**
+- Subtle: 0 1px 3px rgba(0,0,0,0.12)
+- Default: 0 4px 12px rgba(0,0,0,0.15)
+- Elevated: 0 12px 24px rgba(0,0,0,0.20)
+- Dramatic: 0 24px 48px rgba(0,0,0,0.25)
+
+**Glass Morphism:**
+- Overlays: backdrop-blur-xl with surface overlay color at 60% opacity
+- Navigation: backdrop-blur-lg with 80% opacity
+- Modal backgrounds: backdrop-blur-md with 40% opacity
 
 ### Component Library
 
-**Navigation**
-- Top navigation with prominent search, live debates indicator, user profile
-- Left sidebar: topic categories, active debates, followed discussions
-- Bottom navigation (mobile): search, debates, live, profile
+**Navigation:**
+- Top bar: Glass effect with backdrop blur, sticky positioning, 64px height
+- Sidebar: Surface elevated background, 280px width, collapsible with smooth transition
+- Mobile: Bottom sheet navigation with glass effect, 56px height
 
-**Content Cards**
-- Opinion cards: clean surface with author, timestamp, engagement metrics
-- AI cumulative opinion: distinctive purple accent border, "AI-Generated" label
-- Live debate cards: red "LIVE" indicator, viewer count, join button
-- One-on-one debate invitations: elevated surface with accept/decline actions
+**Content Cards:**
+- Opinion cards: Surface background, subtle shadow, 16px border-radius, 1px border
+- AI opinions: Purple accent border-left (3px), glass surface overlay
+- Live debates: Elevated shadow, red live pulse animation on indicator
+- Featured cards: Elevated surface with dramatic shadow, gradient border accent
 
-**Live Streaming Interface**
-- Video player: 16:9 ratio with chat sidebar
-- Participant panel: moderator controls, speaker queue
-- Viewer interaction: reactions, question submission, poll voting
-- Moderation toolbar: mute, remove, spotlight controls
+**Live Streaming:**
+- Video container: 16:9 ratio, elevated shadow, rounded corners
+- Chat sidebar: Glass effect surface, 360px width (desktop)
+- Control bar: Glass bottom overlay with backdrop blur
+- Participant grid: Surface elevated cards with hover lift effect
 
-**Discussion Threads**
-- Threaded replies with visual hierarchy (Discord-inspired)
-- Quote highlighting and reference linking
-- Real-time typing indicators and live updates
-- Formal tone indicators and community guidelines integration
+**Discussion Threads:**
+- Thread container: Surface background with subtle border
+- Reply indentation: 32px per level, connecting line at border-subtle color
+- Hover state: Surface elevated transition with subtle lift
+- Active typing: Animated gradient border pulse
 
-**Forms & Interactions**
-- Search: prominent with topic/user/debate type filters
-- Opinion composer: rich text with formatting, citation tools
-- Debate challenge: formal invitation system with topic proposal
-- Live stream setup: title, description, participant selection, moderation settings
+**Interactive Elements:**
+- Primary buttons: Primary accent background, 40px height, 12px border-radius, smooth scale on hover
+- Secondary buttons: Border-default border, surface hover, subtle shadow
+- Ghost buttons: Transparent with text-secondary, surface-elevated on hover
+- Icon buttons: 40px square, rounded-lg, smooth state transitions
 
-**Data Displays**
-- User reputation scores and debate history
-- Topic engagement metrics and trending indicators
-- Live viewership counts and interaction rates
-- Debate outcome summaries and key point extraction
+**Forms:**
+- Input fields: Surface elevated background, border-default border, 44px height
+- Focus state: Primary accent border, subtle glow effect
+- Search bar: Glass effect with backdrop blur, icon prefix
+- Rich text editor: Surface background with elevated toolbar
 
-**Moderation Tools**
-- Real-time content flagging system
-- Moderator action panel for live streams
-- Community guideline enforcement interface
-- Automated detection alerts and manual review queue
+**Data Display:**
+- Metric cards: Surface elevated, large number in display weight, label in caption style
+- Progress bars: Surface track with primary accent fill, 8px height, rounded-full
+- Charts: Muted accent colors with subtle gradients
+- Leaderboards: Alternating surface/surface-elevated rows, hover lift
 
-## Images
-**No Large Hero Image**: Content and functionality-focused platform prioritizing efficient information access.
+### Animations & Transitions
 
-**Supporting Images**:
-- Topic thumbnails: 16:9 ratio, 240x135px for topic cards and search results
-- User avatars: circular, 32px (threads), 48px (profiles), 64px (live streams)
-- Live stream thumbnails: 16:9 ratio with "LIVE" overlay badge
-- Empty state illustrations: minimal line art for no search results, inactive debates
-- Category icons: consistent iconography using Heroicons library
+**Timing Functions:**
+- Standard: cubic-bezier(0.4, 0, 0.2, 1) - 200ms
+- Smooth: cubic-bezier(0.4, 0, 0.1, 1) - 300ms
+- Bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55) - 400ms
 
-**Image Placement**:
-- Topic thumbnails in browse grids and search results
-- User avatars throughout discussion threads and live interfaces
-- Live stream thumbnails in active debates section
-- Empty state illustrations centered in content areas
+**Motion Patterns:**
+- Card hover: Translate-y by -2px, shadow elevation increase
+- Button interactions: Scale to 0.98 on active
+- Page transitions: Fade + slight vertical slide
+- Live indicators: Continuous pulse animation with opacity 0.6-1
+- Loading states: Shimmer gradient animation
+- Modal entry: Scale from 0.95 with fade, backdrop blur-in
 
-## Key Interaction Patterns
-- **Multi-modal access**: Quick switching between text debates, live streams, one-on-one challenges
-- **Progressive formality**: Informal browsing → structured debate → moderated live discussion
-- **Real-time awareness**: Live indicators, typing status, participant presence
-- **AI integration**: Clearly labeled AI-generated content with transparency
-- **Moderation-first**: Built-in tools for maintaining discourse quality
-- **Mobile-optimized**: Touch-friendly live stream controls, collapsible sidebars, gesture navigation
+### Images
 
-The design balances Discord's familiar discussion patterns with the formality required for serious debate, emphasizing clarity, professionalism, and efficient moderation across all interaction modes.
+**Hero Section:**
+- Full-width gradient overlay (primary accent to background) with abstract geometric pattern
+- Height: 480px (desktop), 320px (mobile)
+- Glass effect platform preview cards floating over gradient
+
+**Supporting Images:**
+- User avatars: Circular, 32px (threads), 48px (cards), 64px (live), subtle ring border
+- Topic thumbnails: 16:9 ratio, 280x158px, rounded-lg, subtle shadow
+- Live stream thumbnails: Red gradient overlay on bottom-left with "LIVE" badge
+- Debate participant cards: 1:1 ratio, 120x120px, elevated shadow
+- Empty states: Minimal monochromatic illustrations with primary accent highlights
+
+**Image Treatment:**
+- All images: Subtle border (border-subtle), smooth loading fade-in
+- Hover states: Slight scale (1.02) with shadow increase
+- Live content: Animated gradient border
+
+### Accessibility
+- Minimum contrast ratio: 4.5:1 for body text, 3:1 for large text
+- Focus indicators: 2px primary accent outline with 4px offset
+- Reduced motion: Disable animations when prefers-reduced-motion is active
+- Dark mode as default with light mode toggle
+- Keyboard navigation: Visible focus states, logical tab order
+
+### Key Interaction Patterns
+- Instant feedback: All interactions respond within 100ms
+- Optimistic updates: Show changes immediately, revert on error
+- Progressive disclosure: Collapsed states with smooth expand animations
+- Contextual actions: Show on hover with fade-in transition
+- Real-time sync: Subtle pulse indicators for live updates
+- Multi-select: Checkbox fade-in on hover, selected items with accent border
+
+The design creates a sophisticated, modern debate platform that feels premium and polished while maintaining exceptional usability and accessibility across all features.

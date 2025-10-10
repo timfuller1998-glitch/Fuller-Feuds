@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ThumbsUp, ThumbsDown } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Brain } from "lucide-react";
 import { ArrowLeft, MessageCircle, Users, TrendingUp, RefreshCw, Video, Calendar, Clock, Eye } from "lucide-react";
 import { Link } from "wouter";
 import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
@@ -288,37 +288,37 @@ export default function Topic() {
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-in">
       {/* Back Button */}
       <Link href="/">
-        <Button variant="ghost" size="sm" data-testid="button-back-home">
+        <Button variant="ghost" size="sm" data-testid="button-back-home" className="transition-smooth">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Topics
         </Button>
       </Link>
 
       {/* Topic Title Above Image */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 flex-wrap">
           {topic.categories.map((cat) => (
-            <Badge key={cat} variant="secondary">{cat}</Badge>
+            <Badge key={cat} variant="secondary" className="shadow-sm">{cat}</Badge>
           ))}
           {topic.isActive && (
-            <Badge className="bg-chart-1 text-white">
+            <Badge className="bg-chart-1 text-white shadow-sm">
               <TrendingUp className="w-3 h-3 mr-1" />
               Active
             </Badge>
           )}
         </div>
-        <h1 className="text-4xl font-bold mb-4" data-testid="text-topic-title">
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight" data-testid="text-topic-title">
           {topic.title}
         </h1>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
             <MessageCircle className="w-4 h-4" />
             <span data-testid="text-opinions-count">{opinions?.length || 0} opinions</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             <span data-testid="text-participants-count">
               {opinions ? new Set(opinions.map(o => o.userId)).size : 0} participants
@@ -328,19 +328,24 @@ export default function Topic() {
       </div>
 
       {/* Header Image */}
-      <div className="aspect-[21/9] relative overflow-hidden rounded-lg">
+      <div className="aspect-[21/9] relative overflow-hidden rounded-lg border border-border/50" style={{ boxShadow: 'var(--shadow-lg)' }}>
         <img 
           src={topic.imageUrl || '/placeholder-topic.jpg'} 
           alt={topic.title}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-smooth hover:scale-105"
         />
       </div>
 
       {/* AI Summary Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>AI-Generated Summary</CardTitle>
+      <Card className="border border-border/50" style={{ boxShadow: 'var(--shadow-md)' }}>
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-chart-3/10 border border-chart-3/20">
+                <Brain className="w-5 h-5 text-chart-3" />
+              </div>
+              AI-Generated Summary
+            </CardTitle>
             {cumulativeData && (
               <Button 
                 variant="outline"
@@ -348,6 +353,7 @@ export default function Topic() {
                 onClick={() => refreshCumulativeMutation.mutate()}
                 disabled={refreshCumulativeMutation.isPending}
                 data-testid="button-refresh-summary"
+                className="transition-smooth"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 {refreshCumulativeMutation.isPending ? "Updating..." : "Refresh"}
@@ -404,9 +410,14 @@ export default function Topic() {
       </Card>
 
       {/* Opinions Section with Tabs */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Opinions</CardTitle>
+      <Card className="border border-border/50" style={{ boxShadow: 'var(--shadow-md)' }}>
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+              <MessageCircle className="w-5 h-5 text-primary" />
+            </div>
+            Opinions
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="your-opinion" className="w-full">

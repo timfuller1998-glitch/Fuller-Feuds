@@ -227,35 +227,36 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
         {/* Header with progress */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold">Welcome to Kirk Debates</h1>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <h1 className="text-4xl font-bold tracking-tight">Welcome to Kirk Debates</h1>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleSkip}
               data-testid="button-skip-onboarding"
+              className="transition-smooth"
             >
               Skip for now
             </Button>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Step {currentStep} of 4</span>
               <span>{Math.round(progressPercentage)}%</span>
             </div>
-            <Progress value={progressPercentage} className="h-2" data-testid="progress-onboarding" />
+            <Progress value={progressPercentage} className="h-3 shadow-sm" data-testid="progress-onboarding" />
           </div>
         </div>
 
         {/* Step content */}
         {currentStep === 1 && (
-          <Card data-testid="card-onboarding-step-1">
-            <CardHeader>
-              <CardTitle>Set Up Your Profile</CardTitle>
-              <CardDescription>
+          <Card data-testid="card-onboarding-step-1" className="border border-border/50 shadow-md">
+            <CardHeader className="space-y-2">
+              <CardTitle className="text-2xl">Set Up Your Profile</CardTitle>
+              <CardDescription className="text-base">
                 Tell us a bit about yourself to personalize your experience
               </CardDescription>
             </CardHeader>
