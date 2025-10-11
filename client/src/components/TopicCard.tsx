@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Users, TrendingUp } from "lucide-react";
+import { MessageCircle, Users, TrendingUp, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
-import { useState, useEffect } from "react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface TopicCardProps {
   id: string;
@@ -13,6 +13,9 @@ interface TopicCardProps {
   participantCount: number;
   opinionsCount: number;
   isActive: boolean;
+  previewContent?: string;
+  previewAuthor?: string;
+  previewIsAI?: boolean;
 }
 
 export default function TopicCard({
@@ -24,16 +27,40 @@ export default function TopicCard({
   participantCount,
   opinionsCount,
   isActive,
+  previewContent,
+  previewAuthor,
+  previewIsAI,
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
-  const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const { currentTheme } = useTheme();
 
-  // Reset image state when imageUrl changes to allow recovery
-  useEffect(() => {
-    setImageError(false);
-    setImageLoaded(false);
-  }, [imageUrl]);
+  // Create gradient colors from theme
+  const getGradientColors = () => {
+    if (currentTheme?.colors) {
+      const colors = currentTheme.colors as any;
+      // Use primary color for gradient
+      if (colors.primary) {
+        const { h, s, l } = colors.primary;
+        return {
+          from: `hsl(${h}, ${s}%, ${Math.min(l + 10, 90)}%)`,
+          to: `hsl(${h}, ${Math.max(s - 20, 10)}%, ${Math.min(l + 25, 95)}%)`,
+        };
+      }
+    }
+    // Fallback to default gradient
+    return {
+      from: 'hsl(var(--primary) / 0.15)',
+      to: 'hsl(var(--primary) / 0.05)',
+    };
+  };
+
+  const { from, to } = getGradientColors();
+
+  // Truncate preview content to fit card with ellipsis
+  const truncateContent = (content: string, maxLength: number = 180) => {
+    if (content.length <= maxLength) return content + '...';
+    return content.substring(0, maxLength).trim() + '...';
+  };
 
   return (
     <Card 
@@ -41,22 +68,13 @@ export default function TopicCard({
       onClick={() => setLocation(`/topic/${id}`)}
       data-testid={`card-topic-${id}`}
     >
-      <div className="aspect-video relative overflow-hidden bg-primary/10">
-        {imageUrl && !imageError ? (
-          <img 
-            src={imageUrl} 
-            alt={title}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            onError={() => setImageError(true)}
-            onLoad={() => setImageLoaded(true)}
-            style={{ display: imageLoaded ? 'block' : 'none' }}
-          />
-        ) : null}
-        {(!imageUrl || imageError || !imageLoaded) && (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-            <MessageCircle className="w-16 h-16 text-primary/30" />
-          </div>
-        )}
+      {/* Theme-based gradient section with preview content */}
+      <div 
+        className="relative p-4 sm:p-6 min-h-[180px] flex flex-col justify-between"
+        style={{
+          background: `linear-gradient(135deg, ${from}, ${to})`,
+        }}
+      >
         <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
           {categories?.slice(0, 2).map((category) => (
             <Badge key={category} variant="secondary" className="bg-background/80 backdrop-blur-sm">
@@ -75,6 +93,18 @@ export default function TopicCard({
               <TrendingUp className="w-3 h-3 mr-1" />
               Active
             </Badge>
+          </div>
+        )}
+
+        {previewContent && (
+          <div className="mt-8 space-y-2">
+            <p className="text-sm leading-relaxed line-clamp-4" data-testid={`text-preview-content-${id}`}>
+              {truncateContent(previewContent)}
+            </p>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {previewIsAI && <Sparkles className="w-3 h-3" />}
+              <span data-testid={`text-preview-author-${id}`}>— {previewAuthor}</span>
+            </div>
           </div>
         )}
       </div>

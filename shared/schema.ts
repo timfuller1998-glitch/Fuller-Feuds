@@ -295,6 +295,9 @@ export type Topic = typeof topics.$inferSelect;
 export type TopicWithCounts = Topic & {
   opinionsCount: number;
   participantCount: number;
+  previewContent?: string;
+  previewAuthor?: string;
+  previewIsAI?: boolean;
 };
 export type InsertOpinion = z.infer<typeof insertOpinionSchema>;
 export type Opinion = typeof opinions.$inferSelect;

@@ -38,8 +38,6 @@ export default function Topic() {
   const [challengingOpinionId, setChallengingOpinionId] = useState<string | null>(null);
   const [flaggingOpinionId, setFlaggingOpinionId] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
-  const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -95,12 +93,6 @@ export default function Topic() {
     queryKey: ["/api/live-streams", { topicId: id }],
     enabled: !!id,
   });
-
-  // Reset image state when topic imageUrl changes
-  useEffect(() => {
-    setImageError(false);
-    setImageLoaded(false);
-  }, [topic?.imageUrl]);
 
   // Get user's opinion on this topic to determine stance
   const userOpinion = opinions?.find(o => o.userId === user?.id);
@@ -334,25 +326,6 @@ export default function Topic() {
             </span>
           </div>
         </div>
-      </div>
-
-      {/* Header Image */}
-      <div className="aspect-[21/9] relative overflow-hidden rounded-lg border border-border/50" style={{ boxShadow: 'var(--shadow-lg)' }}>
-        {topic.imageUrl && !imageError ? (
-          <img 
-            src={topic.imageUrl} 
-            alt={topic.title}
-            className="w-full h-full object-cover transition-smooth hover:scale-105"
-            onError={() => setImageError(true)}
-            onLoad={() => setImageLoaded(true)}
-            style={{ display: imageLoaded ? 'block' : 'none' }}
-          />
-        ) : null}
-        {(!topic.imageUrl || imageError || !imageLoaded) && (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-            <MessageCircle className="w-24 h-24 text-primary/30" />
-          </div>
-        )}
       </div>
 
       {/* Opinions Section with Tabs */}

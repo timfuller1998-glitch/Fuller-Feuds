@@ -256,7 +256,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(topics.createdAt))
       .limit(limit);
     
-    // Fetch counts for each topic
+    // Fetch counts and preview content for each topic
     const topicsWithCounts = await Promise.all(
       topicsList.map(async (topic) => {
         // Get opinion count and participant count
@@ -271,10 +271,53 @@ export class DatabaseStorage implements IStorage {
         const opinionsCount = opinionsList.length;
         const participantCount = new Set(opinionsList.map(o => o.userId)).size;
         
+        // Get preview content: AI summary if exists, otherwise first opinion
+        let previewContent: string | undefined;
+        let previewAuthor: string | undefined;
+        let previewIsAI = false;
+        
+        // Try to get AI summary first
+        const [cumulative] = await db
+          .select()
+          .from(cumulativeOpinions)
+          .where(eq(cumulativeOpinions.topicId, topic.id))
+          .orderBy(desc(cumulativeOpinions.updatedAt))
+          .limit(1);
+        
+        if (cumulative) {
+          previewContent = cumulative.summary;
+          previewAuthor = 'AI Summary';
+          previewIsAI = true;
+        } else {
+          // Get first opinion as fallback
+          const [firstOpinion] = await db
+            .select()
+            .from(opinions)
+            .innerJoin(users, eq(opinions.userId, users.id))
+            .where(and(
+              eq(opinions.topicId, topic.id),
+              eq(opinions.status, 'approved')
+            ))
+            .orderBy(desc(opinions.createdAt))
+            .limit(1);
+          
+          if (firstOpinion) {
+            previewContent = firstOpinion.opinions.content;
+            const user = firstOpinion.users;
+            previewAuthor = user.firstName && user.lastName 
+              ? `${user.firstName} ${user.lastName}` 
+              : user.email || 'Anonymous';
+            previewIsAI = false;
+          }
+        }
+        
         return {
           ...topic,
           opinionsCount,
-          participantCount
+          participantCount,
+          previewContent,
+          previewAuthor,
+          previewIsAI
         };
       })
     );
