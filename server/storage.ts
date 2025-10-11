@@ -65,6 +65,7 @@ export interface IStorage {
   // Opinion operations
   createOpinion(opinion: InsertOpinion): Promise<Opinion>;
   getOpinionsByTopic(topicId: string, userRole?: string): Promise<Opinion[]>;
+  getRecentOpinions(limit?: number, userRole?: string): Promise<Opinion[]>;
   getOpinion(id: string): Promise<Opinion | undefined>;
   updateOpinion(opinionId: string, data: Partial<InsertOpinion>): Promise<Opinion>;
   updateOpinionCounts(opinionId: string, likesCount: number, dislikesCount: number): Promise<void>;
@@ -308,6 +309,64 @@ export class DatabaseStorage implements IStorage {
       .from(opinions)
       .where(and(...whereConditions))
       .orderBy(desc(opinions.createdAt));
+
+    // Enrich each opinion with vote and challenge counts
+    const enrichedOpinions = await Promise.all(
+      baseOpinions.map(async (opinion) => {
+        // Count likes
+        const likesResult = await db
+          .select({ count: count() })
+          .from(opinionVotes)
+          .where(and(
+            eq(opinionVotes.opinionId, opinion.id),
+            eq(opinionVotes.voteType, 'like')
+          ));
+        
+        // Count dislikes
+        const dislikesResult = await db
+          .select({ count: count() })
+          .from(opinionVotes)
+          .where(and(
+            eq(opinionVotes.opinionId, opinion.id),
+            eq(opinionVotes.voteType, 'dislike')
+          ));
+        
+        // Count challenges
+        const challengesResult = await db
+          .select({ count: count() })
+          .from(opinionChallenges)
+          .where(eq(opinionChallenges.opinionId, opinion.id));
+
+        return {
+          ...opinion,
+          likesCount: Number(likesResult[0]?.count || 0),
+          dislikesCount: Number(dislikesResult[0]?.count || 0),
+          repliesCount: 0,
+          challengesCount: Number(challengesResult[0]?.count || 0),
+        };
+      })
+    );
+
+    return enrichedOpinions as Opinion[];
+  }
+
+  async getRecentOpinions(limit: number = 50, userRole?: string): Promise<Opinion[]> {
+    const isModOrAdmin = userRole === 'admin' || userRole === 'moderator';
+    
+    // Build where conditions
+    const whereConditions = [];
+    
+    // Regular users only see approved opinions
+    if (!isModOrAdmin) {
+      whereConditions.push(eq(opinions.status, 'approved'));
+    }
+    
+    const baseOpinions = await db
+      .select()
+      .from(opinions)
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
+      .orderBy(desc(opinions.createdAt))
+      .limit(limit);
 
     // Enrich each opinion with vote and challenge counts
     const enrichedOpinions = await Promise.all(

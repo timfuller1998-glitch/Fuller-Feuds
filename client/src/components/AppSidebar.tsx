@@ -34,7 +34,8 @@ import {
   Plus,
   User,
   Grid,
-  Shield
+  Shield,
+  Clock
 } from "lucide-react";
 import type { Topic } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
@@ -83,6 +84,7 @@ export default function AppSidebar({
     { title: "Live Debates", icon: Radio, path: "/live" },
     { title: "Hot Debates", icon: Flame, path: "/hot-debates" },
     { title: "My Debates", icon: MessageCircle, path: "/debates" },
+    { title: "Recent Opinions", icon: Clock, path: "/recent-opinions" },
   ];
 
   // Check if user is admin or moderator

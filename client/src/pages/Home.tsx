@@ -17,7 +17,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye, RefreshCw, Zap, Mic } from "lucide-react";
+import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye, RefreshCw, Zap, Mic, ChevronRight, Clock } from "lucide-react";
+import { Link } from "wouter";
+import { formatDistanceToNow } from "date-fns";
 import { insertTopicSchema, insertOpinionSchema, type Topic, type TopicWithCounts, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import climateImage from '@assets/generated_images/Climate_change_debate_thumbnail_3b0bbda7.png';
@@ -98,6 +100,25 @@ export default function Home() {
     enabled: !!selectedTopic,
   });
 
+  // Fetch recent opinions for preview
+  const { data: recentOpinions } = useQuery<Opinion[]>({
+    queryKey: ["/api/opinions/recent"],
+    queryFn: () => fetch('/api/opinions/recent?limit=50', { credentials: 'include' }).then(res => res.json()),
+  });
+
+  // Fetch user profile for sort preferences
+  const { data: userProfile } = useQuery<any>({
+    queryKey: ['/api/profile'],
+    queryFn: async () => {
+      const response = await fetch('/api/user', { credentials: 'include' });
+      if (!response.ok) return null;
+      const userData = await response.json();
+      if (!userData?.id) return null;
+      const profileResponse = await fetch(`/api/profile/${userData.id}`, { credentials: 'include' });
+      if (!profileResponse.ok) return null;
+      return profileResponse.json();
+    },
+  });
 
   // Create topic mutation
   const createTopicMutation = useMutation({
@@ -269,6 +290,69 @@ export default function Home() {
     challengesCount: opinion.challengesCount || 0,
     userVote: opinion.userVote || null
   })) || [];
+
+  // Prepare recent opinions preview - top 1 opinion from top 5 topics
+  const categorySortPref = (userProfile?.profile?.categorySortPreference || 'popular') as 'popular' | 'alphabetical' | 'newest' | 'oldest';
+  const opinionSortPref = (userProfile?.profile?.opinionSortPreference || 'newest') as 'newest' | 'oldest' | 'most_liked' | 'most_controversial';
+  
+  const recentOpinionsPreview = recentOpinions && apiTopics 
+    ? (() => {
+        // Group opinions by topic
+        const topicOpinionMap = new Map<string, any[]>();
+        recentOpinions.forEach(opinion => {
+          if (!topicOpinionMap.has(opinion.topicId)) {
+            topicOpinionMap.set(opinion.topicId, []);
+          }
+          topicOpinionMap.get(opinion.topicId)!.push(opinion);
+        });
+
+        // Create topic groups with their opinions
+        const topicGroups = Array.from(topicOpinionMap.entries()).map(([topicId, opinions]) => {
+          const topic = apiTopics.find(t => t.id === topicId);
+          if (!topic) return null;
+          
+          // Sort opinions within topic
+          const sortedOpinions = [...opinions].sort((a, b) => {
+            switch (opinionSortPref) {
+              case 'oldest':
+                return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+              case 'most_liked':
+                return (b.likesCount || 0) - (a.likesCount || 0);
+              case 'most_controversial':
+                const aControversy = (a.likesCount || 0) + (a.dislikesCount || 0);
+                const bControversy = (b.likesCount || 0) + (b.dislikesCount || 0);
+                return bControversy - aControversy;
+              default: // newest
+                return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+            }
+          });
+
+          return {
+            topic,
+            opinion: sortedOpinions[0], // Top opinion
+            mostRecentDate: new Date(Math.max(...opinions.map(o => new Date(o.createdAt || 0).getTime())))
+          };
+        }).filter(Boolean);
+
+        // Sort topic groups by category preference
+        const sortedGroups = topicGroups.sort((a, b) => {
+          if (!a || !b) return 0;
+          switch (categorySortPref) {
+            case 'alphabetical':
+              return a.topic.title.localeCompare(b.topic.title);
+            case 'oldest':
+              return a.mostRecentDate.getTime() - b.mostRecentDate.getTime();
+            case 'newest':
+              return b.mostRecentDate.getTime() - a.mostRecentDate.getTime();
+            default: // popular
+              return b.topic.opinionsCount - a.topic.opinionsCount;
+          }
+        });
+
+        // Return top 5 groups
+        return sortedGroups.slice(0, 5);
+      })()
+    : [];
 
   // If viewing a live debate room, show the full debate interface
   if (viewingLiveDebate) {
@@ -501,131 +585,84 @@ export default function Home() {
         </div>
       )}
 
-      {/* Recent Opinions */}
+      {/* Recent Opinions Preview */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Recent Opinions</h2>
-          {selectedTopic && (
-            <Dialog open={showCreateOpinion} onOpenChange={setShowCreateOpinion}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-share-opinion">
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Share Opinion
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle>Share Your Opinion</DialogTitle>
-                  <DialogDescription>
-                    Share your thoughts on the selected topic.
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...opinionForm}>
-                  <form onSubmit={opinionForm.handleSubmit((data) => createOpinionMutation.mutate(data))} className="space-y-4">
-                    <FormField
-                      control={opinionForm.control}
-                      name="stance"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Your Stance</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-opinion-stance">
-                                <SelectValue placeholder="Select your stance" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="for">For</SelectItem>
-                              <SelectItem value="against">Against</SelectItem>
-                              <SelectItem value="neutral">Neutral</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={opinionForm.control}
-                      name="content"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Your Opinion</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Share your thoughts..." 
-                              className="min-h-32"
-                              {...field} 
-                              data-testid="textarea-opinion-content"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div className="flex justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => setShowCreateOpinion(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit" disabled={createOpinionMutation.isPending} data-testid="button-submit-opinion">
-                        {createOpinionMutation.isPending ? "Sharing..." : "Share Opinion"}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-        
-        <div className="space-y-4">
-          {/* Display real opinions when viewing a specific topic */}
-          {selectedTopic && transformedOpinions.length > 0 ? (
-            transformedOpinions.map((opinion) => (
-              <OpinionCard
-                key={opinion.id}
-                {...opinion}
-                challengesCount={opinion.challengesCount || 0}
-                isLiked={opinion.userVote?.voteType === 'like'}
-                isDisliked={opinion.userVote?.voteType === 'dislike'}
-                onLike={(id) => voteMutation.mutate({ 
-                  opinionId: id, 
-                  voteType: 'like',
-                  currentVote: opinion.userVote?.voteType 
-                })}
-                onDislike={(id) => voteMutation.mutate({ 
-                  opinionId: id, 
-                  voteType: 'dislike',
-                  currentVote: opinion.userVote?.voteType 
-                })}
-                onAdopt={(id) => adoptMutation.mutate(id)}
-                onChallenge={(id) => setChallengingOpinionId(id)}
-                onFlag={(id) => setFlaggingOpinionId(id)}
-              />
-            ))
-          ) : selectedTopic ? (
-            <div className="text-center py-8">
-              <MessageCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground mb-4">No opinions yet for this topic.</p>
-              <Button onClick={() => setShowCreateOpinion(true)}>
-                Share First Opinion
-              </Button>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <MessageCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Select a topic to view opinions.</p>
-            </div>
-          )}
-        </div>
-        
-        {!selectedTopic && (
-          <div className="text-center">
-            <Button variant="outline" data-testid="button-view-more-opinions">
-              View More Opinions
-            </Button>
+          <div className="flex items-center gap-3">
+            <Clock className="w-6 h-6 text-primary" />
+            <h2 className="text-2xl font-bold">Recent Opinions</h2>
           </div>
+          <Link href="/recent-opinions">
+            <Button variant="ghost" size="sm" className="gap-2" data-testid="button-view-all-opinions">
+              View All
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </Link>
+        </div>
+        
+        {recentOpinionsPreview.length > 0 ? (
+          <div 
+            className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
+            style={{ scrollSnapType: 'x mandatory' }}
+          >
+            {recentOpinionsPreview.map((group) => (
+              <div 
+                key={group!.topic.id} 
+                className="flex-none w-[320px] sm:w-[380px]"
+                style={{ scrollSnapAlign: 'start' }}
+              >
+                <OpinionCard
+                  id={group!.opinion.id}
+                  topicId={group!.opinion.topicId}
+                  userId={group!.opinion.userId}
+                  userName={group!.opinion.user ? `${group!.opinion.user.firstName || ''} ${group!.opinion.user.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                  userAvatar={group!.opinion.user?.profileImageUrl}
+                  content={group!.opinion.content}
+                  stance={group!.opinion.stance as "for" | "against" | "neutral"}
+                  timestamp={formatDistanceToNow(new Date(group!.opinion.createdAt!), { addSuffix: true })}
+                  likesCount={group!.opinion.likesCount || 0}
+                  dislikesCount={group!.opinion.dislikesCount || 0}
+                  challengesCount={group!.opinion.challengesCount || 0}
+                  isLiked={group!.opinion.userVote?.voteType === 'like'}
+                  isDisliked={group!.opinion.userVote?.voteType === 'dislike'}
+                  onLike={() => voteMutation.mutate({ 
+                    opinionId: group!.opinion.id, 
+                    voteType: 'like',
+                    currentVote: group!.opinion.userVote?.voteType 
+                  })}
+                  onDislike={() => voteMutation.mutate({ 
+                    opinionId: group!.opinion.id, 
+                    voteType: 'dislike',
+                    currentVote: group!.opinion.userVote?.voteType 
+                  })}
+                  onAdopt={() => adoptMutation.mutate(group!.opinion.id)}
+                  onChallenge={() => setChallengingOpinionId(group!.opinion.id)}
+                  onFlag={() => setFlaggingOpinionId(group!.opinion.id)}
+                />
+              </div>
+            ))}
+            <div 
+              className="flex-none w-[280px] sm:w-[300px]"
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              <Link href="/recent-opinions">
+                <Card className="h-full flex items-center justify-center hover-elevate active-elevate-2 cursor-pointer" data-testid="card-show-more-opinions">
+                  <CardContent className="text-center py-12">
+                    <MessageCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                    <p className="font-medium">Show More Opinions</p>
+                    <p className="text-sm text-muted-foreground">Explore all recent opinions</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <MessageCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">No recent opinions yet. Share your thoughts!</p>
+            </CardContent>
+          </Card>
         )}
       </div>
 

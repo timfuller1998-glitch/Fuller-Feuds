@@ -304,6 +304,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Opinion routes
+  app.get('/api/opinions/recent', async (req: any, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const opinions = await storage.getRecentOpinions(limit, req.userRole);
+      
+      // If user is authenticated, include their vote for each opinion
+      if (req.user?.claims?.sub) {
+        const userId = req.user.claims.sub;
+        const opinionsWithVotes = await Promise.all(
+          opinions.map(async (opinion) => {
+            const userVote = await storage.getUserVoteOnOpinion(opinion.id, userId);
+            return {
+              ...opinion,
+              userVote: userVote ? { voteType: userVote.voteType } : null
+            };
+          })
+        );
+        return res.json(opinionsWithVotes);
+      }
+      
+      res.json(opinions);
+    } catch (error) {
+      console.error("Error fetching recent opinions:", error);
+      res.status(500).json({ message: "Failed to fetch recent opinions" });
+    }
+  });
+
   app.get('/api/topics/:topicId/opinions', async (req: any, res) => {
     try {
       const opinions = await storage.getOpinionsByTopic(req.params.topicId, req.userRole);

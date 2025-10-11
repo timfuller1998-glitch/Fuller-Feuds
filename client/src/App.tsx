@@ -26,6 +26,7 @@ import DebateRoomPage from "@/pages/DebateRoomPage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Onboarding from "@/pages/Onboarding";
 import ThemeGallery from "@/pages/ThemeGallery";
+import RecentOpinions from "@/pages/RecentOpinions";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/debates" component={MyDebates} />
       <Route path="/categories" component={AllCategoriesPage} />
       <Route path="/category/:category" component={CategoryPage} />
+      <Route path="/recent-opinions" component={RecentOpinions} />
       <Route path="/topic/:id" component={Topic} />
       <Route path="/profile/:userId" component={Profile} />
       <Route path="/settings" component={Settings} />
