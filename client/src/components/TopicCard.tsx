@@ -2,7 +2,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Users, TrendingUp, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
-import { useTheme } from "@/contexts/ThemeContext";
 
 interface TopicCardProps {
   id: string;
@@ -32,29 +31,6 @@ export default function TopicCard({
   previewIsAI,
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
-  const { currentTheme } = useTheme();
-
-  // Create gradient colors from theme
-  const getGradientColors = () => {
-    if (currentTheme?.colors) {
-      const colors = currentTheme.colors as any;
-      // Use primary color for gradient
-      if (colors.primary) {
-        const { h, s, l } = colors.primary;
-        return {
-          from: `hsl(${h}, ${s}%, ${Math.min(l + 10, 90)}%)`,
-          to: `hsl(${h}, ${Math.max(s - 20, 10)}%, ${Math.min(l + 25, 95)}%)`,
-        };
-      }
-    }
-    // Fallback to default gradient
-    return {
-      from: 'hsl(var(--primary) / 0.15)',
-      to: 'hsl(var(--primary) / 0.05)',
-    };
-  };
-
-  const { from, to } = getGradientColors();
 
   // Truncate preview content to fit card with ellipsis
   const truncateContent = (content: string, maxLength: number = 180) => {
@@ -70,10 +46,7 @@ export default function TopicCard({
     >
       {/* Theme-based gradient section with preview content */}
       <div 
-        className="relative p-4 sm:p-6 min-h-[180px] flex flex-col justify-between"
-        style={{
-          background: `linear-gradient(135deg, ${from}, ${to})`,
-        }}
+        className="relative p-4 sm:p-6 min-h-[180px] flex flex-col justify-between bg-gradient-to-br from-primary/10 to-primary/5"
       >
         <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
           {categories?.slice(0, 2).map((category) => (
