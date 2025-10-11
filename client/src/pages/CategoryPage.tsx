@@ -4,7 +4,7 @@ import TopicCard from "@/components/TopicCard";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Folder, Radio, Eye, Clock, Users } from "lucide-react";
-import { type Topic, type LiveStream } from "@shared/schema";
+import { type TopicWithCounts, type LiveStream } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
 // Map category names to their icons
@@ -27,7 +27,7 @@ export default function CategoryPage() {
   // Fetch topics for this category using default fetcher
   const queryParams = new URLSearchParams();
   if (category) queryParams.append("category", category);
-  const { data: apiTopics, isLoading: topicsLoading, error: topicsError } = useQuery<Topic[]>({
+  const { data: apiTopics, isLoading: topicsLoading, error: topicsError } = useQuery<TopicWithCounts[]>({
     queryKey: [`/api/topics?${queryParams.toString()}`],
     enabled: !!category,
   });
@@ -47,8 +47,8 @@ export default function CategoryPage() {
     description: topic.description,
     imageUrl: topic.imageUrl || "",
     categories: topic.categories,
-    participantCount: 0, // TODO: Calculate from debate rooms
-    opinionsCount: 0, // TODO: Calculate from opinions count
+    participantCount: topic.participantCount,
+    opinionsCount: topic.opinionsCount,
     isActive: topic.isActive ?? true
   }));
 

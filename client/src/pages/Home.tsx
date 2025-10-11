@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye, RefreshCw, Zap, Mic } from "lucide-react";
-import { insertTopicSchema, insertOpinionSchema, type Topic, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
+import { insertTopicSchema, insertOpinionSchema, type Topic, type TopicWithCounts, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import climateImage from '@assets/generated_images/Climate_change_debate_thumbnail_3b0bbda7.png';
 
@@ -60,7 +60,7 @@ export default function Home() {
   });
 
   // Fetch real topics from API
-  const { data: apiTopics, isLoading: topicsLoading } = useQuery<Topic[]>({
+  const { data: apiTopics, isLoading: topicsLoading } = useQuery<TopicWithCounts[]>({
     queryKey: ["/api/topics", { search: searchQuery }],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -243,8 +243,8 @@ export default function Home() {
     description: topic.description,
     imageUrl: topic.imageUrl || climateImage, // Use default image if none provided
     categories: topic.categories,
-    participantCount: 0, // We'll calculate this later
-    opinionsCount: 0, // We'll calculate this later
+    participantCount: topic.participantCount,
+    opinionsCount: topic.opinionsCount,
     isActive: topic.isActive || false
   })) || [];
 

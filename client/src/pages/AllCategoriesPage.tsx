@@ -19,7 +19,7 @@ import {
   Grid,
   ArrowUpDown
 } from "lucide-react";
-import type { Topic } from "@shared/schema";
+import type { TopicWithCounts } from "@shared/schema";
 
 // Icon mapping for common categories
 const getCategoryIcon = (categoryName: string) => {
@@ -48,7 +48,7 @@ type SortOption = 'popular' | 'alphabetical' | 'recent' | 'oldest';
 interface CategoryData {
   name: string;
   icon: any;
-  topics: Topic[];
+  topics: TopicWithCounts[];
   totalCount: number;
   mostRecentDate?: Date;
 }
@@ -66,7 +66,7 @@ export default function AllCategoriesPage() {
   const sortBy = (userProfile?.profile?.categorySortPreference || 'popular') as SortOption;
 
   // Fetch all topics
-  const { data: apiTopics, isLoading, error } = useQuery<Topic[]>({
+  const { data: apiTopics, isLoading, error } = useQuery<TopicWithCounts[]>({
     queryKey: ["/api/topics"],
   });
 
@@ -237,8 +237,8 @@ export default function AllCategoriesPage() {
                             title={topic.title}
                             description={topic.description}
                             categories={topic.categories}
-                            opinionsCount={0}
-                            participantCount={0}
+                            opinionsCount={topic.opinionsCount}
+                            participantCount={topic.participantCount}
                             isActive={topic.isActive ?? true}
                             imageUrl={topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800"}
                           />
