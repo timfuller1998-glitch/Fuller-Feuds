@@ -746,6 +746,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin - User management routes
+  app.get('/api/admin/users', requireAdmin, async (req, res) => {
+    try {
+      const { role, status, search, limit } = req.query;
+      const users = await storage.getAllUsers({
+        role: role as string,
+        status: status as string,
+        search: search as string,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.put('/api/admin/users/:userId/role', requireAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const { role } = req.body;
+      
+      if (!role || !['user', 'moderator', 'admin'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role. Must be 'user', 'moderator', or 'admin'" });
+      }
+      
+      await storage.updateUserRole(req.params.userId, role, adminId);
+      res.json({ message: 'User role updated successfully' });
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // Admin - Content management routes
+  app.get('/api/admin/topics', requireAdmin, async (req, res) => {
+    try {
+      const { status, startDate, endDate, limit } = req.query;
+      const topics = await storage.getAllTopics({
+        status: status as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      res.json(topics);
+    } catch (error) {
+      console.error("Error fetching topics:", error);
+      res.status(500).json({ message: "Failed to fetch topics" });
+    }
+  });
+
+  app.get('/api/admin/opinions', requireAdmin, async (req, res) => {
+    try {
+      const { status, startDate, endDate, limit } = req.query;
+      const opinions = await storage.getAllOpinions({
+        status: status as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      res.json(opinions);
+    } catch (error) {
+      console.error("Error fetching opinions:", error);
+      res.status(500).json({ message: "Failed to fetch opinions" });
+    }
+  });
+
+  // Admin - Audit log routes
+  app.get('/api/admin/audit-log', requireAdmin, async (req, res) => {
+    try {
+      const { actionType, moderatorId, startDate, endDate, limit } = req.query;
+      const actions = await storage.getModerationActions({
+        actionType: actionType as string,
+        moderatorId: moderatorId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      res.json(actions);
+    } catch (error) {
+      console.error("Error fetching audit log:", error);
+      res.status(500).json({ message: "Failed to fetch audit log" });
+    }
+  });
+
   // Cumulative opinion routes
   app.get('/api/topics/:topicId/cumulative', async (req, res) => {
     try {

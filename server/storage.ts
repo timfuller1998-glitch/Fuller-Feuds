@@ -154,6 +154,17 @@ export interface IStorage {
   archiveTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
   restoreTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
   
+  // Admin - User management
+  getAllUsers(filters?: { role?: string; status?: string; search?: string; limit?: number }): Promise<User[]>;
+  updateUserRole(userId: string, role: string, adminId: string): Promise<void>;
+  
+  // Admin - Content management
+  getAllTopics(filters?: { status?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<TopicWithCounts[]>;
+  getAllOpinions(filters?: { status?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<Opinion[]>;
+  
+  // Admin - Audit log
+  getModerationActions(filters?: { actionType?: string; moderatorId?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<any[]>;
+  
   // Banned phrases operations
   getAllBannedPhrases(): Promise<BannedPhrase[]>;
   createBannedPhrase(phrase: InsertBannedPhrase): Promise<BannedPhrase>;
@@ -1289,6 +1300,148 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Banned phrases operations
+  // Admin - User management
+  async getAllUsers(filters: { role?: string; status?: string; search?: string; limit?: number } = {}): Promise<User[]> {
+    const { role, status, search, limit = 100 } = filters;
+    
+    let query = db.select().from(users);
+    
+    const conditions = [];
+    if (role) {
+      conditions.push(eq(users.role, role));
+    }
+    if (status) {
+      conditions.push(eq(users.status, status));
+    }
+    if (search) {
+      conditions.push(
+        or(
+          ilike(users.email, `%${search}%`),
+          ilike(users.firstName, `%${search}%`),
+          ilike(users.lastName, `%${search}%`)
+        )
+      );
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(users.createdAt)).limit(limit);
+  }
+
+  async updateUserRole(userId: string, role: string, adminId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Update user role
+      await tx.update(users)
+        .set({ role })
+        .where(eq(users.id, userId));
+      
+      // Log the action
+      await tx.insert(moderationActions).values({
+        actionType: 'role_change',
+        targetType: 'user',
+        targetId: userId,
+        moderatorId: adminId,
+        reason: `Role changed to ${role}`,
+      });
+    });
+  }
+  
+  // Admin - Content management
+  async getAllTopics(filters: { status?: string; startDate?: Date; endDate?: Date; limit?: number } = {}): Promise<TopicWithCounts[]> {
+    const { status, startDate, endDate, limit = 100 } = filters;
+    
+    const conditions = [];
+    if (status) {
+      conditions.push(eq(topics.status, status));
+    }
+    if (startDate) {
+      conditions.push(sql`${topics.createdAt} >= ${startDate}`);
+    }
+    if (endDate) {
+      conditions.push(sql`${topics.createdAt} <= ${endDate}`);
+    }
+    
+    let query = db
+      .select({
+        id: topics.id,
+        title: topics.title,
+        category: topics.category,
+        status: topics.status,
+        createdAt: topics.createdAt,
+        updatedAt: topics.updatedAt,
+        participantsCount: topics.participantsCount,
+        opinionsCount: topics.opinionsCount,
+        previewContent: topics.previewContent,
+        previewAuthor: topics.previewAuthor,
+        previewIsAI: topics.previewIsAI,
+      })
+      .from(topics);
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(topics.createdAt)).limit(limit);
+  }
+
+  async getAllOpinions(filters: { status?: string; startDate?: Date; endDate?: Date; limit?: number } = {}): Promise<Opinion[]> {
+    const { status, startDate, endDate, limit = 100 } = filters;
+    
+    const conditions = [];
+    if (status) {
+      conditions.push(eq(opinions.status, status));
+    }
+    if (startDate) {
+      conditions.push(sql`${opinions.createdAt} >= ${startDate}`);
+    }
+    if (endDate) {
+      conditions.push(sql`${opinions.createdAt} <= ${endDate}`);
+    }
+    
+    let query = db.select().from(opinions);
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(opinions.createdAt)).limit(limit);
+  }
+  
+  // Admin - Audit log
+  async getModerationActions(filters: { actionType?: string; moderatorId?: string; startDate?: Date; endDate?: Date; limit?: number } = {}): Promise<any[]> {
+    const { actionType, moderatorId, startDate, endDate, limit = 100 } = filters;
+    
+    const conditions = [];
+    if (actionType) {
+      conditions.push(eq(moderationActions.actionType, actionType));
+    }
+    if (moderatorId) {
+      conditions.push(eq(moderationActions.moderatorId, moderatorId));
+    }
+    if (startDate) {
+      conditions.push(sql`${moderationActions.createdAt} >= ${startDate}`);
+    }
+    if (endDate) {
+      conditions.push(sql`${moderationActions.createdAt} <= ${endDate}`);
+    }
+    
+    let query = db
+      .select({
+        action: moderationActions,
+        moderator: users,
+      })
+      .from(moderationActions)
+      .leftJoin(users, eq(moderationActions.moderatorId, users.id));
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(moderationActions.createdAt)).limit(limit);
+  }
+
   async getAllBannedPhrases(): Promise<BannedPhrase[]> {
     return await db.select().from(bannedPhrases).orderBy(desc(bannedPhrases.createdAt));
   }
