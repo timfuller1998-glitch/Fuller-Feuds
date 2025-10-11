@@ -587,17 +587,9 @@ export default function Home() {
 
       {/* Recent Opinions Preview */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Clock className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-bold">Recent Opinions</h2>
-          </div>
-          <Link href="/recent-opinions">
-            <Button variant="ghost" size="sm" className="gap-2" data-testid="button-view-all-opinions">
-              View All
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </Link>
+        <div className="flex items-center gap-3">
+          <Clock className="w-6 h-6 text-primary" />
+          <h2 className="text-2xl font-bold">Recent Opinions</h2>
         </div>
         
         {recentOpinionsPreview.length > 0 ? (
