@@ -19,15 +19,24 @@ import {
   CheckCircle, 
   XCircle,
   Ban,
-  Unlock
+  Unlock,
+  LayoutDashboard,
+  Users,
+  Filter,
+  FileText
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
+import { DashboardOverview } from "@/components/admin/DashboardOverview";
+import { UserManagement } from "@/components/admin/UserManagement";
+import { ContentFilters } from "@/components/admin/ContentFilters";
+import { AuditLog } from "@/components/admin/AuditLog";
 
 export default function AdminDashboard() {
   const [selectedOpinion, setSelectedOpinion] = useState<string | null>(null);
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
-  const [moderationReason, setModerationReason] = useState("");
+  const [opinionModerationReason, setOpinionModerationReason] = useState("");
+  const [challengeModerationReason, setChallengeModerationReason] = useState("");
 
   // Fetch flagged opinions
   const { data: flaggedOpinions, isLoading: loadingFlagged } = useQuery({
@@ -42,58 +51,54 @@ export default function AdminDashboard() {
   // Opinion moderation mutations
   const approveOpinionMutation = useMutation({
     mutationFn: async (opinionId: string) => {
-      return await apiRequest(`/api/admin/opinions/${opinionId}/approve`, {
-        method: 'POST',
-        body: JSON.stringify({ reason: moderationReason || undefined }),
+      return await apiRequest('POST', `/api/admin/opinions/${opinionId}/approve`, {
+        reason: opinionModerationReason || undefined
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/flagged-opinions'] });
       setSelectedOpinion(null);
-      setModerationReason("");
+      setOpinionModerationReason("");
     },
   });
 
   const hideOpinionMutation = useMutation({
     mutationFn: async (opinionId: string) => {
-      return await apiRequest(`/api/admin/opinions/${opinionId}/hide`, {
-        method: 'POST',
-        body: JSON.stringify({ reason: moderationReason || undefined }),
+      return await apiRequest('POST', `/api/admin/opinions/${opinionId}/hide`, {
+        reason: opinionModerationReason || undefined
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/flagged-opinions'] });
       setSelectedOpinion(null);
-      setModerationReason("");
+      setOpinionModerationReason("");
     },
   });
 
   // Challenge moderation mutations
   const approveChallengeMutation = useMutation({
     mutationFn: async (challengeId: string) => {
-      return await apiRequest(`/api/admin/challenges/${challengeId}/approve`, {
-        method: 'POST',
-        body: JSON.stringify({ reason: moderationReason || undefined }),
+      return await apiRequest('POST', `/api/admin/challenges/${challengeId}/approve`, {
+        reason: challengeModerationReason || undefined
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-challenges'] });
       setSelectedChallenge(null);
-      setModerationReason("");
+      setChallengeModerationReason("");
     },
   });
 
   const rejectChallengeMutation = useMutation({
     mutationFn: async (challengeId: string) => {
-      return await apiRequest(`/api/admin/challenges/${challengeId}/reject`, {
-        method: 'POST',
-        body: JSON.stringify({ reason: moderationReason || undefined }),
+      return await apiRequest('POST', `/api/admin/challenges/${challengeId}/reject`, {
+        reason: challengeModerationReason || undefined
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-challenges'] });
       setSelectedChallenge(null);
-      setModerationReason("");
+      setChallengeModerationReason("");
     },
   });
 
@@ -107,23 +112,49 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <Tabs defaultValue="flagged" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-grid" data-testid="tabs-admin-sections">
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid lg:grid-cols-6" data-testid="tabs-admin-sections">
+          <TabsTrigger value="overview" data-testid="tab-overview">
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="users" data-testid="tab-users">
+            <Users className="h-4 w-4 mr-2" />
+            Users
+          </TabsTrigger>
           <TabsTrigger value="flagged" data-testid="tab-flagged-opinions">
             <Flag className="h-4 w-4 mr-2" />
-            Flagged Opinions
+            Flagged
             {flaggedOpinions?.length > 0 && (
               <Badge variant="destructive" className="ml-2">{flaggedOpinions.length}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="challenges" data-testid="tab-pending-challenges">
             <CheckCircle className="h-4 w-4 mr-2" />
-            Pending Challenges
+            Challenges
             {pendingChallenges?.length > 0 && (
               <Badge variant="default" className="ml-2">{pendingChallenges.length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="filters" data-testid="tab-filters">
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+          </TabsTrigger>
+          <TabsTrigger value="audit" data-testid="tab-audit">
+            <FileText className="h-4 w-4 mr-2" />
+            Audit Log
+          </TabsTrigger>
         </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview">
+          <DashboardOverview />
+        </TabsContent>
+
+        {/* Users Tab */}
+        <TabsContent value="users">
+          <UserManagement />
+        </TabsContent>
 
         {/* Flagged Opinions Tab */}
         <TabsContent value="flagged" className="space-y-4">
@@ -183,8 +214,8 @@ export default function AdminDashboard() {
                     <div className="space-y-3 pt-2">
                       <Textarea
                         placeholder="Moderation reason (optional)"
-                        value={moderationReason}
-                        onChange={(e) => setModerationReason(e.target.value)}
+                        value={opinionModerationReason}
+                        onChange={(e) => setOpinionModerationReason(e.target.value)}
                         data-testid={`textarea-moderation-reason-${item.opinion.id}`}
                       />
                       <div className="flex gap-2">
@@ -209,7 +240,7 @@ export default function AdminDashboard() {
                         <Button
                           onClick={() => {
                             setSelectedOpinion(null);
-                            setModerationReason("");
+                            setOpinionModerationReason("");
                           }}
                           variant="ghost"
                           data-testid={`button-cancel-${item.opinion.id}`}
@@ -288,8 +319,8 @@ export default function AdminDashboard() {
                     <div className="space-y-3 pt-2">
                       <Textarea
                         placeholder="Moderation reason (optional)"
-                        value={moderationReason}
-                        onChange={(e) => setModerationReason(e.target.value)}
+                        value={challengeModerationReason}
+                        onChange={(e) => setChallengeModerationReason(e.target.value)}
                         data-testid={`textarea-challenge-reason-${item.challenge.id}`}
                       />
                       <div className="flex gap-2">
@@ -314,7 +345,7 @@ export default function AdminDashboard() {
                         <Button
                           onClick={() => {
                             setSelectedChallenge(null);
-                            setModerationReason("");
+                            setChallengeModerationReason("");
                           }}
                           variant="ghost"
                           data-testid={`button-cancel-challenge-${item.challenge.id}`}
@@ -338,6 +369,16 @@ export default function AdminDashboard() {
               </Card>
             ))
           )}
+        </TabsContent>
+
+        {/* Content Filters Tab */}
+        <TabsContent value="filters">
+          <ContentFilters />
+        </TabsContent>
+
+        {/* Audit Log Tab */}
+        <TabsContent value="audit">
+          <AuditLog />
         </TabsContent>
       </Tabs>
     </div>
