@@ -9,7 +9,6 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { 
   MessageCircle,
-  ChevronRight,
   Clock,
   TrendingUp
 } from "lucide-react";
@@ -230,32 +229,24 @@ export default function RecentOpinionsPage() {
         {topicGroups.map((group) => (
           <div key={group.topic.id} className="space-y-4">
             {/* Topic Header */}
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="flex-1 min-w-0">
-                <Link href={`/topic/${group.topic.id}`}>
-                  <h2 className="text-2xl font-bold hover-elevate active-elevate-2 inline-block rounded px-2 py-1 -mx-2" data-testid={`link-topic-${group.topic.id}`}>
-                    {group.topic.title}
-                  </h2>
-                </Link>
-                <p className="text-muted-foreground mt-1">{group.topic.description}</p>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  {group.topic.categories.map((cat) => (
-                    <Badge key={cat} variant="secondary" data-testid={`badge-category-${cat}`}>
-                      {cat}
-                    </Badge>
-                  ))}
-                  <Badge variant="outline" className="ml-2">
-                    <MessageCircle className="w-3 h-3 mr-1" />
-                    {group.topic.opinionsCount} opinions
-                  </Badge>
-                </div>
-              </div>
+            <div>
               <Link href={`/topic/${group.topic.id}`}>
-                <Button variant="ghost" size="sm" className="gap-2" data-testid={`button-view-all-${group.topic.id}`}>
-                  View All
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
+                <h2 className="text-2xl font-bold hover-elevate active-elevate-2 inline-block rounded px-2 py-1 -mx-2" data-testid={`link-topic-${group.topic.id}`}>
+                  {group.topic.title}
+                </h2>
               </Link>
+              <p className="text-muted-foreground mt-1">{group.topic.description}</p>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {group.topic.categories.map((cat) => (
+                  <Badge key={cat} variant="secondary" data-testid={`badge-category-${cat}`}>
+                    {cat}
+                  </Badge>
+                ))}
+                <Badge variant="outline" className="ml-2">
+                  <MessageCircle className="w-3 h-3 mr-1" />
+                  {group.topic.opinionsCount} opinions
+                </Badge>
+              </div>
             </div>
 
             {/* Opinions Horizontal Scroll */}
