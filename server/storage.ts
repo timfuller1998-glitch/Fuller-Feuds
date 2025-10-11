@@ -247,12 +247,37 @@ export class DatabaseStorage implements IStorage {
       );
     }
     
-    return await db
+    const topicsList = await db
       .select()
       .from(topics)
       .where(and(...conditions))
       .orderBy(desc(topics.createdAt))
       .limit(limit);
+    
+    // Fetch counts for each topic
+    const topicsWithCounts = await Promise.all(
+      topicsList.map(async (topic) => {
+        // Get opinion count and participant count
+        const opinionsList = await db
+          .select({ userId: opinions.userId, id: opinions.id })
+          .from(opinions)
+          .where(and(
+            eq(opinions.topicId, topic.id),
+            eq(opinions.status, 'approved')
+          ));
+        
+        const opinionsCount = opinionsList.length;
+        const participantCount = new Set(opinionsList.map(o => o.userId)).size;
+        
+        return {
+          ...topic,
+          opinionsCount,
+          participantCount
+        };
+      })
+    );
+    
+    return topicsWithCounts;
   }
 
   async getTopic(id: string): Promise<Topic | undefined> {
