@@ -20,6 +20,7 @@ import {
   type User,
   type UpsertUser,
   type Topic,
+  type TopicWithCounts,
   type InsertTopic,
   type Opinion,
   type InsertOpinion,
@@ -58,7 +59,7 @@ export interface IStorage {
   
   // Topic operations
   createTopic(topic: InsertTopic): Promise<Topic>;
-  getTopics(limit?: number, category?: string, search?: string): Promise<Topic[]>;
+  getTopics(limit?: number, category?: string, search?: string): Promise<TopicWithCounts[]>;
   getTopic(id: string): Promise<Topic | undefined>;
   
   // Opinion operations
@@ -233,7 +234,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getTopics(limit = 50, category?: string, search?: string): Promise<Topic[]> {
+  async getTopics(limit = 50, category?: string, search?: string): Promise<TopicWithCounts[]> {
     let conditions = [eq(topics.isActive, true)];
     
     if (category) {

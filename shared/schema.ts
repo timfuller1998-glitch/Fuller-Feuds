@@ -292,6 +292,10 @@ export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({
 
 export type InsertTopic = z.infer<typeof insertTopicSchema>;
 export type Topic = typeof topics.$inferSelect;
+export type TopicWithCounts = Topic & {
+  opinionsCount: number;
+  participantCount: number;
+};
 export type InsertOpinion = z.infer<typeof insertOpinionSchema>;
 export type Opinion = typeof opinions.$inferSelect;
 export type CumulativeOpinion = typeof cumulativeOpinions.$inferSelect;
