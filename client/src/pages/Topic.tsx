@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -38,6 +38,8 @@ export default function Topic() {
   const [challengingOpinionId, setChallengingOpinionId] = useState<string | null>(null);
   const [flaggingOpinionId, setFlaggingOpinionId] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -93,6 +95,12 @@ export default function Topic() {
     queryKey: ["/api/live-streams", { topicId: id }],
     enabled: !!id,
   });
+
+  // Reset image state when topic imageUrl changes
+  useEffect(() => {
+    setImageError(false);
+    setImageLoaded(false);
+  }, [topic?.imageUrl]);
 
   // Get user's opinion on this topic to determine stance
   const userOpinion = opinions?.find(o => o.userId === user?.id);
@@ -330,85 +338,22 @@ export default function Topic() {
 
       {/* Header Image */}
       <div className="aspect-[21/9] relative overflow-hidden rounded-lg border border-border/50" style={{ boxShadow: 'var(--shadow-lg)' }}>
-        <img 
-          src={topic.imageUrl || '/placeholder-topic.jpg'} 
-          alt={topic.title}
-          className="w-full h-full object-cover transition-smooth hover:scale-105"
-        />
-      </div>
-
-      {/* AI Summary Section */}
-      <Card className="border border-border/50" style={{ boxShadow: 'var(--shadow-md)' }}>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <CardTitle className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-chart-3/10 border border-chart-3/20">
-                <Brain className="w-5 h-5 text-chart-3" />
-              </div>
-              AI-Generated Summary
-            </CardTitle>
-            {cumulativeData && (
-              <Button 
-                variant="outline"
-                size="sm"
-                onClick={() => refreshCumulativeMutation.mutate()}
-                disabled={refreshCumulativeMutation.isPending}
-                data-testid="button-refresh-summary"
-                className="transition-smooth"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                {refreshCumulativeMutation.isPending ? "Updating..." : "Refresh"}
-              </Button>
-            )}
+        {topic.imageUrl && !imageError ? (
+          <img 
+            src={topic.imageUrl} 
+            alt={topic.title}
+            className="w-full h-full object-cover transition-smooth hover:scale-105"
+            onError={() => setImageError(true)}
+            onLoad={() => setImageLoaded(true)}
+            style={{ display: imageLoaded ? 'block' : 'none' }}
+          />
+        ) : null}
+        {(!topic.imageUrl || imageError || !imageLoaded) && (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+            <MessageCircle className="w-24 h-24 text-primary/30" />
           </div>
-        </CardHeader>
-        <CardContent>
-          {cumulativeData ? (
-            <div className="space-y-4">
-              <p className="text-base leading-relaxed">{cumulativeData.summary}</p>
-              {cumulativeData.keyPoints && cumulativeData.keyPoints.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-sm">Key Points:</h4>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                    {cumulativeData.keyPoints.map((point, idx) => (
-                      <li key={idx}>{point}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <Badge variant="default" className="bg-chart-2">For {cumulativeData.supportingPercentage}%</Badge>
-                  <Badge variant="destructive">Against {cumulativeData.opposingPercentage}%</Badge>
-                  <Badge variant="secondary">Neutral {cumulativeData.neutralPercentage}%</Badge>
-                </div>
-                <span className="text-muted-foreground">
-                  Based on {cumulativeData.totalOpinions} opinions
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-6">
-              <p className="text-muted-foreground mb-4">
-                No AI summary available yet. Generate one to see the community perspective!
-              </p>
-              <Button 
-                onClick={() => generateCumulativeMutation.mutate()}
-                disabled={generateCumulativeMutation.isPending || !opinions || opinions.length === 0}
-                data-testid="button-generate-summary"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                {generateCumulativeMutation.isPending ? "Generating..." : "Generate AI Summary"}
-              </Button>
-              {(!opinions || opinions.length === 0) && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  At least one opinion is needed to generate a summary
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
       {/* Opinions Section with Tabs */}
       <Card className="border border-border/50" style={{ boxShadow: 'var(--shadow-md)' }}>
@@ -675,6 +620,79 @@ export default function Topic() {
               )}
             </TabsContent>
           </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* AI Summary Section */}
+      <Card className="border border-border/50" style={{ boxShadow: 'var(--shadow-md)' }}>
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-chart-3/10 border border-chart-3/20">
+                <Brain className="w-5 h-5 text-chart-3" />
+              </div>
+              AI-Generated Summary
+            </CardTitle>
+            {cumulativeData && (
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={() => refreshCumulativeMutation.mutate()}
+                disabled={refreshCumulativeMutation.isPending}
+                data-testid="button-refresh-summary"
+                className="transition-smooth"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                {refreshCumulativeMutation.isPending ? "Updating..." : "Refresh"}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {cumulativeData ? (
+            <div className="space-y-4">
+              <p className="text-base leading-relaxed">{cumulativeData.summary}</p>
+              {cumulativeData.keyPoints && cumulativeData.keyPoints.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm">Key Points:</h4>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                    {cumulativeData.keyPoints.map((point, idx) => (
+                      <li key={idx}>{point}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Badge variant="default" className="bg-chart-2">For {cumulativeData.supportingPercentage}%</Badge>
+                  <Badge variant="destructive">Against {cumulativeData.opposingPercentage}%</Badge>
+                  <Badge variant="secondary">Neutral {cumulativeData.neutralPercentage}%</Badge>
+                </div>
+                <span className="text-muted-foreground">
+                  Based on {cumulativeData.totalOpinions} opinions
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <p className="text-muted-foreground mb-4">
+                No AI summary available yet. Generate one to see the community perspective!
+              </p>
+              <Button 
+                onClick={() => generateCumulativeMutation.mutate()}
+                disabled={generateCumulativeMutation.isPending || !opinions || opinions.length === 0}
+                data-testid="button-generate-summary"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                {generateCumulativeMutation.isPending ? "Generating..." : "Generate AI Summary"}
+              </Button>
+              {(!opinions || opinions.length === 0) && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  At least one opinion is needed to generate a summary
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
