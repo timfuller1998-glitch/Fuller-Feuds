@@ -61,7 +61,7 @@ export default function Home() {
     queryKey: ['/api/stats/platform'],
   });
 
-  // Fetch real topics from API
+  // Fetch real topics from API  
   const { data: apiTopics, isLoading: topicsLoading } = useQuery<TopicWithCounts[]>({
     queryKey: ["/api/topics", { search: searchQuery }],
     queryFn: async () => {
@@ -70,7 +70,7 @@ export default function Home() {
       const response = await fetch(`/api/topics?${params}`);
       if (!response.ok) throw new Error("Failed to fetch topics");
       return response.json();
-    },
+    }
   });
 
   // Fetch opinions for selected topic
@@ -259,13 +259,8 @@ export default function Home() {
 
   // Use only real API topics - no mock data
   const combinedTopics = apiTopics?.map(topic => ({
-    id: topic.id,
-    title: topic.title,
-    description: topic.description,
+    ...topic, // Spread all fields to preserve preview data
     imageUrl: topic.imageUrl || climateImage, // Use default image if none provided
-    categories: topic.categories,
-    participantCount: topic.participantCount,
-    opinionsCount: topic.opinionsCount,
     isActive: topic.isActive || false
   })) || [];
 
