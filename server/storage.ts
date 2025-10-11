@@ -13,6 +13,7 @@ import {
   opinionChallenges,
   opinionFlags,
   moderationActions,
+  bannedPhrases,
   userFollows,
   userProfiles,
   themes,
@@ -43,6 +44,8 @@ import {
   type InsertTheme,
   type ThemeLike,
   type InsertThemeLike,
+  type BannedPhrase,
+  type InsertBannedPhrase,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, sql, count, ilike, or } from "drizzle-orm";
@@ -75,7 +78,7 @@ export interface IStorage {
   getUserVoteOnOpinion(opinionId: string, userId: string): Promise<OpinionVote | undefined>;
   
   // Opinion challenges
-  challengeOpinion(opinionId: string, userId: string, context: string): Promise<void>;
+  challengeOpinion(opinionId: string, userId: string, context: string, status?: string): Promise<void>;
   getOpinionChallenges(opinionId: string, userRole?: string): Promise<any[]>;
   
   // Cumulative opinions
@@ -91,7 +94,7 @@ export interface IStorage {
   endDebateRoom(id: string): Promise<void>;
   
   // Debate messages
-  addDebateMessage(roomId: string, userId: string, content: string): Promise<DebateMessage>;
+  addDebateMessage(roomId: string, userId: string, content: string, status?: string): Promise<DebateMessage>;
   getDebateMessages(roomId: string): Promise<DebateMessage[]>;
   
   // Live streams
@@ -150,6 +153,11 @@ export interface IStorage {
   hideTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
   archiveTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
   restoreTopic(topicId: string, moderatorId: string, reason?: string): Promise<void>;
+  
+  // Banned phrases operations
+  getAllBannedPhrases(): Promise<BannedPhrase[]>;
+  createBannedPhrase(phrase: InsertBannedPhrase): Promise<BannedPhrase>;
+  deleteBannedPhrase(id: string): Promise<void>;
   
   // Theme operations
   createTheme(theme: InsertTheme): Promise<Theme>;
@@ -500,10 +508,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Opinion challenges
-  async challengeOpinion(opinionId: string, userId: string, context: string): Promise<void> {
+  async challengeOpinion(opinionId: string, userId: string, context: string, status: string = 'pending'): Promise<void> {
     await db
       .insert(opinionChallenges)
-      .values({ opinionId, userId, context });
+      .values({ opinionId, userId, context, status });
     
     // Increment challenges count
     await db
@@ -684,10 +692,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Debate messages
-  async addDebateMessage(roomId: string, userId: string, content: string): Promise<DebateMessage> {
+  async addDebateMessage(roomId: string, userId: string, content: string, status: string = 'approved'): Promise<DebateMessage> {
     const [message] = await db
       .insert(debateMessages)
-      .values({ roomId, userId, content })
+      .values({ roomId, userId, content, status })
       .returning();
     return message;
   }
@@ -1278,6 +1286,20 @@ export class DatabaseStorage implements IStorage {
       targetId: topicId,
       reason: reason || 'Topic restored',
     });
+  }
+
+  // Banned phrases operations
+  async getAllBannedPhrases(): Promise<BannedPhrase[]> {
+    return await db.select().from(bannedPhrases).orderBy(desc(bannedPhrases.createdAt));
+  }
+
+  async createBannedPhrase(phrase: InsertBannedPhrase): Promise<BannedPhrase> {
+    const [newPhrase] = await db.insert(bannedPhrases).values(phrase).returning();
+    return newPhrase;
+  }
+
+  async deleteBannedPhrase(id: string): Promise<void> {
+    await db.delete(bannedPhrases).where(eq(bannedPhrases.id, id));
   }
 
   // Theme operations

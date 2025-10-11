@@ -9,12 +9,14 @@ import {
   insertDebateRoomSchema,
   insertLiveStreamSchema,
   insertUserProfileSchema,
-  insertUserFollowSchema
+  insertUserFollowSchema,
+  insertBannedPhraseSchema
 } from "@shared/schema";
 import { z } from "zod";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { AIService } from "./aiService";
+import { validateContent } from "./utils/contentFilter";
 import { 
   attachUserRole,
   requireAuth,
@@ -263,6 +265,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: '' // Set empty description for backward compatibility
       });
       
+      // Content filter validation for topic title
+      const titleFilterResult = await validateContent(validatedData.title);
+      if (!titleFilterResult.isAllowed) {
+        return res.status(400).json({ 
+          message: "Topic title contains inappropriate language.",
+          detail: "Please review our community guidelines."
+        });
+      }
+      
+      // Content filter validation for initial opinion
+      const opinionFilterResult = await validateContent(initialOpinion.trim());
+      if (!opinionFilterResult.isAllowed) {
+        return res.status(400).json({ 
+          message: "Your opinion contains inappropriate language.",
+          detail: "Please review our community guidelines."
+        });
+      }
+      
+      // If title or opinion should be flagged, mark topic as flagged
+      const shouldFlagTopic = titleFilterResult.shouldFlag || opinionFilterResult.shouldFlag;
+      
       // Generate AI image based on topic title
       let imageUrl: string | undefined;
       try {
@@ -275,16 +298,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create topic with generated image
       const topic = await storage.createTopic({
         ...validatedData,
-        imageUrl
+        imageUrl,
+        status: shouldFlagTopic ? 'hidden' : 'active' // Flag topic if content needs review
       });
       
       // Create initial opinion (required)
       try {
+        const opinionStatus = opinionFilterResult.shouldFlag ? 'flagged' : 'approved';
         await storage.createOpinion({
           topicId: topic.id,
           userId: userId,
           content: initialOpinion.trim(),
-          stance: 'neutral' // Default stance, user can change later
+          stance: 'neutral', // Default stance, user can change later
+          status: opinionStatus
         });
       } catch (opinionError) {
         console.error("Error creating initial opinion:", opinionError);
@@ -366,6 +392,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId
       });
       
+      // Content filter validation
+      const filterResult = await validateContent(validatedData.content);
+      if (!filterResult.isAllowed) {
+        return res.status(400).json({ 
+          message: "Your post contains inappropriate language and cannot be submitted.",
+          detail: "Please review our community guidelines."
+        });
+      }
+      
+      // If content should be flagged, create opinion with flagged status
+      if (filterResult.shouldFlag) {
+        validatedData.status = 'flagged';
+      }
+      
       const opinion = await storage.createOpinion(validatedData);
       
       // Auto-update political leaning analysis after creating opinion
@@ -446,7 +486,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Challenge context is required" });
       }
       
-      await storage.challengeOpinion(req.params.opinionId, userId, context.trim());
+      // Content filter validation
+      const filterResult = await validateContent(context.trim());
+      if (!filterResult.isAllowed) {
+        return res.status(400).json({ 
+          message: "Your challenge contains inappropriate language and cannot be submitted.",
+          detail: "Please review our community guidelines."
+        });
+      }
+      
+      // If content should be flagged, mark challenge as flagged (requires storage method update)
+      await storage.challengeOpinion(
+        req.params.opinionId, 
+        userId, 
+        context.trim(),
+        filterResult.shouldFlag ? 'flagged' : 'pending'
+      );
       res.json({ message: "Challenge added" });
     } catch (error) {
       console.error("Error challenging opinion:", error);
@@ -648,6 +703,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error restoring topic:", error);
       res.status(500).json({ message: "Failed to restore topic" });
+    }
+  });
+
+  // Banned phrases routes (admin only)
+  app.get('/api/admin/banned-phrases', requireAdmin, async (req, res) => {
+    try {
+      const phrases = await storage.getAllBannedPhrases();
+      res.json(phrases);
+    } catch (error) {
+      console.error("Error fetching banned phrases:", error);
+      res.status(500).json({ message: "Failed to fetch banned phrases" });
+    }
+  });
+
+  app.post('/api/admin/banned-phrases', requireAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const validatedData = insertBannedPhraseSchema.parse({
+        ...req.body,
+        addedById: adminId
+      });
+      
+      const newPhrase = await storage.createBannedPhrase(validatedData);
+      res.status(201).json(newPhrase);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("Error creating banned phrase:", error);
+      res.status(500).json({ message: "Failed to create banned phrase" });
+    }
+  });
+
+  app.delete('/api/admin/banned-phrases/:id', requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteBannedPhrase(req.params.id);
+      res.status(200).json({ message: 'Banned phrase deleted' });
+    } catch (error) {
+      console.error("Error deleting banned phrase:", error);
+      res.status(500).json({ message: "Failed to delete banned phrase" });
     }
   });
 
@@ -1373,7 +1468,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Message content is required" });
       }
 
-      const message = await storage.addDebateMessage(req.params.roomId, userId, content);
+      // Content filter validation
+      const filterResult = await validateContent(content.trim());
+      if (!filterResult.isAllowed) {
+        return res.status(400).json({ 
+          message: "Your message contains inappropriate language and cannot be sent.",
+          detail: "Please review our community guidelines."
+        });
+      }
+
+      // If content should be flagged, mark message as flagged
+      const messageStatus = filterResult.shouldFlag ? 'flagged' : 'approved';
+      const message = await storage.addDebateMessage(req.params.roomId, userId, content, messageStatus);
       res.status(201).json(message);
     } catch (error) {
       console.error("Error adding debate message:", error);

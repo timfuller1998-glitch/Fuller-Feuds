@@ -107,6 +107,7 @@ export const debateMessages = pgTable("debate_messages", {
   roomId: uuid("room_id").notNull().references(() => debateRooms.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id),
   content: text("content").notNull(),
+  status: varchar("status", { length: 20 }).default("approved"), // 'approved', 'flagged', 'hidden'
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -201,6 +202,17 @@ export const moderationActions = pgTable("moderation_actions", {
   targetType: varchar("target_type", { length: 50 }).notNull(), // 'opinion', 'user', 'topic', 'challenge'
   targetId: varchar("target_id").notNull(),
   reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Banned phrases/words for content filtering
+export const bannedPhrases = pgTable("banned_phrases", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  phrase: text("phrase").notNull().unique(),
+  severity: varchar("severity", { length: 20 }).notNull().default("block"), // 'block' (prevent post), 'flag' (auto-flag for review)
+  category: varchar("category", { length: 50 }).default("general"), // 'profanity', 'hate_speech', 'spam', 'general'
+  matchType: varchar("match_type", { length: 20 }).default("whole_word"), // 'whole_word', 'partial'
+  addedById: varchar("added_by_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -387,3 +399,11 @@ export type Theme = typeof themes.$inferSelect;
 export type InsertTheme = z.infer<typeof insertThemeSchema>;
 export type ThemeLike = typeof themeLikes.$inferSelect;
 export type InsertThemeLike = z.infer<typeof insertThemeLikeSchema>;
+
+export const insertBannedPhraseSchema = createInsertSchema(bannedPhrases).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type BannedPhrase = typeof bannedPhrases.$inferSelect;
+export type InsertBannedPhrase = z.infer<typeof insertBannedPhraseSchema>;
