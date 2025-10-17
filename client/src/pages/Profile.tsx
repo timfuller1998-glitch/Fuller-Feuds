@@ -42,7 +42,13 @@ import {
   Swords,
   Video,
   Clock,
-  Plus
+  Plus,
+  Trophy,
+  Award,
+  Medal,
+  Star,
+  Lock,
+  Check
 } from "lucide-react";
 
 interface ProfileData {
@@ -107,7 +113,7 @@ export default function Profile() {
   const { user: currentUser } = useAuth();
   const [showCreateDebateDialog, setShowCreateDebateDialog] = useState(false);
   const [showScheduleStreamDialog, setShowScheduleStreamDialog] = useState(false);
-  const [activeSection, setActiveSection] = useState<'opinions' | 'debates' | 'followers' | 'following'>('opinions');
+  const [activeSection, setActiveSection] = useState<'opinions' | 'debates' | 'followers' | 'following' | 'badges'>('opinions');
 
   const isOwnProfile = currentUser?.id === userId;
 
@@ -176,6 +182,13 @@ export default function Profile() {
     enabled: isOwnProfile && showScheduleStreamDialog,
   });
 
+  // Fetch user badges
+  const { data: userBadges = [] } = useQuery<any[]>({
+    queryKey: ['/api/users', userId, 'badges'],
+    queryFn: () => fetch(`/api/users/${userId}/badges`, { credentials: 'include' }).then(res => res.json()),
+    enabled: !!userId,
+  });
+
   // Follow/unfollow mutation
   const followMutation = useMutation({
     mutationFn: (action: 'follow' | 'unfollow') => 
@@ -199,6 +212,19 @@ export default function Profile() {
     },
     onError: (error) => {
       console.error("Political analysis failed:", error);
+    }
+  });
+
+  // Badge selection mutation
+  const selectBadgeMutation = useMutation({
+    mutationFn: (badgeId: string | null) => 
+      apiRequest('POST', '/api/users/me/selected-badge', { badgeId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'badges'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/profile', userId] });
+    },
+    onError: (error) => {
+      console.error("Failed to select badge:", error);
     }
   });
 
@@ -450,6 +476,14 @@ export default function Profile() {
             >
               <div className="text-lg sm:text-2xl font-bold">{debateRooms?.length || 0}</div>
               <div className="text-xs text-muted-foreground">Debates</div>
+            </button>
+            <button 
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'badges' ? 'bg-primary/10' : ''}`}
+              onClick={() => setActiveSection('badges')}
+              data-testid="stat-badges"
+            >
+              <div className="text-lg sm:text-2xl font-bold">{userBadges.filter((b: any) => b.unlockedAt).length}/{userBadges.length}</div>
+              <div className="text-xs text-muted-foreground">Badges</div>
             </button>
             <button 
               className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'followers' ? 'bg-primary/10' : ''}`}
@@ -996,6 +1030,104 @@ export default function Profile() {
                       </Button>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Badges Section */}
+        {activeSection === 'badges' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5" />
+                Badges
+              </CardTitle>
+              <CardDescription>
+                {isOwnProfile 
+                  ? `You've unlocked ${userBadges.filter((b: any) => b.unlockedAt).length} of ${userBadges.length} badges`
+                  : `${user.firstName} has unlocked ${userBadges.filter((b: any) => b.unlockedAt).length} of ${userBadges.length} badges`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {userBadges.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No badges available yet</p>
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {userBadges.map((userBadge: any) => {
+                    const isUnlocked = !!userBadge.unlockedAt;
+                    const isSelected = userBadge.isSelected;
+                    const IconComponent = userBadge.icon === 'Trophy' ? Trophy :
+                                         userBadge.icon === 'Award' ? Award :
+                                         userBadge.icon === 'Medal' ? Medal :
+                                         userBadge.icon === 'Star' ? Star : Trophy;
+                    
+                    return (
+                      <div
+                        key={userBadge.badgeId}
+                        className={`relative p-4 border rounded-lg transition-all ${
+                          isUnlocked 
+                            ? 'bg-card hover-elevate active-elevate-2' 
+                            : 'bg-muted/30 opacity-60'
+                        } ${isSelected ? 'ring-2 ring-primary' : ''}`}
+                        data-testid={`badge-${userBadge.badgeId}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                            isUnlocked ? 'bg-primary/10' : 'bg-muted'
+                          }`}>
+                            {isUnlocked ? (
+                              <IconComponent className="w-6 h-6 text-primary" />
+                            ) : (
+                              <Lock className="w-6 h-6 text-muted-foreground" />
+                            )}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <h3 className="font-semibold text-sm">{userBadge.name}</h3>
+                              {isSelected && (
+                                <Badge variant="default" className="text-xs">
+                                  <Check className="w-3 h-3 mr-1" />
+                                  Selected
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {userBadge.description}
+                            </p>
+                            
+                            {isUnlocked ? (
+                              <div className="mt-2 flex items-center justify-between">
+                                <p className="text-xs text-muted-foreground">
+                                  Unlocked {new Date(userBadge.unlockedAt).toLocaleDateString()}
+                                </p>
+                                {isOwnProfile && (
+                                  <Button
+                                    size="sm"
+                                    variant={isSelected ? "outline" : "default"}
+                                    onClick={() => selectBadgeMutation.mutate(isSelected ? null : userBadge.badgeId)}
+                                    disabled={selectBadgeMutation.isPending}
+                                    data-testid={`button-select-badge-${userBadge.badgeId}`}
+                                  >
+                                    {isSelected ? 'Deselect' : 'Display'}
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                🔒 Locked
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
