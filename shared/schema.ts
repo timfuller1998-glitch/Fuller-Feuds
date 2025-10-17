@@ -185,15 +185,37 @@ export const opinionChallenges = pgTable("opinion_challenges", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Opinion flags - for reporting inappropriate content
+// Opinion flags - for reporting logical fallacies
 export const opinionFlags = pgTable("opinion_flags", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   opinionId: uuid("opinion_id").notNull().references(() => opinions.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id),
-  reason: text("reason").notNull(),
+  fallacyType: varchar("fallacy_type", { length: 50 }).notNull(), // 'ad_hominem', 'straw_man', 'false_dichotomy', etc.
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   uniqueIndex("unique_opinion_flag").on(table.opinionId, table.userId)
+]);
+
+// Topic flags - for flagging entire topics
+export const topicFlags = pgTable("topic_flags", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  topicId: uuid("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  fallacyType: varchar("fallacy_type", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_topic_flag").on(table.topicId, table.userId)
+]);
+
+// Debate message flags - for flagging chat messages in debates
+export const debateMessageFlags = pgTable("debate_message_flags", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: uuid("message_id").notNull().references(() => debateMessages.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  fallacyType: varchar("fallacy_type", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_message_flag").on(table.messageId, table.userId)
 ]);
 
 // Moderation actions log - tracks all admin/moderator actions
@@ -350,6 +372,20 @@ export const insertOpinionFlagSchema = createInsertSchema(opinionFlags).omit({
 });
 export type InsertOpinionFlag = z.infer<typeof insertOpinionFlagSchema>;
 export type OpinionFlag = typeof opinionFlags.$inferSelect;
+
+export const insertTopicFlagSchema = createInsertSchema(topicFlags).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertTopicFlag = z.infer<typeof insertTopicFlagSchema>;
+export type TopicFlag = typeof topicFlags.$inferSelect;
+
+export const insertDebateMessageFlagSchema = createInsertSchema(debateMessageFlags).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDebateMessageFlag = z.infer<typeof insertDebateMessageFlagSchema>;
+export type DebateMessageFlag = typeof debateMessageFlags.$inferSelect;
 
 export const insertModerationActionSchema = createInsertSchema(moderationActions).omit({
   id: true,
