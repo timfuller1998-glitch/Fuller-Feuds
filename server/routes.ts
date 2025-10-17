@@ -1843,6 +1843,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Badge routes
+  app.get('/api/badges', async (req, res) => {
+    try {
+      const allBadges = await storage.getAllBadges();
+      res.json(allBadges);
+    } catch (error) {
+      console.error("Error fetching badges:", error);
+      res.status(500).json({ message: "Failed to fetch badges" });
+    }
+  });
+
+  app.get('/api/users/:userId/badges', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const userBadges = await storage.getUserBadges(userId);
+      res.json(userBadges);
+    } catch (error) {
+      console.error("Error fetching user badges:", error);
+      res.status(500).json({ message: "Failed to fetch user badges" });
+    }
+  });
+
+  app.post('/api/users/me/selected-badge', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { badgeId } = req.body;
+      
+      await storage.setSelectedBadge(userId, badgeId || null);
+      res.json({ message: "Selected badge updated successfully" });
+    } catch (error: any) {
+      console.error("Error setting selected badge:", error);
+      if (error.message === "User has not unlocked this badge") {
+        return res.status(403).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to set selected badge" });
+    }
+  });
+
+  app.get('/api/leaderboards', async (req, res) => {
+    try {
+      const leaderboards = await storage.getLeaderboards();
+      res.json(leaderboards);
+    } catch (error) {
+      console.error("Error fetching leaderboards:", error);
+      res.status(500).json({ message: "Failed to fetch leaderboards" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time features following blueprint pattern
