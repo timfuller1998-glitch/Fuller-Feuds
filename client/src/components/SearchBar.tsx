@@ -34,6 +34,8 @@ export default function SearchBar({
   const [topicCategories, setTopicCategories] = useState<string[]>([]);
   const [categoryInput, setCategoryInput] = useState("");
   const [pendingEnterKey, setPendingEnterKey] = useState<string | null>(null);
+  const [dismissedQuery, setDismissedQuery] = useState<string | null>(null);
+  const [pendingMutationQuery, setPendingMutationQuery] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
 
@@ -86,23 +88,30 @@ export default function SearchBar({
   const hasResults = topics && topics.length > 0;
   const hasNoResults = query.length >= 2 && topics !== undefined && topics.length === 0;
 
-  // Auto-show create form when Enter is pressed and search completes with no results
+  // Handle Enter key flow - navigate to search or clear pending state
   useEffect(() => {
-    if (pendingEnterKey && debouncedQuery === pendingEnterKey && hasNoResults) {
-      setTopicTitle(pendingEnterKey);
-      // Don't show form immediately - let the mutation onSuccess handle it
-      generateCategoriesMutation.mutate(pendingEnterKey);
-      setPendingEnterKey(null);
-    } else if (pendingEnterKey && debouncedQuery === pendingEnterKey && topics && topics.length > 0) {
-      // Has results, navigate to search page
-      saveToHistory(pendingEnterKey);
-      onSearch?.(pendingEnterKey);
-      setShowSuggestions(false);
-      setLocation(`/search?q=${encodeURIComponent(pendingEnterKey)}`);
-      window.dispatchEvent(new CustomEvent('searchHistoryUpdate'));
+    if (pendingEnterKey && debouncedQuery === pendingEnterKey) {
+      if (topics && topics.length > 0) {
+        // Has results, navigate to search page
+        saveToHistory(pendingEnterKey);
+        onSearch?.(pendingEnterKey);
+        setShowSuggestions(false);
+        setLocation(`/search?q=${encodeURIComponent(pendingEnterKey)}`);
+        window.dispatchEvent(new CustomEvent('searchHistoryUpdate'));
+      }
+      // Clear pending state regardless - the auto-trigger effect will handle topic creation
       setPendingEnterKey(null);
     }
-  }, [pendingEnterKey, debouncedQuery, hasNoResults, topics]);
+  }, [pendingEnterKey, debouncedQuery, topics]);
+
+  // Auto-trigger topic creation form when no results are found (handles both passive typing and Enter key)
+  useEffect(() => {
+    if (hasNoResults && !showCreateForm && !generateCategoriesMutation.isPending && debouncedQuery.length >= 2 && dismissedQuery !== debouncedQuery) {
+      setTopicTitle(debouncedQuery);
+      setPendingMutationQuery(debouncedQuery);
+      generateCategoriesMutation.mutate(debouncedQuery);
+    }
+  }, [hasNoResults, debouncedQuery, showCreateForm, dismissedQuery]);
 
   // Get search history from localStorage
   const getSearchHistory = (): string[] => {
@@ -150,14 +159,22 @@ export default function SearchBar({
       return response.json();
     },
     onSuccess: (data: { categories: string[] }) => {
-      setTopicCategories(data.categories);
-      setShowCreateForm(true); // Show form after categories are generated
+      // Only show form if the mutation query still matches the current debounced query
+      if (pendingMutationQuery === debouncedQuery) {
+        setTopicCategories(data.categories);
+        setShowCreateForm(true);
+      }
+      setPendingMutationQuery(null);
     },
     onError: (error) => {
       console.error("Failed to generate categories:", error);
-      // Fallback to default categories
-      setTopicCategories(["Politics", "Society", "General"]);
-      setShowCreateForm(true); // Show form even if category generation fails
+      // Only show form if the mutation query still matches the current debounced query
+      if (pendingMutationQuery === debouncedQuery) {
+        // Fallback to default categories
+        setTopicCategories(["Politics", "Society", "General"]);
+        setShowCreateForm(true);
+      }
+      setPendingMutationQuery(null);
     },
   });
 
@@ -212,6 +229,10 @@ export default function SearchBar({
   const handleSearch = (value: string) => {
     setQuery(value);
     onSearch?.(value);
+    // Clear dismissed state when query changes
+    if (value !== dismissedQuery) {
+      setDismissedQuery(null);
+    }
   };
 
   const handleSubmit = (searchTerm: string) => {
@@ -361,27 +382,6 @@ export default function SearchBar({
             </div>
           )}
 
-          {/* No Results - Create New Topic */}
-          {hasNoResults && !showCreateForm && !generateCategoriesMutation.isPending && (
-            <div className="p-4 text-center space-y-3">
-              <div className="text-sm text-muted-foreground">
-                No debates found for "{query}"
-              </div>
-              <Button
-                onClick={() => {
-                  setTopicTitle(query);
-                  // Auto-generate 3 related categories - form will show after this completes
-                  generateCategoriesMutation.mutate(query);
-                }}
-                className="w-full"
-                data-testid="button-create-topic-from-search"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create New Topic
-              </Button>
-            </div>
-          )}
-
           {/* Loading State */}
           {hasNoResults && generateCategoriesMutation.isPending && !showCreateForm && (
             <div className="p-8 text-center">
@@ -486,12 +486,14 @@ export default function SearchBar({
                   <Button
                     variant="outline"
                     onClick={() => {
+                      const queryToDismiss = topicTitle;
                       setShowCreateForm(false);
                       setTopicTitle("");
                       setInitialOpinion("");
                       setStance('neutral');
                       setTopicCategories([]);
                       setCategoryInput("");
+                      setDismissedQuery(queryToDismiss);
                     }}
                     className="flex-1"
                     data-testid="button-cancel-create-topic"

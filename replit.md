@@ -3,6 +3,15 @@
 ## Overview
 Kirk Debates is a modern platform designed to facilitate meaningful discussions on important topics. It combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats. The platform features topic-based debate matching that automatically connects users with opposing viewpoints, privacy controls for debate participants, and AI-generated cumulative opinions that summarize community perspectives and track debate sentiment.
 
+## Recent Changes
+
+### Search Bar Topic Creation (October 17, 2025)
+- **Auto-Open Form**: Search bar now automatically opens topic creation form when no results are found
+- **No Manual Trigger**: Removed "Create New Topic" button - form opens immediately after search completes
+- **Smart Dismissal**: Cancel button properly dismisses the form; typing a different query re-enables auto-trigger
+- **Race Condition Prevention**: Implemented pendingMutationQuery tracking to prevent stale mutations from showing outdated forms
+- **Single API Call**: Refactored to ensure exactly one API call per unique search query
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
