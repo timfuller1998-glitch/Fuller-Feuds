@@ -1,7 +1,7 @@
 # Kirk Debates Platform
 
 ## Overview
-Kirk Debates is a modern platform designed to facilitate meaningful discussions on important topics. It combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats. The platform aims to be a comprehensive environment for constructive idea exchange, featuring AI-generated cumulative opinions that summarize community perspectives and track debate sentiment.
+Kirk Debates is a modern platform designed to facilitate meaningful discussions on important topics. It combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats. The platform features topic-based debate matching that automatically connects users with opposing viewpoints, privacy controls for debate participants, and AI-generated cumulative opinions that summarize community perspectives and track debate sentiment.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -26,6 +26,23 @@ Preferred communication style: Simple, everyday language.
 - **API Design**: RESTful endpoints with structured error handling
 - **Core Data Models**: Users, Topics, Opinions, Debate Rooms, Live Streams, Cumulative Opinions.
 - **Admin & Moderation**: Role-Based Access Control (user, moderator, admin), content status management (opinions, challenges, topics), flagging system, and a comprehensive admin dashboard with audit trails.
+
+### Debate Matching & Privacy System
+- **Topic-Based Matching**: Automatic debate matching connects users with opposing viewpoints on specific topics
+- **Auto-Match Flow**: Click "Start a Debate" → System finds random user with opposite opinion → Creates debate room → User navigated to chat
+- **Manual Opponent Selection**: Users can choose specific opponents from list of available users with opposing views
+- **Opponent Switching**: "End & Match New" button allows users to close current debate and match with new opponent (random or chosen)
+- **Privacy Controls**: 
+  - Each participant can independently set their side of debate as "public" or "private"
+  - Private debates redact that user's messages from opponent's view and public profiles
+  - Messages show as "[Message redacted]" when privacy is enabled
+  - Privacy toggle available in debate room sidebar
+- **Database Schema**: Debate rooms track `participant1Privacy` and `participant2Privacy` (values: 'public' or 'private')
+- **API Endpoints**:
+  - `POST /api/topics/:topicId/match-debate` - Auto-match with random opposing user
+  - `GET /api/topics/:topicId/available-opponents` - List users with opposite opinions
+  - `POST /api/debate-rooms/:roomId/switch-opponent` - Switch to new opponent
+  - `PUT /api/debate-rooms/:roomId/privacy` - Update privacy setting
 
 ### Data Storage Solutions
 - **Primary Database**: PostgreSQL via Neon Database
