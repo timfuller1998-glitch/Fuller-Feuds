@@ -48,7 +48,7 @@ import {
   type InsertBannedPhrase,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, and, sql, count, ilike, or } from "drizzle-orm";
+import { eq, desc, asc, and, sql, count, ilike, or, inArray } from "drizzle-orm";
 import { AIService } from "./aiService";
 
 export interface IStorage {
@@ -705,8 +705,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findOppositeOpinionUsers(topicId: string, userId: string, currentStance: string): Promise<User[]> {
-    // Find users with opposite stance on the topic
-    const oppositeStance = currentStance === 'for' ? 'against' : 'for';
+    // Find users with opposite or different stance on the topic
+    // - "for" can debate with "against" or "neutral"
+    // - "against" can debate with "for" or "neutral"
+    // - "neutral" can debate with "for" or "against"
+    let oppositeStances: string[];
+    if (currentStance === 'for') {
+      oppositeStances = ['against', 'neutral'];
+    } else if (currentStance === 'against') {
+      oppositeStances = ['for', 'neutral'];
+    } else { // neutral
+      oppositeStances = ['for', 'against'];
+    }
     
     const usersWithOpinions = await db
       .select({
@@ -730,7 +740,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(opinions.topicId, topicId),
-          eq(opinions.stance, oppositeStance),
+          inArray(opinions.stance, oppositeStances),
           sql`${opinions.userId} != ${userId}`
         )
       )

@@ -813,7 +813,11 @@ export default function Topic() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-4">
-              Connect with {oppositeOpinions.length} {oppositeOpinions.length === 1 ? 'person' : 'people'} who {userOpinion.stance === 'for' ? 'disagree' : 'agree'} with you on this topic.
+              Connect with {oppositeOpinions.length} {oppositeOpinions.length === 1 ? 'person' : 'people'} who {
+                userOpinion.stance === 'for' ? 'disagree or have a neutral view' : 
+                userOpinion.stance === 'against' ? 'agree or have a neutral view' : 
+                'have a different perspective'
+              } on this topic.
             </p>
             <Button 
               onClick={() => startDebateMutation.mutate()}
@@ -832,7 +836,7 @@ export default function Topic() {
           <CardContent className="pt-6 text-center">
             <MessageCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">
-              No one with an opposite opinion has shared their thoughts yet. Check back later!
+              No one with a different perspective has shared their thoughts yet. Check back later!
             </p>
           </CardContent>
         </Card>
