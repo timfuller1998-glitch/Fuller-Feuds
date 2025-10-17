@@ -5,6 +5,18 @@ Kirk Debates is a modern platform designed to facilitate meaningful discussions 
 
 ## Recent Changes
 
+### Logical Fallacy Flagging System (October 17, 2025)
+- **Comprehensive Flagging**: Users can now flag topics, opinions, and debate messages with specific logical fallacy types
+- **11 Fallacy Types**: Ad Hominem, Straw Man, Misinformation, False Dilemma, Slippery Slope, Appeal to Authority, Hasty Generalization, Red Herring, Circular Reasoning, False Cause, Bandwagon
+- **Visual Indicators**: Fallacy badges display next to flagged content with icons, counts, and educational tooltips
+- **Database Schema**: Added topicFlags, opinionFlags (updated), and debateMessageFlags tables with fallacyType column
+- **Reusable Components**: FallacyFlagDialog for flagging UI, FallacyBadges for display, shared across all content types
+- **API Endpoints**: 
+  - POST /api/topics/:id/flag - Flag a topic
+  - POST /api/opinions/:id/flag - Flag an opinion
+  - POST /api/debate-messages/:id/flag - Flag a debate message
+- **Performance**: Batched SQL aggregation for efficient fallacy count calculation
+
 ### Search Bar Topic Creation (October 17, 2025)
 - **Auto-Open Form**: Search bar now automatically opens topic creation form when no results are found
 - **No Manual Trigger**: Removed "Create New Topic" button - form opens immediately after search completes
