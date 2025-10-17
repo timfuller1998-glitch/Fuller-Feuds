@@ -11,9 +11,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { MessageSquare, Send, LogOut, Swords, User, Lock, Unlock, RefreshCw, UserPlus } from "lucide-react";
+import { MessageSquare, Send, LogOut, Swords, User, Lock, Unlock, RefreshCw, UserPlus, Flag } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import FallacyFlagDialog from "@/components/FallacyFlagDialog";
+import FallacyBadges from "@/components/FallacyBadges";
+import type { FallacyType } from "@shared/fallacies";
 
 interface DebateRoom {
   id: string;
@@ -49,6 +53,7 @@ interface DebateMessage {
   userId: string;
   content: string;
   createdAt: string;
+  fallacyCounts?: { [key: string]: number };
 }
 
 export default function DebateRoomPage() {
@@ -56,8 +61,10 @@ export default function DebateRoomPage() {
   const roomId = params.id;
   const [, navigate] = useLocation();
   const { user: currentUser } = useAuth();
+  const { toast } = useToast();
   const [messageInput, setMessageInput] = useState("");
   const [showChooseOpponentDialog, setShowChooseOpponentDialog] = useState(false);
+  const [flaggingMessageId, setFlaggingMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch debate room
@@ -159,6 +166,37 @@ export default function DebateRoomPage() {
   const { data: availableOpponents = [] } = useQuery<User[]>({
     queryKey: ["/api/topics", room?.topicId, "available-opponents"],
     enabled: !!room?.topicId && showChooseOpponentDialog,
+  });
+
+  // Flag debate message mutation
+  const flagMessageMutation = useMutation({
+    mutationFn: async (fallacyType: FallacyType) => {
+      if (!flaggingMessageId) return;
+      const response = await fetch(`/api/debate-messages/${flaggingMessageId}/flag`, {
+        method: "POST",
+        body: JSON.stringify({ fallacyType }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Flag submitted",
+        description: "Thank you for helping keep debates productive.",
+      });
+      setFlaggingMessageId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId, "messages"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit flag",
+        variant: "destructive",
+      });
+    },
   });
 
   // Scroll to bottom on new messages
@@ -401,7 +439,7 @@ export default function DebateRoomPage() {
                             {sender?.lastName?.[0] || sender?.email?.[1]?.toUpperCase() || "?"}
                           </AvatarFallback>
                         </Avatar>
-                        <div className={`flex-1 max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'}`}>
+                        <div className={`flex-1 max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
                           <div className="flex items-baseline gap-2 mb-1">
                             <p className="text-sm font-medium">
                               {senderName}
@@ -419,6 +457,27 @@ export default function DebateRoomPage() {
                           >
                             <p className="text-sm">{message.content}</p>
                           </div>
+                          
+                          {/* Fallacy badges */}
+                          {message.fallacyCounts && Object.keys(message.fallacyCounts).some(key => message.fallacyCounts![key] > 0) && (
+                            <div className="mt-2">
+                              <FallacyBadges fallacyCounts={message.fallacyCounts} />
+                            </div>
+                          )}
+                          
+                          {/* Flag button */}
+                          {!isOwnMessage && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setFlaggingMessageId(message.id)}
+                              className="mt-1 h-6 px-2 text-xs"
+                              data-testid={`button-flag-message-${message.id}`}
+                            >
+                              <Flag className="w-3 h-3 mr-1" />
+                              Flag
+                            </Button>
+                          )}
                         </div>
                       </div>
                     );
@@ -527,6 +586,15 @@ export default function DebateRoomPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Fallacy Flag Dialog */}
+      <FallacyFlagDialog
+        open={!!flaggingMessageId}
+        onOpenChange={(open) => !open && setFlaggingMessageId(null)}
+        onSubmit={(fallacyType) => flagMessageMutation.mutate(fallacyType)}
+        isPending={flagMessageMutation.isPending}
+        entityType="message"
+      />
     </div>
   );
 }

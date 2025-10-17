@@ -878,18 +878,47 @@ export class DatabaseStorage implements IStorage {
       .where(eq(debateMessages.roomId, roomId))
       .orderBy(debateMessages.createdAt);
 
-    // If no viewer specified, return all messages (for system use)
+    // Aggregate fallacy counts for all messages
+    const messageIds = messages.map(m => m.id);
+    const fallacyCounts = messageIds.length > 0 
+      ? await db
+          .select({
+            messageId: debateMessageFlags.messageId,
+            fallacyType: debateMessageFlags.fallacyType,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(debateMessageFlags)
+          .where(inArray(debateMessageFlags.messageId, messageIds))
+          .groupBy(debateMessageFlags.messageId, debateMessageFlags.fallacyType)
+      : [];
+
+    // Build fallacy counts map
+    const fallacyMap: Record<string, Record<string, number>> = {};
+    for (const row of fallacyCounts) {
+      if (!fallacyMap[row.messageId]) {
+        fallacyMap[row.messageId] = {};
+      }
+      fallacyMap[row.messageId][row.fallacyType] = row.count;
+    }
+
+    // If no viewer specified, return all messages with fallacy counts
     if (!viewerId) {
-      return messages;
+      return messages.map(m => ({
+        ...m,
+        fallacyCounts: fallacyMap[m.id] || {}
+      }));
     }
 
     // Get the debate room to check privacy settings
     const room = await this.getDebateRoom(roomId);
     if (!room) {
-      return messages;
+      return messages.map(m => ({
+        ...m,
+        fallacyCounts: fallacyMap[m.id] || {}
+      }));
     }
 
-    // Redact messages based on privacy settings
+    // Redact messages based on privacy settings and add fallacy counts
     return messages.map(message => {
       // Check if this message's author has privacy set to private
       const isParticipant1 = message.userId === room.participant1Id;
@@ -902,11 +931,15 @@ export class DatabaseStorage implements IStorage {
       if (shouldRedact) {
         return {
           ...message,
-          content: '[Message redacted - user privacy settings]'
+          content: '[Message redacted - user privacy settings]',
+          fallacyCounts: fallacyMap[message.id] || {}
         };
       }
 
-      return message;
+      return {
+        ...message,
+        fallacyCounts: fallacyMap[message.id] || {}
+      };
     });
   }
 

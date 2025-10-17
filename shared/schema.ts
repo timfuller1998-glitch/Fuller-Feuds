@@ -351,7 +351,9 @@ export type Opinion = typeof opinions.$inferSelect & {
 export type CumulativeOpinion = typeof cumulativeOpinions.$inferSelect;
 export type DebateRoom = typeof debateRooms.$inferSelect;
 export type InsertDebateRoom = z.infer<typeof insertDebateRoomSchema>;
-export type DebateMessage = typeof debateMessages.$inferSelect;
+export type DebateMessage = typeof debateMessages.$inferSelect & {
+  fallacyCounts?: { [key: string]: number };
+};
 export type LiveStream = typeof liveStreams.$inferSelect;
 export type InsertLiveStream = z.infer<typeof insertLiveStreamSchema>;
 export type StreamInvitation = typeof streamInvitations.$inferSelect;
