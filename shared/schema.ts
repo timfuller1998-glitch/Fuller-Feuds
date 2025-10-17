@@ -39,9 +39,32 @@ export const users = pgTable("users", {
   onboardingComplete: boolean("onboarding_complete").default(false),
   role: varchar("role", { length: 20 }).default("user"), // 'user', 'moderator', 'admin'
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'suspended', 'banned'
+  selectedBadgeId: varchar("selected_badge_id"), // Badge displayed on user avatar
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Gamification: Badges
+export const badges = pgTable("badges", {
+  id: varchar("id", { length: 50 }).primaryKey(), // e.g. 'first_debate', 'opinionated_10'
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description").notNull(),
+  icon: varchar("icon", { length: 50 }).notNull(), // Lucide icon name
+  category: varchar("category", { length: 30 }).notNull(), // 'debate', 'opinion', 'topic', 'quality'
+  tier: integer("tier").notNull().default(1), // 1, 2, 3, etc. for progression
+  requirement: integer("requirement").notNull(), // Numeric threshold (e.g. 10 debates)
+  requirementType: varchar("requirement_type", { length: 30 }).notNull(), // 'debate_count', 'opinion_count', 'topic_count', 'low_fallacy_rate'
+});
+
+// Gamification: User badges (tracks which badges users have unlocked)
+export const userBadges = pgTable("user_badges", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  badgeId: varchar("badge_id", { length: 50 }).notNull().references(() => badges.id),
+  unlockedAt: timestamp("unlocked_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_user_badge").on(table.userId, table.badgeId)
+]);
 
 // Debate topics
 export const topics = pgTable("topics", {
@@ -458,3 +481,15 @@ export const insertBannedPhraseSchema = createInsertSchema(bannedPhrases).omit({
 
 export type BannedPhrase = typeof bannedPhrases.$inferSelect;
 export type InsertBannedPhrase = z.infer<typeof insertBannedPhraseSchema>;
+
+// Badges
+export const insertBadgeSchema = createInsertSchema(badges);
+export type Badge = typeof badges.$inferSelect;
+export type InsertBadge = z.infer<typeof insertBadgeSchema>;
+
+export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({
+  id: true,
+  unlockedAt: true,
+});
+export type UserBadge = typeof userBadges.$inferSelect;
+export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
