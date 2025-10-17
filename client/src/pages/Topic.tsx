@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,6 +33,7 @@ const opinionFormSchema = insertOpinionSchema.omit({
 
 export default function Topic() {
   const { id } = useParams();
+  const [, navigate] = useLocation();
   const { user } = useAuth();
   const [showOpinionForm, setShowOpinionForm] = useState(false);
   const [challengingOpinionId, setChallengingOpinionId] = useState<string | null>(null);
@@ -234,6 +235,22 @@ export default function Topic() {
     },
     onError: (error: any) => {
       console.error("Failed to adopt opinion:", error);
+    },
+  });
+
+  // Start debate mutation
+  const startDebateMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/topics/${id}/match-debate`, {});
+      return response.json();
+    },
+    onSuccess: (room) => {
+      // Navigate to the newly created debate room
+      navigate(`/debate-room/${room.id}`);
+    },
+    onError: (error: any) => {
+      console.error("Failed to start debate:", error);
+      alert(error.message || "Failed to start debate. Please try again.");
     },
   });
 
@@ -798,9 +815,13 @@ export default function Topic() {
             <p className="text-muted-foreground mb-4">
               Connect with {oppositeOpinions.length} {oppositeOpinions.length === 1 ? 'person' : 'people'} who {userOpinion.stance === 'for' ? 'disagree' : 'agree'} with you on this topic.
             </p>
-            <Button data-testid="button-start-chat">
+            <Button 
+              onClick={() => startDebateMutation.mutate()}
+              disabled={startDebateMutation.isPending}
+              data-testid="button-start-chat"
+            >
               <MessageCircle className="w-4 h-4 mr-2" />
-              Start a Debate
+              {startDebateMutation.isPending ? "Matching..." : "Start a Debate"}
             </Button>
           </CardContent>
         </Card>
