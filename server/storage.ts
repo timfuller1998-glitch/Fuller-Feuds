@@ -12,6 +12,8 @@ import {
   opinionVotes,
   opinionChallenges,
   opinionFlags,
+  topicFlags,
+  debateMessageFlags,
   moderationActions,
   bannedPhrases,
   userFollows,
@@ -142,7 +144,9 @@ export interface IStorage {
   getUserDebateRooms(userId: string): Promise<DebateRoom[]>;
   
   // Moderation operations
-  flagOpinion(opinionId: string, userId: string, reason: string): Promise<void>;
+  flagOpinion(opinionId: string, userId: string, fallacyType: string): Promise<void>;
+  flagTopic(topicId: string, userId: string, fallacyType: string): Promise<void>;
+  flagDebateMessage(messageId: string, userId: string, fallacyType: string): Promise<void>;
   getFlaggedOpinions(): Promise<any[]>;
   approveOpinion(opinionId: string, moderatorId: string, reason?: string): Promise<void>;
   hideOpinion(opinionId: string, moderatorId: string, reason?: string): Promise<void>;
@@ -1249,9 +1253,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Moderation operations
-  async flagOpinion(opinionId: string, userId: string, reason: string): Promise<void> {
-    await db.insert(opinionFlags).values({ opinionId, userId, reason }).onConflictDoNothing();
+  async flagOpinion(opinionId: string, userId: string, fallacyType: string): Promise<void> {
+    await db.insert(opinionFlags).values({ opinionId, userId, fallacyType }).onConflictDoNothing();
     await db.update(opinions).set({ status: 'flagged' }).where(eq(opinions.id, opinionId));
+  }
+
+  async flagTopic(topicId: string, userId: string, fallacyType: string): Promise<void> {
+    await db.insert(topicFlags).values({ topicId, userId, fallacyType }).onConflictDoNothing();
+  }
+
+  async flagDebateMessage(messageId: string, userId: string, fallacyType: string): Promise<void> {
+    await db.insert(debateMessageFlags).values({ messageId, userId, fallacyType }).onConflictDoNothing();
+    await db.update(debateMessages).set({ status: 'flagged' }).where(eq(debateMessages.id, messageId));
   }
 
   async getFlaggedOpinions(): Promise<any[]> {

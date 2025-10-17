@@ -538,17 +538,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/opinions/:opinionId/flag', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { reason } = req.body;
+      const { fallacyType } = req.body;
       
-      if (!reason || typeof reason !== 'string') {
-        return res.status(400).json({ error: 'Reason is required' });
+      if (!fallacyType || typeof fallacyType !== 'string') {
+        return res.status(400).json({ error: 'Fallacy type is required' });
       }
       
-      await storage.flagOpinion(req.params.opinionId, userId, reason);
+      await storage.flagOpinion(req.params.opinionId, userId, fallacyType);
       res.status(200).json({ message: 'Opinion flagged successfully' });
     } catch (error) {
       console.error("Error flagging opinion:", error);
       res.status(500).json({ message: "Failed to flag opinion" });
+    }
+  });
+
+  // Flag topic
+  app.post('/api/topics/:topicId/flag', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { fallacyType } = req.body;
+      
+      if (!fallacyType || typeof fallacyType !== 'string') {
+        return res.status(400).json({ error: 'Fallacy type is required' });
+      }
+      
+      await storage.flagTopic(req.params.topicId, userId, fallacyType);
+      res.status(200).json({ message: 'Topic flagged successfully' });
+    } catch (error) {
+      console.error("Error flagging topic:", error);
+      res.status(500).json({ message: "Failed to flag topic" });
+    }
+  });
+
+  // Flag debate message
+  app.post('/api/debate-messages/:messageId/flag', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { fallacyType } = req.body;
+      
+      if (!fallacyType || typeof fallacyType !== 'string') {
+        return res.status(400).json({ error: 'Fallacy type is required' });
+      }
+      
+      await storage.flagDebateMessage(req.params.messageId, userId, fallacyType);
+      res.status(200).json({ message: 'Debate message flagged successfully' });
+    } catch (error) {
+      console.error("Error flagging debate message:", error);
+      res.status(500).json({ message: "Failed to flag debate message" });
     }
   });
 
