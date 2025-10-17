@@ -1981,17 +1981,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserBadges(userId: string): Promise<any[]> {
-    const unlocked = await db
+    // Get user's selected badge ID
+    const [user] = await db
+      .select({ selectedBadgeId: users.selectedBadgeId })
+      .from(users)
+      .where(eq(users.id, userId));
+    
+    const selectedBadgeId = user?.selectedBadgeId;
+
+    // Get all badge definitions
+    const allBadges = await db.select().from(badges).orderBy(asc(badges.category), asc(badges.tier));
+    
+    // Get unlocked badges for this user
+    const unlockedBadges = await db
       .select({
-        badge: badges,
+        badgeId: userBadges.badgeId,
         unlockedAt: userBadges.unlockedAt,
       })
       .from(userBadges)
-      .innerJoin(badges, eq(userBadges.badgeId, badges.id))
-      .where(eq(userBadges.userId, userId))
-      .orderBy(desc(userBadges.unlockedAt));
-
-    return unlocked;
+      .where(eq(userBadges.userId, userId));
+    
+    // Create a map of unlocked badges
+    const unlockedMap = new Map(unlockedBadges.map(ub => [ub.badgeId, ub.unlockedAt]));
+    
+    // Return all badges with unlock status and selection status
+    return allBadges.map(badge => ({
+      ...badge,
+      badgeId: badge.id,
+      icon: badge.icon,
+      name: badge.name,
+      description: badge.description,
+      category: badge.category,
+      unlockedAt: unlockedMap.get(badge.id) || null,
+      isSelected: selectedBadgeId === badge.id,
+    }));
   }
 
   async checkAndAwardBadges(userId: string): Promise<string[]> {

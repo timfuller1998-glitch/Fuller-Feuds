@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import UserAvatar from "./UserAvatar";
+import { AvatarWithBadge } from "./AvatarWithBadge";
 import { 
   Home, 
   Search, 
@@ -226,9 +226,10 @@ export default function AppSidebar({
         <SidebarFooter className="border-t p-4">
           <Link href={`/profile/${currentUser.id}`} onClick={handleLinkClick} data-testid="link-user-profile">
             <div className="flex items-center gap-3 mb-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2 transition-colors">
-              <UserAvatar 
+              <AvatarWithBadge 
+                userId={currentUser.id}
                 name={currentUser.name} 
-                imageUrl={currentUser.avatar}
+                profileImageUrl={currentUser.avatar}
                 size="sm"
                 showOnlineStatus
                 isOnline={currentUser.isOnline}

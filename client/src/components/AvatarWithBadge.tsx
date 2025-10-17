@@ -7,17 +7,37 @@ interface AvatarWithBadgeProps {
   profileImageUrl?: string;
   firstName?: string;
   lastName?: string;
+  name?: string;
+  size?: "sm" | "md" | "lg";
   className?: string;
   showBadge?: boolean;
+  showOnlineStatus?: boolean;
+  isOnline?: boolean;
 }
+
+const sizeClasses = {
+  sm: "h-8 w-8",
+  md: "h-12 w-12",
+  lg: "h-16 w-16"
+};
+
+const textSizeClasses = {
+  sm: "text-xs",
+  md: "text-sm",
+  lg: "text-base"
+};
 
 export function AvatarWithBadge({
   userId,
   profileImageUrl,
   firstName,
   lastName,
-  className = "h-10 w-10",
+  name,
+  size = "md",
+  className,
   showBadge = true,
+  showOnlineStatus = false,
+  isOnline = false,
 }: AvatarWithBadgeProps) {
   // Fetch user's selected badge
   const { data: userBadges = [] } = useQuery<any[]>({
@@ -35,18 +55,40 @@ export function AvatarWithBadge({
     return IconComponent || LucideIcons.Trophy;
   };
 
+  // Determine display name
+  const displayName = name || `${firstName || ''} ${lastName || ''}`.trim();
+  const initials = displayName
+    .split(" ")
+    .map(word => word[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+
+  // Use size classes if no custom className provided
+  const avatarClassName = className || sizeClasses[size];
+
   return (
     <div className="relative inline-block" data-testid={`avatar-with-badge-${userId}`}>
-      <Avatar className={className}>
-        <AvatarImage src={profileImageUrl} />
-        <AvatarFallback>
-          {firstName?.charAt(0)}{lastName?.charAt(0)}
+      <Avatar className={avatarClassName}>
+        <AvatarImage src={profileImageUrl} alt={displayName} />
+        <AvatarFallback className={textSizeClasses[size]}>
+          {initials}
         </AvatarFallback>
       </Avatar>
       
+      {showOnlineStatus && (
+        <div className="absolute -bottom-0.5 -right-0.5 z-10">
+          <div className={`w-3 h-3 rounded-full border-2 border-background ${
+            isOnline ? 'bg-chart-1' : 'bg-muted'
+          }`} />
+        </div>
+      )}
+      
       {showBadge && selectedBadge && (
         <div 
-          className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center border-2 border-background"
+          className={`absolute w-5 h-5 rounded-full bg-primary flex items-center justify-center border-2 border-background ${
+            showOnlineStatus ? '-top-1 -right-1' : '-bottom-1 -right-1'
+          }`}
           data-testid={`badge-overlay-${userId}`}
           title={selectedBadge.name}
         >
