@@ -79,10 +79,16 @@ export async function setupAuth(app: Express) {
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
     verified: passport.AuthenticateCallback
   ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
+    try {
+      const user = {};
+      updateUserSession(user, tokens);
+      await upsertUser(tokens.claims());
+      console.log('[Auth Verify] User upserted successfully:', tokens.claims()?.sub);
+      verified(null, user);
+    } catch (error) {
+      console.error('[Auth Verify] Error during user upsert:', error);
+      verified(error as Error);
+    }
   };
 
   for (const domain of process.env
@@ -103,16 +109,47 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    const hostname = req.hostname;
+    console.log(`[Auth Login] Hostname: ${hostname}`);
+    console.log(`[Auth Login] Available domains: ${process.env.REPLIT_DOMAINS}`);
+    
+    passport.authenticate(`replitauth:${hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+    const hostname = req.hostname;
+    console.log(`[Auth Callback] Hostname: ${hostname}`);
+    console.log(`[Auth Callback] Available domains: ${process.env.REPLIT_DOMAINS}`);
+    
+    passport.authenticate(`replitauth:${hostname}`, (err: any, user: any, info: any) => {
+      if (err) {
+        console.error('[Auth Callback] Error during authentication:', err);
+        return res.status(500).json({ 
+          message: 'Authentication error',
+          error: err.message || 'Unknown error'
+        });
+      }
+      
+      if (!user) {
+        console.error('[Auth Callback] No user returned, info:', info);
+        return res.redirect('/api/login');
+      }
+      
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error('[Auth Callback] Error during login:', loginErr);
+          return res.status(500).json({ 
+            message: 'Login error',
+            error: loginErr.message || 'Unknown error'
+          });
+        }
+        
+        console.log('[Auth Callback] Login successful');
+        return res.redirect('/');
+      });
     })(req, res, next);
   });
 
