@@ -1534,9 +1534,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Debate message routes
-  app.get('/api/debate-rooms/:roomId/messages', async (req, res) => {
+  app.get('/api/debate-rooms/:roomId/messages', async (req: any, res) => {
     try {
-      const messages = await storage.getDebateMessages(req.params.roomId);
+      // Pass the viewer ID if authenticated, for privacy redaction
+      const viewerId = req.user?.claims?.sub;
+      const messages = await storage.getDebateMessages(req.params.roomId, viewerId);
       res.json(messages);
     } catch (error) {
       console.error("Error fetching debate messages:", error);
@@ -1569,6 +1571,179 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error adding debate message:", error);
       res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // Auto-match debate endpoint
+  app.post('/api/topics/:topicId/match-debate', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { topicId } = req.params;
+
+      // Get user's opinion on this topic to determine their stance
+      const userOpinions = await storage.getOpinionsByTopic(topicId);
+      const userOpinion = userOpinions.find(o => o.userId === userId);
+
+      if (!userOpinion) {
+        return res.status(400).json({ 
+          message: "You must have an opinion on this topic before starting a debate" 
+        });
+      }
+
+      // Find users with opposite opinions
+      const oppositeUsers = await storage.findOppositeOpinionUsers(topicId, userId, userOpinion.stance);
+
+      if (oppositeUsers.length === 0) {
+        return res.status(404).json({ 
+          message: "No users with opposite opinions are available for debate right now" 
+        });
+      }
+
+      // Randomly select an opponent
+      const opponent = oppositeUsers[Math.floor(Math.random() * oppositeUsers.length)];
+
+      // Get opponent's opinion to determine their stance
+      const opponentOpinion = userOpinions.find(o => o.userId === opponent.id);
+      const opponentStance = opponentOpinion?.stance || (userOpinion.stance === 'for' ? 'against' : 'for');
+
+      // Create the debate room
+      const room = await storage.createDebateRoom({
+        topicId,
+        participant1Id: userId,
+        participant2Id: opponent.id,
+        participant1Stance: userOpinion.stance,
+        participant2Stance: opponentStance,
+      });
+
+      res.status(201).json(room);
+    } catch (error) {
+      console.error("Error matching debate:", error);
+      res.status(500).json({ message: "Failed to match debate" });
+    }
+  });
+
+  // Get available opponents for a topic
+  app.get('/api/topics/:topicId/available-opponents', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { topicId } = req.params;
+
+      // Get user's opinion on this topic
+      const userOpinions = await storage.getOpinionsByTopic(topicId);
+      const userOpinion = userOpinions.find(o => o.userId === userId);
+
+      if (!userOpinion) {
+        return res.status(400).json({ 
+          message: "You must have an opinion on this topic first" 
+        });
+      }
+
+      // Find users with opposite opinions
+      const oppositeUsers = await storage.findOppositeOpinionUsers(topicId, userId, userOpinion.stance);
+
+      res.json(oppositeUsers);
+    } catch (error) {
+      console.error("Error fetching available opponents:", error);
+      res.status(500).json({ message: "Failed to fetch available opponents" });
+    }
+  });
+
+  // Switch opponent in debate room
+  app.post('/api/debate-rooms/:roomId/switch-opponent', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { roomId } = req.params;
+      const { opponentId } = req.body; // Optional - if not provided, match randomly
+
+      // Get current room
+      const currentRoom = await storage.getDebateRoom(roomId);
+      if (!currentRoom) {
+        return res.status(404).json({ message: "Debate room not found" });
+      }
+
+      // Verify user is a participant
+      if (currentRoom.participant1Id !== userId && currentRoom.participant2Id !== userId) {
+        return res.status(403).json({ message: "You are not a participant in this debate" });
+      }
+
+      // End the current room
+      await storage.endDebateRoom(roomId);
+
+      // Determine user's stance
+      const userStance = currentRoom.participant1Id === userId 
+        ? currentRoom.participant1Stance 
+        : currentRoom.participant2Stance;
+
+      let newOpponentId: string;
+      let newOpponentStance: string;
+
+      if (opponentId) {
+        // Specific opponent selected
+        newOpponentId = opponentId;
+        // Get opponent's opinion to determine stance
+        const opponentOpinions = await storage.getOpinionsByTopic(currentRoom.topicId);
+        const opponentOpinion = opponentOpinions.find(o => o.userId === opponentId);
+        newOpponentStance = opponentOpinion?.stance || (userStance === 'for' ? 'against' : 'for');
+      } else {
+        // Random match
+        const oppositeUsers = await storage.findOppositeOpinionUsers(
+          currentRoom.topicId, 
+          userId, 
+          userStance
+        );
+
+        if (oppositeUsers.length === 0) {
+          return res.status(404).json({ 
+            message: "No users with opposite opinions are available" 
+          });
+        }
+
+        const opponent = oppositeUsers[Math.floor(Math.random() * oppositeUsers.length)];
+        newOpponentId = opponent.id;
+
+        const opponentOpinions = await storage.getOpinionsByTopic(currentRoom.topicId);
+        const opponentOpinion = opponentOpinions.find(o => o.userId === newOpponentId);
+        newOpponentStance = opponentOpinion?.stance || (userStance === 'for' ? 'against' : 'for');
+      }
+
+      // Create new debate room
+      const newRoom = await storage.createDebateRoom({
+        topicId: currentRoom.topicId,
+        participant1Id: userId,
+        participant2Id: newOpponentId,
+        participant1Stance: userStance,
+        participant2Stance: newOpponentStance,
+      });
+
+      res.status(201).json(newRoom);
+    } catch (error) {
+      console.error("Error switching opponent:", error);
+      res.status(500).json({ message: "Failed to switch opponent" });
+    }
+  });
+
+  // Update debate room privacy
+  app.put('/api/debate-rooms/:roomId/privacy', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { roomId } = req.params;
+      const { privacy } = req.body;
+
+      if (!privacy || (privacy !== 'public' && privacy !== 'private')) {
+        return res.status(400).json({ 
+          message: "Privacy must be 'public' or 'private'" 
+        });
+      }
+
+      await storage.updateDebateRoomPrivacy(roomId, userId, privacy);
+
+      res.json({ message: "Privacy settings updated successfully" });
+    } catch (error) {
+      console.error("Error updating privacy:", error);
+      if (error instanceof Error && error.message.includes("not a participant")) {
+        return res.status(403).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to update privacy settings" });
     }
   });
 

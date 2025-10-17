@@ -96,6 +96,8 @@ export const debateRooms = pgTable("debate_rooms", {
   participant2Id: varchar("participant2_id").notNull().references(() => users.id),
   participant1Stance: varchar("participant1_stance", { length: 20 }).notNull(),
   participant2Stance: varchar("participant2_stance", { length: 20 }).notNull(),
+  participant1Privacy: varchar("participant1_privacy", { length: 20 }).default("public"), // 'public', 'private'
+  participant2Privacy: varchar("participant2_privacy", { length: 20 }).default("public"), // 'public', 'private'
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'ended', 'abandoned'
   startedAt: timestamp("started_at").defaultNow(),
   endedAt: timestamp("ended_at"),

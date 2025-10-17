@@ -92,10 +92,12 @@ export interface IStorage {
   getDebateRoom(id: string): Promise<DebateRoom | undefined>;
   getUserDebateRooms(userId: string): Promise<DebateRoom[]>;
   endDebateRoom(id: string): Promise<void>;
+  findOppositeOpinionUsers(topicId: string, userId: string, currentStance: string): Promise<User[]>;
+  updateDebateRoomPrivacy(roomId: string, userId: string, privacy: 'public' | 'private'): Promise<void>;
   
   // Debate messages
   addDebateMessage(roomId: string, userId: string, content: string, status?: string): Promise<DebateMessage>;
-  getDebateMessages(roomId: string): Promise<DebateMessage[]>;
+  getDebateMessages(roomId: string, viewerId?: string): Promise<DebateMessage[]>;
   
   // Live streams
   createLiveStream(stream: InsertLiveStream): Promise<LiveStream>;
@@ -702,6 +704,64 @@ export class DatabaseStorage implements IStorage {
       .where(eq(debateRooms.id, id));
   }
 
+  async findOppositeOpinionUsers(topicId: string, userId: string, currentStance: string): Promise<User[]> {
+    // Find users with opposite stance on the topic
+    const oppositeStance = currentStance === 'for' ? 'against' : 'for';
+    
+    const usersWithOpinions = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+        bio: users.bio,
+        location: users.location,
+        followedCategories: users.followedCategories,
+        onboardingStep: users.onboardingStep,
+        onboardingComplete: users.onboardingComplete,
+        role: users.role,
+        status: users.status,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
+      .from(opinions)
+      .innerJoin(users, eq(opinions.userId, users.id))
+      .where(
+        and(
+          eq(opinions.topicId, topicId),
+          eq(opinions.stance, oppositeStance),
+          sql`${opinions.userId} != ${userId}`
+        )
+      )
+      .groupBy(users.id);
+    
+    return usersWithOpinions;
+  }
+
+  async updateDebateRoomPrivacy(roomId: string, userId: string, privacy: 'public' | 'private'): Promise<void> {
+    // First get the room to determine which participant this is
+    const room = await this.getDebateRoom(roomId);
+    if (!room) {
+      throw new Error('Debate room not found');
+    }
+
+    // Determine which participant field to update
+    if (room.participant1Id === userId) {
+      await db
+        .update(debateRooms)
+        .set({ participant1Privacy: privacy })
+        .where(eq(debateRooms.id, roomId));
+    } else if (room.participant2Id === userId) {
+      await db
+        .update(debateRooms)
+        .set({ participant2Privacy: privacy })
+        .where(eq(debateRooms.id, roomId));
+    } else {
+      throw new Error('User is not a participant in this debate room');
+    }
+  }
+
   // Debate messages
   async addDebateMessage(roomId: string, userId: string, content: string, status: string = 'approved'): Promise<DebateMessage> {
     const [message] = await db
@@ -711,12 +771,43 @@ export class DatabaseStorage implements IStorage {
     return message;
   }
 
-  async getDebateMessages(roomId: string): Promise<DebateMessage[]> {
-    return await db
+  async getDebateMessages(roomId: string, viewerId?: string): Promise<DebateMessage[]> {
+    const messages = await db
       .select()
       .from(debateMessages)
       .where(eq(debateMessages.roomId, roomId))
       .orderBy(debateMessages.createdAt);
+
+    // If no viewer specified, return all messages (for system use)
+    if (!viewerId) {
+      return messages;
+    }
+
+    // Get the debate room to check privacy settings
+    const room = await this.getDebateRoom(roomId);
+    if (!room) {
+      return messages;
+    }
+
+    // Redact messages based on privacy settings
+    return messages.map(message => {
+      // Check if this message's author has privacy set to private
+      const isParticipant1 = message.userId === room.participant1Id;
+      const isParticipant2 = message.userId === room.participant2Id;
+      
+      const shouldRedact = 
+        (isParticipant1 && room.participant1Privacy === 'private' && viewerId !== room.participant1Id) ||
+        (isParticipant2 && room.participant2Privacy === 'private' && viewerId !== room.participant2Id);
+
+      if (shouldRedact) {
+        return {
+          ...message,
+          content: '[Message redacted - user privacy settings]'
+        };
+      }
+
+      return message;
+    });
   }
 
   // Live streams
