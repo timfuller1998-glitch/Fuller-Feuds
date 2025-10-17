@@ -399,7 +399,22 @@ export class DatabaseStorage implements IStorage {
 
   async getTopic(id: string): Promise<Topic | undefined> {
     const [topic] = await db.select().from(topics).where(eq(topics.id, id));
-    return topic;
+    
+    if (!topic) {
+      return undefined;
+    }
+
+    // Aggregate fallacy counts for the topic
+    const fallacyCountsMap = await aggregateFallacyCounts(
+      [topic],
+      topicFlags,
+      'topicId'
+    );
+
+    return {
+      ...topic,
+      fallacyCounts: fallacyCountsMap.get(topic.id) || {},
+    } as any;
   }
 
   // Opinion operations

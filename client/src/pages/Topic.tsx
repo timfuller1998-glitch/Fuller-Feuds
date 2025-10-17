@@ -13,15 +13,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ThumbsUp, ThumbsDown, Brain } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Brain, Flag } from "lucide-react";
 import { ArrowLeft, MessageCircle, Users, TrendingUp, RefreshCw, Video, Calendar, Clock, Eye } from "lucide-react";
 import { Link } from "wouter";
 import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import OpinionCard from "@/components/OpinionCard";
 import ChallengeDialog from "@/components/ChallengeDialog";
+import FallacyBadges from "@/components/FallacyBadges";
+import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import { formatDistanceToNow } from "date-fns";
+import type { FallacyType } from "@shared/fallacies";
 
 const opinionFormSchema = insertOpinionSchema.omit({
   topicId: true,
@@ -35,10 +39,12 @@ export default function Topic() {
   const { id } = useParams();
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [showOpinionForm, setShowOpinionForm] = useState(false);
   const [challengingOpinionId, setChallengingOpinionId] = useState<string | null>(null);
   const [flaggingOpinionId, setFlaggingOpinionId] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
+  const [showTopicFlagDialog, setShowTopicFlagDialog] = useState(false);
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -238,6 +244,36 @@ export default function Topic() {
     },
   });
 
+  // Flag topic mutation
+  const flagTopicMutation = useMutation({
+    mutationFn: async (fallacyType: FallacyType) => {
+      const response = await fetch(`/api/topics/${id}/flag`, {
+        method: "POST",
+        body: JSON.stringify({ fallacyType }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Flag submitted",
+        description: "Thank you for helping keep debates productive.",
+      });
+      setShowTopicFlagDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit flag",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Start debate mutation
   const startDebateMutation = useMutation({
     mutationFn: async () => {
@@ -328,9 +364,29 @@ export default function Topic() {
             </Badge>
           )}
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight" data-testid="text-topic-title">
-          {topic.title}
-        </h1>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight flex-1" data-testid="text-topic-title">
+            {topic.title}
+          </h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowTopicFlagDialog(true)}
+            data-testid="button-flag-topic"
+            className="flex-shrink-0"
+          >
+            <Flag className="w-4 h-4 mr-2" />
+            Flag Topic
+          </Button>
+        </div>
+        
+        {/* Display fallacy badges if any */}
+        {topic.fallacyCounts && Object.keys(topic.fallacyCounts).some(key => topic.fallacyCounts[key] > 0) && (
+          <div className="mt-3">
+            <FallacyBadges fallacyCounts={topic.fallacyCounts} />
+          </div>
+        )}
+
         <div className="flex items-center gap-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <MessageCircle className="w-4 h-4" />
@@ -897,6 +953,15 @@ export default function Topic() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Topic Flag Dialog */}
+      <FallacyFlagDialog
+        open={showTopicFlagDialog}
+        onOpenChange={setShowTopicFlagDialog}
+        onSubmit={(fallacyType) => flagTopicMutation.mutate(fallacyType)}
+        isPending={flagTopicMutation.isPending}
+        entityType="topic"
+      />
     </div>
   );
 }
