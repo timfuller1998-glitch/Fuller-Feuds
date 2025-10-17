@@ -7,7 +7,7 @@ export function startScheduledJobs() {
     log('[CRON] Starting daily AI summary update at 2:00 AM');
     
     try {
-      const topics = await storage.getTopics(1000);
+      const topics = await storage.getTopics({ limit: 1000 });
       let generated = 0;
       let refreshed = 0;
       let skipped = 0;

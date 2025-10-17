@@ -5,6 +5,23 @@ Kirk Debates is a modern platform designed to facilitate meaningful discussions 
 
 ## Recent Changes
 
+### User Topic Management on Profile Page (October 17, 2025)
+- **Topics Stat Button**: Added Topics count button to profile page stats section showing total topics created by user
+- **Topics Section**: Click Topics stat to view all user-created topics with full details (title, categories, opinion count, date)
+- **Delete Functionality**: Topic owners can delete their topics with confirmation dialog warning about cascade effects
+- **Backend Optimization**: Implemented efficient topic counting with dedicated `countTopicsByUser` method to avoid pagination limits
+- **Database Schema**: Topics filtered by `createdById` field; soft delete using `isActive` flag preserves data integrity
+- **API Endpoints**:
+  - GET /api/profile/:userId - Returns totalTopics count (optimized with COUNT query)
+  - GET /api/topics - Supports `createdBy` filter parameter for user-specific topic lists
+  - DELETE /api/topics/:id - Soft delete with ownership verification (403 if not creator)
+- **Frontend Features**:
+  - Topic cards display categories, opinion counts, and creation dates
+  - Delete button only visible to topic owners (isOwnProfile check)
+  - TanStack Query cache invalidation for real-time UI updates
+  - Confirmation dialog: "Are you sure you want to delete this topic? This will also delete all associated opinions and debates."
+- **Implementation Notes**: Refactored `getTopics` to accept options object instead of positional parameters for better flexibility
+
 ### Logical Fallacy Flagging System (October 17, 2025)
 - **Comprehensive Flagging**: Users can now flag topics, opinions, and debate messages with specific logical fallacy types
 - **11 Fallacy Types**: Ad Hominem, Straw Man, Misinformation, False Dilemma, Slippery Slope, Appeal to Authority, Hasty Generalization, Red Herring, Circular Reasoning, False Cause, Bandwagon

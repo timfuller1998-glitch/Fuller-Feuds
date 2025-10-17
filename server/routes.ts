@@ -207,12 +207,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Topic routes
   app.get('/api/topics', async (req, res) => {
     try {
-      const { category, search, limit } = req.query;
-      const topics = await storage.getTopics(
-        limit ? parseInt(limit as string) : undefined,
-        category as string,
-        search as string
-      );
+      const { category, search, limit, createdBy } = req.query;
+      const topics = await storage.getTopics({
+        limit: limit ? parseInt(limit as string) : undefined,
+        category: category as string,
+        search: search as string,
+        createdBy: createdBy as string,
+      });
       res.json(topics);
     } catch (error) {
       console.error("Error fetching topics:", error);
@@ -335,6 +336,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error creating topic:", error);
       res.status(500).json({ message: "Failed to create topic" });
+    }
+  });
+
+  app.delete('/api/topics/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const topicId = req.params.id;
+
+      // Get the topic to verify ownership
+      const topic = await storage.getTopic(topicId);
+      if (!topic) {
+        return res.status(404).json({ message: "Topic not found" });
+      }
+
+      // Check if the user is the creator of the topic
+      if (topic.createdById !== userId) {
+        return res.status(403).json({ message: "You can only delete topics you created" });
+      }
+
+      // Delete the topic (soft delete)
+      await storage.deleteTopic(topicId);
+      res.json({ success: true, message: "Topic deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting topic:", error);
+      res.status(500).json({ message: "Failed to delete topic" });
     }
   });
 
@@ -1212,9 +1238,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const followerCount = profile?.followerCount || 0;
       const followingCount = profile?.followingCount || 0;
       
+      // Count user's created topics
+      const totalTopics = await storage.countTopicsByUser(req.params.userId);
+      
       res.json({
         user,
-        profile,
+        profile: {
+          ...profile,
+          totalTopics,
+        },
         followerCount,
         followingCount
       });

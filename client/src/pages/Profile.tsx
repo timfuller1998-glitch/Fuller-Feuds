@@ -76,6 +76,7 @@ interface ProfileData {
     totalDislikes: number;
     followerCount: number;
     followingCount: number;
+    totalTopics: number;
     lastAnalyzedAt?: string;
     opinionSortPreference?: string;
     categorySortPreference?: string;
@@ -115,7 +116,7 @@ export default function Profile() {
   const { user: currentUser } = useAuth();
   const [showCreateDebateDialog, setShowCreateDebateDialog] = useState(false);
   const [showScheduleStreamDialog, setShowScheduleStreamDialog] = useState(false);
-  const [activeSection, setActiveSection] = useState<'opinions' | 'debates' | 'followers' | 'following' | 'badges' | 'leaderboards'>('opinions');
+  const [activeSection, setActiveSection] = useState<'opinions' | 'debates' | 'topics' | 'followers' | 'following' | 'badges' | 'leaderboards'>('opinions');
 
   const isOwnProfile = currentUser?.id === userId;
 
@@ -148,6 +149,13 @@ export default function Profile() {
     queryKey: ['/api/profile', userId, 'opinions', opinionSortBy],
     queryFn: () => fetch(`/api/profile/${userId}/opinions?sortBy=${opinionSortBy}&limit=50`, { credentials: 'include' }).then(res => res.json()),
     enabled: !!userId,
+  });
+
+  // Fetch user's created topics
+  const { data: userTopics = [], isLoading: topicsLoading } = useQuery<any[]>({
+    queryKey: ['/api/users', userId, 'topics'],
+    queryFn: () => fetch(`/api/topics?createdBy=${userId}`, { credentials: 'include' }).then(res => res.json()),
+    enabled: !!userId && activeSection === 'topics',
   });
 
   // Fetch follow status (only if viewing another user's profile)
@@ -234,6 +242,20 @@ export default function Profile() {
     },
     onError: (error) => {
       console.error("Failed to select badge:", error);
+    }
+  });
+
+  // Delete topic mutation
+  const deleteTopicMutation = useMutation({
+    mutationFn: (topicId: string) => 
+      apiRequest('DELETE', `/api/topics/${topicId}`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'topics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/profile', userId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/topics'] });
+    },
+    onError: (error) => {
+      console.error("Failed to delete topic:", error);
     }
   });
 
@@ -487,6 +509,14 @@ export default function Profile() {
             >
               <div className="text-lg sm:text-2xl font-bold">{debateRooms?.length || 0}</div>
               <div className="text-xs text-muted-foreground">Debates</div>
+            </button>
+            <button 
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'topics' ? 'bg-primary/10' : ''}`}
+              onClick={() => setActiveSection('topics')}
+              data-testid="stat-topics"
+            >
+              <div className="text-lg sm:text-2xl font-bold">{profile?.totalTopics || 0}</div>
+              <div className="text-xs text-muted-foreground">Topics</div>
             </button>
             <button 
               className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'badges' ? 'bg-primary/10' : ''}`}
@@ -965,6 +995,89 @@ export default function Profile() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* Topics Section */}
+        {activeSection === 'topics' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Topics</CardTitle>
+              <CardDescription>
+                Topics created by {isOwnProfile ? 'you' : `${user.firstName}`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {topicsLoading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-muted rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : userTopics.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No topics created yet</p>
+                  {isOwnProfile && (
+                    <p className="text-sm mt-2">
+                      Create your first topic to start a debate!
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {userTopics.map((topic: any) => (
+                    <div 
+                      key={topic.id} 
+                      className="border rounded-lg p-4 hover:bg-muted/30 transition-colors"
+                      data-testid={`topic-${topic.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div 
+                          className="flex-1 cursor-pointer"
+                          onClick={() => navigate(`/topic/${topic.id}`)}
+                        >
+                          <h3 className="font-semibold mb-1">{topic.title}</h3>
+                          <p className="text-sm text-muted-foreground mb-2">{topic.description}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {topic.categories?.map((cat: string) => (
+                              <Badge key={cat} variant="secondary" className="text-xs">
+                                {cat}
+                              </Badge>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <MessageSquare className="w-3 h-3" />
+                              {topic.opinionCount || 0} opinions
+                            </span>
+                            <span>{new Date(topic.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        {isOwnProfile && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              if (window.confirm('Are you sure you want to delete this topic? This will also delete all associated opinions and debates.')) {
+                                deleteTopicMutation.mutate(topic.id);
+                              }
+                            }}
+                            disabled={deleteTopicMutation.isPending}
+                            data-testid={`button-delete-topic-${topic.id}`}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* Followers Section */}

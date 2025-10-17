@@ -118,8 +118,10 @@ export interface IStorage {
   
   // Topic operations
   createTopic(topic: InsertTopic): Promise<Topic>;
-  getTopics(limit?: number, category?: string, search?: string): Promise<TopicWithCounts[]>;
+  getTopics(options?: { limit?: number; category?: string; search?: string; createdBy?: string }): Promise<TopicWithCounts[]>;
   getTopic(id: string): Promise<Topic | undefined>;
+  deleteTopic(id: string): Promise<void>;
+  countTopicsByUser(userId: string): Promise<number>;
   
   // Opinion operations
   createOpinion(opinion: InsertOpinion): Promise<Opinion>;
@@ -322,7 +324,8 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getTopics(limit = 50, category?: string, search?: string): Promise<TopicWithCounts[]> {
+  async getTopics(options?: { limit?: number; category?: string; search?: string; createdBy?: string }): Promise<TopicWithCounts[]> {
+    const { limit = 50, category, search, createdBy } = options || {};
     let conditions = [eq(topics.isActive, true)];
     
     if (category) {
@@ -334,6 +337,10 @@ export class DatabaseStorage implements IStorage {
       conditions.push(
         sql`${topics.title} ILIKE ${`%${search}%`} OR ${topics.description} ILIKE ${`%${search}%`}`
       );
+    }
+    
+    if (createdBy) {
+      conditions.push(eq(topics.createdById, createdBy));
     }
     
     const topicsList = await db
@@ -430,6 +437,25 @@ export class DatabaseStorage implements IStorage {
       ...topic,
       fallacyCounts: fallacyCountsMap.get(topic.id) || {},
     } as any;
+  }
+
+  async deleteTopic(id: string): Promise<void> {
+    // Soft delete the topic by setting isActive to false
+    await db
+      .update(topics)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(topics.id, id));
+  }
+
+  async countTopicsByUser(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(topics)
+      .where(and(
+        eq(topics.createdById, userId),
+        eq(topics.isActive, true)
+      ));
+    return Number(result[0].count);
   }
 
   // Opinion operations
