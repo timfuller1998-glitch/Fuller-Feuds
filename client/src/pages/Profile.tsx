@@ -113,7 +113,7 @@ export default function Profile() {
   const { user: currentUser } = useAuth();
   const [showCreateDebateDialog, setShowCreateDebateDialog] = useState(false);
   const [showScheduleStreamDialog, setShowScheduleStreamDialog] = useState(false);
-  const [activeSection, setActiveSection] = useState<'opinions' | 'debates' | 'followers' | 'following' | 'badges'>('opinions');
+  const [activeSection, setActiveSection] = useState<'opinions' | 'debates' | 'followers' | 'following' | 'badges' | 'leaderboards'>('opinions');
 
   const isOwnProfile = currentUser?.id === userId;
 
@@ -187,6 +187,13 @@ export default function Profile() {
     queryKey: ['/api/users', userId, 'badges'],
     queryFn: () => fetch(`/api/users/${userId}/badges`, { credentials: 'include' }).then(res => res.json()),
     enabled: !!userId,
+  });
+
+  // Fetch leaderboards
+  const { data: leaderboards } = useQuery<any>({
+    queryKey: ['/api/leaderboards'],
+    queryFn: () => fetch('/api/leaderboards', { credentials: 'include' }).then(res => res.json()),
+    enabled: activeSection === 'leaderboards',
   });
 
   // Follow/unfollow mutation
@@ -460,9 +467,9 @@ export default function Profile() {
           </div>
           
           {/* Stats - Now Clickable */}
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 mt-6 pt-6 border-t">
+          <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2 sm:gap-3 mt-6 pt-6 border-t">
             <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'opinions' ? 'bg-primary/10' : ''}`}
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'opinions' ? 'bg-primary/10' : ''}`}
               onClick={() => setActiveSection('opinions')}
               data-testid="stat-opinions"
             >
@@ -470,7 +477,7 @@ export default function Profile() {
               <div className="text-xs text-muted-foreground">Opinions</div>
             </button>
             <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'debates' ? 'bg-primary/10' : ''}`}
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'debates' ? 'bg-primary/10' : ''}`}
               onClick={() => setActiveSection('debates')}
               data-testid="stat-debates"
             >
@@ -478,7 +485,7 @@ export default function Profile() {
               <div className="text-xs text-muted-foreground">Debates</div>
             </button>
             <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'badges' ? 'bg-primary/10' : ''}`}
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'badges' ? 'bg-primary/10' : ''}`}
               onClick={() => setActiveSection('badges')}
               data-testid="stat-badges"
             >
@@ -486,7 +493,17 @@ export default function Profile() {
               <div className="text-xs text-muted-foreground">Badges</div>
             </button>
             <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'followers' ? 'bg-primary/10' : ''}`}
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'leaderboards' ? 'bg-primary/10' : ''}`}
+              onClick={() => setActiveSection('leaderboards')}
+              data-testid="stat-leaderboards"
+            >
+              <div className="text-lg sm:text-2xl font-bold">
+                <BarChart3 className="w-5 h-5 mx-auto" />
+              </div>
+              <div className="text-xs text-muted-foreground">Rankings</div>
+            </button>
+            <button 
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'followers' ? 'bg-primary/10' : ''}`}
               onClick={() => setActiveSection('followers')}
               data-testid="stat-followers"
             >
@@ -494,7 +511,7 @@ export default function Profile() {
               <div className="text-xs text-muted-foreground">Followers</div>
             </button>
             <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-4 py-2 transition-colors ${activeSection === 'following' ? 'bg-primary/10' : ''}`}
+              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'following' ? 'bg-primary/10' : ''}`}
               onClick={() => setActiveSection('following')}
               data-testid="stat-following"
             >
@@ -1034,6 +1051,216 @@ export default function Profile() {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Leaderboards Section */}
+        {activeSection === 'leaderboards' && (
+          <div className="space-y-6">
+            {leaderboards ? (
+              <>
+                {/* Most Opinionated Users */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5" />
+                      Most Opinionated Users
+                    </CardTitle>
+                    <CardDescription>
+                      Top users by total opinions posted
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {leaderboards.mostOpinionated?.map((entry: any, index: number) => (
+                        <div
+                          key={entry.userId}
+                          className={`flex items-center gap-3 p-3 rounded-lg border ${
+                            entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
+                          }`}
+                          data-testid={`leaderboard-opinions-${index}`}
+                        >
+                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                            index === 0 ? 'bg-yellow-500 text-yellow-50' :
+                            index === 1 ? 'bg-gray-400 text-gray-50' :
+                            index === 2 ? 'bg-orange-600 text-orange-50' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={entry.profileImageUrl} />
+                            <AvatarFallback className="text-xs">
+                              {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {entry.firstName} {entry.lastName}
+                              {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
+                            </p>
+                          </div>
+                          <Badge variant="secondary">{entry.count} opinions</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Most Active Debaters */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Swords className="w-5 h-5" />
+                      Most Active Debaters
+                    </CardTitle>
+                    <CardDescription>
+                      Top users by debate participation
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {leaderboards.mostDebates?.map((entry: any, index: number) => (
+                        <div
+                          key={entry.userId}
+                          className={`flex items-center gap-3 p-3 rounded-lg border ${
+                            entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
+                          }`}
+                          data-testid={`leaderboard-debates-${index}`}
+                        >
+                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                            index === 0 ? 'bg-yellow-500 text-yellow-50' :
+                            index === 1 ? 'bg-gray-400 text-gray-50' :
+                            index === 2 ? 'bg-orange-600 text-orange-50' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={entry.profileImageUrl} />
+                            <AvatarFallback className="text-xs">
+                              {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {entry.firstName} {entry.lastName}
+                              {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
+                            </p>
+                          </div>
+                          <Badge variant="secondary">{entry.count} debates</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Top Topic Creators */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Brain className="w-5 h-5" />
+                      Top Topic Creators
+                    </CardTitle>
+                    <CardDescription>
+                      Top users by topics created
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {leaderboards.mostTopics?.map((entry: any, index: number) => (
+                        <div
+                          key={entry.userId}
+                          className={`flex items-center gap-3 p-3 rounded-lg border ${
+                            entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
+                          }`}
+                          data-testid={`leaderboard-topics-${index}`}
+                        >
+                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                            index === 0 ? 'bg-yellow-500 text-yellow-50' :
+                            index === 1 ? 'bg-gray-400 text-gray-50' :
+                            index === 2 ? 'bg-orange-600 text-orange-50' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={entry.profileImageUrl} />
+                            <AvatarFallback className="text-xs">
+                              {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {entry.firstName} {entry.lastName}
+                              {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
+                            </p>
+                          </div>
+                          <Badge variant="secondary">{entry.count} topics</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Logical Reasoning Champions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Star className="w-5 h-5" />
+                      Logical Reasoning Champions
+                    </CardTitle>
+                    <CardDescription>
+                      Users with the best logical reasoning (lowest fallacy rate)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {leaderboards.logicalReasoning?.map((entry: any, index: number) => (
+                        <div
+                          key={entry.userId}
+                          className={`flex items-center gap-3 p-3 rounded-lg border ${
+                            entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
+                          }`}
+                          data-testid={`leaderboard-reasoning-${index}`}
+                        >
+                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                            index === 0 ? 'bg-yellow-500 text-yellow-50' :
+                            index === 1 ? 'bg-gray-400 text-gray-50' :
+                            index === 2 ? 'bg-orange-600 text-orange-50' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={entry.profileImageUrl} />
+                            <AvatarFallback className="text-xs">
+                              {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {entry.firstName} {entry.lastName}
+                              {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
+                            </p>
+                          </div>
+                          <Badge variant="secondary">{entry.fallacyRate.toFixed(1)}% fallacy rate</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center py-8 text-muted-foreground">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Loading leaderboards...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
 
         {/* Badges Section */}
