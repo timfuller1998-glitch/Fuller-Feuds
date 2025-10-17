@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, Award, Medal, Star } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 interface AvatarWithBadgeProps {
@@ -30,18 +30,9 @@ export function AvatarWithBadge({
   const selectedBadge = userBadges.find((b: any) => b.isSelected);
 
   const getBadgeIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'Trophy':
-        return Trophy;
-      case 'Award':
-        return Award;
-      case 'Medal':
-        return Medal;
-      case 'Star':
-        return Star;
-      default:
-        return Trophy;
-    }
+    // Dynamically resolve icon from lucide-react
+    const IconComponent = (LucideIcons as any)[iconName];
+    return IconComponent || LucideIcons.Trophy;
   };
 
   return (

@@ -75,6 +75,53 @@ Preferred communication style: Simple, everyday language.
   - `PUT /api/debate-rooms/:roomId/privacy` - Update privacy setting
   - `GET /api/users/me/debate-rooms` - Get enriched list of user's active debate rooms
 
+### Gamification System (October 17, 2025)
+The platform includes a comprehensive gamification system with achievement badges and leaderboards to encourage user engagement and reward quality participation.
+
+#### Badge System
+- **Database Schema**: 
+  - `badges` table stores badge definitions (id, name, description, icon, category, unlockCriteria)
+  - `userBadges` table tracks user progress (userId, badgeId, unlockedAt, isSelected)
+  - `users` table includes `selectedBadgeId` for displaying badges on avatars
+- **Badge Categories**:
+  - **Debate Participation**: First Debater (1 debate), Debate Enthusiast (10 debates), Debate Master (50 debates)
+  - **Opinion Sharing**: First Opinion (1 opinion), Opinion Contributor (10 opinions), Opinion Expert (50 opinions), Opinion Leader (100 opinions)
+  - **Topic Creation**: Topic Creator (1 topic), Topic Pioneer (10 topics)
+  - **Quality Recognition**: Logical Thinker (low fallacy rate, requires 10+ content items with <5% flagged)
+- **Badge Icons**: Trophy, Award, Medal, Star (from Lucide React)
+- **Automatic Award System**: 
+  - Badges are automatically checked and awarded when users perform qualifying actions
+  - Triggered after creating opinions, topics, or debate rooms
+  - Background processing prevents blocking user actions
+- **Badge Display**: 
+  - Users can view all badges (locked/unlocked) on their profile page
+  - Selected badges appear as small icon overlays on user avatars throughout the site
+  - Only unlocked badges can be selected for display
+  - AvatarWithBadge component provides reusable badge overlay functionality
+
+#### Leaderboard System
+- **Four Leaderboard Categories**:
+  1. **Most Opinionated Users**: Ranks users by total opinions posted
+  2. **Most Active Debaters**: Ranks users by total debates participated in
+  3. **Top Topic Creators**: Ranks users by topics created
+  4. **Logical Reasoning Champions**: Ranks users by lowest fallacy rate (flagged content percentage)
+- **Leaderboard Features**:
+  - Top 10 users displayed in each category
+  - Medal indicators for top 3 positions (gold, silver, bronze)
+  - Current user highlighted if they appear in rankings
+  - Accessible from profile page "Rankings" tab
+- **API Endpoints**:
+  - `GET /api/badges` - Get all badge definitions
+  - `GET /api/users/:userId/badges` - Get user's badge progress and selected badge
+  - `POST /api/users/me/selected-badge` - Select/deselect a badge for display
+  - `GET /api/leaderboards` - Get all leaderboard rankings
+- **Storage Methods**:
+  - `getBadges()` - Fetch all badge definitions
+  - `getUserBadges(userId)` - Get user's badges with unlock status
+  - `checkAndAwardBadges(userId)` - Check criteria and award earned badges
+  - `setSelectedBadge(userId, badgeId)` - Update user's displayed badge
+  - `getLeaderboards()` - Calculate and return all leaderboard rankings
+
 ### Data Storage Solutions
 - **Primary Database**: PostgreSQL via Neon Database
 - **Session Storage**: PostgreSQL-based session store using `connect-pg-simple`

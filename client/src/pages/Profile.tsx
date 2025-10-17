@@ -21,6 +21,7 @@ import { insertUserProfileSchema, insertLiveStreamSchema } from "@shared/schema"
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import * as LucideIcons from "lucide-react";
 import {
   Users,
   User,
@@ -1291,10 +1292,8 @@ export default function Profile() {
                   {userBadges.map((userBadge: any) => {
                     const isUnlocked = !!userBadge.unlockedAt;
                     const isSelected = userBadge.isSelected;
-                    const IconComponent = userBadge.icon === 'Trophy' ? Trophy :
-                                         userBadge.icon === 'Award' ? Award :
-                                         userBadge.icon === 'Medal' ? Medal :
-                                         userBadge.icon === 'Star' ? Star : Trophy;
+                    // Dynamically resolve icon from lucide-react
+                    const IconComponent = (LucideIcons as any)[userBadge.icon] || Trophy;
                     
                     return (
                       <div
