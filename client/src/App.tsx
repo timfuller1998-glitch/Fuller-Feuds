@@ -130,7 +130,7 @@ function AuthenticatedApp() {
           }}
         />
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center gap-2 sm:gap-4 p-2 sm:p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <header className="sticky top-0 z-[100000] flex items-center gap-2 sm:gap-4 p-2 sm:p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex-1 max-w-2xl mx-auto px-2 sm:px-0">
               <SearchBar 

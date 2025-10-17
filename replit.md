@@ -11,7 +11,10 @@ Kirk Debates is a modern platform designed to facilitate meaningful discussions 
 - **Smart Dismissal**: Cancel button properly dismisses the form; typing a different query re-enables auto-trigger
 - **Race Condition Prevention**: Implemented pendingMutationQuery tracking to prevent stale mutations from showing outdated forms
 - **Single API Call**: Refactored to ensure exactly one API call per unique search query
-- **Z-Index Fix**: Increased popup z-index to 999999 to prevent it from going under other elements when scrolling, especially on mobile
+- **Z-Index & Sticky Header Fix**: 
+  - Made header sticky with z-index 100000 to stay at top when scrolling
+  - Set popup z-index to 999999 to stay above all scrolling content
+  - Prevents topic cards from appearing above popup when scrolling on mobile
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
