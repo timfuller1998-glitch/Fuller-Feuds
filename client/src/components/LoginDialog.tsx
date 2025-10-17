@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Shield, Sparkles, CheckCircle } from "lucide-react";
+import { MessageCircle, Shield, Sparkles, CheckCircle, Mail } from "lucide-react";
+import { SiGoogle, SiGithub } from "react-icons/si";
 
 interface LoginDialogProps {
   open: boolean;
@@ -32,9 +33,9 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
             <div className="flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium">Instant Access</p>
+                <p className="font-medium">Quick & Easy</p>
                 <p className="text-sm text-muted-foreground">
-                  New users? No problem! Signing in automatically creates your account
+                  Sign in with Google, GitHub, or email in seconds
                 </p>
               </div>
             </div>
@@ -42,9 +43,9 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
             <div className="flex items-start gap-3">
               <Shield className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium">Secure Authentication</p>
+                <p className="font-medium">Secure & Private</p>
                 <p className="text-sm text-muted-foreground">
-                  Powered by Replit Auth for safe and seamless login
+                  Your data is protected with industry-standard encryption
                 </p>
               </div>
             </div>
@@ -52,9 +53,9 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
             <div className="flex items-start gap-3">
               <Sparkles className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium">Personalized Experience</p>
+                <p className="font-medium">Instant Access</p>
                 <p className="text-sm text-muted-foreground">
-                  Set up your profile and customize your debate feed
+                  Start debating immediately - no lengthy forms required
                 </p>
               </div>
             </div>
@@ -66,8 +67,15 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
             size="lg"
             data-testid="button-login-dialog"
           >
-            Continue with Replit
+            Sign In
           </Button>
+
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <SiGoogle className="w-4 h-4" />
+            <SiGithub className="w-4 h-4" />
+            <Mail className="w-4 h-4" />
+            <span>Multiple login options available</span>
+          </div>
 
           <p className="text-xs text-center text-muted-foreground">
             By continuing, you agree to our Terms of Service and Privacy Policy
