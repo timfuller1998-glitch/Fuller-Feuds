@@ -258,8 +258,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Initial opinion is required" });
       }
 
-      // Validate stance if provided
-      const validStance = stance && ['for', 'against', 'neutral'].includes(stance) ? stance : 'neutral';
+      // Validate stance if provided (case-insensitive)
+      const normalizedStance = stance ? String(stance).toLowerCase() : 'neutral';
+      const validStance = ['for', 'against', 'neutral'].includes(normalizedStance) ? normalizedStance : 'neutral';
       
       // Validate the topic data
       const validatedData = insertTopicSchema.parse({

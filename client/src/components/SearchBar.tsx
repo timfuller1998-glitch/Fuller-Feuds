@@ -55,6 +55,11 @@ export default function SearchBar({
   // Close suggestions when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Element;
+      // Don't close if clicking on Select dropdown content (rendered in portal)
+      if (target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
+        return;
+      }
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
       }
@@ -435,11 +440,14 @@ export default function SearchBar({
                   />
                 </div>
 
-                <div>
+                <div key={`stance-${showCreateForm}`}>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">
                     Your Stance
                   </label>
-                  <Select value={stance} onValueChange={(value: 'for' | 'against' | 'neutral') => setStance(value)}>
+                  <Select 
+                    value={stance} 
+                    onValueChange={(value: 'for' | 'against' | 'neutral') => setStance(value)}
+                  >
                     <SelectTrigger className="h-9 text-sm" data-testid="select-stance">
                       <SelectValue placeholder="Select your stance" />
                     </SelectTrigger>
