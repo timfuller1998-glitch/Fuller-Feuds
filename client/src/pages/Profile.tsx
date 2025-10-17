@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarWithBadge } from "@/components/AvatarWithBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -395,12 +396,14 @@ export default function Profile() {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 w-full">
               <div className="relative flex-shrink-0">
-                <Avatar className="h-20 w-20 sm:h-24 sm:w-24">
-                  <AvatarImage src={user.profileImageUrl} />
-                  <AvatarFallback className="text-2xl">
-                    {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
+                <AvatarWithBadge
+                  userId={userId!}
+                  profileImageUrl={user.profileImageUrl}
+                  firstName={user.firstName}
+                  lastName={user.lastName}
+                  className="h-20 w-20 sm:h-24 sm:w-24 text-2xl"
+                  showBadge={true}
+                />
                 {profile && profile.politicalLeaning && (
                   <div 
                     className="absolute inset-0 rounded-full border-4 pointer-events-none"
