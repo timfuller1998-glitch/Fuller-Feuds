@@ -62,12 +62,18 @@ Preferred communication style: Simple, everyday language.
   - Private debates redact that user's messages from opponent's view and public profiles
   - Messages show as "[Message redacted]" when privacy is enabled
   - Privacy toggle available in debate room sidebar
+- **Active Debates Visibility**:
+  - "My Active Debates" page displays all ongoing debate rooms for the current user
+  - Shows topic title, opponent details, stances, message count, and time since start
+  - Real-time badge in sidebar shows count of active debates (updates every 10 seconds)
+  - Enriched data includes full topic information and opponent profile details
 - **Database Schema**: Debate rooms track `participant1Privacy` and `participant2Privacy` (values: 'public' or 'private')
 - **API Endpoints**:
   - `POST /api/topics/:topicId/match-debate` - Auto-match with random opposing user
   - `GET /api/topics/:topicId/available-opponents` - List users with opposite opinions
   - `POST /api/debate-rooms/:roomId/switch-opponent` - Switch to new opponent
   - `PUT /api/debate-rooms/:roomId/privacy` - Update privacy setting
+  - `GET /api/users/me/debate-rooms` - Get enriched list of user's active debate rooms
 
 ### Data Storage Solutions
 - **Primary Database**: PostgreSQL via Neon Database

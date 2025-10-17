@@ -72,6 +72,14 @@ export default function AppSidebar({
     queryKey: ["/api/topics"],
   });
 
+  // Fetch user's active debate rooms to show count badge
+  const { data: activeDebateRooms } = useQuery<any[]>({
+    queryKey: ["/api/users/me/debate-rooms"],
+    refetchInterval: 10000, // Refetch every 10 seconds to catch new matches
+  });
+
+  const activeDebatesCount = activeDebateRooms?.length || 0;
+
   // Close sidebar on mobile when link is clicked
   const handleLinkClick = () => {
     if (isMobile) {
@@ -84,6 +92,7 @@ export default function AppSidebar({
     { title: "Live Debates", icon: Radio, path: "/live" },
     { title: "Hot Debates", icon: Flame, path: "/hot-debates" },
     { title: "My Debates", icon: MessageCircle, path: "/debates" },
+    { title: "My Active Debates", icon: MessageCircle, path: "/my-active-debates", badge: activeDebatesCount },
     { title: "Recent Opinions", icon: Clock, path: "/recent-opinions" },
   ];
 
@@ -158,6 +167,11 @@ export default function AppSidebar({
                     <Link href={item.path} onClick={handleLinkClick} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>
+                      {'badge' in item && item.badge > 0 && (
+                        <Badge variant="default" className="ml-auto text-xs" data-testid="badge-active-debates-count">
+                          {item.badge}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -187,8 +187,8 @@ export interface IStorage {
   getUserFollowing(userId: string, limit?: number): Promise<User[]>;
   updateFollowCounts(userId: string): Promise<void>;
   
-  // User debate rooms
-  getUserDebateRooms(userId: string): Promise<DebateRoom[]>;
+  // User debate rooms with enriched data
+  getUserActiveDebateRoomsEnriched(userId: string): Promise<any[]>;
   
   // Moderation operations
   flagOpinion(opinionId: string, userId: string, fallacyType: string): Promise<void>;
@@ -860,6 +860,81 @@ export class DatabaseStorage implements IStorage {
     } else {
       throw new Error('User is not a participant in this debate room');
     }
+  }
+
+  async getUserActiveDebateRoomsEnriched(userId: string): Promise<any[]> {
+    // Get active debate rooms for the user
+    const rooms = await db
+      .select()
+      .from(debateRooms)
+      .where(
+        and(
+          eq(debateRooms.status, 'active'),
+          or(
+            eq(debateRooms.participant1Id, userId),
+            eq(debateRooms.participant2Id, userId)
+          )
+        )
+      )
+      .orderBy(desc(debateRooms.startedAt));
+
+    if (rooms.length === 0) {
+      return [];
+    }
+
+    // Enrich with topic and opponent data, filtering out rooms with errors or missing data
+    const enrichedRooms = await Promise.all(
+      rooms.map(async (room) => {
+        try {
+          // Get topic information
+          const topic = await this.getTopic(room.topicId);
+          
+          // Determine opponent ID
+          const opponentId = room.participant1Id === userId 
+            ? room.participant2Id 
+            : room.participant1Id;
+          
+          // Get opponent information
+          const opponent = await this.getUser(opponentId);
+          
+          // Skip if topic or opponent is missing
+          if (!topic || !opponent) {
+            return null;
+          }
+          
+          // Count messages in this room
+          const messageCount = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(debateMessages)
+            .where(eq(debateMessages.roomId, room.id));
+          
+          // Determine user's stance
+          const userStance = room.participant1Id === userId
+            ? room.participant1Stance
+            : room.participant2Stance;
+          
+          const opponentStance = room.participant1Id === userId
+            ? room.participant2Stance
+            : room.participant1Stance;
+
+          return {
+            ...room,
+            topic,
+            opponent,
+            messageCount: messageCount[0]?.count || 0,
+            userStance,
+            opponentStance,
+          };
+        } catch (error) {
+          // Skip rooms that error during enrichment (e.g., deleted topics/users)
+          console.error(`Error enriching debate room ${room.id}:`, error);
+          return null;
+        }
+      })
+    );
+
+    // Filter out null entries (rooms with errors or missing data)
+    return enrichedRooms.filter(room => room !== null);
   }
 
   // Debate messages

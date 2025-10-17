@@ -1787,6 +1787,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user's active debate rooms with enriched data
+  app.get('/api/users/me/debate-rooms', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const rooms = await storage.getUserActiveDebateRoomsEnriched(userId);
+      res.json(rooms);
+    } catch (error) {
+      console.error("Error fetching user debate rooms:", error);
+      res.status(500).json({ message: "Failed to fetch debate rooms" });
+    }
+  });
+
   // Live stream routes
   app.get('/api/live-streams', async (req, res) => {
     try {
