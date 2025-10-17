@@ -509,6 +509,7 @@ export default function Topic() {
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
                       challengesCount={opinion.challengesCount || 0}
+                      fallacyCounts={opinion.fallacyCounts || {}}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
                       onLike={(id) => voteMutation.mutate({ 
@@ -523,7 +524,6 @@ export default function Topic() {
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
                       onChallenge={(id) => setChallengingOpinionId(id)}
-                      onFlag={(id) => setFlaggingOpinionId(id)}
                     />
                   ))}
                 </div>
@@ -548,6 +548,7 @@ export default function Topic() {
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
                       challengesCount={opinion.challengesCount || 0}
+                      fallacyCounts={opinion.fallacyCounts || {}}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
                       onLike={(id) => voteMutation.mutate({ 
@@ -562,7 +563,6 @@ export default function Topic() {
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
                       onChallenge={(id) => setChallengingOpinionId(id)}
-                      onFlag={(id) => setFlaggingOpinionId(id)}
                     />
                   ))}
                 </div>
@@ -587,6 +587,7 @@ export default function Topic() {
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
                       challengesCount={opinion.challengesCount || 0}
+                      fallacyCounts={opinion.fallacyCounts || {}}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
                       onLike={(id) => voteMutation.mutate({ 
@@ -601,7 +602,6 @@ export default function Topic() {
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
                       onChallenge={(id) => setChallengingOpinionId(id)}
-                      onFlag={(id) => setFlaggingOpinionId(id)}
                     />
                   ))}
                 </div>

@@ -52,6 +52,53 @@ import {
 import { db } from "./db";
 import { eq, desc, asc, and, sql, count, ilike, or, inArray } from "drizzle-orm";
 import { AIService } from "./aiService";
+import { FALLACY_OPTIONS } from "@shared/fallacies";
+
+// Helper function to aggregate fallacy counts by entity IDs
+async function aggregateFallacyCounts<T extends { id: string }>(
+  entities: T[],
+  flagTable: typeof opinionFlags | typeof topicFlags | typeof debateMessageFlags,
+  entityIdField: keyof typeof flagTable.$inferSelect
+): Promise<Map<string, Record<string, number>>> {
+  if (entities.length === 0) {
+    return new Map();
+  }
+
+  const entityIds = entities.map(e => e.id);
+  
+  // Query all flags for these entities
+  const flags = await db
+    .select({
+      entityId: flagTable[entityIdField as any],
+      fallacyType: flagTable.fallacyType,
+      count: count()
+    })
+    .from(flagTable)
+    .where(inArray(flagTable[entityIdField as any], entityIds))
+    .groupBy(flagTable[entityIdField as any], flagTable.fallacyType);
+
+  // Build map of entity ID -> fallacy counts
+  const countsMap = new Map<string, Record<string, number>>();
+  
+  for (const entity of entities) {
+    // Initialize with all fallacy types at 0
+    const fallacyCounts: Record<string, number> = {};
+    FALLACY_OPTIONS.forEach(f => {
+      fallacyCounts[f.id] = 0;
+    });
+    countsMap.set(entity.id, fallacyCounts);
+  }
+
+  // Fill in actual counts
+  for (const flag of flags) {
+    const counts = countsMap.get(flag.entityId as string);
+    if (counts && flag.fallacyType) {
+      counts[flag.fallacyType] = Number(flag.count);
+    }
+  }
+
+  return countsMap;
+}
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -378,6 +425,17 @@ export class DatabaseStorage implements IStorage {
       .where(and(...whereConditions))
       .orderBy(desc(opinions.createdAt));
 
+    if (baseOpinions.length === 0) {
+      return [];
+    }
+
+    // Batch aggregate fallacy counts for all opinions
+    const fallacyCountsMap = await aggregateFallacyCounts(
+      baseOpinions,
+      opinionFlags,
+      'opinionId'
+    );
+
     // Enrich each opinion with vote and challenge counts
     const enrichedOpinions = await Promise.all(
       baseOpinions.map(async (opinion) => {
@@ -411,6 +469,7 @@ export class DatabaseStorage implements IStorage {
           dislikesCount: Number(dislikesResult[0]?.count || 0),
           repliesCount: 0,
           challengesCount: Number(challengesResult[0]?.count || 0),
+          fallacyCounts: fallacyCountsMap.get(opinion.id) || {},
         };
       })
     );
@@ -436,6 +495,17 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(opinions.createdAt))
       .limit(limit);
 
+    if (baseOpinions.length === 0) {
+      return [];
+    }
+
+    // Batch aggregate fallacy counts for all opinions
+    const fallacyCountsMap = await aggregateFallacyCounts(
+      baseOpinions,
+      opinionFlags,
+      'opinionId'
+    );
+
     // Enrich each opinion with vote and challenge counts
     const enrichedOpinions = await Promise.all(
       baseOpinions.map(async (opinion) => {
@@ -469,6 +539,7 @@ export class DatabaseStorage implements IStorage {
           dislikesCount: Number(dislikesResult[0]?.count || 0),
           repliesCount: 0,
           challengesCount: Number(challengesResult[0]?.count || 0),
+          fallacyCounts: fallacyCountsMap.get(opinion.id) || {},
         };
       })
     );

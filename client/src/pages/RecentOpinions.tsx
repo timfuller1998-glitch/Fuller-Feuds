@@ -272,13 +272,13 @@ export default function RecentOpinionsPage() {
                     likesCount={opinion.likesCount || 0}
                     dislikesCount={opinion.dislikesCount || 0}
                     challengesCount={opinion.challengesCount || 0}
+                    fallacyCounts={opinion.fallacyCounts || {}}
                     isLiked={opinion.userVote?.voteType === 'like'}
                     isDisliked={opinion.userVote?.voteType === 'dislike'}
                     onLike={() => handleVote(opinion.id, opinion.userVote?.voteType || null, 'like')}
                     onDislike={() => handleVote(opinion.id, opinion.userVote?.voteType || null, 'dislike')}
                     onAdopt={() => adoptMutation.mutate(opinion.id)}
                     onChallenge={() => setChallengingOpinionId(opinion.id)}
-                    onFlag={() => setFlaggingOpinionId(opinion.id)}
                   />
                 </div>
               ))}

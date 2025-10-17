@@ -3,11 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import UserAvatar from "./UserAvatar";
+import FallacyBadges from "./FallacyBadges";
+import FallacyFlagDialog from "./FallacyFlagDialog";
 import { ThumbsUp, ThumbsDown, UserPlus, Clock, AlertTriangle, ChevronDown, Flag } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { FallacyType } from "@shared/fallacies";
 
 interface OpinionCardProps {
   id: string;
@@ -21,6 +26,7 @@ interface OpinionCardProps {
   likesCount: number;
   dislikesCount: number;
   challengesCount: number;
+  fallacyCounts?: Record<string, number>;
   isLiked?: boolean;
   isDisliked?: boolean;
   onLike?: (id: string) => void;
@@ -54,6 +60,7 @@ export default function OpinionCard({
   likesCount,
   dislikesCount,
   challengesCount,
+  fallacyCounts = {},
   isLiked = false,
   isDisliked = false,
   onLike,
@@ -64,11 +71,45 @@ export default function OpinionCard({
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
   const [showChallenges, setShowChallenges] = useState(false);
+  const [showFlagDialog, setShowFlagDialog] = useState(false);
+  const { toast } = useToast();
 
   // Fetch challenges when expanded
   const { data: challenges } = useQuery<any[]>({
     queryKey: ["/api/opinions", id, "challenges"],
     enabled: showChallenges && challengesCount > 0,
+  });
+
+  // Flag mutation
+  const flagMutation = useMutation({
+    mutationFn: async (fallacyType: FallacyType) => {
+      const response = await fetch(`/api/opinions/${id}/flag`, {
+        method: "POST",
+        body: JSON.stringify({ fallacyType }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Flag submitted",
+        description: "Thank you for helping keep debates productive.",
+      });
+      setShowFlagDialog(false);
+      // Invalidate queries to refetch with updated flag counts
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", topicId, "opinions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/opinions/recent"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit flag",
+        variant: "destructive",
+      });
+    },
   });
 
   // Use props directly - no local state for vote counts
@@ -83,6 +124,10 @@ export default function OpinionCard({
 
   const handleDislike = () => {
     onDislike?.(id);
+  };
+
+  const handleFlag = () => {
+    setShowFlagDialog(true);
   };
 
   return (
@@ -135,6 +180,13 @@ export default function OpinionCard({
         <p className="text-sm leading-relaxed mb-4" data-testid={`text-opinion-content-${id}`}>
           {content}
         </p>
+
+        {/* Display fallacy badges if any */}
+        {Object.keys(fallacyCounts).some(key => fallacyCounts[key] > 0) && (
+          <div className="mb-3">
+            <FallacyBadges fallacyCounts={fallacyCounts} />
+          </div>
+        )}
         
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
@@ -202,7 +254,7 @@ export default function OpinionCard({
               className="h-8 px-3"
               onClick={(e) => {
                 e.stopPropagation();
-                onFlag?.(id);
+                handleFlag();
               }}
               data-testid={`button-flag-${id}`}
             >
@@ -259,6 +311,15 @@ export default function OpinionCard({
           </Collapsible>
         )}
       </CardContent>
+
+      {/* Fallacy Flag Dialog */}
+      <FallacyFlagDialog
+        open={showFlagDialog}
+        onOpenChange={setShowFlagDialog}
+        onSubmit={(fallacyType) => flagMutation.mutate(fallacyType)}
+        isPending={flagMutation.isPending}
+        entityType="opinion"
+      />
     </Card>
   );
 }
