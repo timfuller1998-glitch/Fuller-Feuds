@@ -20,7 +20,7 @@ interface SearchBarProps {
 
 export default function SearchBar({ 
   onSearch, 
-  placeholder = "Search debate topics...", 
+  placeholder = "Search or create debate topics...", 
   className = "",
   value: externalValue,
 }: SearchBarProps) {
@@ -393,39 +393,7 @@ export default function SearchBar({
           {/* Inline Topic Creation Form */}
           {hasNoResults && showCreateForm && (
             <div className="p-4 space-y-3">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold">Create New Topic</h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    setTopicTitle("");
-                    setInitialOpinion("");
-                    setStance('neutral');
-                    setTopicCategories([]);
-                    setCategoryInput("");
-                  }}
-                  data-testid="button-close-create-form"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-
               <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                    Title
-                  </label>
-                  <Input
-                    value={topicTitle}
-                    onChange={(e) => setTopicTitle(e.target.value)}
-                    placeholder="Enter topic title..."
-                    className="h-9 text-sm"
-                    data-testid="input-topic-title"
-                  />
-                </div>
-
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">
                     Your Initial Opinion
@@ -514,14 +482,31 @@ export default function SearchBar({
                   </p>
                 </div>
 
-                <Button
-                  onClick={handleCreateTopic}
-                  disabled={!topicTitle.trim() || !initialOpinion.trim() || topicCategories.length === 0 || createTopicMutation.isPending}
-                  className="w-full"
-                  data-testid="button-submit-create-topic"
-                >
-                  {createTopicMutation.isPending ? "Creating..." : "Create Topic"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowCreateForm(false);
+                      setTopicTitle("");
+                      setInitialOpinion("");
+                      setStance('neutral');
+                      setTopicCategories([]);
+                      setCategoryInput("");
+                    }}
+                    className="flex-1"
+                    data-testid="button-cancel-create-topic"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCreateTopic}
+                    disabled={!topicTitle.trim() || !initialOpinion.trim() || topicCategories.length === 0 || createTopicMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-submit-create-topic"
+                  >
+                    {createTopicMutation.isPending ? "Creating..." : "Create Topic"}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
