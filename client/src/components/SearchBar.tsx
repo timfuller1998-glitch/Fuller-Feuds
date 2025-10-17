@@ -7,6 +7,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { type Topic } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -29,6 +30,7 @@ export default function SearchBar({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [topicTitle, setTopicTitle] = useState("");
   const [initialOpinion, setInitialOpinion] = useState("");
+  const [stance, setStance] = useState<'for' | 'against' | 'neutral'>('neutral');
   const [topicCategories, setTopicCategories] = useState<string[]>([]);
   const [categoryInput, setCategoryInput] = useState("");
   const [pendingEnterKey, setPendingEnterKey] = useState<string | null>(null);
@@ -83,7 +85,7 @@ export default function SearchBar({
   useEffect(() => {
     if (pendingEnterKey && debouncedQuery === pendingEnterKey && hasNoResults) {
       setTopicTitle(pendingEnterKey);
-      setShowCreateForm(true);
+      // Don't show form immediately - let the mutation onSuccess handle it
       generateCategoriesMutation.mutate(pendingEnterKey);
       setPendingEnterKey(null);
     } else if (pendingEnterKey && debouncedQuery === pendingEnterKey && topics && topics.length > 0) {
@@ -144,17 +146,19 @@ export default function SearchBar({
     },
     onSuccess: (data: { categories: string[] }) => {
       setTopicCategories(data.categories);
+      setShowCreateForm(true); // Show form after categories are generated
     },
     onError: (error) => {
       console.error("Failed to generate categories:", error);
       // Fallback to default categories
       setTopicCategories(["Politics", "Society", "General"]);
+      setShowCreateForm(true); // Show form even if category generation fails
     },
   });
 
   // Create topic mutation
   const createTopicMutation = useMutation({
-    mutationFn: async (data: { title: string; initialOpinion: string; categories: string[] }) => {
+    mutationFn: async (data: { title: string; initialOpinion: string; stance: string; categories: string[] }) => {
       const response = await apiRequest("POST", "/api/topics", data);
       return response.json();
     },
@@ -165,6 +169,7 @@ export default function SearchBar({
       setShowCreateForm(false);
       setTopicTitle("");
       setInitialOpinion("");
+      setStance('neutral');
       setTopicCategories([]);
       setCategoryInput("");
       setLocation(`/topic/${data.id}`);
@@ -194,6 +199,7 @@ export default function SearchBar({
     createTopicMutation.mutate({
       title: topicTitle,
       initialOpinion: initialOpinion.trim(),
+      stance: stance,
       categories: topicCategories,
     });
   };
@@ -351,25 +357,31 @@ export default function SearchBar({
           )}
 
           {/* No Results - Create New Topic */}
-          {hasNoResults && !showCreateForm && (
+          {hasNoResults && !showCreateForm && !generateCategoriesMutation.isPending && (
             <div className="p-4 text-center space-y-3">
               <div className="text-sm text-muted-foreground">
                 No debates found for "{query}"
               </div>
               <Button
                 onClick={() => {
-                  setShowCreateForm(true);
                   setTopicTitle(query);
-                  // Auto-generate 3 related categories
+                  // Auto-generate 3 related categories - form will show after this completes
                   generateCategoriesMutation.mutate(query);
                 }}
-                disabled={generateCategoriesMutation.isPending}
                 className="w-full"
                 data-testid="button-create-topic-from-search"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                {generateCategoriesMutation.isPending ? "Loading..." : "Create New Topic"}
+                Create New Topic
               </Button>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {hasNoResults && generateCategoriesMutation.isPending && !showCreateForm && (
+            <div className="p-8 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3"></div>
+              <p className="text-sm text-muted-foreground">Preparing topic creation...</p>
             </div>
           )}
 
@@ -385,6 +397,7 @@ export default function SearchBar({
                     setShowCreateForm(false);
                     setTopicTitle("");
                     setInitialOpinion("");
+                    setStance('neutral');
                     setTopicCategories([]);
                     setCategoryInput("");
                   }}
@@ -420,6 +433,22 @@ export default function SearchBar({
                     data-testid="input-initial-opinion"
                     required
                   />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Your Stance
+                  </label>
+                  <Select value={stance} onValueChange={(value: 'for' | 'against' | 'neutral') => setStance(value)}>
+                    <SelectTrigger className="h-9 text-sm" data-testid="select-stance">
+                      <SelectValue placeholder="Select your stance" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="for">For - I support this topic</SelectItem>
+                      <SelectItem value="against">Against - I oppose this topic</SelectItem>
+                      <SelectItem value="neutral">Neutral - I'm undecided or balanced</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>

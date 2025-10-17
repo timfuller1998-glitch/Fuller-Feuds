@@ -251,12 +251,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/topics', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { initialOpinion, ...topicData } = req.body;
+      const { initialOpinion, stance, ...topicData } = req.body;
       
       // Validate initial opinion is provided and not empty
       if (!initialOpinion || !initialOpinion.trim()) {
         return res.status(400).json({ message: "Initial opinion is required" });
       }
+
+      // Validate stance if provided
+      const validStance = stance && ['for', 'against', 'neutral'].includes(stance) ? stance : 'neutral';
       
       // Validate the topic data
       const validatedData = insertTopicSchema.parse({
@@ -309,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           topicId: topic.id,
           userId: userId,
           content: initialOpinion.trim(),
-          stance: 'neutral', // Default stance, user can change later
+          stance: validStance, // Use the stance provided by user
           status: opinionStatus
         });
       } catch (opinionError) {
