@@ -323,6 +323,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to create initial opinion" });
       }
       
+      // Check and award badges asynchronously
+      storage.checkAndAwardBadges(userId).catch(err => {
+        console.error("Error checking badges:", err);
+      });
+      
       res.status(201).json(topic);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -416,6 +421,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Do this asynchronously without blocking the response
       storage.analyzeUserPoliticalLeaning(userId).catch(err => {
         console.error("Error auto-analyzing political leaning:", err);
+      });
+      
+      // Check and award badges asynchronously
+      storage.checkAndAwardBadges(userId).catch(err => {
+        console.error("Error checking badges:", err);
       });
       
       res.status(201).json(opinion);
@@ -1653,6 +1663,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         participant2Id: opponent.id,
         participant1Stance: userOpinion.stance,
         participant2Stance: opponentStance,
+      });
+
+      // Check and award badges asynchronously for both participants
+      storage.checkAndAwardBadges(userId).catch(err => {
+        console.error("Error checking badges for user:", err);
+      });
+      storage.checkAndAwardBadges(opponent.id).catch(err => {
+        console.error("Error checking badges for opponent:", err);
       });
 
       res.status(201).json(room);
