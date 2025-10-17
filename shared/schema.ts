@@ -327,7 +327,9 @@ export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({
 }).partial();
 
 export type InsertTopic = z.infer<typeof insertTopicSchema>;
-export type Topic = typeof topics.$inferSelect;
+export type Topic = typeof topics.$inferSelect & {
+  fallacyCounts?: { [key: string]: number };
+};
 export type TopicWithCounts = Topic & {
   opinionsCount: number;
   participantCount: number;
@@ -336,7 +338,16 @@ export type TopicWithCounts = Topic & {
   previewIsAI?: boolean;
 };
 export type InsertOpinion = z.infer<typeof insertOpinionSchema>;
-export type Opinion = typeof opinions.$inferSelect;
+export type Opinion = typeof opinions.$inferSelect & {
+  fallacyCounts?: { [key: string]: number };
+  userVote?: 'like' | 'dislike' | null;
+  author?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    profileImageUrl: string | null;
+  };
+};
 export type CumulativeOpinion = typeof cumulativeOpinions.$inferSelect;
 export type DebateRoom = typeof debateRooms.$inferSelect;
 export type InsertDebateRoom = z.infer<typeof insertDebateRoomSchema>;

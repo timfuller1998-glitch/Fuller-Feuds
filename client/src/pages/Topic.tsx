@@ -42,8 +42,6 @@ export default function Topic() {
   const { toast } = useToast();
   const [showOpinionForm, setShowOpinionForm] = useState(false);
   const [challengingOpinionId, setChallengingOpinionId] = useState<string | null>(null);
-  const [flaggingOpinionId, setFlaggingOpinionId] = useState<string | null>(null);
-  const [flagReason, setFlagReason] = useState("");
   const [showTopicFlagDialog, setShowTopicFlagDialog] = useState(false);
 
   // Fetch topic details
@@ -199,21 +197,6 @@ export default function Topic() {
     },
     onError: (error: any) => {
       console.error("Failed to vote:", error);
-    },
-  });
-
-  // Flag mutation
-  const flagMutation = useMutation({
-    mutationFn: async ({ opinionId, reason }: { opinionId: string; reason: string }) => {
-      return apiRequest('POST', `/api/opinions/${opinionId}/flag`, { reason });
-    },
-    onSuccess: () => {
-      setFlaggingOpinionId(null);
-      setFlagReason("");
-      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
-    },
-    onError: (error: any) => {
-      console.error("Failed to flag opinion:", error);
     },
   });
 
@@ -909,50 +892,6 @@ export default function Topic() {
         }}
         isPending={challengeMutation.isPending}
       />
-
-      {/* Flag Dialog */}
-      <Dialog open={!!flaggingOpinionId} onOpenChange={(open) => !open && setFlaggingOpinionId(null)}>
-        <DialogContent onClick={(e) => e.stopPropagation()} data-testid="dialog-flag-opinion">
-          <DialogHeader>
-            <DialogTitle>Flag Opinion</DialogTitle>
-            <DialogDescription>
-              Report this opinion if it violates community guidelines. Please provide a reason for flagging.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              value={flagReason}
-              onChange={(e) => setFlagReason(e.target.value)}
-              placeholder="Why are you flagging this opinion? (e.g., spam, harassment, misinformation)"
-              rows={4}
-              data-testid="textarea-flag-reason"
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setFlaggingOpinionId(null);
-                  setFlagReason("");
-                }}
-                data-testid="button-cancel-flag"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (flaggingOpinionId && flagReason.trim()) {
-                    flagMutation.mutate({ opinionId: flaggingOpinionId, reason: flagReason.trim() });
-                  }
-                }}
-                disabled={!flagReason.trim() || flagMutation.isPending}
-                data-testid="button-submit-flag"
-              >
-                {flagMutation.isPending ? "Flagging..." : "Flag Opinion"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Topic Flag Dialog */}
       <FallacyFlagDialog
