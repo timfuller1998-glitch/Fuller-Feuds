@@ -8,7 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Send, LogOut, Swords, User } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { MessageSquare, Send, LogOut, Swords, User, Lock, Unlock, RefreshCw, UserPlus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -19,6 +22,8 @@ interface DebateRoom {
   participant2Id: string;
   participant1Stance: string;
   participant2Stance: string;
+  participant1Privacy?: string;
+  participant2Privacy?: string;
   status: string;
   startedAt: string;
   endedAt?: string;
@@ -52,6 +57,7 @@ export default function DebateRoomPage() {
   const [, navigate] = useLocation();
   const { user: currentUser } = useAuth();
   const [messageInput, setMessageInput] = useState("");
+  const [showChooseOpponentDialog, setShowChooseOpponentDialog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch debate room
@@ -114,6 +120,47 @@ export default function DebateRoomPage() {
     },
   });
 
+  // Privacy toggle mutation
+  const privacyMutation = useMutation({
+    mutationFn: async (isPrivate: boolean) => {
+      const response = await apiRequest('PUT', `/api/debate-rooms/${roomId}/privacy`, { 
+        privacy: isPrivate ? 'private' : 'public' 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId, "messages"] });
+    },
+    onError: (error) => {
+      console.error("Failed to update privacy:", error);
+    },
+  });
+
+  // Switch opponent mutation
+  const switchOpponentMutation = useMutation({
+    mutationFn: async (opponentId?: string) => {
+      const response = await apiRequest('POST', `/api/debate-rooms/${roomId}/switch-opponent`, 
+        opponentId ? { opponentId } : {}
+      );
+      return response.json();
+    },
+    onSuccess: (newRoom) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
+      navigate(`/debate-room/${newRoom.id}`);
+    },
+    onError: (error: any) => {
+      console.error("Failed to switch opponent:", error);
+      alert(error.message || "Failed to switch opponent. Please try again.");
+    },
+  });
+
+  // Fetch available opponents
+  const { data: availableOpponents = [] } = useQuery<User[]>({
+    queryKey: ["/api/topics", room?.topicId, "available-opponents"],
+    enabled: !!room?.topicId && showChooseOpponentDialog,
+  });
+
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -157,6 +204,9 @@ export default function DebateRoomPage() {
 
   const isParticipant = currentUser?.id === room.participant1Id || currentUser?.id === room.participant2Id;
   const isEnded = room.status === "ended";
+  const isParticipant1 = currentUser?.id === room.participant1Id;
+  const currentUserPrivacy = isParticipant1 ? room.participant1Privacy : room.participant2Privacy;
+  const isPrivate = currentUserPrivacy === 'private';
 
   return (
     <div className="container max-w-7xl mx-auto p-4">
@@ -183,16 +233,37 @@ export default function DebateRoomPage() {
               </div>
             </div>
             {isParticipant && !isEnded && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleEndDebate}
-                disabled={endDebateMutation.isPending}
-                data-testid="button-end-debate"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                End Debate
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => switchOpponentMutation.mutate(undefined)}
+                  disabled={switchOpponentMutation.isPending}
+                  data-testid="button-match-new"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {switchOpponentMutation.isPending ? "Matching..." : "End & Match New"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowChooseOpponentDialog(true)}
+                  data-testid="button-choose-opponent"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Choose Opponent
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleEndDebate}
+                  disabled={endDebateMutation.isPending}
+                  data-testid="button-end-debate"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  End Debate
+                </Button>
+              </div>
             )}
           </div>
         </CardHeader>
@@ -255,6 +326,39 @@ export default function DebateRoomPage() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Privacy Toggle */}
+            {isParticipant && !isEnded && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Your Privacy Setting</Label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {isPrivate ? (
+                        <Lock className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <Unlock className="w-4 h-4 text-muted-foreground" />
+                      )}
+                      <span className="text-sm text-muted-foreground">
+                        {isPrivate ? "Private" : "Public"}
+                      </span>
+                    </div>
+                    <Switch
+                      checked={isPrivate}
+                      onCheckedChange={(checked) => privacyMutation.mutate(checked)}
+                      disabled={privacyMutation.isPending}
+                      data-testid="switch-privacy"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {isPrivate 
+                      ? "Your messages are hidden from your opponent and public profiles" 
+                      : "Your messages are visible to everyone"}
+                  </p>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -366,6 +470,63 @@ export default function DebateRoomPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Choose Opponent Dialog */}
+      <Dialog open={showChooseOpponentDialog} onOpenChange={setShowChooseOpponentDialog}>
+        <DialogContent data-testid="dialog-choose-opponent">
+          <DialogHeader>
+            <DialogTitle>Choose an Opponent</DialogTitle>
+            <DialogDescription>
+              Select someone with an opposing view on {topic?.title} to debate with
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            {availableOpponents.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No opponents available at the moment
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {availableOpponents.map((opponent) => (
+                  <div
+                    key={opponent.id}
+                    className="flex items-center justify-between p-3 rounded-lg border hover-elevate active-elevate-2"
+                    data-testid={`opponent-option-${opponent.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src={opponent.profileImageUrl} />
+                        <AvatarFallback>
+                          {opponent.firstName?.[0] || opponent.email?.[0]?.toUpperCase() || "?"}
+                          {opponent.lastName?.[0] || opponent.email?.[1]?.toUpperCase() || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-sm">
+                          {opponent.firstName && opponent.lastName
+                            ? `${opponent.firstName} ${opponent.lastName}`
+                            : opponent.email}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        switchOpponentMutation.mutate(opponent.id);
+                        setShowChooseOpponentDialog(false);
+                      }}
+                      disabled={switchOpponentMutation.isPending}
+                      data-testid={`button-select-opponent-${opponent.id}`}
+                    >
+                      Select
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
