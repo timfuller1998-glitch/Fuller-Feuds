@@ -29,6 +29,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Debate Matching & Privacy System
 - **Topic-Based Matching**: Automatic debate matching connects users with opposing viewpoints on specific topics.
+- **Direct Debate Initiation**: Users can click "Change My Mind" button on any opinion card to immediately start a debate with the opinion author. The system validates that users have opposite stances before creating the debate room.
 - **Privacy Controls**: Each participant can independently set their side of debate as "public" or "private".
 - **Active Debates Visibility**: "My Active Debates" page displays all ongoing debate rooms for the current user.
 
