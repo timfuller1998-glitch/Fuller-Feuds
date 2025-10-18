@@ -192,6 +192,20 @@ export default function Home() {
     },
   });
 
+  // Start debate with opinion author
+  const startDebateWithOpinionMutation = useMutation({
+    mutationFn: async (opinionId: string) => {
+      const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, {});
+      return response.json();
+    },
+    onSuccess: (room) => {
+      window.location.href = `/debate-room/${room.id}`;
+    },
+    onError: (error: any) => {
+      alert(error.message || "Failed to start debate");
+    },
+  });
+
   // AI synthesis mutations
   const generateCumulativeMutation = useMutation({
     mutationFn: async () => {
@@ -611,6 +625,7 @@ export default function Home() {
                     currentVote: group!.opinion.userVote?.voteType 
                   })}
                   onAdopt={() => adoptMutation.mutate(group!.opinion.id)}
+                  onDebate={() => startDebateWithOpinionMutation.mutate(group!.opinion.id)}
                   onFlag={() => setFlaggingOpinionId(group!.opinion.id)}
                 />
               </div>

@@ -158,6 +158,18 @@ export default function RecentOpinionsPage() {
     },
   };
 
+  // Start debate mutation
+  const startDebateWithOpinionMutation = {
+    mutate: async (opinionId: string) => {
+      const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, {});
+      const room = await response.json();
+      window.location.href = `/debate-room/${room.id}`;
+    },
+    onError: (error: any) => {
+      alert(error.message || "Failed to start debate");
+    },
+  };
+
   const handleVote = (opinionId: string, currentVote: 'like' | 'dislike' | null, newVote: 'like' | 'dislike') => {
     const voteType = currentVote === newVote ? null : newVote;
     voteMutation.mutate({ opinionId, voteType });
@@ -265,6 +277,7 @@ export default function RecentOpinionsPage() {
                     onLike={() => handleVote(opinion.id, opinion.userVote?.voteType || null, 'like')}
                     onDislike={() => handleVote(opinion.id, opinion.userVote?.voteType || null, 'dislike')}
                     onAdopt={() => adoptMutation.mutate(opinion.id)}
+                    onDebate={() => startDebateWithOpinionMutation.mutate(opinion.id)}
                   />
                 </div>
               ))}
