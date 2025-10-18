@@ -21,7 +21,6 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import OpinionCard from "@/components/OpinionCard";
-import ChallengeDialog from "@/components/ChallengeDialog";
 import FallacyBadges from "@/components/FallacyBadges";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import { formatDistanceToNow } from "date-fns";
@@ -41,7 +40,6 @@ export default function Topic() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [showOpinionForm, setShowOpinionForm] = useState(false);
-  const [challengingOpinionId, setChallengingOpinionId] = useState<string | null>(null);
   const [showTopicFlagDialog, setShowTopicFlagDialog] = useState(false);
 
   // Fetch topic details
@@ -197,20 +195,6 @@ export default function Topic() {
     },
     onError: (error: any) => {
       console.error("Failed to vote:", error);
-    },
-  });
-
-  // Challenge mutation
-  const challengeMutation = useMutation({
-    mutationFn: async ({ opinionId, context }: { opinionId: string; context: string }) => {
-      return apiRequest('POST', `/api/opinions/${opinionId}/challenge`, { context });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
-      setChallengingOpinionId(null);
-    },
-    onError: (error: any) => {
-      console.error("Failed to challenge opinion:", error);
     },
   });
 
@@ -547,7 +531,6 @@ export default function Topic() {
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
-                      challengesCount={opinion.challengesCount || 0}
                       fallacyCounts={opinion.fallacyCounts || {}}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
@@ -562,7 +545,6 @@ export default function Topic() {
                         currentVote: opinion.userVote?.voteType 
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
-                      onChallenge={(id) => setChallengingOpinionId(id)}
                     />
                   ))}
                 </div>
@@ -586,7 +568,6 @@ export default function Topic() {
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
-                      challengesCount={opinion.challengesCount || 0}
                       fallacyCounts={opinion.fallacyCounts || {}}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
@@ -601,7 +582,6 @@ export default function Topic() {
                         currentVote: opinion.userVote?.voteType 
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
-                      onChallenge={(id) => setChallengingOpinionId(id)}
                     />
                   ))}
                 </div>
@@ -625,7 +605,6 @@ export default function Topic() {
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
-                      challengesCount={opinion.challengesCount || 0}
                       fallacyCounts={opinion.fallacyCounts || {}}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
@@ -640,7 +619,6 @@ export default function Topic() {
                         currentVote: opinion.userVote?.voteType 
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
-                      onChallenge={(id) => setChallengingOpinionId(id)}
                     />
                   ))}
                 </div>
@@ -880,18 +858,6 @@ export default function Topic() {
           </CardContent>
         </Card>
       )}
-
-      {/* Challenge Dialog */}
-      <ChallengeDialog
-        open={!!challengingOpinionId}
-        onOpenChange={(open) => !open && setChallengingOpinionId(null)}
-        onSubmit={(context) => {
-          if (challengingOpinionId) {
-            challengeMutation.mutate({ opinionId: challengingOpinionId, context });
-          }
-        }}
-        isPending={challengeMutation.isPending}
-      />
 
       {/* Topic Flag Dialog */}
       <FallacyFlagDialog
