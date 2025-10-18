@@ -1624,27 +1624,33 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${topics.createdAt} <= ${endDate}`);
     }
     
-    let query = db
+    const results = await db
       .select({
         id: topics.id,
         title: topics.title,
-        category: topics.category,
+        description: topics.description,
+        categories: topics.categories,
+        imageUrl: topics.imageUrl,
+        createdById: topics.createdById,
+        isActive: topics.isActive,
         status: topics.status,
         createdAt: topics.createdAt,
         updatedAt: topics.updatedAt,
-        participantsCount: topics.participantsCount,
-        opinionsCount: topics.opinionsCount,
-        previewContent: topics.previewContent,
-        previewAuthor: topics.previewAuthor,
-        previewIsAI: topics.previewIsAI,
+        opinionsCount: sql<number>`(SELECT COUNT(*)::int FROM ${opinions} WHERE ${opinions.topicId} = ${topics.id})`,
       })
-      .from(topics);
+      .from(topics)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(topics.createdAt))
+      .limit(limit);
     
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions)) as any;
-    }
-    
-    return await query.orderBy(desc(topics.createdAt)).limit(limit);
+    // Map to TopicWithCounts format (add missing fields)
+    return results.map(topic => ({
+      ...topic,
+      participantCount: 0, // Can calculate if needed
+      previewContent: undefined,
+      previewAuthor: undefined,
+      previewIsAI: undefined,
+    }));
   }
 
   async getAllOpinions(filters: { status?: string; startDate?: Date; endDate?: Date; limit?: number } = {}): Promise<Opinion[]> {
