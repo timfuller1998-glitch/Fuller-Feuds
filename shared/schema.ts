@@ -91,7 +91,6 @@ export const opinions = pgTable("opinions", {
   likesCount: integer("likes_count").default(0),
   dislikesCount: integer("dislikes_count").default(0),
   repliesCount: integer("replies_count").default(0),
-  challengesCount: integer("challenges_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -198,16 +197,6 @@ export const opinionVotes = pgTable("opinion_votes", {
   uniqueIndex("unique_opinion_user_vote").on(table.opinionId, table.userId)
 ]);
 
-// Opinion challenges - for adding context when users misrepresent data
-export const opinionChallenges = pgTable("opinion_challenges", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  opinionId: uuid("opinion_id").notNull().references(() => opinions.id, { onDelete: "cascade" }),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  context: text("context").notNull(), // The challenge/context being added
-  status: varchar("status", { length: 20 }).default("pending"), // 'pending', 'approved', 'rejected'
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
 // Opinion flags - for reporting logical fallacies
 export const opinionFlags = pgTable("opinion_flags", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -310,7 +299,6 @@ export const insertOpinionSchema = createInsertSchema(opinions).omit({
   likesCount: true,
   dislikesCount: true,
   repliesCount: true,
-  challengesCount: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -387,14 +375,6 @@ export type UserFollow = typeof userFollows.$inferSelect;
 export type InsertUserFollow = z.infer<typeof insertUserFollowSchema>;
 export type UserProfile = typeof userProfiles.$inferSelect;
 export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
-
-export const insertOpinionChallengeSchema = createInsertSchema(opinionChallenges).omit({
-  id: true,
-  status: true,
-  createdAt: true,
-});
-export type InsertOpinionChallenge = z.infer<typeof insertOpinionChallengeSchema>;
-export type OpinionChallenge = typeof opinionChallenges.$inferSelect;
 
 export const insertOpinionVoteSchema = createInsertSchema(opinionVotes).omit({
   id: true,

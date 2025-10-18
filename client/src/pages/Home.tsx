@@ -8,7 +8,6 @@ import TopicCard from "@/components/TopicCard";
 import LiveDebateRoom from "@/components/LiveDebateRoom";
 import OpinionCard from "@/components/OpinionCard";
 import CumulativeOpinion from "@/components/CumulativeOpinion";
-import ChallengeDialog from "@/components/ChallengeDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,7 +46,6 @@ export default function Home() {
   const [viewingLiveDebate, setViewingLiveDebate] = useState<string | null>(null);
   const [showCreateTopic, setShowCreateTopic] = useState(false);
   const [showCreateOpinion, setShowCreateOpinion] = useState(false);
-  const [challengingOpinionId, setChallengingOpinionId] = useState<string | null>(null);
   const [flaggingOpinionId, setFlaggingOpinionId] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
 
@@ -178,19 +176,6 @@ export default function Home() {
     },
     onError: (error: any) => {
       console.error("Failed to flag opinion:", error);
-    },
-  });
-
-  const challengeMutation = useMutation({
-    mutationFn: async ({ opinionId, context }: { opinionId: string; context: string }) => {
-      return apiRequest('POST', `/api/opinions/${opinionId}/challenge`, { context });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/topics", selectedTopic, "opinions"] });
-      setChallengingOpinionId(null);
-    },
-    onError: (error: any) => {
-      console.error("Failed to challenge opinion:", error);
     },
   });
 
@@ -609,7 +594,6 @@ export default function Home() {
                   timestamp={formatDistanceToNow(new Date(group!.opinion.createdAt!), { addSuffix: true })}
                   likesCount={group!.opinion.likesCount || 0}
                   dislikesCount={group!.opinion.dislikesCount || 0}
-                  challengesCount={group!.opinion.challengesCount || 0}
                   isLiked={group!.opinion.userVote?.voteType === 'like'}
                   isDisliked={group!.opinion.userVote?.voteType === 'dislike'}
                   onLike={() => voteMutation.mutate({ 
@@ -623,7 +607,6 @@ export default function Home() {
                     currentVote: group!.opinion.userVote?.voteType 
                   })}
                   onAdopt={() => adoptMutation.mutate(group!.opinion.id)}
-                  onChallenge={() => setChallengingOpinionId(group!.opinion.id)}
                   onFlag={() => setFlaggingOpinionId(group!.opinion.id)}
                 />
               </div>
@@ -652,18 +635,6 @@ export default function Home() {
           </Card>
         )}
       </div>
-
-      {/* Challenge Dialog */}
-      <ChallengeDialog
-        open={!!challengingOpinionId}
-        onOpenChange={(open) => !open && setChallengingOpinionId(null)}
-        onSubmit={(context) => {
-          if (challengingOpinionId) {
-            challengeMutation.mutate({ opinionId: challengingOpinionId, context });
-          }
-        }}
-        isPending={challengeMutation.isPending}
-      />
 
       {/* Flag Dialog */}
       <Dialog open={!!flaggingOpinionId} onOpenChange={(open) => !open && setFlaggingOpinionId(null)}>

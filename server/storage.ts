@@ -10,7 +10,6 @@ import {
   streamParticipants,
   streamChatMessages,
   opinionVotes,
-  opinionChallenges,
   opinionFlags,
   topicFlags,
   debateMessageFlags,
@@ -39,7 +38,6 @@ import {
   type StreamParticipant,
   type StreamChatMessage,
   type OpinionVote,
-  type OpinionChallenge,
   type UserFollow,
   type InsertUserFollow,
   type UserProfile,
@@ -135,10 +133,6 @@ export interface IStorage {
   voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike' | null): Promise<void>;
   getUserVoteOnOpinion(opinionId: string, userId: string): Promise<OpinionVote | undefined>;
   
-  // Opinion challenges
-  challengeOpinion(opinionId: string, userId: string, context: string, status?: string): Promise<void>;
-  getOpinionChallenges(opinionId: string, userRole?: string): Promise<any[]>;
-  
   // Cumulative opinions
   getCumulativeOpinion(topicId: string): Promise<CumulativeOpinion | undefined>;
   upsertCumulativeOpinion(topicId: string, data: Partial<CumulativeOpinion>): Promise<CumulativeOpinion>;
@@ -206,9 +200,6 @@ export interface IStorage {
   getFlaggedOpinions(): Promise<any[]>;
   approveOpinion(opinionId: string, moderatorId: string, reason?: string): Promise<void>;
   hideOpinion(opinionId: string, moderatorId: string, reason?: string): Promise<void>;
-  approveChallenge(challengeId: string, moderatorId: string, reason?: string): Promise<void>;
-  rejectChallenge(challengeId: string, moderatorId: string, reason?: string): Promise<void>;
-  getPendingChallenges(): Promise<any[]>;
   suspendUser(userId: string, moderatorId: string, reason?: string): Promise<void>;
   banUser(userId: string, moderatorId: string, reason?: string): Promise<void>;
   reinstateUser(userId: string, moderatorId: string, reason?: string): Promise<void>;
@@ -512,19 +503,12 @@ export class DatabaseStorage implements IStorage {
             eq(opinionVotes.opinionId, opinion.id),
             eq(opinionVotes.voteType, 'dislike')
           ));
-        
-        // Count challenges
-        const challengesResult = await db
-          .select({ count: count() })
-          .from(opinionChallenges)
-          .where(eq(opinionChallenges.opinionId, opinion.id));
 
         return {
           ...opinion,
           likesCount: Number(likesResult[0]?.count || 0),
           dislikesCount: Number(dislikesResult[0]?.count || 0),
           repliesCount: 0,
-          challengesCount: Number(challengesResult[0]?.count || 0),
           fallacyCounts: fallacyCountsMap.get(opinion.id) || {},
         };
       })
@@ -582,19 +566,12 @@ export class DatabaseStorage implements IStorage {
             eq(opinionVotes.opinionId, opinion.id),
             eq(opinionVotes.voteType, 'dislike')
           ));
-        
-        // Count challenges
-        const challengesResult = await db
-          .select({ count: count() })
-          .from(opinionChallenges)
-          .where(eq(opinionChallenges.opinionId, opinion.id));
 
         return {
           ...opinion,
           likesCount: Number(likesResult[0]?.count || 0),
           dislikesCount: Number(dislikesResult[0]?.count || 0),
           repliesCount: 0,
-          challengesCount: Number(challengesResult[0]?.count || 0),
           fallacyCounts: fallacyCountsMap.get(opinion.id) || {},
         };
       })
@@ -651,19 +628,6 @@ export class DatabaseStorage implements IStorage {
     return vote;
   }
 
-  // Opinion challenges
-  async challengeOpinion(opinionId: string, userId: string, context: string, status: string = 'pending'): Promise<void> {
-    await db
-      .insert(opinionChallenges)
-      .values({ opinionId, userId, context, status });
-    
-    // Increment challenges count
-    await db
-      .update(opinions)
-      .set({ challengesCount: sql`${opinions.challengesCount} + 1` })
-      .where(eq(opinions.id, opinionId));
-  }
-
   // Adopt opinion - creates a new opinion for the user with same content and stance
   async adoptOpinion(opinionId: string, userId: string): Promise<Opinion> {
     // Get the original opinion
@@ -710,39 +674,6 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
-  }
-
-  async getOpinionChallenges(opinionId: string, userRole?: string): Promise<any[]> {
-    const isModOrAdmin = userRole === 'admin' || userRole === 'moderator';
-    
-    // Build where conditions
-    const whereConditions = [eq(opinionChallenges.opinionId, opinionId)];
-    
-    // Regular users only see approved challenges
-    if (!isModOrAdmin) {
-      whereConditions.push(eq(opinionChallenges.status, 'approved'));
-    }
-    
-    const challenges = await db
-      .select({
-        id: opinionChallenges.id,
-        context: opinionChallenges.context,
-        status: opinionChallenges.status,
-        createdAt: opinionChallenges.createdAt,
-        userId: opinionChallenges.userId,
-        user: {
-          id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          profileImageUrl: users.profileImageUrl,
-        }
-      })
-      .from(opinionChallenges)
-      .leftJoin(users, eq(opinionChallenges.userId, users.id))
-      .where(and(...whereConditions))
-      .orderBy(desc(opinionChallenges.createdAt));
-    
-    return challenges;
   }
 
   // Cumulative opinions
@@ -1540,46 +1471,6 @@ export class DatabaseStorage implements IStorage {
       targetId: opinionId,
       reason: reason || 'Opinion hidden by moderator',
     });
-  }
-
-  async approveChallenge(challengeId: string, moderatorId: string, reason?: string): Promise<void> {
-    await db.update(opinionChallenges).set({ status: 'approved' }).where(eq(opinionChallenges.id, challengeId));
-    await db.insert(moderationActions).values({
-      moderatorId,
-      actionType: 'approve_challenge',
-      targetType: 'challenge',
-      targetId: challengeId,
-      reason: reason || 'Challenge approved',
-    });
-  }
-
-  async rejectChallenge(challengeId: string, moderatorId: string, reason?: string): Promise<void> {
-    await db.update(opinionChallenges).set({ status: 'rejected' }).where(eq(opinionChallenges.id, challengeId));
-    await db.insert(moderationActions).values({
-      moderatorId,
-      actionType: 'reject_challenge',
-      targetType: 'challenge',
-      targetId: challengeId,
-      reason: reason || 'Challenge rejected',
-    });
-  }
-
-  async getPendingChallenges(): Promise<any[]> {
-    const pending = await db
-      .select({
-        challenge: opinionChallenges,
-        opinion: opinions,
-        topic: topics,
-        author: users,
-      })
-      .from(opinionChallenges)
-      .innerJoin(opinions, eq(opinionChallenges.opinionId, opinions.id))
-      .innerJoin(topics, eq(opinions.topicId, topics.id))
-      .innerJoin(users, eq(opinionChallenges.userId, users.id))
-      .where(eq(opinionChallenges.status, 'pending'))
-      .orderBy(desc(opinionChallenges.createdAt));
-    
-    return pending;
   }
 
   async suspendUser(userId: string, moderatorId: string, reason?: string): Promise<void> {

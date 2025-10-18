@@ -16,7 +16,6 @@ import type { Opinion, Topic, TopicWithCounts } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
-import ChallengeDialog from "@/components/ChallengeDialog";
 
 interface OpinionWithTopic extends Opinion {
   topic?: Topic;
@@ -32,7 +31,6 @@ interface TopicGroup {
 export default function RecentOpinionsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const [challengingOpinionId, setChallengingOpinionId] = useState<string | null>(null);
   const [flaggingOpinionId, setFlaggingOpinionId] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
 
@@ -150,17 +148,6 @@ export default function RecentOpinionsPage() {
     },
   };
 
-  // Challenge mutation
-  const challengeMutation = {
-    mutate: async ({ opinionId, context }: { opinionId: string; context: string }) => {
-      return apiRequest('POST', `/api/opinions/${opinionId}/challenge`, { context });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/opinions/recent"] });
-      setChallengingOpinionId(null);
-    },
-  };
-
   // Adopt mutation
   const adoptMutation = {
     mutate: async (opinionId: string) => {
@@ -271,14 +258,12 @@ export default function RecentOpinionsPage() {
                     timestamp={formatDistanceToNow(new Date(opinion.createdAt!), { addSuffix: true })}
                     likesCount={opinion.likesCount || 0}
                     dislikesCount={opinion.dislikesCount || 0}
-                    challengesCount={opinion.challengesCount || 0}
                     fallacyCounts={opinion.fallacyCounts || {}}
                     isLiked={opinion.userVote?.voteType === 'like'}
                     isDisliked={opinion.userVote?.voteType === 'dislike'}
                     onLike={() => handleVote(opinion.id, opinion.userVote?.voteType || null, 'like')}
                     onDislike={() => handleVote(opinion.id, opinion.userVote?.voteType || null, 'dislike')}
                     onAdopt={() => adoptMutation.mutate(opinion.id)}
-                    onChallenge={() => setChallengingOpinionId(opinion.id)}
                   />
                 </div>
               ))}
@@ -300,17 +285,6 @@ export default function RecentOpinionsPage() {
           </div>
         ))}
       </div>
-
-      {/* Challenge Dialog */}
-      <ChallengeDialog
-        open={!!challengingOpinionId}
-        onOpenChange={(open) => !open && setChallengingOpinionId(null)}
-        onSubmit={(context) => {
-          if (challengingOpinionId) {
-            challengeMutation.mutate({ opinionId: challengingOpinionId, context });
-          }
-        }}
-      />
 
       {/* Flag Dialog */}
       <Dialog open={!!flaggingOpinionId} onOpenChange={(open) => !open && setFlaggingOpinionId(null)}>

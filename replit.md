@@ -5,6 +5,24 @@ Kirk Debates is a modern platform designed to facilitate meaningful discussions 
 
 ## Recent Changes
 
+### Challenge System Removal (October 18, 2025)
+- **Removed Deprecated Challenge System**: Completely removed the old challenge system that allowed users to add context for misrepresented data
+- **Replaced by Fallacy Flagging**: The challenge system has been superseded by the comprehensive logical fallacy flagging system with 11 specific fallacy types
+- **Database Changes**: 
+  - Removed `opinionChallenges` table from schema
+  - Removed `challengesCount` column from opinions table
+  - Pushed schema changes with `npm run db:push --force` to remove challenge data
+- **Backend Cleanup**:
+  - Removed challenge-related imports, interface methods, and implementations from server/storage.ts
+  - Removed `challengeOpinion`, `getOpinionChallenges`, `approveChallenge`, `rejectChallenge`, `getPendingChallenges` methods
+  - Updated `insertOpinionSchema` to remove challengesCount field reference
+- **Frontend Cleanup**:
+  - Removed ChallengeDialog.tsx component
+  - Removed challenge mutations and related state from Home.tsx, RecentOpinions.tsx, Topic.tsx
+  - Removed challengesCount prop and onChallenge callback from OpinionCard.tsx
+  - Removed pending challenges display from admin DashboardOverview.tsx
+- **Rationale**: The fallacy flagging system provides structured, educational feedback with specific fallacy types, badges, and tooltips - making the generic challenge system redundant
+
 ### User Topic Management on Profile Page (October 17, 2025)
 - **Topics Stat Button**: Added Topics count button to profile page stats section showing total topics created by user
 - **Topics Section**: Click Topics stat to view all user-created topics with full details (title, categories, opinion count, date)

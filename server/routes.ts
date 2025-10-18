@@ -517,38 +517,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/opinions/:opinionId/challenge', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { context } = req.body;
-      
-      if (!context || context.trim().length === 0) {
-        return res.status(400).json({ message: "Challenge context is required" });
-      }
-      
-      // Content filter validation
-      const filterResult = await validateContent(context.trim());
-      if (!filterResult.isAllowed) {
-        return res.status(400).json({ 
-          message: "Your challenge contains inappropriate language and cannot be submitted.",
-          detail: "Please review our community guidelines."
-        });
-      }
-      
-      // If content should be flagged, mark challenge as flagged (requires storage method update)
-      await storage.challengeOpinion(
-        req.params.opinionId, 
-        userId, 
-        context.trim(),
-        filterResult.shouldFlag ? 'flagged' : 'pending'
-      );
-      res.json({ message: "Challenge added" });
-    } catch (error) {
-      console.error("Error challenging opinion:", error);
-      res.status(500).json({ message: "Failed to challenge opinion" });
-    }
-  });
-
   app.post('/api/opinions/:opinionId/adopt', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -557,16 +525,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error adopting opinion:", error);
       res.status(500).json({ message: "Failed to adopt opinion" });
-    }
-  });
-
-  app.get('/api/opinions/:opinionId/challenges', async (req: any, res) => {
-    try {
-      const challenges = await storage.getOpinionChallenges(req.params.opinionId, req.userRole);
-      res.json(challenges);
-    } catch (error) {
-      console.error("Error fetching challenges:", error);
-      res.status(500).json({ message: "Failed to fetch challenges" });
     }
   });
 
@@ -660,45 +618,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error hiding opinion:", error);
       res.status(500).json({ message: "Failed to hide opinion" });
-    }
-  });
-
-  // Admin routes - Get pending challenges
-  app.get('/api/admin/pending-challenges', requireModerator, async (req, res) => {
-    try {
-      const pending = await storage.getPendingChallenges();
-      res.json(pending);
-    } catch (error) {
-      console.error("Error fetching pending challenges:", error);
-      res.status(500).json({ message: "Failed to fetch pending challenges" });
-    }
-  });
-
-  // Admin routes - Approve challenge
-  app.post('/api/admin/challenges/:challengeId/approve', requireModerator, async (req: any, res) => {
-    try {
-      const moderatorId = req.user.claims.sub;
-      const { reason } = req.body;
-      
-      await storage.approveChallenge(req.params.challengeId, moderatorId, reason);
-      res.status(200).json({ message: 'Challenge approved' });
-    } catch (error) {
-      console.error("Error approving challenge:", error);
-      res.status(500).json({ message: "Failed to approve challenge" });
-    }
-  });
-
-  // Admin routes - Reject challenge
-  app.post('/api/admin/challenges/:challengeId/reject', requireModerator, async (req: any, res) => {
-    try {
-      const moderatorId = req.user.claims.sub;
-      const { reason } = req.body;
-      
-      await storage.rejectChallenge(req.params.challengeId, moderatorId, reason);
-      res.status(200).json({ message: 'Challenge rejected' });
-    } catch (error) {
-      console.error("Error rejecting challenge:", error);
-      res.status(500).json({ message: "Failed to reject challenge" });
     }
   });
 
