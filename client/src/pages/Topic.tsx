@@ -480,9 +480,9 @@ export default function Topic() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="for">For</SelectItem>
-                              <SelectItem value="against">Against</SelectItem>
-                              <SelectItem value="neutral">Neutral</SelectItem>
+                              <SelectItem value="for" data-testid="option-stance-for">For</SelectItem>
+                              <SelectItem value="against" data-testid="option-stance-against">Against</SelectItem>
+                              <SelectItem value="neutral" data-testid="option-stance-neutral">Neutral</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
