@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import UserAvatar from "./UserAvatar";
 import FallacyBadges from "./FallacyBadges";
 import FallacyFlagDialog from "./FallacyFlagDialog";
-import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag, Link as LinkIcon, ExternalLink, ChevronDown } from "lucide-react";
+import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag, Link as LinkIcon, ExternalLink, ChevronDown, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
@@ -32,6 +32,7 @@ interface OpinionCardProps {
   onDislike?: (id: string) => void;
   onAdopt?: (id: string) => void;
   onFlag?: (id: string) => void;
+  onDebate?: (id: string) => void;
 }
 
 const stanceBadgeVariant = {
@@ -64,7 +65,8 @@ export default function OpinionCard({
   onLike,
   onDislike,
   onAdopt,
-  onFlag
+  onFlag,
+  onDebate
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
   const [showFlagDialog, setShowFlagDialog] = useState(false);
@@ -224,6 +226,22 @@ export default function OpinionCard({
               <UserPlus className="w-3 h-3 mr-1" />
               <span className="hidden sm:inline">Adopt</span>
             </Button>
+
+            {onDebate && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDebate(id);
+                }}
+                data-testid={`button-debate-${id}`}
+              >
+                <MessageCircle className="w-3 h-3 mr-1" />
+                <span className="hidden sm:inline">Change My Mind</span>
+              </Button>
+            )}
             
             <Button
               variant="ghost"
