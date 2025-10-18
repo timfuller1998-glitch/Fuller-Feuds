@@ -3,75 +3,6 @@
 ## Overview
 Kirk Debates is a modern platform designed to facilitate meaningful discussions on important topics. It combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats. The platform features topic-based debate matching that automatically connects users with opposing viewpoints, privacy controls for debate participants, AI-generated cumulative opinions that summarize community perspectives and track debate sentiment, and support for attaching reference links to opinions to cite sources.
 
-## Recent Changes
-
-### Opinion Reference Links Feature (October 18, 2025)
-- **Reference Links Support**: Users can now attach reference URLs when creating or updating opinions to cite sources and provide supporting evidence
-- **Database Schema**: Added `references` field as `text[]` array column to opinions table with default empty array
-- **Form UI**: Topic opinion form includes "Add Reference Link" button to dynamically add/remove reference URL inputs with validation
-- **Display**: OpinionCard shows collapsible "References" section with icon badge when references exist - users can toggle to view/hide reference links
-- **Validation**: URL validation ensures only valid URLs or empty strings are accepted in references array
-- **Implementation Scope**: References feature available on Topic page opinion forms; empty references are filtered out on display
-- **All OpinionCard Usages Updated**: Topic.tsx, Home.tsx, and RecentOpinions.tsx all pass references prop to display reference links
-
-### Challenge System Removal (October 18, 2025)
-- **Removed Deprecated Challenge System**: Completely removed the old challenge system that allowed users to add context for misrepresented data
-- **Replaced by Fallacy Flagging**: The challenge system has been superseded by the comprehensive logical fallacy flagging system with 11 specific fallacy types
-- **Database Changes**: 
-  - Removed `opinionChallenges` table from schema
-  - Removed `challengesCount` column from opinions table
-  - Pushed schema changes with `npm run db:push --force` to remove challenge data
-- **Backend Cleanup**:
-  - Removed challenge-related imports, interface methods, and implementations from server/storage.ts
-  - Removed `challengeOpinion`, `getOpinionChallenges`, `approveChallenge`, `rejectChallenge`, `getPendingChallenges` methods
-  - Updated `insertOpinionSchema` to remove challengesCount field reference
-- **Frontend Cleanup**:
-  - Removed ChallengeDialog.tsx component
-  - Removed challenge mutations and related state from Home.tsx, RecentOpinions.tsx, Topic.tsx
-  - Removed challengesCount prop and onChallenge callback from OpinionCard.tsx
-  - Removed pending challenges display from admin DashboardOverview.tsx
-- **Rationale**: The fallacy flagging system provides structured, educational feedback with specific fallacy types, badges, and tooltips - making the generic challenge system redundant
-
-### User Topic Management on Profile Page (October 17, 2025)
-- **Topics Stat Button**: Added Topics count button to profile page stats section showing total topics created by user
-- **Topics Section**: Click Topics stat to view all user-created topics with full details (title, categories, opinion count, date)
-- **Delete Functionality**: Topic owners can delete their topics with confirmation dialog warning about cascade effects
-- **Backend Optimization**: Implemented efficient topic counting with dedicated `countTopicsByUser` method to avoid pagination limits
-- **Database Schema**: Topics filtered by `createdById` field; soft delete using `isActive` flag preserves data integrity
-- **API Endpoints**:
-  - GET /api/profile/:userId - Returns totalTopics count (optimized with COUNT query)
-  - GET /api/topics - Supports `createdBy` filter parameter for user-specific topic lists
-  - DELETE /api/topics/:id - Soft delete with ownership verification (403 if not creator)
-- **Frontend Features**:
-  - Topic cards display categories, opinion counts, and creation dates
-  - Delete button only visible to topic owners (isOwnProfile check)
-  - TanStack Query cache invalidation for real-time UI updates
-  - Confirmation dialog: "Are you sure you want to delete this topic? This will also delete all associated opinions and debates."
-- **Implementation Notes**: Refactored `getTopics` to accept options object instead of positional parameters for better flexibility
-
-### Logical Fallacy Flagging System (October 17, 2025)
-- **Comprehensive Flagging**: Users can now flag topics, opinions, and debate messages with specific logical fallacy types
-- **11 Fallacy Types**: Ad Hominem, Straw Man, Misinformation, False Dilemma, Slippery Slope, Appeal to Authority, Hasty Generalization, Red Herring, Circular Reasoning, False Cause, Bandwagon
-- **Visual Indicators**: Fallacy badges display next to flagged content with icons, counts, and educational tooltips
-- **Database Schema**: Added topicFlags, opinionFlags (updated), and debateMessageFlags tables with fallacyType column
-- **Reusable Components**: FallacyFlagDialog for flagging UI, FallacyBadges for display, shared across all content types
-- **API Endpoints**: 
-  - POST /api/topics/:id/flag - Flag a topic
-  - POST /api/opinions/:id/flag - Flag an opinion
-  - POST /api/debate-messages/:id/flag - Flag a debate message
-- **Performance**: Batched SQL aggregation for efficient fallacy count calculation
-
-### Search Bar Topic Creation (October 17, 2025)
-- **Auto-Open Form**: Search bar now automatically opens topic creation form when no results are found
-- **No Manual Trigger**: Removed "Create New Topic" button - form opens immediately after search completes
-- **Smart Dismissal**: Cancel button properly dismisses the form; typing a different query re-enables auto-trigger
-- **Race Condition Prevention**: Implemented pendingMutationQuery tracking to prevent stale mutations from showing outdated forms
-- **Single API Call**: Refactored to ensure exactly one API call per unique search query
-- **Z-Index & Sticky Header Fix**: 
-  - Made header sticky with z-index 100000 to stay at top when scrolling
-  - Set popup z-index to 999999 to stay above all scrolling content
-  - Prevents topic cards from appearing above popup when scrolling on mobile
-
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
@@ -97,80 +28,18 @@ Preferred communication style: Simple, everyday language.
 - **Admin & Moderation**: Role-Based Access Control (user, moderator, admin), content status management (opinions, challenges, topics), flagging system, and a comprehensive admin dashboard with audit trails.
 
 ### Debate Matching & Privacy System
-- **Topic-Based Matching**: Automatic debate matching connects users with opposing viewpoints on specific topics
-- **Auto-Match Flow**: Click "Start a Debate" → System finds random user with opposite opinion → Creates debate room → User navigated to chat
-- **Manual Opponent Selection**: Users can choose specific opponents from list of available users with opposing views
-- **Opponent Switching**: "End & Match New" button allows users to close current debate and match with new opponent (random or chosen)
-- **Privacy Controls**: 
-  - Each participant can independently set their side of debate as "public" or "private"
-  - Private debates redact that user's messages from opponent's view and public profiles
-  - Messages show as "[Message redacted]" when privacy is enabled
-  - Privacy toggle available in debate room sidebar
-- **Active Debates Visibility**:
-  - "My Active Debates" page displays all ongoing debate rooms for the current user
-  - Shows topic title, opponent details, stances, message count, and time since start
-  - Real-time badge in sidebar shows count of active debates (updates every 10 seconds)
-  - Enriched data includes full topic information and opponent profile details
-- **Database Schema**: Debate rooms track `participant1Privacy` and `participant2Privacy` (values: 'public' or 'private')
-- **API Endpoints**:
-  - `POST /api/topics/:topicId/match-debate` - Auto-match with random opposing user
-  - `GET /api/topics/:topicId/available-opponents` - List users with opposite opinions
-  - `POST /api/debate-rooms/:roomId/switch-opponent` - Switch to new opponent
-  - `PUT /api/debate-rooms/:roomId/privacy` - Update privacy setting
-  - `GET /api/users/me/debate-rooms` - Get enriched list of user's active debate rooms
+- **Topic-Based Matching**: Automatic debate matching connects users with opposing viewpoints on specific topics.
+- **Privacy Controls**: Each participant can independently set their side of debate as "public" or "private".
+- **Active Debates Visibility**: "My Active Debates" page displays all ongoing debate rooms for the current user.
 
-### Gamification System (October 17, 2025)
-The platform includes a comprehensive gamification system with achievement badges and leaderboards to encourage user engagement and reward quality participation.
-
-#### Badge System
-- **Database Schema**: 
-  - `badges` table stores badge definitions (id, name, description, icon, category, unlockCriteria)
-  - `userBadges` table tracks user progress (userId, badgeId, unlockedAt, isSelected)
-  - `users` table includes `selectedBadgeId` for displaying badges on avatars
-- **Badge Categories**:
-  - **Debate Participation**: First Debater (1 debate), Debate Enthusiast (10 debates), Debate Master (50 debates)
-  - **Opinion Sharing**: First Opinion (1 opinion), Opinion Contributor (10 opinions), Opinion Expert (50 opinions), Opinion Leader (100 opinions)
-  - **Topic Creation**: Topic Creator (1 topic), Topic Pioneer (10 topics)
-  - **Quality Recognition**: Logical Thinker (low fallacy rate, requires 10+ content items with <5% flagged)
-- **Badge Icons**: Trophy, Award, Medal, Star (from Lucide React)
-- **Automatic Award System**: 
-  - Badges are automatically checked and awarded when users perform qualifying actions
-  - Triggered after creating opinions, topics, or debate rooms
-  - Background processing prevents blocking user actions
-- **Badge Display**: 
-  - Users can view all badges (locked/unlocked) on their profile page
-  - Selected badges appear as small icon overlays on user avatars throughout the site
-  - Only unlocked badges can be selected for display
-  - AvatarWithBadge component provides reusable badge overlay functionality
-
-#### Leaderboard System
-- **Four Leaderboard Categories**:
-  1. **Most Opinionated Users**: Ranks users by total opinions posted
-  2. **Most Active Debaters**: Ranks users by total debates participated in
-  3. **Top Topic Creators**: Ranks users by topics created
-  4. **Logical Reasoning Champions**: Ranks users by lowest fallacy rate (flagged content percentage)
-- **Leaderboard Features**:
-  - Top 10 users displayed in each category
-  - Medal indicators for top 3 positions (gold, silver, bronze)
-  - Current user highlighted if they appear in rankings
-  - Accessible from profile page "Rankings" tab
-- **API Endpoints**:
-  - `GET /api/badges` - Get all badge definitions
-  - `GET /api/users/:userId/badges` - Get user's badge progress and selected badge
-  - `POST /api/users/me/selected-badge` - Select/deselect a badge for display
-  - `GET /api/leaderboards` - Get all leaderboard rankings
-- **Storage Methods**:
-  - `getBadges()` - Fetch all badge definitions
-  - `getUserBadges(userId)` - Get user's badges with unlock status
-  - `checkAndAwardBadges(userId)` - Check criteria and award earned badges
-  - `setSelectedBadge(userId, badgeId)` - Update user's displayed badge
-  - `getLeaderboards()` - Calculate and return all leaderboard rankings
+### Gamification System
+- **Badge System**: Awards users for participation (Debate Participation, Opinion Sharing, Topic Creation) and quality (Logical Thinker). Badges are automatically awarded and can be displayed on user avatars.
+- **Leaderboard System**: Ranks users across categories such as "Most Opinionated Users", "Most Active Debaters", "Top Topic Creators", and "Logical Reasoning Champions".
 
 ### Data Storage Solutions
 - **Primary Database**: PostgreSQL via Neon Database
-- **Session Storage**: PostgreSQL-based session store using `connect-pg-simple`
+- **Session Storage**: PostgreSQL-based session store
 - **Schema Management**: Drizzle migrations
-- **Connection Pooling**: Neon serverless connection pooling
 
 ### Authentication and Authorization
 - **Provider**: Replit Auth using OpenID Connect
@@ -189,7 +58,7 @@ The platform includes a comprehensive gamification system with achievement badge
 - **Express Session**: Session management
 
 ### AI Services
-- **OpenAI API**: GPT-based AI for cumulative opinion summaries and content analysis (e.g., category generation).
+- **OpenAI API**: GPT-based AI for cumulative opinion summaries and content analysis.
 
 ### UI and Design Libraries
 - **Radix UI**: Accessible component primitives
