@@ -548,10 +548,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Start debate with opinion author
   app.post('/api/opinions/:opinionId/start-debate', isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { opinionId } = req.params;
+    
     try {
-      const userId = req.user.claims.sub;
-      const { opinionId } = req.params;
-      
       console.log(`[Debate] User ${userId} attempting to start debate with opinion ${opinionId}`);
 
       const room = await storage.createDebateRoomWithOpinionAuthor(opinionId, userId);
