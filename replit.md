@@ -1,9 +1,18 @@
 # Kirk Debates Platform
 
 ## Overview
-Kirk Debates is a modern platform designed to facilitate meaningful discussions on important topics. It combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats. The platform features topic-based debate matching that automatically connects users with opposing viewpoints, privacy controls for debate participants, and AI-generated cumulative opinions that summarize community perspectives and track debate sentiment.
+Kirk Debates is a modern platform designed to facilitate meaningful discussions on important topics. It combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats. The platform features topic-based debate matching that automatically connects users with opposing viewpoints, privacy controls for debate participants, AI-generated cumulative opinions that summarize community perspectives and track debate sentiment, and support for attaching reference links to opinions to cite sources.
 
 ## Recent Changes
+
+### Opinion Reference Links Feature (October 18, 2025)
+- **Reference Links Support**: Users can now attach reference URLs when creating or updating opinions to cite sources and provide supporting evidence
+- **Database Schema**: Added `references` field as `text[]` array column to opinions table with default empty array
+- **Form UI**: Topic opinion form includes "Add Reference Link" button to dynamically add/remove reference URL inputs with validation
+- **Display**: OpinionCard shows collapsible "References" section with icon badge when references exist - users can toggle to view/hide reference links
+- **Validation**: URL validation ensures only valid URLs or empty strings are accepted in references array
+- **Implementation Scope**: References feature available on Topic page opinion forms; empty references are filtered out on display
+- **All OpinionCard Usages Updated**: Topic.tsx, Home.tsx, and RecentOpinions.tsx all pass references prop to display reference links
 
 ### Challenge System Removal (October 18, 2025)
 - **Removed Deprecated Challenge System**: Completely removed the old challenge system that allowed users to add context for misrepresented data
