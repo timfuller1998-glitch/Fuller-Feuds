@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ThumbsUp, ThumbsDown, Brain, Flag } from "lucide-react";
-import { ArrowLeft, MessageCircle, Users, TrendingUp, RefreshCw, Video, Calendar, Clock, Eye } from "lucide-react";
+import { ArrowLeft, MessageCircle, Users, TrendingUp, RefreshCw, Video, Calendar, Clock, Eye, Link as LinkIcon, Plus, X } from "lucide-react";
 import { Link } from "wouter";
 import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -32,6 +32,7 @@ const opinionFormSchema = insertOpinionSchema.omit({
 }).extend({
   content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
   stance: z.enum(["for", "against", "neutral"], { required_error: "Please select a stance" }),
+  references: z.array(z.string().url("Must be a valid URL")).optional().default([]),
 });
 
 export default function Topic() {
@@ -433,6 +434,7 @@ export default function Topic() {
                     onClick={() => {
                       opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
                       opinionForm.setValue('content', userOpinion.content);
+                      opinionForm.setValue('references', userOpinion.references || []);
                       setShowOpinionForm(true);
                     }}
                     data-testid="button-change-opinion"
@@ -483,6 +485,66 @@ export default function Topic() {
                         </FormItem>
                       )}
                     />
+
+                    {/* References Section */}
+                    <FormField
+                      control={opinionForm.control}
+                      name="references"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <LinkIcon className="w-4 h-4" />
+                            Reference Links (Optional)
+                          </FormLabel>
+                          <div className="space-y-2">
+                            {(field.value || []).map((ref, index) => (
+                              <div key={index} className="flex gap-2">
+                                <FormControl>
+                                  <input
+                                    type="url"
+                                    placeholder="https://example.com/source"
+                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={ref}
+                                    onChange={(e) => {
+                                      const newRefs = [...(field.value || [])];
+                                      newRefs[index] = e.target.value;
+                                      field.onChange(newRefs);
+                                    }}
+                                    data-testid={`input-reference-${index}`}
+                                  />
+                                </FormControl>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    const newRefs = (field.value || []).filter((_, i) => i !== index);
+                                    field.onChange(newRefs);
+                                  }}
+                                  data-testid={`button-remove-reference-${index}`}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                field.onChange([...(field.value || []), '']);
+                              }}
+                              data-testid="button-add-reference"
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Reference Link
+                            </Button>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <div className="flex gap-2">
                       <Button 
                         type="button" 
