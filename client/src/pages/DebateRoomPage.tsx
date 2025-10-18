@@ -383,7 +383,7 @@ export default function DebateRoomPage() {
       )}
 
       {/* Chat Area - Full Width */}
-      <Card className="flex flex-col h-[calc(100vh-500px)] sm:h-[calc(100vh-400px)]">
+      <Card className="flex flex-col min-h-[400px] max-h-[600px]">
         <CardHeader className="border-b">
           <CardTitle className="text-lg flex items-center gap-2">
             <MessageSquare className="w-5 h-5" />
