@@ -593,6 +593,7 @@ export default function Topic() {
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
+                      references={opinion.references || []}
                       fallacyCounts={opinion.fallacyCounts || {}}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
@@ -630,6 +631,7 @@ export default function Topic() {
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
+                      references={opinion.references || []}
                       fallacyCounts={opinion.fallacyCounts || {}}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}
@@ -667,6 +669,7 @@ export default function Topic() {
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
+                      references={opinion.references || []}
                       fallacyCounts={opinion.fallacyCounts || {}}
                       isLiked={opinion.userVote?.voteType === 'like'}
                       isDisliked={opinion.userVote?.voteType === 'dislike'}

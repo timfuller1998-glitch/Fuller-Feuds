@@ -258,6 +258,7 @@ export default function RecentOpinionsPage() {
                     timestamp={formatDistanceToNow(new Date(opinion.createdAt!), { addSuffix: true })}
                     likesCount={opinion.likesCount || 0}
                     dislikesCount={opinion.dislikesCount || 0}
+                    references={opinion.references || []}
                     fallacyCounts={opinion.fallacyCounts || {}}
                     isLiked={opinion.userVote?.voteType === 'like'}
                     isDisliked={opinion.userVote?.voteType === 'dislike'}

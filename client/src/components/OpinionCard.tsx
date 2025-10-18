@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import UserAvatar from "./UserAvatar";
 import FallacyBadges from "./FallacyBadges";
 import FallacyFlagDialog from "./FallacyFlagDialog";
-import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag } from "lucide-react";
+import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag, Link as LinkIcon, ExternalLink, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
@@ -24,6 +24,7 @@ interface OpinionCardProps {
   timestamp: string;
   likesCount: number;
   dislikesCount: number;
+  references?: string[];
   fallacyCounts?: Record<string, number>;
   isLiked?: boolean;
   isDisliked?: boolean;
@@ -56,6 +57,7 @@ export default function OpinionCard({
   timestamp,
   likesCount,
   dislikesCount,
+  references = [],
   fallacyCounts = {},
   isLiked = false,
   isDisliked = false,
@@ -66,6 +68,7 @@ export default function OpinionCard({
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
   const [showFlagDialog, setShowFlagDialog] = useState(false);
+  const [showReferences, setShowReferences] = useState(false);
   const { toast } = useToast();
 
   // Flag mutation
@@ -235,8 +238,53 @@ export default function OpinionCard({
               <Flag className="w-3 h-3 mr-1" />
               <span className="hidden sm:inline">Flag</span>
             </Button>
+
+            {/* Show references button if there are any */}
+            {references && references.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReferences(!showReferences);
+                }}
+                data-testid={`button-show-references-${id}`}
+              >
+                <LinkIcon className="w-3 h-3 mr-1" />
+                <span className="hidden sm:inline">References</span>
+                <span className="sm:hidden">({references.length})</span>
+                <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showReferences ? 'rotate-180' : ''}`} />
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* References Section */}
+        {showReferences && references && references.length > 0 && (
+          <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-2">
+              <LinkIcon className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Reference Links</span>
+            </div>
+            <div className="space-y-2">
+              {references.filter(ref => ref.trim()).map((ref, index) => (
+                <a
+                  key={index}
+                  href={ref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  data-testid={`link-reference-${index}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">{ref}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
 
       {/* Fallacy Flag Dialog */}

@@ -594,6 +594,8 @@ export default function Home() {
                   timestamp={formatDistanceToNow(new Date(group!.opinion.createdAt!), { addSuffix: true })}
                   likesCount={group!.opinion.likesCount || 0}
                   dislikesCount={group!.opinion.dislikesCount || 0}
+                  references={group!.opinion.references || []}
+                  fallacyCounts={group!.opinion.fallacyCounts || {}}
                   isLiked={group!.opinion.userVote?.voteType === 'like'}
                   isDisliked={group!.opinion.userVote?.voteType === 'dislike'}
                   onLike={() => voteMutation.mutate({ 
