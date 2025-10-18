@@ -9,9 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { MessageSquare, Send, LogOut, Swords, User, Lock, Unlock, RefreshCw, UserPlus, Flag } from "lucide-react";
+import { MessageSquare, Send, LogOut, Swords, Lock, Unlock, RefreshCw, UserPlus, Flag } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -97,6 +95,12 @@ export default function DebateRoomPage() {
     enabled: !!roomId,
   });
 
+  // Fetch available opponents
+  const { data: availableOpponents = [] } = useQuery<User[]>({
+    queryKey: ["/api/topics", room?.topicId, "opponents"],
+    enabled: !!room?.topicId && showChooseOpponentDialog,
+  });
+
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -120,58 +124,76 @@ export default function DebateRoomPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
+      toast({
+        title: "Debate ended",
+        description: "The debate has been concluded.",
+      });
       navigate("/debates");
     },
     onError: (error) => {
       console.error("Failed to end debate:", error);
+      toast({
+        title: "Error",
+        description: "Failed to end debate",
+        variant: "destructive",
+      });
     },
   });
 
-  // Privacy toggle mutation
+  // Privacy mutation
   const privacyMutation = useMutation({
     mutationFn: async (isPrivate: boolean) => {
-      const response = await apiRequest('PUT', `/api/debate-rooms/${roomId}/privacy`, { 
-        privacy: isPrivate ? 'private' : 'public' 
+      const response = await apiRequest('PATCH', `/api/debate-rooms/${roomId}/privacy`, {
+        privacy: isPrivate ? 'private' : 'public'
       });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId, "messages"] });
+      toast({
+        title: "Privacy updated",
+        description: "Your privacy setting has been changed.",
+      });
     },
     onError: (error) => {
       console.error("Failed to update privacy:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update privacy setting",
+        variant: "destructive",
+      });
     },
   });
 
   // Switch opponent mutation
   const switchOpponentMutation = useMutation({
-    mutationFn: async (opponentId?: string) => {
-      const response = await apiRequest('POST', `/api/debate-rooms/${roomId}/switch-opponent`, 
-        opponentId ? { opponentId } : {}
-      );
+    mutationFn: async (newOpponentId?: string) => {
+      const response = await apiRequest('POST', `/api/debate-rooms/${roomId}/switch-opponent`, {
+        newOpponentId
+      });
       return response.json();
     },
-    onSuccess: (newRoom) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
-      navigate(`/debate-room/${newRoom.id}`);
+      toast({
+        title: "Opponent switched",
+        description: "You've been matched with a new opponent.",
+      });
+      setShowChooseOpponentDialog(false);
     },
-    onError: (error: any) => {
+    onError: (error) => {
       console.error("Failed to switch opponent:", error);
-      alert(error.message || "Failed to switch opponent. Please try again.");
+      toast({
+        title: "Error",
+        description: "Failed to switch opponent",
+        variant: "destructive",
+      });
     },
   });
 
-  // Fetch available opponents
-  const { data: availableOpponents = [] } = useQuery<User[]>({
-    queryKey: ["/api/topics", room?.topicId, "available-opponents"],
-    enabled: !!room?.topicId && showChooseOpponentDialog,
-  });
-
-  // Flag debate message mutation
+  // Flag message mutation
   const flagMessageMutation = useMutation({
     mutationFn: async (fallacyType: FallacyType) => {
-      if (!flaggingMessageId) return;
       const response = await fetch(`/api/debate-messages/${flaggingMessageId}/flag`, {
         method: "POST",
         body: JSON.stringify({ fallacyType }),
@@ -215,6 +237,11 @@ export default function DebateRoomPage() {
     }
   };
 
+  const handleTogglePrivacy = () => {
+    const newPrivacyState = !isPrivate;
+    privacyMutation.mutate(newPrivacyState);
+  };
+
   if (roomLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -247,288 +274,241 @@ export default function DebateRoomPage() {
   const isPrivate = currentUserPrivacy === 'private';
 
   return (
-    <div className="container max-w-7xl mx-auto p-4">
-      {/* Header */}
-      <Card className="mb-4">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="p-3 rounded-lg bg-blue-500/10">
-                <Swords className="w-6 h-6 text-blue-500" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h1 className="text-2xl font-bold" data-testid="text-debate-topic">
-                    {topic?.title || "Loading topic..."}
-                  </h1>
-                  <Badge variant={isEnded ? "secondary" : "default"} data-testid="badge-debate-status">
-                    {room.status}
-                  </Badge>
-                </div>
-                {topic?.description && (
-                  <p className="text-muted-foreground text-sm">{topic.description}</p>
-                )}
+    <div className="max-w-5xl mx-auto space-y-4 p-4">
+      {/* Topic Header - Centered and Clean */}
+      <div className="text-center space-y-2">
+        <div className="flex items-center justify-center gap-2">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Swords className="w-5 h-5 text-primary" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-debate-topic">
+            {topic?.title || "Loading topic..."}
+          </h1>
+          <Badge variant={isEnded ? "secondary" : "default"} data-testid="badge-debate-status">
+            {room.status}
+          </Badge>
+        </div>
+        {topic?.description && (
+          <p className="text-muted-foreground text-sm max-w-2xl mx-auto">{topic.description}</p>
+        )}
+      </div>
+
+      {/* Participants Face-Off - Horizontal VS Layout */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between gap-4">
+            {/* Participant 1 */}
+            <div className="flex-1 flex items-center gap-3 justify-start">
+              <Avatar className="w-12 h-12 sm:w-16 sm:h-16">
+                <AvatarImage src={participant1?.profileImageUrl} />
+                <AvatarFallback>
+                  {participant1?.firstName?.[0] || participant1?.email?.[0]?.toUpperCase() || "?"}
+                  {participant1?.lastName?.[0] || participant1?.email?.[1]?.toUpperCase() || "?"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col items-start">
+                <p className="font-semibold text-sm sm:text-base" data-testid={`text-participant-${participant1?.id}`}>
+                  {participant1?.firstName && participant1?.lastName
+                    ? `${participant1.firstName} ${participant1.lastName}`
+                    : participant1?.email || "Loading..."}
+                </p>
+                <Badge variant="outline" className="text-xs">
+                  {room.participant1Stance}
+                </Badge>
               </div>
             </div>
-            {isParticipant && !isEnded && (
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => switchOpponentMutation.mutate(undefined)}
-                  disabled={switchOpponentMutation.isPending}
-                  data-testid="button-match-new"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  {switchOpponentMutation.isPending ? "Matching..." : "End & Match New"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowChooseOpponentDialog(true)}
-                  data-testid="button-choose-opponent"
-                >
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Choose Opponent
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleEndDebate}
-                  disabled={endDebateMutation.isPending}
-                  data-testid="button-end-debate"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  End Debate
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-      </Card>
 
-      <div className="grid gap-4 md:grid-cols-[300px_1fr]">
-        {/* Participants Sidebar */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Participants</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Participant 1 */}
-            {participant1 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarImage src={participant1.profileImageUrl} />
-                    <AvatarFallback>
-                      {participant1.firstName?.[0] || participant1.email?.[0]?.toUpperCase() || "?"}
-                      {participant1.lastName?.[0] || participant1.email?.[1]?.toUpperCase() || "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm" data-testid={`text-participant-${participant1.id}`}>
-                      {participant1.firstName && participant1.lastName
-                        ? `${participant1.firstName} ${participant1.lastName}`
-                        : participant1.email}
-                    </p>
-                    <Badge variant="outline" className="text-xs">
-                      {room.participant1Stance}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <Separator />
+            {/* VS Badge */}
+            <div className="flex-shrink-0">
+              <Badge variant="default" className="px-3 py-1 text-sm font-bold">VS</Badge>
+            </div>
 
             {/* Participant 2 */}
-            {participant2 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarImage src={participant2.profileImageUrl} />
-                    <AvatarFallback>
-                      {participant2.firstName?.[0] || participant2.email?.[0]?.toUpperCase() || "?"}
-                      {participant2.lastName?.[0] || participant2.email?.[1]?.toUpperCase() || "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm" data-testid={`text-participant-${participant2.id}`}>
-                      {participant2.firstName && participant2.lastName
-                        ? `${participant2.firstName} ${participant2.lastName}`
-                        : participant2.email}
-                    </p>
-                    <Badge variant="outline" className="text-xs">
-                      {room.participant2Stance}
-                    </Badge>
-                  </div>
-                </div>
+            <div className="flex-1 flex items-center gap-3 justify-end">
+              <div className="flex flex-col items-end">
+                <p className="font-semibold text-sm sm:text-base" data-testid={`text-participant-${participant2?.id}`}>
+                  {participant2?.firstName && participant2?.lastName
+                    ? `${participant2.firstName} ${participant2.lastName}`
+                    : participant2?.email || "Loading..."}
+                </p>
+                <Badge variant="outline" className="text-xs">
+                  {room.participant2Stance}
+                </Badge>
               </div>
-            )}
+              <Avatar className="w-12 h-12 sm:w-16 sm:h-16">
+                <AvatarImage src={participant2?.profileImageUrl} />
+                <AvatarFallback>
+                  {participant2?.firstName?.[0] || participant2?.email?.[0]?.toUpperCase() || "?"}
+                  {participant2?.lastName?.[0] || participant2?.email?.[1]?.toUpperCase() || "?"}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            {/* Privacy Toggle */}
-            {isParticipant && !isEnded && (
+      {/* Action Buttons - End Debate & Privacy Toggle */}
+      {isParticipant && !isEnded && (
+        <div className="flex flex-wrap gap-2 justify-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTogglePrivacy}
+            disabled={privacyMutation.isPending}
+            data-testid="button-toggle-privacy"
+          >
+            {isPrivate ? (
               <>
-                <Separator />
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Your Privacy Setting</Label>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {isPrivate ? (
-                        <Lock className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <Unlock className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <span className="text-sm text-muted-foreground">
-                        {isPrivate ? "Private" : "Public"}
-                      </span>
-                    </div>
-                    <Switch
-                      checked={isPrivate}
-                      onCheckedChange={(checked) => privacyMutation.mutate(checked)}
-                      disabled={privacyMutation.isPending}
-                      data-testid="switch-privacy"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {isPrivate 
-                      ? "Your messages are hidden from your opponent and public profiles" 
-                      : "Your messages are visible to everyone"}
-                  </p>
-                </div>
+                <Unlock className="w-4 h-4 mr-2" />
+                Make Public
+              </>
+            ) : (
+              <>
+                <Lock className="w-4 h-4 mr-2" />
+                Make Private
               </>
             )}
-          </CardContent>
-        </Card>
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleEndDebate}
+            disabled={endDebateMutation.isPending}
+            data-testid="button-end-debate"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            End Debate
+          </Button>
+        </div>
+      )}
 
-        {/* Chat Area */}
-        <Card className="flex flex-col h-[calc(100vh-300px)]">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MessageSquare className="w-5 h-5" />
-              Debate Chat
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col p-0">
-            {/* Messages */}
-            <ScrollArea className="flex-1 px-4">
-              <div className="space-y-4 py-4">
-                {messages.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No messages yet. Start the debate!</p>
-                  </div>
-                ) : (
-                  messages.map((message) => {
-                    const isOwnMessage = message.userId === currentUser?.id;
-                    const sender = message.userId === room.participant1Id ? participant1 : participant2;
-                    const senderName = sender?.firstName && sender?.lastName
-                      ? `${sender.firstName} ${sender.lastName}`
-                      : sender?.email || 'Unknown';
-                    
-                    return (
-                      <div
-                        key={message.id}
-                        className={`flex gap-3 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}
-                        data-testid={`message-${message.id}`}
-                      >
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={sender?.profileImageUrl} />
-                          <AvatarFallback>
-                            {sender?.firstName?.[0] || sender?.email?.[0]?.toUpperCase() || "?"}
-                            {sender?.lastName?.[0] || sender?.email?.[1]?.toUpperCase() || "?"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className={`flex-1 max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
-                          <div className="flex items-baseline gap-2 mb-1">
-                            <p className="text-sm font-medium">
-                              {senderName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(message.createdAt).toLocaleTimeString()}
-                            </p>
-                          </div>
-                          <div
-                            className={`rounded-lg p-3 ${
-                              isOwnMessage
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted'
-                            }`}
-                          >
-                            <p className="text-sm">{message.content}</p>
-                          </div>
-                          
-                          {/* Fallacy badges */}
-                          {message.fallacyCounts && Object.keys(message.fallacyCounts).some(key => message.fallacyCounts![key] > 0) && (
-                            <div className="mt-2">
-                              <FallacyBadges fallacyCounts={message.fallacyCounts} />
-                            </div>
-                          )}
-                          
-                          {/* Flag button */}
-                          {!isOwnMessage && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setFlaggingMessageId(message.id)}
-                              className="mt-1 h-6 px-2 text-xs"
-                              data-testid={`button-flag-message-${message.id}`}
-                            >
-                              <Flag className="w-3 h-3 mr-1" />
-                              Flag
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            </ScrollArea>
-
-            {/* Message Input */}
-            {isParticipant && !isEnded && (
-              <div className="border-t p-4">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Type your message..."
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                    disabled={sendMessageMutation.isPending}
-                    data-testid="input-message"
-                  />
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={!messageInput.trim() || sendMessageMutation.isPending}
-                    data-testid="button-send-message"
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
+      {/* Chat Area - Full Width */}
+      <Card className="flex flex-col h-[calc(100vh-500px)] sm:h-[calc(100vh-400px)]">
+        <CardHeader className="border-b">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <MessageSquare className="w-5 h-5" />
+            Debate Chat
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 flex flex-col p-0">
+          {/* Messages */}
+          <ScrollArea className="flex-1 px-4">
+            <div className="space-y-4 py-4">
+              {messages.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No messages yet. Start the debate!</p>
                 </div>
+              ) : (
+                messages.map((message) => {
+                  const isOwnMessage = message.userId === currentUser?.id;
+                  const sender = message.userId === room.participant1Id ? participant1 : participant2;
+                  const senderName = sender?.firstName && sender?.lastName
+                    ? `${sender.firstName} ${sender.lastName}`
+                    : sender?.email || 'Unknown';
+                  
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex gap-3 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}
+                      data-testid={`message-${message.id}`}
+                    >
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={sender?.profileImageUrl} />
+                        <AvatarFallback>
+                          {sender?.firstName?.[0] || sender?.email?.[0]?.toUpperCase() || "?"}
+                          {sender?.lastName?.[0] || sender?.email?.[1]?.toUpperCase() || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className={`flex-1 max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <p className="text-sm font-medium">
+                            {senderName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(message.createdAt).toLocaleTimeString()}
+                          </p>
+                        </div>
+                        <div
+                          className={`rounded-lg p-3 ${
+                            isOwnMessage
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted'
+                          }`}
+                        >
+                          <p className="text-sm">{message.content}</p>
+                        </div>
+                        
+                        {/* Fallacy badges */}
+                        {message.fallacyCounts && Object.keys(message.fallacyCounts).some(key => message.fallacyCounts![key] > 0) && (
+                          <div className="mt-2">
+                            <FallacyBadges fallacyCounts={message.fallacyCounts} />
+                          </div>
+                        )}
+                        
+                        {/* Flag button */}
+                        {!isOwnMessage && !isEnded && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setFlaggingMessageId(message.id)}
+                            className="mt-1 h-6 px-2 text-xs"
+                            data-testid={`button-flag-message-${message.id}`}
+                          >
+                            <Flag className="w-3 h-3 mr-1" />
+                            Flag Fallacy
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+
+          {/* Message Input */}
+          {isParticipant && !isEnded && (
+            <div className="border-t p-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Type your message..."
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  disabled={sendMessageMutation.isPending}
+                  data-testid="input-message"
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!messageInput.trim() || sendMessageMutation.isPending}
+                  data-testid="button-send-message"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
               </div>
-            )}
-            
-            {!isParticipant && (
-              <div className="border-t p-4 text-center text-sm text-muted-foreground">
-                You are viewing this debate as a spectator
-              </div>
-            )}
-            
-            {isEnded && (
-              <div className="border-t p-4 text-center text-sm text-muted-foreground">
-                This debate has ended
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+          
+          {!isParticipant && (
+            <div className="border-t p-4 text-center text-sm text-muted-foreground">
+              You are viewing this debate as a spectator
+            </div>
+          )}
+          
+          {isEnded && (
+            <div className="border-t p-4 text-center text-sm text-muted-foreground">
+              This debate has ended
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Choose Opponent Dialog */}
       <Dialog open={showChooseOpponentDialog} onOpenChange={setShowChooseOpponentDialog}>

@@ -167,7 +167,7 @@ export default function AppSidebar({
                     <Link href={item.path} onClick={handleLinkClick} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                       <item.icon className="w-4 h-4" />
                       <span>{item.title}</span>
-                      {'badge' in item && item.badge > 0 && (
+                      {'badge' in item && item.badge !== undefined && item.badge > 0 && (
                         <Badge variant="default" className="ml-auto text-xs" data-testid="badge-active-debates-count">
                           {item.badge}
                         </Badge>
