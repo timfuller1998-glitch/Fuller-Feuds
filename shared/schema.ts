@@ -88,6 +88,7 @@ export const opinions = pgTable("opinions", {
   content: text("content").notNull(),
   stance: varchar("stance", { length: 20 }).notNull(), // 'for', 'against', 'neutral'
   status: varchar("status", { length: 20 }).default("approved"), // 'pending', 'approved', 'flagged', 'hidden'
+  references: text("references").array().default(sql`ARRAY[]::text[]`), // Reference links/URLs
   likesCount: integer("likes_count").default(0),
   dislikesCount: integer("dislikes_count").default(0),
   repliesCount: integer("replies_count").default(0),
