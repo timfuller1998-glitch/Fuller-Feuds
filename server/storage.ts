@@ -141,6 +141,7 @@ export interface IStorage {
   
   // Debate rooms
   createDebateRoom(room: InsertDebateRoom): Promise<DebateRoom>;
+  createDebateRoomWithOpinionAuthor(opinionId: string, userId: string): Promise<DebateRoom>;
   getDebateRoom(id: string): Promise<DebateRoom | undefined>;
   getUserDebateRooms(userId: string): Promise<DebateRoom[]>;
   endDebateRoom(id: string): Promise<void>;
@@ -743,6 +744,56 @@ export class DatabaseStorage implements IStorage {
   async createDebateRoom(room: InsertDebateRoom): Promise<DebateRoom> {
     const [created] = await db.insert(debateRooms).values(room).returning();
     return created;
+  }
+
+  async createDebateRoomWithOpinionAuthor(opinionId: string, userId: string): Promise<DebateRoom> {
+    // Get the opinion to find the author and topic
+    const opinion = await this.getOpinion(opinionId);
+    if (!opinion) {
+      throw new Error("Opinion not found");
+    }
+
+    const opinionAuthorId = opinion.userId;
+    const topicId = opinion.topicId;
+
+    // Prevent users from debating themselves
+    if (opinionAuthorId === userId) {
+      throw new Error("You cannot debate your own opinion");
+    }
+
+    // Get current user's opinion on the same topic to determine their stance
+    const userOpinions = await db
+      .select()
+      .from(opinions)
+      .where(and(
+        eq(opinions.topicId, topicId),
+        eq(opinions.userId, userId)
+      ))
+      .limit(1);
+
+    if (userOpinions.length === 0) {
+      throw new Error("You must have an opinion on this topic before starting a debate");
+    }
+
+    const userOpinion = userOpinions[0];
+
+    // Check if they have the same stance
+    if (userOpinion.stance === opinion.stance) {
+      throw new Error("You cannot debate someone with the same stance as you");
+    }
+
+    // Create the debate room
+    const room = await this.createDebateRoom({
+      topicId,
+      participant1Id: userId,
+      participant2Id: opinionAuthorId,
+      participant1Stance: userOpinion.stance,
+      participant2Stance: opinion.stance,
+      participant1Privacy: "public",
+      participant2Privacy: "public",
+    });
+
+    return room;
   }
 
   async getDebateRoom(id: string): Promise<DebateRoom | undefined> {
