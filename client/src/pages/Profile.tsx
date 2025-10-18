@@ -1188,7 +1188,7 @@ export default function Profile() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {leaderboards.mostOpinionated?.map((entry: any, index: number) => (
+                      {(leaderboards.mostOpinionated || []).map((entry: any, index: number) => (
                         <div
                           key={entry.userId}
                           className={`flex items-center gap-3 p-3 rounded-lg border ${
@@ -1236,7 +1236,7 @@ export default function Profile() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {leaderboards.mostDebates?.map((entry: any, index: number) => (
+                      {(leaderboards.mostDebates || []).map((entry: any, index: number) => (
                         <div
                           key={entry.userId}
                           className={`flex items-center gap-3 p-3 rounded-lg border ${
@@ -1284,7 +1284,7 @@ export default function Profile() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {leaderboards.mostTopics?.map((entry: any, index: number) => (
+                      {(leaderboards.mostTopics || []).map((entry: any, index: number) => (
                         <div
                           key={entry.userId}
                           className={`flex items-center gap-3 p-3 rounded-lg border ${
@@ -1332,7 +1332,7 @@ export default function Profile() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {leaderboards.logicalReasoning?.map((entry: any, index: number) => (
+                      {(leaderboards.logicalReasoning || []).map((entry: any, index: number) => (
                         <div
                           key={entry.userId}
                           className={`flex items-center gap-3 p-3 rounded-lg border ${
