@@ -33,6 +33,8 @@ interface OpinionCardProps {
   onAdopt?: (id: string) => void;
   onFlag?: (id: string) => void;
   onDebate?: (id: string) => void;
+  onRandomMatch?: () => void;
+  isRandomMatchPending?: boolean;
 }
 
 const stanceBadgeVariant = {
@@ -66,7 +68,9 @@ export default function OpinionCard({
   onDislike,
   onAdopt,
   onFlag,
-  onDebate
+  onDebate,
+  onRandomMatch,
+  isRandomMatchPending = false
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
   const [showFlagDialog, setShowFlagDialog] = useState(false);
@@ -240,6 +244,25 @@ export default function OpinionCard({
               >
                 <MessageCircle className="w-3 h-3 mr-1" />
                 <span className="hidden sm:inline">Change My Mind</span>
+              </Button>
+            )}
+
+            {onRandomMatch && (
+              <Button
+                variant="default"
+                size="sm"
+                className="h-8 px-3"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRandomMatch();
+                }}
+                disabled={isRandomMatchPending}
+                data-testid={`button-random-match-${id}`}
+              >
+                <MessageCircle className="w-3 h-3 mr-1" />
+                <span className="hidden sm:inline">
+                  {isRandomMatchPending ? "Matching..." : "Find Random Debate"}
+                </span>
               </Button>
             )}
             

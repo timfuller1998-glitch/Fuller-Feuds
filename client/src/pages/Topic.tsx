@@ -451,18 +451,31 @@ export default function Topic() {
                     </div>
                     <p className="text-sm">{userOpinion.content}</p>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
-                      opinionForm.setValue('content', userOpinion.content);
-                      opinionForm.setValue('references', userOpinion.references || []);
-                      setShowOpinionForm(true);
-                    }}
-                    data-testid="button-change-opinion"
-                  >
-                    Update Opinion
-                  </Button>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
+                        opinionForm.setValue('content', userOpinion.content);
+                        opinionForm.setValue('references', userOpinion.references || []);
+                        setShowOpinionForm(true);
+                      }}
+                      data-testid="button-change-opinion"
+                    >
+                      Update Opinion
+                    </Button>
+                    {oppositeOpinions.length > 0 && (
+                      <Button
+                        variant="default"
+                        onClick={() => startDebateMutation.mutate()}
+                        disabled={startDebateMutation.isPending}
+                        data-testid="button-find-random-debate"
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        {startDebateMutation.isPending ? "Matching..." : "Find Random Debate"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ) : showOpinionForm ? (
                 <Form {...opinionForm}>
@@ -630,7 +643,9 @@ export default function Topic() {
                         currentVote: opinion.userVote?.voteType 
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
-                      onDebate={(id) => startDebateWithOpinionMutation.mutate(id)}
+                      onDebate={opinion.userId !== user?.id ? (id) => startDebateWithOpinionMutation.mutate(id) : undefined}
+                      onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
+                      isRandomMatchPending={startDebateMutation.isPending}
                     />
                   ))}
                 </div>
@@ -669,7 +684,9 @@ export default function Topic() {
                         currentVote: opinion.userVote?.voteType 
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
-                      onDebate={(id) => startDebateWithOpinionMutation.mutate(id)}
+                      onDebate={opinion.userId !== user?.id ? (id) => startDebateWithOpinionMutation.mutate(id) : undefined}
+                      onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
+                      isRandomMatchPending={startDebateMutation.isPending}
                     />
                   ))}
                 </div>
@@ -708,7 +725,9 @@ export default function Topic() {
                         currentVote: opinion.userVote?.voteType 
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
-                      onDebate={(id) => startDebateWithOpinionMutation.mutate(id)}
+                      onDebate={opinion.userId !== user?.id ? (id) => startDebateWithOpinionMutation.mutate(id) : undefined}
+                      onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
+                      isRandomMatchPending={startDebateMutation.isPending}
                     />
                   ))}
                 </div>
@@ -912,42 +931,6 @@ export default function Topic() {
         </div>
       )}
 
-      {/* Chat with Opposite Opinion Users */}
-      {userOpinion && oppositeOpinions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Debate with Others</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
-              Connect with {oppositeOpinions.length} {oppositeOpinions.length === 1 ? 'person' : 'people'} who {
-                userOpinion.stance === 'for' ? 'disagree or have a neutral view' : 
-                userOpinion.stance === 'against' ? 'agree or have a neutral view' : 
-                'have a different perspective'
-              } on this topic.
-            </p>
-            <Button 
-              onClick={() => startDebateMutation.mutate()}
-              disabled={startDebateMutation.isPending}
-              data-testid="button-start-chat"
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              {startDebateMutation.isPending ? "Matching..." : "Start a Debate"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {userOpinion && oppositeOpinions.length === 0 && (
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <MessageCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">
-              No one with a different perspective has shared their thoughts yet. Check back later!
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Topic Flag Dialog */}
       <FallacyFlagDialog
