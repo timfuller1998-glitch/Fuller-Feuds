@@ -242,19 +242,21 @@ export default function OpinionCard({
             {/* Show references button if there are any */}
             {references && references.length > 0 && (
               <Button
-                variant="ghost"
+                variant={showReferences ? "default" : "outline"}
                 size="sm"
-                className="h-8 px-3"
+                className="h-8 px-3 gap-1.5"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowReferences(!showReferences);
                 }}
                 data-testid={`button-show-references-${id}`}
               >
-                <LinkIcon className="w-3 h-3 mr-1" />
-                <span className="hidden sm:inline">References</span>
-                <span className="sm:hidden">({references.length})</span>
-                <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${showReferences ? 'rotate-180' : ''}`} />
+                <LinkIcon className="w-3.5 h-3.5" />
+                <span>References</span>
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                  {references.length}
+                </Badge>
+                <ChevronDown className={`w-3 h-3 ml-0.5 transition-transform ${showReferences ? 'rotate-180' : ''}`} />
               </Button>
             )}
           </div>
