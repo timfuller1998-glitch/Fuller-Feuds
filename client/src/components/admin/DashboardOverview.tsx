@@ -20,10 +20,6 @@ export function DashboardOverview() {
     queryKey: ['/api/admin/flagged-opinions'],
   });
 
-  const { data: pendingChallenges } = useQuery({
-    queryKey: ['/api/admin/pending-challenges'],
-  });
-
   const stats = [
     {
       title: "Total Users",
@@ -48,7 +44,7 @@ export function DashboardOverview() {
     },
     {
       title: "Flagged Content",
-      value: (flaggedOpinions?.length || 0) + (pendingChallenges?.length || 0),
+      value: flaggedOpinions?.length || 0,
       icon: Flag,
       description: "Items requiring review",
       testId: "stat-flagged"
