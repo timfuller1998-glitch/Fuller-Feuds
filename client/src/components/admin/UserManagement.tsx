@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
-import { Users, Search, Shield, User, Ban, Unlock } from "lucide-react";
+import { Users, Search, Shield, User, Ban, Unlock, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +28,7 @@ export function UserManagement() {
   const [newRole, setNewRole] = useState<string>("");
   const [statusChangeUser, setStatusChangeUser] = useState<any>(null);
   const [newStatus, setNewStatus] = useState<string>("");
+  const [deleteUser, setDeleteUser] = useState<any>(null);
 
   // Fetch users with filters
   const { data: users, isLoading } = useQuery({
@@ -68,6 +69,18 @@ export function UserManagement() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/audit-log'] });
       setStatusChangeUser(null);
       setNewStatus("");
+    },
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest('DELETE', `/api/admin/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/audit-log'] });
+      setDeleteUser(null);
     },
   });
 
@@ -215,6 +228,15 @@ export function UserManagement() {
                       {user.status === 'banned' ? <Unlock className="h-4 w-4 mr-2" /> : <Ban className="h-4 w-4 mr-2" />}
                       Status
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setDeleteUser(user)}
+                      data-testid={`button-delete-user-${user.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -305,6 +327,35 @@ export function UserManagement() {
               data-testid="button-confirm-status-change"
             >
               {updateStatusMutation.isPending ? "Updating..." : "Update Status"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <AlertDialog open={!!deleteUser} onOpenChange={() => setDeleteUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete the account for {deleteUser?.firstName} {deleteUser?.lastName}?
+              <br /><br />
+              <strong className="text-destructive">This action cannot be undone.</strong> All user data, opinions, debates, and associated content will be permanently removed from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-user">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteUser) {
+                  deleteUserMutation.mutate(deleteUser.id);
+                }
+              }}
+              disabled={deleteUserMutation.isPending}
+              data-testid="button-confirm-delete-user"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteUserMutation.isPending ? "Deleting..." : "Delete Account"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
