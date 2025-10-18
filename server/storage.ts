@@ -211,6 +211,7 @@ export interface IStorage {
   getAllUsers(filters?: { role?: string; status?: string; search?: string; limit?: number }): Promise<User[]>;
   updateUserRole(userId: string, role: string, adminId: string): Promise<void>;
   updateUserStatus(userId: string, status: string, adminId: string): Promise<void>;
+  deleteUser(userId: string, adminId: string): Promise<void>;
   
   // Admin - Content management
   getAllTopics(filters?: { status?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<TopicWithCounts[]>;
@@ -1606,6 +1607,57 @@ export class DatabaseStorage implements IStorage {
         moderatorId: adminId,
         reason: `Status changed to ${status}`,
       });
+    });
+  }
+
+  async deleteUser(userId: string, adminId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Log the deletion action before deleting
+      await tx.insert(moderationActions).values({
+        actionType: 'user_deletion',
+        targetType: 'user',
+        targetId: userId,
+        moderatorId: adminId,
+        reason: `User account permanently deleted`,
+      });
+
+      // Delete user's data in the correct order (due to foreign key constraints)
+      // Delete opinions first (they reference users)
+      await tx.delete(opinions).where(eq(opinions.userId, userId));
+      
+      // Delete debate messages (they reference users)
+      await tx.delete(debateMessages).where(eq(debateMessages.userId, userId));
+      
+      // Delete debate rooms where user is participant
+      await tx.delete(debateRooms).where(
+        or(
+          eq(debateRooms.participant1Id, userId),
+          eq(debateRooms.participant2Id, userId)
+        )
+      );
+      
+      // Delete topics created by user
+      await tx.delete(topics).where(eq(topics.createdById, userId));
+      
+      // Delete user follows
+      await tx.delete(userFollows).where(
+        or(
+          eq(userFollows.followerId, userId),
+          eq(userFollows.followingId, userId)
+        )
+      );
+      
+      // Delete user profile
+      await tx.delete(userProfiles).where(eq(userProfiles.userId, userId));
+      
+      // Delete opinion votes
+      await tx.delete(opinionVotes).where(eq(opinionVotes.userId, userId));
+      
+      // Delete user badges
+      await tx.delete(userBadges).where(eq(userBadges.userId, userId));
+      
+      // Finally, delete the user
+      await tx.delete(users).where(eq(users.id, userId));
     });
   }
   
