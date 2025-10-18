@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye, RefreshCw, Zap, Mic, ChevronRight, Clock } from "lucide-react";
+import { TrendingUp, MessageCircle, Users, Plus, Radio, Eye, RefreshCw, Zap, Mic, ChevronRight, Clock, Link as LinkIcon, X } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { insertTopicSchema, insertOpinionSchema, type Topic, type TopicWithCounts, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
@@ -37,6 +37,7 @@ const opinionFormSchema = insertOpinionSchema.omit({
 }).extend({
   content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
   stance: z.enum(["for", "against", "neutral"], { required_error: "Please select a stance" }),
+  references: z.array(z.string().url().or(z.literal(''))).optional().default([]),
 });
 
 export default function Home() {
@@ -234,6 +235,7 @@ export default function Home() {
     defaultValues: {
       content: "",
       stance: "neutral",
+      references: [],
     },
   });
 
