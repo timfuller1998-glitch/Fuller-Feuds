@@ -1,14 +1,13 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import UserAvatar from "./UserAvatar";
 import FallacyBadges from "./FallacyBadges";
 import FallacyFlagDialog from "./FallacyFlagDialog";
-import { ThumbsUp, ThumbsDown, UserPlus, Clock, AlertTriangle, ChevronDown, Flag } from "lucide-react";
+import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -25,14 +24,12 @@ interface OpinionCardProps {
   timestamp: string;
   likesCount: number;
   dislikesCount: number;
-  challengesCount: number;
   fallacyCounts?: Record<string, number>;
   isLiked?: boolean;
   isDisliked?: boolean;
   onLike?: (id: string) => void;
   onDislike?: (id: string) => void;
   onAdopt?: (id: string) => void;
-  onChallenge?: (id: string) => void;
   onFlag?: (id: string) => void;
 }
 
@@ -59,26 +56,17 @@ export default function OpinionCard({
   timestamp,
   likesCount,
   dislikesCount,
-  challengesCount,
   fallacyCounts = {},
   isLiked = false,
   isDisliked = false,
   onLike,
   onDislike,
   onAdopt,
-  onChallenge,
   onFlag
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
-  const [showChallenges, setShowChallenges] = useState(false);
   const [showFlagDialog, setShowFlagDialog] = useState(false);
   const { toast } = useToast();
-
-  // Fetch challenges when expanded
-  const { data: challenges } = useQuery<any[]>({
-    queryKey: ["/api/opinions", id, "challenges"],
-    enabled: showChallenges && challengesCount > 0,
-  });
 
   // Flag mutation
   const flagMutation = useMutation({
@@ -226,20 +214,6 @@ export default function OpinionCard({
               className="h-8 px-3"
               onClick={(e) => {
                 e.stopPropagation();
-                onChallenge?.(id);
-              }}
-              data-testid={`button-challenge-${id}`}
-            >
-              <AlertTriangle className="w-3 h-3 mr-1" />
-              {challengesCount > 0 && challengesCount}
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-3"
-              onClick={(e) => {
-                e.stopPropagation();
                 onAdopt?.(id);
               }}
               data-testid={`button-adopt-${id}`}
@@ -263,53 +237,6 @@ export default function OpinionCard({
             </Button>
           </div>
         </div>
-
-        {/* Challenges Section */}
-        {challengesCount > 0 && (
-          <Collapsible open={showChallenges} onOpenChange={setShowChallenges} className="mt-4">
-            <CollapsibleTrigger 
-              className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover-elevate active-elevate-2 rounded p-2 w-full"
-              onClick={(e) => e.stopPropagation()}
-              data-testid={`button-toggle-challenges-${id}`}
-            >
-              <ChevronDown className={`w-4 h-4 transition-transform ${showChallenges ? 'rotate-180' : ''}`} />
-              <AlertTriangle className="w-4 h-4" />
-              <span>{challengesCount} Challenge{challengesCount !== 1 ? 's' : ''}</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
-              {challenges?.map((challenge) => (
-                <div 
-                  key={challenge.id} 
-                  className="border rounded-lg p-3 bg-muted/30"
-                  data-testid={`challenge-${challenge.id}`}
-                >
-                  <div className="flex items-start gap-3">
-                    {challenge.user && (
-                      <UserAvatar 
-                        name={`${challenge.user.firstName || ''} ${challenge.user.lastName || ''}`.trim() || 'Anonymous'} 
-                        imageUrl={challenge.user.profileImageUrl} 
-                        size="sm" 
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium">
-                          {challenge.user ? `${challenge.user.firstName || ''} ${challenge.user.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                        </span>
-                        {challenge.createdAt && (
-                          <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(challenge.createdAt), { addSuffix: true })}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{challenge.context}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        )}
       </CardContent>
 
       {/* Fallacy Flag Dialog */}
