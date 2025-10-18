@@ -755,6 +755,8 @@ export class DatabaseStorage implements IStorage {
 
     const opinionAuthorId = opinion.userId;
     const topicId = opinion.topicId;
+    
+    console.log(`[Debate Storage] Creating debate: opinionAuthor=${opinionAuthorId}, currentUser=${userId}, topicId=${topicId}`);
 
     // Prevent users from debating themselves
     if (opinionAuthorId === userId) {
@@ -770,6 +772,8 @@ export class DatabaseStorage implements IStorage {
         eq(opinions.userId, userId)
       ))
       .limit(1);
+    
+    console.log(`[Debate Storage] Found ${userOpinions.length} opinions for user ${userId} on topic ${topicId}`);
 
     if (userOpinions.length === 0) {
       throw new Error("You must have an opinion on this topic before starting a debate");

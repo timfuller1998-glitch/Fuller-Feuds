@@ -551,12 +551,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { opinionId } = req.params;
+      
+      console.log(`[Debate] User ${userId} attempting to start debate with opinion ${opinionId}`);
 
       const room = await storage.createDebateRoomWithOpinionAuthor(opinionId, userId);
+      
+      console.log(`[Debate] Successfully created debate room ${room.id} between ${room.participant1Id} and ${room.participant2Id}`);
       res.status(201).json(room);
     } catch (error: any) {
-      console.error("Error starting debate:", error);
-      res.status(error.message?.includes('cannot debate') || error.message?.includes('same stance') ? 400 : 500)
+      console.error(`[Debate] Error starting debate for user ${userId} with opinion ${opinionId}:`, error.message);
+      res.status(error.message?.includes('cannot debate') || error.message?.includes('same stance') || error.message?.includes('must have an opinion') ? 400 : 500)
         .json({ message: error.message || "Failed to start debate" });
     }
   });
