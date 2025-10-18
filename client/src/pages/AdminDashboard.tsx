@@ -23,7 +23,10 @@ import {
   LayoutDashboard,
   Users,
   Filter,
-  FileText
+  FileText,
+  MessageSquare,
+  Trash2,
+  BookOpen
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
@@ -31,12 +34,34 @@ import { DashboardOverview } from "@/components/admin/DashboardOverview";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { ContentFilters } from "@/components/admin/ContentFilters";
 import { AuditLog } from "@/components/admin/AuditLog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function AdminDashboard() {
   const [selectedOpinion, setSelectedOpinion] = useState<string | null>(null);
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
   const [opinionModerationReason, setOpinionModerationReason] = useState("");
   const [challengeModerationReason, setChallengeModerationReason] = useState("");
+  const [deleteTopicId, setDeleteTopicId] = useState<string | null>(null);
+  const [deleteOpinionId, setDeleteOpinionId] = useState<string | null>(null);
+
+  // Fetch all topics
+  const { data: allTopics, isLoading: loadingTopics } = useQuery({
+    queryKey: ['/api/admin/topics'],
+  });
+
+  // Fetch all opinions
+  const { data: allOpinions, isLoading: loadingOpinions } = useQuery({
+    queryKey: ['/api/admin/opinions'],
+  });
 
   // Fetch flagged opinions
   const { data: flaggedOpinions, isLoading: loadingFlagged } = useQuery({
@@ -102,6 +127,30 @@ export default function AdminDashboard() {
     },
   });
 
+  // Delete topic mutation
+  const deleteTopicMutation = useMutation({
+    mutationFn: async (topicId: string) => {
+      return await apiRequest('DELETE', `/api/admin/topics/${topicId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/topics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/audit-log'] });
+      setDeleteTopicId(null);
+    },
+  });
+
+  // Delete opinion mutation
+  const deleteOpinionMutation = useMutation({
+    mutationFn: async (opinionId: string) => {
+      return await apiRequest('DELETE', `/api/admin/opinions/${opinionId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/opinions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/audit-log'] });
+      setDeleteOpinionId(null);
+    },
+  });
+
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="flex items-center gap-3 mb-6">
@@ -113,7 +162,7 @@ export default function AdminDashboard() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid lg:grid-cols-6" data-testid="tabs-admin-sections">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid lg:grid-cols-8" data-testid="tabs-admin-sections">
           <TabsTrigger value="overview" data-testid="tab-overview">
             <LayoutDashboard className="h-4 w-4 mr-2" />
             Overview
@@ -121,6 +170,14 @@ export default function AdminDashboard() {
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="h-4 w-4 mr-2" />
             Users
+          </TabsTrigger>
+          <TabsTrigger value="topics" data-testid="tab-topics">
+            <BookOpen className="h-4 w-4 mr-2" />
+            Topics
+          </TabsTrigger>
+          <TabsTrigger value="opinions" data-testid="tab-opinions">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Opinions
           </TabsTrigger>
           <TabsTrigger value="flagged" data-testid="tab-flagged-opinions">
             <Flag className="h-4 w-4 mr-2" />
@@ -154,6 +211,132 @@ export default function AdminDashboard() {
         {/* Users Tab */}
         <TabsContent value="users">
           <UserManagement />
+        </TabsContent>
+
+        {/* Topics Tab */}
+        <TabsContent value="topics" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                All Topics
+              </CardTitle>
+              <CardDescription>View and moderate all platform topics</CardDescription>
+            </CardHeader>
+          </Card>
+          {loadingTopics ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Loading topics...
+              </CardContent>
+            </Card>
+          ) : allTopics?.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                No topics found
+              </CardContent>
+            </Card>
+          ) : (
+            allTopics?.map((topic: any) => (
+              <Card key={topic.id} className="hover-elevate" data-testid={`card-topic-${topic.id}`}>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg truncate" data-testid={`text-topic-title-${topic.id}`}>
+                        {topic.title}
+                      </CardTitle>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <Badge variant="secondary" data-testid={`badge-topic-status-${topic.id}`}>
+                          {topic.status}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {topic.opinionsCount || 0} opinions
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          Created {formatDistanceToNow(new Date(topic.createdAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setDeleteTopicId(topic.id)}
+                      data-testid={`button-delete-topic-${topic.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  </div>
+                </CardHeader>
+              </Card>
+            ))
+          )}
+        </TabsContent>
+
+        {/* Opinions Tab */}
+        <TabsContent value="opinions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                All Opinions
+              </CardTitle>
+              <CardDescription>View and moderate all platform opinions</CardDescription>
+            </CardHeader>
+          </Card>
+          {loadingOpinions ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Loading opinions...
+              </CardContent>
+            </Card>
+          ) : allOpinions?.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                No opinions found
+              </CardContent>
+            </Card>
+          ) : (
+            allOpinions?.map((opinion: any) => (
+              <Card key={opinion.id} className="hover-elevate" data-testid={`card-opinion-${opinion.id}`}>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant={opinion.stance === 'for' ? 'default' : 'secondary'}>
+                          {opinion.stance}
+                        </Badge>
+                        <Badge variant="outline" data-testid={`badge-opinion-status-${opinion.id}`}>
+                          {opinion.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm mb-2" data-testid={`text-opinion-content-${opinion.id}`}>
+                        {opinion.content}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{opinion.likesCount || 0} likes</span>
+                        <span>•</span>
+                        <span>{opinion.dislikesCount || 0} dislikes</span>
+                        <span>•</span>
+                        <span>
+                          {formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setDeleteOpinionId(opinion.id)}
+                      data-testid={`button-delete-opinion-${opinion.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  </div>
+                </CardHeader>
+              </Card>
+            ))
+          )}
         </TabsContent>
 
         {/* Flagged Opinions Tab */}
@@ -381,6 +564,60 @@ export default function AdminDashboard() {
           <AuditLog />
         </TabsContent>
       </Tabs>
+
+      {/* Delete Topic Confirmation Dialog */}
+      <AlertDialog open={!!deleteTopicId} onOpenChange={() => setDeleteTopicId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Topic</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this topic? This action cannot be undone and will also remove all associated opinions and debates.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-topic">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTopicId) {
+                  deleteTopicMutation.mutate(deleteTopicId);
+                }
+              }}
+              disabled={deleteTopicMutation.isPending}
+              data-testid="button-confirm-delete-topic"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteTopicMutation.isPending ? "Deleting..." : "Delete Topic"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Opinion Confirmation Dialog */}
+      <AlertDialog open={!!deleteOpinionId} onOpenChange={() => setDeleteOpinionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Opinion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this opinion? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-opinion">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteOpinionId) {
+                  deleteOpinionMutation.mutate(deleteOpinionId);
+                }
+              }}
+              disabled={deleteOpinionMutation.isPending}
+              data-testid="button-confirm-delete-opinion"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteOpinionMutation.isPending ? "Deleting..." : "Delete Opinion"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

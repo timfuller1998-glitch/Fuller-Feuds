@@ -775,6 +775,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/admin/users/:userId/status', requireAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const { status } = req.body;
+      
+      if (!status || !['active', 'suspended', 'banned'].includes(status)) {
+        return res.status(400).json({ message: "Invalid status. Must be 'active', 'suspended', or 'banned'" });
+      }
+      
+      await storage.updateUserStatus(req.params.userId, status, adminId);
+      res.json({ message: 'User status updated successfully' });
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      res.status(500).json({ message: "Failed to update user status" });
+    }
+  });
+
   // Admin - Content management routes
   app.get('/api/admin/topics', requireAdmin, async (req, res) => {
     try {
@@ -805,6 +822,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching opinions:", error);
       res.status(500).json({ message: "Failed to fetch opinions" });
+    }
+  });
+
+  app.delete('/api/admin/topics/:topicId', requireAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const topicId = req.params.topicId;
+      
+      await storage.deleteTopicAdmin(topicId, adminId);
+      res.json({ message: 'Topic deleted successfully' });
+    } catch (error) {
+      console.error("Error deleting topic:", error);
+      res.status(500).json({ message: "Failed to delete topic" });
+    }
+  });
+
+  app.delete('/api/admin/opinions/:opinionId', requireAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const opinionId = req.params.opinionId;
+      
+      await storage.deleteOpinionAdmin(opinionId, adminId);
+      res.json({ message: 'Opinion deleted successfully' });
+    } catch (error) {
+      console.error("Error deleting opinion:", error);
+      res.status(500).json({ message: "Failed to delete opinion" });
     }
   });
 

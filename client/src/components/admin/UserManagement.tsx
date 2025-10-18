@@ -26,6 +26,8 @@ export function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [newRole, setNewRole] = useState<string>("");
+  const [statusChangeUser, setStatusChangeUser] = useState<any>(null);
+  const [newStatus, setNewStatus] = useState<string>("");
 
   // Fetch users with filters
   const { data: users, isLoading } = useQuery({
@@ -50,8 +52,22 @@ export function UserManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/audit-log'] });
       setSelectedUser(null);
       setNewRole("");
+    },
+  });
+
+  // Update user status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ userId, status }: { userId: string; status: string }) => {
+      return await apiRequest('PUT', `/api/admin/users/${userId}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/audit-log'] });
+      setStatusChangeUser(null);
+      setNewStatus("");
     },
   });
 
@@ -174,18 +190,32 @@ export function UserManagement() {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedUser(user);
-                      setNewRole(user.role);
-                    }}
-                    data-testid={`button-manage-${user.id}`}
-                  >
-                    <Shield className="h-4 w-4 mr-2" />
-                    Manage Role
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setNewRole(user.role);
+                      }}
+                      data-testid={`button-manage-role-${user.id}`}
+                    >
+                      <Shield className="h-4 w-4 mr-2" />
+                      Role
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setStatusChangeUser(user);
+                        setNewStatus(user.status);
+                      }}
+                      data-testid={`button-manage-status-${user.id}`}
+                    >
+                      {user.status === 'banned' ? <Unlock className="h-4 w-4 mr-2" /> : <Ban className="h-4 w-4 mr-2" />}
+                      Status
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -229,6 +259,52 @@ export function UserManagement() {
               data-testid="button-confirm-role-change"
             >
               {updateRoleMutation.isPending ? "Updating..." : "Update Role"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Status Change Dialog */}
+      <AlertDialog open={!!statusChangeUser} onOpenChange={() => setStatusChangeUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update User Status</AlertDialogTitle>
+            <AlertDialogDescription>
+              Change the account status for {statusChangeUser?.firstName} {statusChangeUser?.lastName}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Select value={newStatus} onValueChange={setNewStatus}>
+              <SelectTrigger data-testid="select-new-status">
+                <SelectValue placeholder="Select new status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="suspended">Suspended</SelectItem>
+                <SelectItem value="banned">Banned</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground mt-3">
+              {newStatus === 'banned' && 'User will be permanently banned from the platform.'}
+              {newStatus === 'suspended' && 'User will be temporarily suspended from the platform.'}
+              {newStatus === 'active' && 'User will have full access to the platform.'}
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-status-change">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (statusChangeUser && newStatus) {
+                  updateStatusMutation.mutate({
+                    userId: statusChangeUser.id,
+                    status: newStatus,
+                  });
+                }
+              }}
+              disabled={!newStatus || newStatus === statusChangeUser?.status || updateStatusMutation.isPending}
+              data-testid="button-confirm-status-change"
+            >
+              {updateStatusMutation.isPending ? "Updating..." : "Update Status"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

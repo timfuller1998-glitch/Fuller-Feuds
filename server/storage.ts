@@ -210,10 +210,13 @@ export interface IStorage {
   // Admin - User management
   getAllUsers(filters?: { role?: string; status?: string; search?: string; limit?: number }): Promise<User[]>;
   updateUserRole(userId: string, role: string, adminId: string): Promise<void>;
+  updateUserStatus(userId: string, status: string, adminId: string): Promise<void>;
   
   // Admin - Content management
   getAllTopics(filters?: { status?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<TopicWithCounts[]>;
   getAllOpinions(filters?: { status?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<Opinion[]>;
+  deleteTopicAdmin(topicId: string, adminId: string): Promise<void>;
+  deleteOpinionAdmin(opinionId: string, adminId: string): Promise<void>;
   
   // Admin - Audit log
   getModerationActions(filters?: { actionType?: string; moderatorId?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<any[]>;
@@ -1587,6 +1590,24 @@ export class DatabaseStorage implements IStorage {
       });
     });
   }
+
+  async updateUserStatus(userId: string, status: string, adminId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Update user status
+      await tx.update(users)
+        .set({ status })
+        .where(eq(users.id, userId));
+      
+      // Log the action
+      await tx.insert(moderationActions).values({
+        actionType: 'status_change',
+        targetType: 'user',
+        targetId: userId,
+        moderatorId: adminId,
+        reason: `Status changed to ${status}`,
+      });
+    });
+  }
   
   // Admin - Content management
   async getAllTopics(filters: { status?: string; startDate?: Date; endDate?: Date; limit?: number } = {}): Promise<TopicWithCounts[]> {
@@ -1647,6 +1668,41 @@ export class DatabaseStorage implements IStorage {
     }
     
     return await query.orderBy(desc(opinions.createdAt)).limit(limit);
+  }
+
+  async deleteTopicAdmin(topicId: string, adminId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Soft delete the topic
+      await tx.update(topics)
+        .set({ isActive: false })
+        .where(eq(topics.id, topicId));
+      
+      // Log the action
+      await tx.insert(moderationActions).values({
+        actionType: 'topic_delete',
+        targetType: 'topic',
+        targetId: topicId,
+        moderatorId: adminId,
+        reason: 'Deleted by admin',
+      });
+    });
+  }
+
+  async deleteOpinionAdmin(opinionId: string, adminId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Hard delete the opinion
+      await tx.delete(opinions)
+        .where(eq(opinions.id, opinionId));
+      
+      // Log the action
+      await tx.insert(moderationActions).values({
+        actionType: 'opinion_delete',
+        targetType: 'opinion',
+        targetId: opinionId,
+        moderatorId: adminId,
+        reason: 'Deleted by admin',
+      });
+    });
   }
   
   // Admin - Audit log
