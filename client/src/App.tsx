@@ -138,7 +138,6 @@ function AuthenticatedApp() {
               <SearchBar 
                 value={searchQuery}
                 onSearch={handleSearch}
-                placeholder="Search debate topics..."
                 className=""
               />
             </div>

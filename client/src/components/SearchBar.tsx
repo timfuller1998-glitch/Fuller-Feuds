@@ -20,7 +20,7 @@ interface SearchBarProps {
 
 export default function SearchBar({ 
   onSearch, 
-  placeholder = "Search or create debate topics...", 
+  placeholder = "search or create topics to debate your opinions...", 
   className = "",
   value: externalValue,
 }: SearchBarProps) {
