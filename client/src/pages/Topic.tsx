@@ -348,7 +348,7 @@ export default function Topic() {
         </div>
         
         {/* Display fallacy badges if any */}
-        {topic.fallacyCounts && Object.keys(topic.fallacyCounts).some(key => topic.fallacyCounts[key] > 0) && (
+        {topic.fallacyCounts && Object.keys(topic.fallacyCounts).some(key => (topic.fallacyCounts?.[key] || 0) > 0) && (
           <div className="mt-3">
             <FallacyBadges fallacyCounts={topic.fallacyCounts} />
           </div>
