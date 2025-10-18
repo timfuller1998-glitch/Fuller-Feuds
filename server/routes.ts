@@ -546,6 +546,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Start debate with opinion author
+  app.post('/api/opinions/:opinionId/start-debate', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { opinionId } = req.params;
+
+      const room = await storage.createDebateRoomWithOpinionAuthor(opinionId, userId);
+      res.status(201).json(room);
+    } catch (error: any) {
+      console.error("Error starting debate:", error);
+      res.status(error.message?.includes('cannot debate') || error.message?.includes('same stance') ? 400 : 500)
+        .json({ message: error.message || "Failed to start debate" });
+    }
+  });
+
   // Flag topic
   app.post('/api/topics/:topicId/flag', isAuthenticated, async (req: any, res) => {
     try {
