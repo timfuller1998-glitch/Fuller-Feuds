@@ -212,6 +212,28 @@ export default function Topic() {
     },
   });
 
+  // Start debate with opinion author
+  const startDebateWithOpinionMutation = useMutation({
+    mutationFn: async (opinionId: string) => {
+      const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, {});
+      return response.json();
+    },
+    onSuccess: (room) => {
+      toast({
+        title: "Debate started!",
+        description: "Navigating to debate room...",
+      });
+      navigate(`/debate-room/${room.id}`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Cannot start debate",
+        description: error.message || "Failed to start debate",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Flag topic mutation
   const flagTopicMutation = useMutation({
     mutationFn: async (fallacyType: FallacyType) => {
@@ -608,6 +630,7 @@ export default function Topic() {
                         currentVote: opinion.userVote?.voteType 
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
+                      onDebate={(id) => startDebateWithOpinionMutation.mutate(id)}
                     />
                   ))}
                 </div>
@@ -646,6 +669,7 @@ export default function Topic() {
                         currentVote: opinion.userVote?.voteType 
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
+                      onDebate={(id) => startDebateWithOpinionMutation.mutate(id)}
                     />
                   ))}
                 </div>
@@ -684,6 +708,7 @@ export default function Topic() {
                         currentVote: opinion.userVote?.voteType 
                       })}
                       onAdopt={(id) => adoptMutation.mutate(id)}
+                      onDebate={(id) => startDebateWithOpinionMutation.mutate(id)}
                     />
                   ))}
                 </div>
