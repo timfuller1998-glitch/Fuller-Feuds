@@ -91,8 +91,8 @@ export default function AppSidebar({
     { title: "Trending", icon: TrendingUp, path: "/trending" },
     { title: "Live Debates", icon: Radio, path: "/live" },
     { title: "Hot Debates", icon: Flame, path: "/hot-debates" },
-    { title: "My Debates", icon: MessageCircle, path: "/debates" },
-    { title: "My Active Debates", icon: MessageCircle, path: "/my-active-debates", badge: activeDebatesCount },
+    { title: "My Topics", icon: MessageCircle, path: "/debates" },
+    { title: "My Current Debates", icon: MessageCircle, path: "/my-active-debates", badge: activeDebatesCount },
     { title: "Recent Opinions", icon: Clock, path: "/recent-opinions" },
   ];
 
