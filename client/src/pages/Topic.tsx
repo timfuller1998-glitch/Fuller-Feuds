@@ -622,7 +622,8 @@ export default function Topic() {
                       id={opinion.id}
                       topicId={opinion.topicId}
                       userId={opinion.userId}
-                      userName="User"
+                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                      userAvatar={opinion.author?.profileImageUrl}
                       content={opinion.content}
                       stance={opinion.stance}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
@@ -663,7 +664,8 @@ export default function Topic() {
                       id={opinion.id}
                       topicId={opinion.topicId}
                       userId={opinion.userId}
-                      userName="User"
+                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                      userAvatar={opinion.author?.profileImageUrl}
                       content={opinion.content}
                       stance={opinion.stance}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
@@ -704,7 +706,8 @@ export default function Topic() {
                       id={opinion.id}
                       topicId={opinion.topicId}
                       userId={opinion.userId}
-                      userName="User"
+                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                      userAvatar={opinion.author?.profileImageUrl}
                       content={opinion.content}
                       stance={opinion.stance}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}

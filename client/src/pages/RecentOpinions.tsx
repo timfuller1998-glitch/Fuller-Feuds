@@ -263,8 +263,8 @@ export default function RecentOpinionsPage() {
                     id={opinion.id}
                     topicId={opinion.topicId}
                     userId={opinion.userId}
-                    userName={opinion.user ? `${opinion.user.firstName || ''} ${opinion.user.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                    userAvatar={opinion.user?.profileImageUrl}
+                    userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                    userAvatar={opinion.author?.profileImageUrl}
                     content={opinion.content}
                     stance={opinion.stance as "for" | "against" | "neutral"}
                     timestamp={formatDistanceToNow(new Date(opinion.createdAt!), { addSuffix: true })}

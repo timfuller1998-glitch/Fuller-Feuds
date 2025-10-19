@@ -472,8 +472,12 @@ export class DatabaseStorage implements IStorage {
     }
     
     const baseOpinions = await db
-      .select()
+      .select({
+        opinion: opinions,
+        author: users
+      })
       .from(opinions)
+      .leftJoin(users, eq(opinions.userId, users.id))
       .where(and(...whereConditions))
       .orderBy(desc(opinions.createdAt));
 
@@ -483,14 +487,17 @@ export class DatabaseStorage implements IStorage {
 
     // Batch aggregate fallacy counts for all opinions
     const fallacyCountsMap = await aggregateFallacyCounts(
-      baseOpinions,
+      baseOpinions.map(row => row.opinion),
       opinionFlags,
       'opinionId'
     );
 
     // Enrich each opinion with vote and challenge counts
     const enrichedOpinions = await Promise.all(
-      baseOpinions.map(async (opinion) => {
+      baseOpinions.map(async (row) => {
+        const opinion = row.opinion;
+        const author = row.author;
+        
         // Count likes
         const likesResult = await db
           .select({ count: count() })
@@ -511,6 +518,12 @@ export class DatabaseStorage implements IStorage {
 
         return {
           ...opinion,
+          author: author ? {
+            id: author.id,
+            firstName: author.firstName,
+            lastName: author.lastName,
+            profileImageUrl: author.profileImageUrl
+          } : null,
           likesCount: Number(likesResult[0]?.count || 0),
           dislikesCount: Number(dislikesResult[0]?.count || 0),
           repliesCount: 0,
@@ -534,8 +547,12 @@ export class DatabaseStorage implements IStorage {
     }
     
     const baseOpinions = await db
-      .select()
+      .select({
+        opinion: opinions,
+        author: users
+      })
       .from(opinions)
+      .leftJoin(users, eq(opinions.userId, users.id))
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(opinions.createdAt))
       .limit(limit);
@@ -546,14 +563,17 @@ export class DatabaseStorage implements IStorage {
 
     // Batch aggregate fallacy counts for all opinions
     const fallacyCountsMap = await aggregateFallacyCounts(
-      baseOpinions,
+      baseOpinions.map(row => row.opinion),
       opinionFlags,
       'opinionId'
     );
 
     // Enrich each opinion with vote and challenge counts
     const enrichedOpinions = await Promise.all(
-      baseOpinions.map(async (opinion) => {
+      baseOpinions.map(async (row) => {
+        const opinion = row.opinion;
+        const author = row.author;
+        
         // Count likes
         const likesResult = await db
           .select({ count: count() })
@@ -574,6 +594,12 @@ export class DatabaseStorage implements IStorage {
 
         return {
           ...opinion,
+          author: author ? {
+            id: author.id,
+            firstName: author.firstName,
+            lastName: author.lastName,
+            profileImageUrl: author.profileImageUrl
+          } : null,
           likesCount: Number(likesResult[0]?.count || 0),
           dislikesCount: Number(dislikesResult[0]?.count || 0),
           repliesCount: 0,

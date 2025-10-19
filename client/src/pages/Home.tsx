@@ -603,8 +603,8 @@ export default function Home() {
                   id={group!.opinion.id}
                   topicId={group!.opinion.topicId}
                   userId={group!.opinion.userId}
-                  userName={group!.opinion.user ? `${group!.opinion.user.firstName || ''} ${group!.opinion.user.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                  userAvatar={group!.opinion.user?.profileImageUrl}
+                  userName={group!.opinion.author ? `${group!.opinion.author.firstName || ''} ${group!.opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                  userAvatar={group!.opinion.author?.profileImageUrl}
                   content={group!.opinion.content}
                   stance={group!.opinion.stance as "for" | "against" | "neutral"}
                   timestamp={formatDistanceToNow(new Date(group!.opinion.createdAt!), { addSuffix: true })}
