@@ -259,39 +259,52 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    // First try to find existing user by ID or email
-    const existingByEmail = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, userData.email))
-      .limit(1);
-    
-    if (existingByEmail.length > 0) {
-      // Update existing user by email
-      const [updatedUser] = await db
-        .update(users)
-        .set({
-          ...userData,
-          updatedAt: new Date(),
+    // Try to insert, and if there's a conflict on ID, update the existing user
+    // If there's a conflict on email (different ID), the insert will fail due to unique constraint
+    try {
+      const [user] = await db
+        .insert(users)
+        .values(userData)
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            email: userData.email,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            profileImageUrl: userData.profileImageUrl,
+            updatedAt: new Date(),
+          },
         })
-        .where(eq(users.email, userData.email))
         .returning();
-      return updatedUser;
+      return user;
+    } catch (error: any) {
+      // Check if it's a duplicate email constraint error
+      if (error.message?.includes('users_email_unique')) {
+        // Email already exists with a different ID
+        // Find the existing user by email and update their info (preserve their ID)
+        const [existingUser] = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, userData.email))
+          .limit(1);
+        
+        if (existingUser) {
+          // Update the existing user's info, keeping their original ID
+          const [updatedUser] = await db
+            .update(users)
+            .set({
+              firstName: userData.firstName,
+              lastName: userData.lastName,
+              profileImageUrl: userData.profileImageUrl,
+              updatedAt: new Date(),
+            })
+            .where(eq(users.email, userData.email))
+            .returning();
+          return updatedUser;
+        }
+      }
+      throw error;
     }
-    
-    // Try insert with conflict on ID
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
   }
 
   async updateUserProfileImage(userId: string, profileImageUrl: string): Promise<void> {
@@ -384,16 +397,16 @@ export class DatabaseStorage implements IStorage {
         // Count unique participants across opinions, votes, and flags using a single SQL query
         // This uses UNION to combine all three sources and DISTINCT to count unique users
         const participantsResult = await db.execute(sql`
-          SELECT COUNT(DISTINCT user_id) as count
+          SELECT COUNT(DISTINCT user_id)::int as count
           FROM (
-            SELECT user_id FROM ${opinions} WHERE topic_id = ${topic.id}
+            SELECT user_id FROM opinions WHERE topic_id = ${topic.id}
             UNION
-            SELECT user_id FROM ${opinionVotes} WHERE opinion_id IN (
-              SELECT id FROM ${opinions} WHERE topic_id = ${topic.id}
+            SELECT user_id FROM opinion_votes WHERE opinion_id IN (
+              SELECT id FROM opinions WHERE topic_id = ${topic.id}
             )
             UNION
-            SELECT user_id FROM ${opinionFlags} WHERE opinion_id IN (
-              SELECT id FROM ${opinions} WHERE topic_id = ${topic.id}
+            SELECT user_id FROM opinion_flags WHERE opinion_id IN (
+              SELECT id FROM opinions WHERE topic_id = ${topic.id}
             )
           ) AS all_participants
           WHERE user_id IS NOT NULL
