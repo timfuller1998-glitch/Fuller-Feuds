@@ -252,7 +252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/topics', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { initialOpinion, stance, ...topicData } = req.body;
+      const { initialOpinion, stance, references, ...topicData } = req.body;
       
       // Validate initial opinion is provided and not empty
       if (!initialOpinion || !initialOpinion.trim()) {
@@ -315,7 +315,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId: userId,
           content: initialOpinion.trim(),
           stance: validStance, // Use the stance provided by user
-          status: opinionStatus
+          status: opinionStatus,
+          references: references || []
         });
       } catch (opinionError) {
         console.error("Error creating initial opinion:", opinionError);

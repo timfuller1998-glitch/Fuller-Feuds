@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, History, Plus, X } from "lucide-react";
+import { Search, History, Plus, X, Link as LinkIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ export default function SearchBar({
   const [stance, setStance] = useState<'for' | 'against' | 'neutral'>('neutral');
   const [topicCategories, setTopicCategories] = useState<string[]>([]);
   const [categoryInput, setCategoryInput] = useState("");
+  const [references, setReferences] = useState<string[]>([]);
   const [pendingEnterKey, setPendingEnterKey] = useState<string | null>(null);
   const [dismissedQuery, setDismissedQuery] = useState<string | null>(null);
   const [pendingMutationQuery, setPendingMutationQuery] = useState<string | null>(null);
@@ -180,7 +181,7 @@ export default function SearchBar({
 
   // Create topic mutation
   const createTopicMutation = useMutation({
-    mutationFn: async (data: { title: string; initialOpinion: string; stance: string; categories: string[] }) => {
+    mutationFn: async (data: { title: string; initialOpinion: string; stance: string; categories: string[]; references?: string[] }) => {
       const response = await apiRequest("POST", "/api/topics", data);
       return response.json();
     },
@@ -194,6 +195,7 @@ export default function SearchBar({
       setStance('neutral');
       setTopicCategories([]);
       setCategoryInput("");
+      setReferences([]);
       setLocation(`/topic/${data.id}`);
     },
     onError: (error) => {
@@ -220,11 +222,16 @@ export default function SearchBar({
     // Use current query from search bar as the title (not the debounced/stale topicTitle)
     const currentTitle = query.trim();
     if (!currentTitle || !initialOpinion.trim() || topicCategories.length === 0) return;
+    
+    // Filter out empty references
+    const validReferences = references.filter(ref => ref.trim());
+    
     createTopicMutation.mutate({
       title: currentTitle,
       initialOpinion: initialOpinion.trim(),
       stance: stance,
       categories: topicCategories,
+      references: validReferences.length > 0 ? validReferences : undefined,
     });
   };
 
@@ -484,6 +491,55 @@ export default function SearchBar({
                   </p>
                 </div>
 
+                {/* Reference Links Section */}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-2">
+                    <LinkIcon className="w-4 h-4" />
+                    Reference Links (Optional)
+                  </label>
+                  <div className="space-y-2">
+                    {references.map((ref, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          type="url"
+                          placeholder="https://example.com/source"
+                          className="h-9 text-sm flex-1"
+                          value={ref}
+                          onChange={(e) => {
+                            const newRefs = [...references];
+                            newRefs[index] = e.target.value;
+                            setReferences(newRefs);
+                          }}
+                          data-testid={`input-reference-${index}`}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setReferences(references.filter((_, i) => i !== index));
+                          }}
+                          data-testid={`button-remove-reference-${index}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setReferences([...references, '']);
+                      }}
+                      data-testid="button-add-reference"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Reference Link
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -495,6 +551,7 @@ export default function SearchBar({
                       setStance('neutral');
                       setTopicCategories([]);
                       setCategoryInput("");
+                      setReferences([]);
                       setDismissedQuery(queryToDismiss);
                     }}
                     className="flex-1"
