@@ -359,7 +359,26 @@ export class DatabaseStorage implements IStorage {
           ));
         
         const opinionsCount = opinionsList.length;
-        const participantCount = new Set(opinionsList.map(o => o.userId)).size;
+        
+        // Count unique participants across opinions, votes, and flags using a single SQL query
+        // This uses UNION to combine all three sources and DISTINCT to count unique users
+        const participantsResult = await db.execute(sql`
+          SELECT COUNT(DISTINCT user_id) as count
+          FROM (
+            SELECT user_id FROM ${opinions} WHERE topic_id = ${topic.id}
+            UNION
+            SELECT user_id FROM ${opinionVotes} WHERE opinion_id IN (
+              SELECT id FROM ${opinions} WHERE topic_id = ${topic.id}
+            )
+            UNION
+            SELECT user_id FROM ${opinionFlags} WHERE opinion_id IN (
+              SELECT id FROM ${opinions} WHERE topic_id = ${topic.id}
+            )
+          ) AS all_participants
+          WHERE user_id IS NOT NULL
+        `);
+        
+        const participantCount = Number(participantsResult.rows[0]?.count || 0);
         
         // Get preview content: AI summary if exists, otherwise first opinion
         let previewContent: string | undefined;
