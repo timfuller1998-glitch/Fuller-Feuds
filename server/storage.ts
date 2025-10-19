@@ -396,17 +396,18 @@ export class DatabaseStorage implements IStorage {
         
         // Count unique participants across opinions, votes, and flags using a single SQL query
         // This uses UNION to combine all three sources and DISTINCT to count unique users
+        // Only counts participants for approved opinions
         const participantsResult = await db.execute(sql`
           SELECT COUNT(DISTINCT user_id)::int as count
           FROM (
-            SELECT user_id FROM opinions WHERE topic_id = ${topic.id}
+            SELECT user_id FROM opinions WHERE topic_id = ${topic.id} AND status = 'approved'
             UNION
             SELECT user_id FROM opinion_votes WHERE opinion_id IN (
-              SELECT id FROM opinions WHERE topic_id = ${topic.id}
+              SELECT id FROM opinions WHERE topic_id = ${topic.id} AND status = 'approved'
             )
             UNION
             SELECT user_id FROM opinion_flags WHERE opinion_id IN (
-              SELECT id FROM opinions WHERE topic_id = ${topic.id}
+              SELECT id FROM opinions WHERE topic_id = ${topic.id} AND status = 'approved'
             )
           ) AS all_participants
           WHERE user_id IS NOT NULL
