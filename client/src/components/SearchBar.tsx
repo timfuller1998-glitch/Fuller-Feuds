@@ -217,9 +217,11 @@ export default function SearchBar({
 
   // Handle form submission
   const handleCreateTopic = () => {
-    if (!topicTitle.trim() || !initialOpinion.trim() || topicCategories.length === 0) return;
+    // Use current query from search bar as the title (not the debounced/stale topicTitle)
+    const currentTitle = query.trim();
+    if (!currentTitle || !initialOpinion.trim() || topicCategories.length === 0) return;
     createTopicMutation.mutate({
-      title: topicTitle,
+      title: currentTitle,
       initialOpinion: initialOpinion.trim(),
       stance: stance,
       categories: topicCategories,
@@ -396,20 +398,6 @@ export default function SearchBar({
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                    Topic Title
-                  </label>
-                  <Input
-                    value={topicTitle}
-                    onChange={(e) => setTopicTitle(e.target.value)}
-                    placeholder="Enter topic title..."
-                    className="h-9 text-sm"
-                    data-testid="input-topic-title"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
                     Your Initial Opinion
                   </label>
                   <Textarea
@@ -516,7 +504,7 @@ export default function SearchBar({
                   </Button>
                   <Button
                     onClick={handleCreateTopic}
-                    disabled={!topicTitle.trim() || !initialOpinion.trim() || topicCategories.length === 0 || createTopicMutation.isPending}
+                    disabled={!query.trim() || !initialOpinion.trim() || topicCategories.length === 0 || createTopicMutation.isPending}
                     className="flex-1"
                     data-testid="button-submit-create-topic"
                   >
