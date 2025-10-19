@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import TopicCard from "@/components/TopicCard";
+import OpinionCard from "@/components/OpinionCard";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { 
@@ -15,6 +16,7 @@ import {
   Grid
 } from "lucide-react";
 import type { TopicWithCounts } from "@shared/schema";
+import { formatDistanceToNow } from "date-fns";
 import climateImage from '@assets/generated_images/Climate_change_debate_thumbnail_3b0bbda7.png';
 
 interface SectionData {
@@ -23,7 +25,19 @@ interface SectionData {
   topics: TopicWithCounts[];
   totalCount: number;
   linkPath: string;
+  type?: 'topics'; // default type
 }
+
+interface OpinionSectionData {
+  title: string;
+  icon: any;
+  opinions: any[];
+  totalCount: number;
+  linkPath: string;
+  type: 'opinions';
+}
+
+type AnySectionData = SectionData | OpinionSectionData;
 
 export default function Home() {
   const { user } = useAuth();
@@ -53,7 +67,7 @@ export default function Home() {
   })) || [];
 
   // Create sections data
-  const sections: SectionData[] = [];
+  const sections: AnySectionData[] = [];
 
   // 1. Trending - Most popular by participant count
   if (topics.length > 0) {
@@ -141,33 +155,16 @@ export default function Home() {
     }
   }
 
-  // 5. Recent Opinions - Topics with newest opinions
-  if (recentOpinions && recentOpinions.length > 0 && topics.length > 0) {
-    const topicOpinionMap = new Map<string, any>();
-    recentOpinions.forEach(opinion => {
-      if (!topicOpinionMap.has(opinion.topicId)) {
-        topicOpinionMap.set(opinion.topicId, opinion);
-      }
+  // 5. Recent Opinions - Display recent opinions directly
+  if (recentOpinions && recentOpinions.length > 0) {
+    sections.push({
+      title: "Recent Opinions",
+      icon: Clock,
+      opinions: recentOpinions.slice(0, 5),
+      totalCount: recentOpinions.length,
+      linkPath: "/recent-opinions",
+      type: 'opinions'
     });
-
-    const recentTopics = topics
-      .filter(topic => topicOpinionMap.has(topic.id))
-      .sort((a, b) => {
-        const dateA = new Date(topicOpinionMap.get(a.id)?.createdAt || 0).getTime();
-        const dateB = new Date(topicOpinionMap.get(b.id)?.createdAt || 0).getTime();
-        return dateB - dateA;
-      })
-      .slice(0, 5);
-
-    if (recentTopics.length > 0) {
-      sections.push({
-        title: "Recent Opinions",
-        icon: Clock,
-        topics: recentTopics,
-        totalCount: topicOpinionMap.size,
-        linkPath: "/recent-opinions"
-      });
-    }
   }
 
   if (isLoading) {
@@ -222,13 +219,16 @@ export default function Home() {
                         {section.title}
                       </h2>
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        {section.topics.length} of {section.totalCount} {section.totalCount === 1 ? 'debate' : 'debates'}
+                        {section.type === 'opinions' 
+                          ? `${section.opinions.length} of ${section.totalCount} ${section.totalCount === 1 ? 'opinion' : 'opinions'}`
+                          : `${section.topics.length} of ${section.totalCount} ${section.totalCount === 1 ? 'debate' : 'debates'}`
+                        }
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Horizontal Scrolling Topics */}
+                {/* Horizontal Scrolling Items */}
                 <div className="w-full overflow-hidden">
                   <div 
                     className="flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden pb-2 sm:pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
@@ -236,51 +236,110 @@ export default function Home() {
                       scrollbarWidth: 'thin',
                       scrollSnapType: 'x mandatory'
                     }}
-                    data-testid={`scroll-topics-${section.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    data-testid={`scroll-${section.type === 'opinions' ? 'opinions' : 'topics'}-${section.title.toLowerCase().replace(/\s+/g, '-')}`}
                   >
-                    {section.topics.map((topic) => (
-                      <div 
-                        key={topic.id} 
-                        className="flex-none w-[280px] sm:w-[300px]"
-                        style={{ scrollSnapAlign: 'start' }}
-                      >
-                        <TopicCard
-                          id={topic.id}
-                          title={topic.title}
-                          description={topic.description}
-                          categories={topic.categories}
-                          opinionsCount={topic.opinionsCount}
-                          participantCount={topic.participantCount}
-                          isActive={topic.isActive ?? true}
-                          imageUrl={topic.imageUrl ?? climateImage}
-                        />
-                      </div>
-                    ))}
-                    {section.totalCount > 5 && (
-                      <div 
-                        className="flex-none w-[280px] sm:w-[300px]"
-                        style={{ scrollSnapAlign: 'start' }}
-                      >
-                        <Card className="h-full hover-elevate active-elevate-2 transition-all">
-                          <CardContent className="flex flex-col items-center justify-center h-full min-h-[160px] sm:min-h-[200px] p-4 sm:p-6">
-                            <SectionIcon className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground mb-2 sm:mb-4" />
-                            <p className="text-center text-sm sm:text-base font-medium mb-2">
-                              {section.totalCount - 5} more {section.totalCount - 5 === 1 ? 'debate' : 'debates'}
-                            </p>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              asChild
-                              data-testid={`button-viewall-${section.title.toLowerCase().replace(/\s+/g, '-')}`}
-                            >
-                              <Link href={section.linkPath}>
-                                View All
-                                <ChevronRight className="w-4 h-4 ml-1" />
-                              </Link>
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      </div>
+                    {section.type === 'opinions' ? (
+                      // Render Opinion Cards
+                      <>
+                        {section.opinions.map((opinion) => (
+                          <div 
+                            key={opinion.id} 
+                            className="flex-none w-[280px] sm:w-[300px]"
+                            style={{ scrollSnapAlign: 'start' }}
+                          >
+                            <OpinionCard
+                              id={opinion.id}
+                              topicId={opinion.topicId}
+                              userId={opinion.userId}
+                              userName={opinion.userName || opinion.user?.firstName || 'Anonymous'}
+                              userAvatar={opinion.userAvatar || opinion.user?.profileImageUrl}
+                              content={opinion.content}
+                              stance={opinion.stance}
+                              timestamp={formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true })}
+                              likesCount={opinion.likesCount || 0}
+                              dislikesCount={opinion.dislikesCount || 0}
+                              references={opinion.references || []}
+                              fallacyCounts={opinion.fallacyCounts || {}}
+                              isLiked={opinion.userVote?.voteType === 'like'}
+                              isDisliked={opinion.userVote?.voteType === 'dislike'}
+                            />
+                          </div>
+                        ))}
+                        {section.totalCount > 5 && (
+                          <div 
+                            className="flex-none w-[280px] sm:w-[300px]"
+                            style={{ scrollSnapAlign: 'start' }}
+                          >
+                            <Card className="h-full hover-elevate active-elevate-2 transition-all">
+                              <CardContent className="flex flex-col items-center justify-center h-full min-h-[160px] sm:min-h-[200px] p-4 sm:p-6">
+                                <SectionIcon className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground mb-2 sm:mb-4" />
+                                <p className="text-center text-sm sm:text-base font-medium mb-2">
+                                  {section.totalCount - 5} more {section.totalCount - 5 === 1 ? 'opinion' : 'opinions'}
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  asChild
+                                  data-testid={`button-viewall-${section.title.toLowerCase().replace(/\s+/g, '-')}`}
+                                >
+                                  <Link href={section.linkPath}>
+                                    View All
+                                    <ChevronRight className="w-4 h-4 ml-1" />
+                                  </Link>
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      // Render Topic Cards
+                      <>
+                        {section.topics.map((topic) => (
+                          <div 
+                            key={topic.id} 
+                            className="flex-none w-[280px] sm:w-[300px]"
+                            style={{ scrollSnapAlign: 'start' }}
+                          >
+                            <TopicCard
+                              id={topic.id}
+                              title={topic.title}
+                              description={topic.description}
+                              categories={topic.categories}
+                              opinionsCount={topic.opinionsCount}
+                              participantCount={topic.participantCount}
+                              isActive={topic.isActive ?? true}
+                              imageUrl={topic.imageUrl ?? climateImage}
+                            />
+                          </div>
+                        ))}
+                        {section.totalCount > 5 && (
+                          <div 
+                            className="flex-none w-[280px] sm:w-[300px]"
+                            style={{ scrollSnapAlign: 'start' }}
+                          >
+                            <Card className="h-full hover-elevate active-elevate-2 transition-all">
+                              <CardContent className="flex flex-col items-center justify-center h-full min-h-[160px] sm:min-h-[200px] p-4 sm:p-6">
+                                <SectionIcon className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground mb-2 sm:mb-4" />
+                                <p className="text-center text-sm sm:text-base font-medium mb-2">
+                                  {section.totalCount - 5} more {section.totalCount - 5 === 1 ? 'debate' : 'debates'}
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  asChild
+                                  data-testid={`button-viewall-${section.title.toLowerCase().replace(/\s+/g, '-')}`}
+                                >
+                                  <Link href={section.linkPath}>
+                                    View All
+                                    <ChevronRight className="w-4 h-4 ml-1" />
+                                  </Link>
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
