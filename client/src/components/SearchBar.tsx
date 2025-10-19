@@ -428,7 +428,7 @@ export default function SearchBar({
                     <SelectTrigger className="h-9 text-sm" data-testid="select-stance">
                       <SelectValue placeholder="Select your stance" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" sideOffset={4} className="z-[999999]">
                       <SelectItem value="for">For - I support this topic</SelectItem>
                       <SelectItem value="against">Against - I oppose this topic</SelectItem>
                       <SelectItem value="neutral">Neutral - I'm undecided or balanced</SelectItem>
