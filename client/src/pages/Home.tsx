@@ -43,7 +43,7 @@ export default function Home() {
   const { user } = useAuth();
 
   // Fetch all topics
-  const { data: apiTopics, isLoading } = useQuery<TopicWithCounts[]>({
+  const { data: apiTopics, isLoading: topicsLoading } = useQuery<TopicWithCounts[]>({
     queryKey: ["/api/topics"],
   });
 
@@ -54,9 +54,8 @@ export default function Home() {
   });
 
   // Fetch recent opinions
-  const { data: recentOpinions } = useQuery<any[]>({
+  const { data: recentOpinions, isLoading: opinionsLoading } = useQuery<any[]>({
     queryKey: ["/api/opinions/recent"],
-    queryFn: () => fetch('/api/opinions/recent?limit=100', { credentials: 'include' }).then(res => res.json()),
   });
 
   // Use real API topics with default image fallback
@@ -167,6 +166,9 @@ export default function Home() {
     });
   }
 
+  // Show loading only while initial data is loading
+  const isLoading = topicsLoading || opinionsLoading;
+  
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -251,8 +253,8 @@ export default function Home() {
                               id={opinion.id}
                               topicId={opinion.topicId}
                               userId={opinion.userId}
-                              userName={opinion.userName || opinion.user?.firstName || 'Anonymous'}
-                              userAvatar={opinion.userAvatar || opinion.user?.profileImageUrl}
+                              userName={opinion.author?.firstName || 'Anonymous'}
+                              userAvatar={opinion.author?.profileImageUrl}
                               content={opinion.content}
                               stance={opinion.stance}
                               timestamp={formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true })}
