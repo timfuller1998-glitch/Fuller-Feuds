@@ -396,6 +396,20 @@ export default function SearchBar({
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    Topic Title
+                  </label>
+                  <Input
+                    value={topicTitle}
+                    onChange={(e) => setTopicTitle(e.target.value)}
+                    placeholder="Enter topic title..."
+                    className="h-9 text-sm"
+                    data-testid="input-topic-title"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">
                     Your Initial Opinion
                   </label>
                   <Textarea
