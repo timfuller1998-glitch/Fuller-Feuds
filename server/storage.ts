@@ -259,6 +259,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // First try to find existing user by ID or email
+    const existingByEmail = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, userData.email))
+      .limit(1);
+    
+    if (existingByEmail.length > 0) {
+      // Update existing user by email
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          ...userData,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.email, userData.email))
+        .returning();
+      return updatedUser;
+    }
+    
+    // Try insert with conflict on ID
     const [user] = await db
       .insert(users)
       .values(userData)
@@ -653,21 +674,34 @@ export class DatabaseStorage implements IStorage {
 
   // Opinion voting
   async voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike' | null): Promise<void> {
+    console.log(`[VOTE] voteOnOpinion called - opinionId: ${opinionId}, userId: ${userId}, voteType: ${voteType}`);
+    
     if (voteType === null) {
       // Remove vote
-      await db
+      console.log('[VOTE] Removing vote');
+      const result = await db
         .delete(opinionVotes)
         .where(and(eq(opinionVotes.opinionId, opinionId), eq(opinionVotes.userId, userId)));
+      console.log('[VOTE] Delete result:', result);
     } else {
       // Add or update vote
-      await db
+      console.log('[VOTE] Adding/updating vote');
+      const result = await db
         .insert(opinionVotes)
         .values({ opinionId, userId, voteType })
         .onConflictDoUpdate({
           target: [opinionVotes.opinionId, opinionVotes.userId],
-          set: { voteType, createdAt: new Date() },
+          set: { voteType },
         });
+      console.log('[VOTE] Insert/update result:', result);
     }
+    
+    // Verify the vote was saved
+    const savedVote = await db
+      .select()
+      .from(opinionVotes)
+      .where(and(eq(opinionVotes.opinionId, opinionId), eq(opinionVotes.userId, userId)));
+    console.log('[VOTE] Saved vote:', savedVote);
   }
 
   async getUserVoteOnOpinion(opinionId: string, userId: string): Promise<OpinionVote | undefined> {
