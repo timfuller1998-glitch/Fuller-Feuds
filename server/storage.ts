@@ -674,34 +674,21 @@ export class DatabaseStorage implements IStorage {
 
   // Opinion voting
   async voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike' | null): Promise<void> {
-    console.log(`[VOTE] voteOnOpinion called - opinionId: ${opinionId}, userId: ${userId}, voteType: ${voteType}`);
-    
     if (voteType === null) {
       // Remove vote
-      console.log('[VOTE] Removing vote');
-      const result = await db
+      await db
         .delete(opinionVotes)
         .where(and(eq(opinionVotes.opinionId, opinionId), eq(opinionVotes.userId, userId)));
-      console.log('[VOTE] Delete result:', result);
     } else {
       // Add or update vote
-      console.log('[VOTE] Adding/updating vote');
-      const result = await db
+      await db
         .insert(opinionVotes)
         .values({ opinionId, userId, voteType })
         .onConflictDoUpdate({
           target: [opinionVotes.opinionId, opinionVotes.userId],
           set: { voteType },
         });
-      console.log('[VOTE] Insert/update result:', result);
     }
-    
-    // Verify the vote was saved
-    const savedVote = await db
-      .select()
-      .from(opinionVotes)
-      .where(and(eq(opinionVotes.opinionId, opinionId), eq(opinionVotes.userId, userId)));
-    console.log('[VOTE] Saved vote:', savedVote);
   }
 
   async getUserVoteOnOpinion(opinionId: string, userId: string): Promise<OpinionVote | undefined> {
