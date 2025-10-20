@@ -22,6 +22,14 @@ interface PoliticalLeaningAnalysis {
   reasoning: string;
 }
 
+interface PoliticalCompass2DAnalysis {
+  economicScore: number; // -100 (socialist) to +100 (capitalist)
+  authoritarianScore: number; // -100 (libertarian) to +100 (authoritarian)
+  confidence: 'high' | 'medium' | 'low';
+  reasoning: string;
+  quadrant: 'authoritarian-capitalist' | 'libertarian-capitalist' | 'libertarian-socialist' | 'authoritarian-socialist' | 'centrist';
+}
+
 export class AIService {
   static async generateCategories(topicTitle: string): Promise<string[]> {
     try {
@@ -323,6 +331,151 @@ Return only valid JSON.`;
         score: Math.round(score),
         confidence,
         reasoning: `Analysis based on ${opinions.length} opinions with stance distribution: ${forCount} supportive, ${againstCount} opposing, ${neutralCount} neutral`
+      };
+    }
+  }
+
+  static async analyze2DPoliticalCompass(opinions: Opinion[]): Promise<PoliticalCompass2DAnalysis> {
+    if (opinions.length === 0) {
+      return {
+        economicScore: 0,
+        authoritarianScore: 0,
+        confidence: 'low',
+        reasoning: 'No opinions available for analysis',
+        quadrant: 'centrist'
+      };
+    }
+
+    // Determine confidence based on opinion count
+    let confidence: 'high' | 'medium' | 'low' = 'low';
+    if (opinions.length >= 30) {
+      confidence = 'high';
+    } else if (opinions.length >= 10) {
+      confidence = 'medium';
+    }
+
+    // Prepare opinions for AI analysis (last 50 opinions)
+    const recentOpinions = opinions.slice(-50);
+    const opinionTexts = recentOpinions.map((opinion, index) => 
+      `Opinion ${index + 1}: ${opinion.content} (Stance: ${opinion.stance})`
+    ).join('\n\n');
+
+    const prompt = `
+Analyze the following user opinions to determine their political position on a 2-dimensional political compass.
+
+User Opinions (${recentOpinions.length} most recent):
+${opinionTexts}
+
+Please provide an analysis in the following JSON format:
+{
+  "economicScore": -50,
+  "authoritarianScore": 25,
+  "reasoning": "Brief explanation of the analysis"
+}
+
+ECONOMIC AXIS (-100 to +100):
+-100 to -51: Very Socialist (strong wealth redistribution, extensive government control of economy, anti-capitalist)
+-50 to -21: Socialist (supports wealth redistribution, market regulation, public ownership of key industries)
+-20 to +20: Mixed Economy (balanced approach, regulated capitalism, some social programs)
++21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
++51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
+
+AUTHORITARIAN AXIS (-100 to +100):
+-100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
+-50 to -21: Libertarian (personal freedom priority, limited government power, strong individual rights)
+-20 to +20: Moderate (balanced authority and freedom, pragmatic governance)
++21 to +50: Authoritarian (strong government control, order over freedom, limited civil liberties)
++51 to +100: Very Authoritarian (total state control, strict social order, minimal individual freedoms)
+
+Consider these aspects:
+ECONOMIC indicators:
+- Views on taxation, welfare, healthcare, education funding
+- Stance on business regulation, labor rights, unions
+- Opinions on wealth inequality and redistribution
+- Free market vs. planned economy preferences
+
+AUTHORITARIAN indicators:
+- Views on government surveillance, law enforcement, military
+- Stance on censorship, free speech, personal privacy
+- Opinions on drug policy, gun rights, personal freedoms
+- Traditional values vs. progressive social policies
+
+Return only valid JSON.`;
+
+    try {
+      // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          {
+            role: "system",
+            content: "You are a political science expert who analyzes ideological positions on a 2D political compass objectively and accurately. Always respond with valid JSON only."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 500
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      if (!responseContent) {
+        throw new Error("No response from OpenAI");
+      }
+
+      let aiAnalysis;
+      try {
+        aiAnalysis = JSON.parse(responseContent);
+      } catch (parseError) {
+        console.error("Failed to parse AI 2D political analysis:", responseContent);
+        throw new Error("Invalid AI response format");
+      }
+
+      const economicScore = Math.max(-100, Math.min(100, aiAnalysis.economicScore || 0));
+      const authoritarianScore = Math.max(-100, Math.min(100, aiAnalysis.authoritarianScore || 0));
+
+      // Determine quadrant
+      let quadrant: PoliticalCompass2DAnalysis['quadrant'] = 'centrist';
+      if (Math.abs(economicScore) > 20 || Math.abs(authoritarianScore) > 20) {
+        if (economicScore > 20 && authoritarianScore > 20) {
+          quadrant = 'authoritarian-capitalist';
+        } else if (economicScore > 20 && authoritarianScore < -20) {
+          quadrant = 'libertarian-capitalist';
+        } else if (economicScore < -20 && authoritarianScore < -20) {
+          quadrant = 'libertarian-socialist';
+        } else if (economicScore < -20 && authoritarianScore > 20) {
+          quadrant = 'authoritarian-socialist';
+        }
+      }
+
+      return {
+        economicScore,
+        authoritarianScore,
+        confidence,
+        reasoning: aiAnalysis.reasoning || 'Analysis based on expressed opinions',
+        quadrant
+      };
+
+    } catch (error) {
+      console.error("Error analyzing 2D political compass:", error);
+      
+      // Fallback analysis without AI - simple heuristic
+      const forCount = opinions.filter(op => op.stance === 'for').length;
+      const againstCount = opinions.filter(op => op.stance === 'against').length;
+      
+      // Simple heuristic: estimate based on stance patterns
+      const ratio = forCount - againstCount;
+      const economicScore = Math.max(-100, Math.min(100, (ratio / opinions.length) * 30));
+      const authoritarianScore = 0; // Default to center on authority axis without content analysis
+
+      return {
+        economicScore: Math.round(economicScore),
+        authoritarianScore: Math.round(authoritarianScore),
+        confidence,
+        reasoning: `Fallback analysis based on ${opinions.length} opinions with stance distribution: ${forCount} supportive, ${againstCount} opposing`,
+        quadrant: 'centrist'
       };
     }
   }

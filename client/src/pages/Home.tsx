@@ -256,6 +256,8 @@ export default function Home() {
                               userName={opinion.author?.firstName || 'Anonymous'}
                               userAvatar={opinion.author?.profileImageUrl}
                               politicalLeaningScore={opinion.author?.politicalLeaningScore}
+                              economicScore={(opinion.author as any)?.economicScore}
+                              authoritarianScore={(opinion.author as any)?.authoritarianScore}
                               content={opinion.content}
                               stance={opinion.stance}
                               timestamp={formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true })}

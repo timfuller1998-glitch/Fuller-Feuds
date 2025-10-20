@@ -13,7 +13,9 @@ interface AvatarWithBadgeProps {
   showBadge?: boolean;
   showOnlineStatus?: boolean;
   isOnline?: boolean;
-  politicalLeaningScore?: number;
+  politicalLeaningScore?: number; // DEPRECATED: Legacy single-axis score
+  economicScore?: number; // -100 (socialist) to +100 (capitalist)
+  authoritarianScore?: number; // -100 (libertarian) to +100 (authoritarian)
   showPoliticalLeaning?: boolean;
 }
 
@@ -35,13 +37,78 @@ const ringWidthClasses = {
   lg: "border-4"
 };
 
-// Helper function to determine color from political leaning score
+// Helper function to determine color from political leaning score (DEPRECATED)
 const getPoliticalLeaningColorFromScore = (score: number) => {
   if (score < -50) return '#3b82f6'; // Very Progressive - blue
   if (score < -20) return '#3b82f6'; // Progressive - blue
   if (score <= 20) return '#a855f7'; // Moderate - purple
   if (score <= 50) return '#ef4444'; // Conservative - red
   return '#ef4444'; // Very Conservative - red
+};
+
+// Helper function to convert HSL to hex color
+const hslToHex = (h: number, s: number, l: number): string => {
+  l /= 100;
+  const a = s * Math.min(l, 1 - l) / 100;
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+};
+
+// 2D political compass color blending function
+const get2DPoliticalCompassColor = (economicScore: number, authoritarianScore: number): string => {
+  // Normalize scores to -1 to 1 range for easier calculation
+  const x = economicScore / 100;  // -1 (socialist) to +1 (capitalist)
+  const y = authoritarianScore / 100;  // -1 (libertarian) to +1 (authoritarian)
+  
+  // Calculate distance from center (0,0) - used for intensity
+  const distanceFromCenter = Math.sqrt(x * x + y * y);
+  const intensity = Math.min(distanceFromCenter, 1); // 0 to 1
+  
+  // Base colors for each quadrant (Hue, Saturation, Lightness)
+  // Blue (authoritarian capitalist): H=220
+  // Yellow (libertarian capitalist): H=50
+  // Green (libertarian socialist): H=140
+  // Red (authoritarian socialist): H=0
+  
+  let hue: number;
+  let saturation: number;
+  let lightness: number;
+  
+  // Determine quadrant and interpolate hue
+  if (x >= 0 && y >= 0) {
+    // Authoritarian Capitalist (Blue) - top right
+    hue = 220;
+    saturation = 60 + (intensity * 30); // 60-90%
+    lightness = 65 - (intensity * 20); // 65-45% (darker at extremes)
+  } else if (x >= 0 && y < 0) {
+    // Libertarian Capitalist (Yellow) - bottom right
+    hue = 50;
+    saturation = 60 + (intensity * 35); // 60-95%
+    lightness = 65 - (intensity * 20); // 65-45%
+  } else if (x < 0 && y < 0) {
+    // Libertarian Socialist (Green) - bottom left
+    hue = 140;
+    saturation = 50 + (intensity * 35); // 50-85%
+    lightness = 60 - (intensity * 20); // 60-40%
+  } else {
+    // Authoritarian Socialist (Red) - top left
+    hue = 0;
+    saturation = 60 + (intensity * 30); // 60-90%
+    lightness = 60 - (intensity * 20); // 60-40%
+  }
+  
+  // For very center positions, reduce saturation further (more gray/purple)
+  if (Math.abs(x) < 0.2 && Math.abs(y) < 0.2) {
+    saturation = 30;
+    lightness = 70;
+    hue = 270; // Purple for centrists
+  }
+  
+  return hslToHex(hue, saturation, lightness);
 };
 
 export function AvatarWithBadge({
@@ -56,6 +123,8 @@ export function AvatarWithBadge({
   showOnlineStatus = false,
   isOnline = false,
   politicalLeaningScore,
+  economicScore,
+  authoritarianScore,
   showPoliticalLeaning = true,
 }: AvatarWithBadgeProps) {
   // Fetch user's selected badge
@@ -96,7 +165,17 @@ export function AvatarWithBadge({
       </Avatar>
       
       {/* Political Leaning Ring */}
-      {showPoliticalLeaning && politicalLeaningScore !== undefined && (
+      {showPoliticalLeaning && (economicScore !== undefined && authoritarianScore !== undefined) && (
+        <div 
+          className={`absolute inset-0 rounded-full pointer-events-none ${ringWidthClasses[size]}`}
+          style={{ 
+            borderColor: get2DPoliticalCompassColor(economicScore, authoritarianScore),
+          }}
+          data-testid="political-leaning-ring"
+        />
+      )}
+      {/* Legacy Political Leaning Ring (fallback) */}
+      {showPoliticalLeaning && politicalLeaningScore !== undefined && economicScore === undefined && (
         <div 
           className={`absolute inset-0 rounded-full pointer-events-none ${ringWidthClasses[size]}`}
           style={{ 

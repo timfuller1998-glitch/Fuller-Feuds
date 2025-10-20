@@ -19,7 +19,9 @@ interface OpinionCardProps {
   userId?: string;
   userName: string;
   userAvatar?: string;
-  politicalLeaningScore?: number;
+  politicalLeaningScore?: number; // DEPRECATED: Legacy single-axis score
+  economicScore?: number; // -100 (socialist) to +100 (capitalist)
+  authoritarianScore?: number; // -100 (libertarian) to +100 (authoritarian)
   content: string;
   stance: "for" | "against" | "neutral";
   timestamp: string;
@@ -57,6 +59,8 @@ export default function OpinionCard({
   userName,
   userAvatar,
   politicalLeaningScore,
+  economicScore,
+  authoritarianScore,
   content,
   stance,
   timestamp,
@@ -150,6 +154,8 @@ export default function OpinionCard({
                 profileImageUrl={userAvatar} 
                 size="sm"
                 politicalLeaningScore={politicalLeaningScore}
+                economicScore={economicScore}
+                authoritarianScore={authoritarianScore}
                 showPoliticalLeaning={true}
               />
               <div>
@@ -170,6 +176,8 @@ export default function OpinionCard({
                 profileImageUrl={userAvatar} 
                 size="sm"
                 politicalLeaningScore={politicalLeaningScore}
+                economicScore={economicScore}
+                authoritarianScore={authoritarianScore}
                 showPoliticalLeaning={true}
               />
               <div>

@@ -625,6 +625,8 @@ export default function Topic() {
                       userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
                       userAvatar={opinion.author?.profileImageUrl}
                       politicalLeaningScore={opinion.author?.politicalLeaningScore}
+                      economicScore={(opinion.author as any)?.economicScore}
+                      authoritarianScore={(opinion.author as any)?.authoritarianScore}
                       content={opinion.content}
                       stance={opinion.stance}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
@@ -668,6 +670,8 @@ export default function Topic() {
                       userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
                       userAvatar={opinion.author?.profileImageUrl}
                       politicalLeaningScore={opinion.author?.politicalLeaningScore}
+                      economicScore={(opinion.author as any)?.economicScore}
+                      authoritarianScore={(opinion.author as any)?.authoritarianScore}
                       content={opinion.content}
                       stance={opinion.stance}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
@@ -711,6 +715,8 @@ export default function Topic() {
                       userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
                       userAvatar={opinion.author?.profileImageUrl}
                       politicalLeaningScore={opinion.author?.politicalLeaningScore}
+                      economicScore={(opinion.author as any)?.economicScore}
+                      authoritarianScore={(opinion.author as any)?.authoritarianScore}
                       content={opinion.content}
                       stance={opinion.stance}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}

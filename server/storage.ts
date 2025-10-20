@@ -511,6 +511,25 @@ export class DatabaseStorage implements IStorage {
   // Opinion operations
   async createOpinion(opinion: InsertOpinion): Promise<Opinion> {
     const [created] = await db.insert(opinions).values(opinion).returning();
+    
+    // Increment opinionCount in user_profiles for political leaning analysis
+    const [updatedProfile] = await db
+      .update(userProfiles)
+      .set({ 
+        opinionCount: sql`${userProfiles.opinionCount} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(userProfiles.userId, opinion.userId))
+      .returning();
+    
+    // Trigger AI political compass analysis every 5 opinions (asynchronously)
+    if (updatedProfile && updatedProfile.opinionCount !== null && updatedProfile.opinionCount % 5 === 0) {
+      // Run analysis in background without blocking response
+      this.analyze2DUserPoliticalCompass(opinion.userId).catch(error => {
+        console.error(`Failed to analyze political compass for user ${opinion.userId}:`, error);
+      });
+    }
+    
     return created;
   }
 
@@ -580,7 +599,9 @@ export class DatabaseStorage implements IStorage {
             firstName: author.firstName,
             lastName: author.lastName,
             profileImageUrl: author.profileImageUrl,
-            politicalLeaningScore: profile?.leaningScore ?? undefined
+            politicalLeaningScore: profile?.leaningScore ?? undefined,
+            economicScore: profile?.economicScore ?? undefined,
+            authoritarianScore: profile?.authoritarianScore ?? undefined
           } : null,
           likesCount: Number(likesResult[0]?.count || 0),
           dislikesCount: Number(dislikesResult[0]?.count || 0),
@@ -660,7 +681,9 @@ export class DatabaseStorage implements IStorage {
             firstName: author.firstName,
             lastName: author.lastName,
             profileImageUrl: author.profileImageUrl,
-            politicalLeaningScore: profile?.leaningScore ?? undefined
+            politicalLeaningScore: profile?.leaningScore ?? undefined,
+            economicScore: profile?.economicScore ?? undefined,
+            authoritarianScore: profile?.authoritarianScore ?? undefined
           } : null,
           likesCount: Number(likesResult[0]?.count || 0),
           dislikesCount: Number(dislikesResult[0]?.count || 0),
@@ -1412,6 +1435,34 @@ export class DatabaseStorage implements IStorage {
     return await this.upsertUserProfile(userId, {
       politicalLeaning: analysis.leaning,
       leaningScore: analysis.score,
+      leaningConfidence: analysis.confidence,
+      totalOpinions: userOpinions.length,
+      lastAnalyzedAt: new Date(),
+    });
+  }
+
+  async analyze2DUserPoliticalCompass(userId: string): Promise<UserProfile> {
+    // Get user's last 50 opinions for analysis
+    const userOpinions = await this.getUserOpinions(userId, 'recent', 50);
+    
+    if (userOpinions.length === 0) {
+      // No opinions to analyze, return basic profile
+      return await this.upsertUserProfile(userId, {
+        economicScore: 0,
+        authoritarianScore: 0,
+        leaningConfidence: 'low',
+        totalOpinions: 0,
+        lastAnalyzedAt: new Date(),
+      });
+    }
+
+    // Use AI to analyze 2D political compass position based on opinions
+    const analysis = await AIService.analyze2DPoliticalCompass(userOpinions);
+    
+    // Update profile with analysis results
+    return await this.upsertUserProfile(userId, {
+      economicScore: analysis.economicScore,
+      authoritarianScore: analysis.authoritarianScore,
       leaningConfidence: analysis.confidence,
       totalOpinions: userOpinions.length,
       lastAnalyzedAt: new Date(),
