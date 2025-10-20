@@ -273,7 +273,10 @@ export const userProfiles = pgTable("user_profiles", {
   opinionSortPreference: varchar("opinion_sort_preference", { length: 25 }).default("newest"), // 'newest', 'oldest', 'most_liked', 'most_controversial'
   categorySortPreference: varchar("category_sort_preference", { length: 20 }).default("popular"), // 'popular', 'alphabetical', 'newest', 'oldest'
   politicalLeaning: varchar("political_leaning", { length: 50 }), // 'progressive', 'moderate', 'conservative', etc.
-  leaningScore: integer("leaning_score").default(0), // -100 (very progressive) to +100 (very conservative)
+  leaningScore: integer("leaning_score").default(0), // DEPRECATED: Legacy single-axis score (kept for backward compatibility)
+  economicScore: integer("economic_score").default(0), // -100 (socialist) to +100 (capitalist)
+  authoritarianScore: integer("authoritarian_score").default(0), // -100 (libertarian) to +100 (authoritarian)
+  opinionCount: integer("opinion_count").default(0), // Count of opinions posted (triggers AI analysis every 5)
   leaningConfidence: varchar("leaning_confidence", { length: 20 }).default("low"), // 'high', 'medium', 'low'
   totalOpinions: integer("total_opinions").default(0),
   totalLikes: integer("total_likes").default(0),
@@ -328,6 +331,9 @@ export const insertUserFollowSchema = createInsertSchema(userFollows).omit({
 export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({
   id: true,
   userId: true,
+  economicScore: true,
+  authoritarianScore: true,
+  opinionCount: true,
   totalOpinions: true,
   totalLikes: true,
   totalDislikes: true,
