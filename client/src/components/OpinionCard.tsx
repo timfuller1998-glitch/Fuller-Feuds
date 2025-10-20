@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import UserAvatar from "./UserAvatar";
+import AvatarWithBadge from "./AvatarWithBadge";
 import FallacyBadges from "./FallacyBadges";
 import FallacyFlagDialog from "./FallacyFlagDialog";
 import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag, Link as LinkIcon, ExternalLink, ChevronDown, MessageCircle } from "lucide-react";
@@ -19,6 +19,7 @@ interface OpinionCardProps {
   userId?: string;
   userName: string;
   userAvatar?: string;
+  politicalLeaningScore?: number;
   content: string;
   stance: "for" | "against" | "neutral";
   timestamp: string;
@@ -55,6 +56,7 @@ export default function OpinionCard({
   userId,
   userName,
   userAvatar,
+  politicalLeaningScore,
   content,
   stance,
   timestamp,
@@ -142,7 +144,14 @@ export default function OpinionCard({
               onClick={(e) => e.stopPropagation()}
               data-testid={`link-profile-${userId}`}
             >
-              <UserAvatar name={userName} imageUrl={userAvatar} size="sm" />
+              <AvatarWithBadge 
+                userId={userId}
+                displayName={userName} 
+                profileImageUrl={userAvatar} 
+                size="sm"
+                politicalLeaningScore={politicalLeaningScore}
+                showPoliticalLeaning={true}
+              />
               <div>
                 <h4 className="font-medium" data-testid={`text-opinion-author-${id}`}>
                   {userName}
@@ -155,7 +164,14 @@ export default function OpinionCard({
             </Link>
           ) : (
             <div className="flex items-center gap-3">
-              <UserAvatar name={userName} imageUrl={userAvatar} size="sm" />
+              <AvatarWithBadge 
+                userId={userId || "unknown"}
+                displayName={userName} 
+                profileImageUrl={userAvatar} 
+                size="sm"
+                politicalLeaningScore={politicalLeaningScore}
+                showPoliticalLeaning={true}
+              />
               <div>
                 <h4 className="font-medium" data-testid={`text-opinion-author-${id}`}>
                   {userName}
