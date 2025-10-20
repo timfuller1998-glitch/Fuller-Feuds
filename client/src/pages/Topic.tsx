@@ -624,6 +624,7 @@ export default function Topic() {
                       userId={opinion.userId}
                       userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
                       userAvatar={opinion.author?.profileImageUrl}
+                      politicalLeaningScore={opinion.author?.politicalLeaningScore}
                       content={opinion.content}
                       stance={opinion.stance}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
@@ -666,6 +667,7 @@ export default function Topic() {
                       userId={opinion.userId}
                       userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
                       userAvatar={opinion.author?.profileImageUrl}
+                      politicalLeaningScore={opinion.author?.politicalLeaningScore}
                       content={opinion.content}
                       stance={opinion.stance}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
@@ -708,6 +710,7 @@ export default function Topic() {
                       userId={opinion.userId}
                       userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
                       userAvatar={opinion.author?.profileImageUrl}
+                      politicalLeaningScore={opinion.author?.politicalLeaningScore}
                       content={opinion.content}
                       stance={opinion.stance}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}

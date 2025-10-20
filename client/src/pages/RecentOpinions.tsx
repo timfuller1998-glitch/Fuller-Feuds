@@ -265,6 +265,7 @@ export default function RecentOpinionsPage() {
                     userId={opinion.userId}
                     userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
                     userAvatar={opinion.author?.profileImageUrl}
+                    politicalLeaningScore={opinion.author?.politicalLeaningScore}
                     content={opinion.content}
                     stance={opinion.stance as "for" | "against" | "neutral"}
                     timestamp={formatDistanceToNow(new Date(opinion.createdAt!), { addSuffix: true })}
