@@ -528,10 +528,12 @@ export class DatabaseStorage implements IStorage {
     const baseOpinions = await db
       .select({
         opinion: opinions,
-        author: users
+        author: users,
+        profile: userProfiles
       })
       .from(opinions)
       .leftJoin(users, eq(opinions.userId, users.id))
+      .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
       .where(and(...whereConditions))
       .orderBy(desc(opinions.createdAt));
 
@@ -551,6 +553,7 @@ export class DatabaseStorage implements IStorage {
       baseOpinions.map(async (row) => {
         const opinion = row.opinion;
         const author = row.author;
+        const profile = row.profile;
         
         // Count likes
         const likesResult = await db
@@ -576,7 +579,8 @@ export class DatabaseStorage implements IStorage {
             id: author.id,
             firstName: author.firstName,
             lastName: author.lastName,
-            profileImageUrl: author.profileImageUrl
+            profileImageUrl: author.profileImageUrl,
+            politicalLeaningScore: profile?.leaningScore ?? undefined
           } : null,
           likesCount: Number(likesResult[0]?.count || 0),
           dislikesCount: Number(dislikesResult[0]?.count || 0),
@@ -603,10 +607,12 @@ export class DatabaseStorage implements IStorage {
     const baseOpinions = await db
       .select({
         opinion: opinions,
-        author: users
+        author: users,
+        profile: userProfiles
       })
       .from(opinions)
       .leftJoin(users, eq(opinions.userId, users.id))
+      .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(opinions.createdAt))
       .limit(limit);
@@ -627,6 +633,7 @@ export class DatabaseStorage implements IStorage {
       baseOpinions.map(async (row) => {
         const opinion = row.opinion;
         const author = row.author;
+        const profile = row.profile;
         
         // Count likes
         const likesResult = await db
@@ -652,7 +659,8 @@ export class DatabaseStorage implements IStorage {
             id: author.id,
             firstName: author.firstName,
             lastName: author.lastName,
-            profileImageUrl: author.profileImageUrl
+            profileImageUrl: author.profileImageUrl,
+            politicalLeaningScore: profile?.leaningScore ?? undefined
           } : null,
           likesCount: Number(likesResult[0]?.count || 0),
           dislikesCount: Number(dislikesResult[0]?.count || 0),
