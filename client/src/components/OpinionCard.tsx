@@ -146,7 +146,7 @@ export default function OpinionCard({
             >
               <AvatarWithBadge 
                 userId={userId}
-                displayName={userName} 
+                name={userName} 
                 profileImageUrl={userAvatar} 
                 size="sm"
                 politicalLeaningScore={politicalLeaningScore}
@@ -166,7 +166,7 @@ export default function OpinionCard({
             <div className="flex items-center gap-3">
               <AvatarWithBadge 
                 userId={userId || "unknown"}
-                displayName={userName} 
+                name={userName} 
                 profileImageUrl={userAvatar} 
                 size="sm"
                 politicalLeaningScore={politicalLeaningScore}
