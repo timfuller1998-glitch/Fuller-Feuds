@@ -52,10 +52,11 @@ Preferred communication style: Simple, everyday language.
   - **Extremist Fade**: At ±85 on either axis, colors fade to black (up to 70% darker) to indicate extreme positions
 - **Data Flow**: Backend analysis → user_profiles.economicScore/authoritarianScore → API responses → Frontend avatar rings and charts
 - **Opinion Count Tracking**: 
-  - **Automatic Counting**: Opinion count incremented on creation (UPSERT), counted from database on deletion
-  - **Data Integrity**: deleteOpinionAdmin counts actual remaining opinions within transaction to ensure accuracy
-  - **Sync Utility**: syncOpinionCounts() recalculates all counts, fixes orphaned profiles with stale counts
-  - **Admin Endpoint**: POST /api/admin/sync-opinion-counts (requires admin auth) for manual count synchronization
+  - **Dual-Field System**: Maintains two synchronized fields: `opinionCount` (triggers AI analysis every 5 opinions) and `totalOpinions` (displayed on frontend)
+  - **Automatic Counting**: Both fields incremented on creation (UPSERT), both counted from database on deletion
+  - **Data Integrity**: deleteOpinionAdmin counts actual remaining opinions within transaction to ensure accuracy of both fields
+  - **Sync Utility**: syncOpinionCounts() recalculates and syncs both fields to actual counts, fixes orphaned profiles with stale counts
+  - **Admin Endpoint**: POST /api/admin/sync-opinion-counts (requires admin auth) for manual synchronization of both fields
 
 ### Gamification System
 - **Badge System**: Awards users for participation (Debate Participation, Opinion Sharing, Topic Creation) and quality (Logical Thinker). Badges are automatically awarded and can be displayed on user avatars.
