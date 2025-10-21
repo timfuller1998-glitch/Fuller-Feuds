@@ -1981,13 +1981,14 @@ export class DatabaseStorage implements IStorage {
       
       const newCount = Number(remainingCount.count);
       
-      // Ensure user profile exists and update with correct count using UPSERT
+      // Ensure user profile exists and update with correct counts (both opinionCount and totalOpinions) using UPSERT
       // This handles both existing profiles and missing profiles
       await tx
         .insert(userProfiles)
         .values({
           userId: opinion.userId,
           opinionCount: newCount,
+          totalOpinions: newCount,
           economicScore: 0,
           authoritarianScore: 0,
           updatedAt: new Date()
@@ -1996,11 +1997,12 @@ export class DatabaseStorage implements IStorage {
           target: userProfiles.userId,
           set: {
             opinionCount: newCount,
+            totalOpinions: newCount,
             updatedAt: new Date()
           }
         });
       
-      console.log(`[Opinion Deleted] User ${opinion.userId} opinion count set to ${newCount} (${newCount} remaining opinions)`);
+      console.log(`[Opinion Deleted] User ${opinion.userId} opinion counts set to ${newCount} (${newCount} remaining opinions)`);
       
       // Log the action
       await tx.insert(moderationActions).values({
