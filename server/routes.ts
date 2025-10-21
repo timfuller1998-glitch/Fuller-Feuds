@@ -155,6 +155,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User routes
+  app.get('/api/users/me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      let user = await storage.getUser(userId);
+      
+      // If user doesn't exist, create them automatically
+      if (!user) {
+        const claims = req.user.claims;
+        await storage.createUser({
+          id: userId,
+          email: claims.email,
+          firstName: claims.first_name || null,
+          lastName: claims.last_name || null,
+          profileImageUrl: claims.profile_image_url || null,
+        });
+        user = await storage.getUser(userId);
+      }
+      
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching current user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.patch('/api/users/me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { followedCategories } = req.body;
+
+      if (followedCategories !== undefined && !Array.isArray(followedCategories)) {
+        return res.status(400).json({ message: "followedCategories must be an array" });
+      }
+
+      if (followedCategories) {
+        await storage.updateFollowedCategories(userId, followedCategories);
+      }
+
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating current user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
   app.get('/api/users/:id', async (req, res) => {
     try {
       const user = await storage.getUser(req.params.id);

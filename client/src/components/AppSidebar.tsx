@@ -36,7 +36,8 @@ import {
   User,
   Grid,
   Shield,
-  Clock
+  Clock,
+  Star
 } from "lucide-react";
 import type { Topic } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
@@ -306,19 +307,36 @@ export default function AppSidebar({
                   </SidebarMenuItem>
                   {recentCategoryItems.map((category) => (
                     <SidebarMenuItem key={`recent-${category.title}`}>
-                      <SidebarMenuButton asChild>
+                      <div className="flex items-center gap-2 px-2 py-1.5 w-full">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 flex-shrink-0"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleCategoryMutation.mutate({
+                              category: category.title,
+                              isFollowing: false, // Adding to saved list
+                            });
+                          }}
+                          data-testid={`button-follow-category-${category.title.toLowerCase()}`}
+                        >
+                          <Star className="w-4 h-4" />
+                        </Button>
                         <Link 
                           href={`/category/${category.title}`} 
                           onClick={handleLinkClick}
+                          className="flex items-center gap-2 flex-1 min-w-0 hover-elevate active-elevate-2 rounded-md px-2 py-1 -mx-2 -my-1"
                           data-testid={`link-recent-category-${category.title.toLowerCase()}`}
                         >
-                          <category.icon className="w-4 h-4" />
-                          <span>{category.title}</span>
-                          <Badge variant="secondary" className="ml-auto text-xs">
+                          <category.icon className="w-4 h-4 flex-shrink-0" />
+                          <span className="flex-1 truncate text-sm">{category.title}</span>
+                          <Badge variant="secondary" className="text-xs flex-shrink-0">
                             {category.count}
                           </Badge>
                         </Link>
-                      </SidebarMenuButton>
+                      </div>
                     </SidebarMenuItem>
                   ))}
                 </>
