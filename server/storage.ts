@@ -515,12 +515,13 @@ export class DatabaseStorage implements IStorage {
   async createOpinion(opinion: InsertOpinion): Promise<Opinion> {
     const [created] = await db.insert(opinions).values(opinion).returning();
     
-    // Ensure user profile exists and increment opinionCount using UPSERT
+    // Ensure user profile exists and increment both opinionCount and totalOpinions using UPSERT
     const [profile] = await db
       .insert(userProfiles)
       .values({
         userId: opinion.userId,
         opinionCount: 1,
+        totalOpinions: 1,
         economicScore: 0,
         authoritarianScore: 0,
         updatedAt: new Date()
@@ -529,6 +530,7 @@ export class DatabaseStorage implements IStorage {
         target: userProfiles.userId,
         set: {
           opinionCount: sql`${userProfiles.opinionCount} + 1`,
+          totalOpinions: sql`${userProfiles.totalOpinions} + 1`,
           updatedAt: new Date()
         }
       })
