@@ -106,7 +106,7 @@ export default function Topic() {
 
   // Fetch live streams for this topic
   const { data: liveStreams } = useQuery<any[]>({
-    queryKey: ["/api/live-streams", { topicId: id }],
+    queryKey: [`/api/live-streams?topicId=${id}`],
     enabled: !!id,
   });
 
