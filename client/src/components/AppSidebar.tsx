@@ -103,10 +103,7 @@ export default function AppSidebar({
         ? savedCategories.filter(c => c !== category)
         : [...savedCategories, category];
       
-      return apiRequest("/api/users/me", {
-        method: "PATCH",
-        body: JSON.stringify({ followedCategories: newFollowedCategories }),
-      });
+      return apiRequest("PATCH", "/api/users/me", { followedCategories: newFollowedCategories });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });

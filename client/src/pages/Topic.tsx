@@ -60,9 +60,7 @@ export default function Topic() {
   // Record topic view when user visits
   useEffect(() => {
     if (id && user?.id) {
-      apiRequest(`/api/topics/${id}/view`, {
-        method: 'POST',
-      }).catch(err => {
+      apiRequest('POST', `/api/topics/${id}/view`).catch(err => {
         console.error("Failed to record topic view:", err);
       });
     }
