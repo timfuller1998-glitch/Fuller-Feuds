@@ -77,7 +77,7 @@ export class AIService {
         n: 1,
       });
 
-      const imageUrl = response.data[0]?.url;
+      const imageUrl = response.data?.[0]?.url;
       if (!imageUrl) {
         throw new Error("No image URL returned from DALL-E");
       }
@@ -403,6 +403,8 @@ AUTHORITARIAN indicators:
 Return only valid JSON.`;
 
     try {
+      console.log(`[AI Analysis] Starting 2D political compass analysis for ${recentOpinions.length} opinions`);
+      
       // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
       const completion = await openai.chat.completions.create({
         model: "gpt-5",
@@ -421,20 +423,27 @@ Return only valid JSON.`;
       });
 
       const responseContent = completion.choices[0]?.message?.content;
+      console.log(`[AI Analysis] Raw OpenAI response:`, responseContent);
+      
       if (!responseContent) {
+        console.error("[AI Analysis] ERROR: No response from OpenAI");
         throw new Error("No response from OpenAI");
       }
 
       let aiAnalysis;
       try {
         aiAnalysis = JSON.parse(responseContent);
+        console.log(`[AI Analysis] Parsed AI analysis:`, JSON.stringify(aiAnalysis, null, 2));
       } catch (parseError) {
-        console.error("Failed to parse AI 2D political analysis:", responseContent);
+        console.error("[AI Analysis] ERROR: Failed to parse AI 2D political analysis:", responseContent);
+        console.error("[AI Analysis] Parse error details:", parseError);
         throw new Error("Invalid AI response format");
       }
 
       const economicScore = Math.max(-100, Math.min(100, aiAnalysis.economicScore || 0));
       const authoritarianScore = Math.max(-100, Math.min(100, aiAnalysis.authoritarianScore || 0));
+      
+      console.log(`[AI Analysis] Final scores - Economic: ${economicScore}, Authoritarian: ${authoritarianScore}`);
 
       // Determine quadrant
       let quadrant: PoliticalCompass2DAnalysis['quadrant'] = 'centrist';
@@ -449,6 +458,8 @@ Return only valid JSON.`;
           quadrant = 'authoritarian-socialist';
         }
       }
+      
+      console.log(`[AI Analysis] Determined quadrant: ${quadrant}, confidence: ${confidence}`);
 
       return {
         economicScore,
