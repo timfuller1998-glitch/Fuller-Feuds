@@ -33,6 +33,24 @@ Preferred communication style: Simple, everyday language.
 - **Privacy Controls**: Each participant can independently set their side of debate as "public" or "private".
 - **Active Debates Visibility**: "My Active Debates" page displays all ongoing debate rooms for the current user.
 
+### 2D Political Compass System
+- **AI-Powered Analysis**: Uses OpenAI GPT-5 to analyze users' last 50 opinions and calculate political positioning on two independent axes
+- **Economic Axis**: Ranges from -100 (capitalist) to +100 (socialist), measuring economic policy preferences
+- **Authoritarian Axis**: Ranges from -100 (libertarian) to +100 (authoritarian), measuring views on government authority
+- **Automatic Updates**: Analysis runs in background every 5 opinions posted, incrementing opinionCount and updating scores asynchronously
+- **Visual Representation**: 
+  - **Avatar Rings**: Color-coded rings around user avatars using 4-quadrant blending system
+  - **Political Compass Chart**: Interactive SVG visualization showing user position on 2D compass with quadrant gradients
+  - **Profile Popover**: Hoverable chart on profile page confidence metric displays full compass visualization
+- **Color Scheme**:
+  - **Red** (H=0): Authoritarian Capitalist (economic < 0, authoritarian > 0)
+  - **Blue** (H=220): Authoritarian Socialist (economic > 0, authoritarian > 0)
+  - **Green** (H=140): Libertarian Capitalist (economic < 0, authoritarian < 0)
+  - **Yellow** (H=50): Libertarian Socialist (economic > 0, authoritarian < 0)
+  - **Blending**: Colors blend smoothly with minimal white only at center (±15% radius)
+  - **Extremist Fade**: At ±85 on either axis, colors fade to black (up to 70% darker) to indicate extreme positions
+- **Data Flow**: Backend analysis → user_profiles.economicScore/authoritarianScore → API responses → Frontend avatar rings and charts
+
 ### Gamification System
 - **Badge System**: Awards users for participation (Debate Participation, Opinion Sharing, Topic Creation) and quality (Logical Thinker). Badges are automatically awarded and can be displayed on user avatars.
 - **Leaderboard System**: Ranks users across categories such as "Most Opinionated Users", "Most Active Debaters", "Top Topic Creators", and "Logical Reasoning Champions".
