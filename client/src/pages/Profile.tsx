@@ -379,6 +379,51 @@ export default function Profile() {
     return "Very Conservative";
   };
 
+  // 2D Political Compass Description
+  const get2DPoliticalDescription = (economicScore: number, authoritarianScore: number) => {
+    // Economic axis descriptors
+    let economicLabel = "";
+    const absEconomic = Math.abs(economicScore);
+    if (absEconomic >= 85) {
+      economicLabel = economicScore < 0 ? "extreme capitalist" : "extreme socialist";
+    } else if (absEconomic >= 60) {
+      economicLabel = economicScore < 0 ? "very capitalist" : "very socialist";
+    } else if (absEconomic >= 30) {
+      economicLabel = economicScore < 0 ? "capitalist" : "socialist";
+    } else if (absEconomic >= 15) {
+      economicLabel = economicScore < 0 ? "moderate capitalist" : "moderate socialist";
+    } else {
+      economicLabel = "economically centrist";
+    }
+
+    // Authoritarian axis descriptors
+    let authoritarianLabel = "";
+    const absAuthoritarian = Math.abs(authoritarianScore);
+    if (absAuthoritarian >= 85) {
+      authoritarianLabel = authoritarianScore > 0 ? "extreme authoritarian" : "extreme libertarian";
+    } else if (absAuthoritarian >= 60) {
+      authoritarianLabel = authoritarianScore > 0 ? "very authoritarian" : "very libertarian";
+    } else if (absAuthoritarian >= 30) {
+      authoritarianLabel = authoritarianScore > 0 ? "authoritarian" : "libertarian";
+    } else if (absAuthoritarian >= 15) {
+      authoritarianLabel = authoritarianScore > 0 ? "moderate authoritarian" : "moderate libertarian";
+    } else {
+      authoritarianLabel = "socially centrist";
+    }
+
+    // Combine labels
+    if (economicLabel.includes("centrist") && authoritarianLabel.includes("centrist")) {
+      return "moderate";
+    }
+    if (economicLabel.includes("centrist")) {
+      return authoritarianLabel;
+    }
+    if (authoritarianLabel.includes("centrist")) {
+      return economicLabel;
+    }
+    return `${economicLabel}, ${authoritarianLabel}`;
+  };
+
   if (profileLoading || !profileData) {
     return (
       <div className="container mx-auto py-8">
@@ -430,16 +475,10 @@ export default function Profile() {
                   lastName={user.lastName}
                   className="h-20 w-20 sm:h-24 sm:w-24 text-2xl"
                   showBadge={true}
+                  economicScore={profile?.economicScore}
+                  authoritarianScore={profile?.authoritarianScore}
+                  showPoliticalLeaning={true}
                 />
-                {profile && profile.politicalLeaning && (
-                  <div 
-                    className="absolute inset-0 rounded-full border-4 pointer-events-none"
-                    style={{ 
-                      borderColor: getPoliticalLeaningColorFromScore(profile.leaningScore),
-                    }}
-                    data-testid="political-leaning-ring"
-                  />
-                )}
               </div>
               
               <div className="space-y-3 flex-1 min-w-0">
@@ -447,30 +486,30 @@ export default function Profile() {
                   <h1 className="text-2xl sm:text-3xl font-bold break-words" data-testid="profile-name">
                     {profile?.displayFirstName != null ? profile.displayFirstName : user.firstName}{profile?.displayFirstName != null ? (profile?.displayLastName ? ` ${profile.displayLastName}` : '') : (user.lastName ? ` ${user.lastName}` : '')}
                   </h1>
-                  {profile && profile.politicalLeaning && (
-                    <p className="text-sm text-muted-foreground" data-testid="political-leaning-label">
-                      {getLeaningDescription(profile.leaningScore)}
-                      {profile.leaningConfidence && (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <span className="text-xs cursor-help hover:text-foreground transition-colors" data-testid="confidence-metric"> • {profile.leaningConfidence} confidence</span>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto" data-testid="popover-political-compass">
-                            <div className="space-y-2">
-                              <h4 className="font-medium text-sm">Political Compass Position</h4>
-                              <PoliticalCompassChart 
-                                economicScore={profile.economicScore}
-                                authoritarianScore={profile.authoritarianScore}
-                                size="sm"
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Based on analysis of {profile.totalOpinions} opinions
-                              </p>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      )}
-                    </p>
+                  {profile && (profile.economicScore !== undefined || profile.economicScore !== null) && (profile.authoritarianScore !== undefined || profile.authoritarianScore !== null) && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left" data-testid="political-leaning-label">
+                          {get2DPoliticalDescription(profile.economicScore ?? 0, profile.authoritarianScore ?? 0)}
+                          {profile.leaningConfidence && (
+                            <span className="text-xs" data-testid="confidence-metric"> • {profile.leaningConfidence} confidence</span>
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto" data-testid="popover-political-compass">
+                        <div className="space-y-2">
+                          <h4 className="font-medium text-sm">Political Compass Position</h4>
+                          <PoliticalCompassChart 
+                            economicScore={profile.economicScore}
+                            authoritarianScore={profile.authoritarianScore}
+                            size="sm"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Based on analysis of {profile.totalOpinions} opinions
+                          </p>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   )}
                   <p className="text-sm text-muted-foreground truncate" data-testid="profile-email">
                     {user.email}
