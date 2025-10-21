@@ -17,6 +17,7 @@ import {
   bannedPhrases,
   userFollows,
   userProfiles,
+  topicViews,
   themes,
   themeLikes,
   badges,
@@ -252,6 +253,10 @@ export interface IStorage {
   checkAndAwardBadges(userId: string): Promise<string[]>;
   setSelectedBadge(userId: string, badgeId: string | null): Promise<void>;
   getLeaderboards(): Promise<any>;
+  
+  // Topic views tracking
+  recordTopicView(userId: string, topicId: string): Promise<void>;
+  getRecentlyViewedCategories(userId: string, limit?: number): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2585,6 +2590,60 @@ export class DatabaseStorage implements IStorage {
         count: Number(item.count),
       })).filter(item => item.user),
     };
+  }
+
+  // Topic views tracking
+  async recordTopicView(userId: string, topicId: string): Promise<void> {
+    // Record the topic view
+    await db.insert(topicViews).values({
+      userId,
+      topicId,
+    });
+  }
+
+  async getRecentlyViewedCategories(userId: string, limit: number = 5): Promise<string[]> {
+    // Get recent topic views for this user
+    const recentViews = await db
+      .select({
+        topicId: topicViews.topicId,
+        viewedAt: topicViews.viewedAt,
+      })
+      .from(topicViews)
+      .where(eq(topicViews.userId, userId))
+      .orderBy(desc(topicViews.viewedAt))
+      .limit(50); // Get more views to extract unique categories
+
+    if (recentViews.length === 0) {
+      return [];
+    }
+
+    // Get the topics for these views
+    const topicIds = recentViews.map((v) => v.topicId);
+    const viewedTopics = await db
+      .select()
+      .from(topics)
+      .where(inArray(topics.id, topicIds));
+
+    // Extract unique categories in order of most recent view
+    const categorySet = new Set<string>();
+    const categoryOrder: string[] = [];
+
+    for (const view of recentViews) {
+      const topic = viewedTopics.find((t) => t.id === view.topicId);
+      if (topic && topic.categories) {
+        for (const category of topic.categories) {
+          if (!categorySet.has(category)) {
+            categorySet.add(category);
+            categoryOrder.push(category);
+            if (categoryOrder.length >= limit) {
+              return categoryOrder;
+            }
+          }
+        }
+      }
+    }
+
+    return categoryOrder;
   }
 }
 

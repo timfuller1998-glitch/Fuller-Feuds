@@ -288,6 +288,17 @@ export const userProfiles = pgTable("user_profiles", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Topic views tracking for recent categories
+export const topicViews = pgTable("topic_views", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  topicId: uuid("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
+  viewedAt: timestamp("viewed_at").defaultNow(),
+}, (table) => [
+  index("topic_views_user_id_idx").on(table.userId),
+  index("topic_views_viewed_at_idx").on(table.viewedAt)
+]);
+
 // Schema types and validation
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
