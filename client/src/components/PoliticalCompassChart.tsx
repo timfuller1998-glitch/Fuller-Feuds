@@ -33,12 +33,67 @@ export function PoliticalCompassChart({
   const userX = normalizeX(economicScore || 0);
   const userY = normalizeY(authoritarianScore || 0);
 
-  // Quadrant colors matching the 4-color system (FLIPPED)
+  // Dynamic color calculation matching avatar ring system
+  const getQuadrantColor = (economicPos: number, authoritarianPos: number) => {
+    const x = economicPos / 100;  // -1 (capitalist) to +1 (socialist)
+    const y = authoritarianPos / 100;  // -1 (libertarian) to +1 (authoritarian)
+    
+    const distanceFromCenter = Math.sqrt(x * x + y * y);
+    const intensity = Math.min(distanceFromCenter, 1);
+    
+    let hue: number;
+    let saturation: number;
+    let lightness: number;
+    
+    // Determine quadrant and base color
+    if (x < 0 && y >= 0) {
+      hue = 0; // Red - Authoritarian Capitalist
+      saturation = 70 + (intensity * 25);
+      lightness = 55;
+    } else if (x >= 0 && y >= 0) {
+      hue = 220; // Blue - Authoritarian Socialist
+      saturation = 70 + (intensity * 25);
+      lightness = 55;
+    } else if (x < 0 && y < 0) {
+      hue = 140; // Green - Libertarian Capitalist
+      saturation = 65 + (intensity * 30);
+      lightness = 50;
+    } else {
+      hue = 50; // Yellow - Libertarian Socialist
+      saturation = 70 + (intensity * 25);
+      lightness = 55;
+    }
+    
+    // Minimal white in center
+    if (distanceFromCenter < 0.15) {
+      saturation = saturation * 0.6;
+      lightness = 65;
+    } else if (distanceFromCenter < 0.3) {
+      saturation = saturation * 0.8;
+      lightness = 60;
+    } else {
+      lightness = 55 - (intensity * 10);
+    }
+    
+    // Fade to black at extremes (±85)
+    const absX = Math.abs(x);
+    const absY = Math.abs(y);
+    if (absX >= 0.85 || absY >= 0.85) {
+      const maxAbsolute = Math.max(absX, absY);
+      const extremeFactor = (maxAbsolute - 0.85) / 0.15;
+      lightness = lightness * (1 - extremeFactor * 0.7);
+      saturation = saturation * (1 - extremeFactor * 0.3);
+    }
+    
+    return `hsl(${hue} ${saturation}% ${lightness}%)`;
+  };
+
+  // Calculate corner colors for gradients
   const quadrantColors = {
-    topLeft: "hsl(0 80% 55%)",        // Red - Authoritarian Capitalist
-    topRight: "hsl(220 80% 55%)",     // Blue - Authoritarian Socialist
-    bottomLeft: "hsl(140 70% 50%)",   // Green - Libertarian Capitalist
-    bottomRight: "hsl(50 80% 55%)"    // Yellow - Libertarian Socialist
+    topLeft: getQuadrantColor(-100, 100),        // Red - Authoritarian Capitalist
+    topRight: getQuadrantColor(100, 100),        // Blue - Authoritarian Socialist
+    bottomLeft: getQuadrantColor(-100, -100),    // Green - Libertarian Capitalist
+    bottomRight: getQuadrantColor(100, -100)     // Yellow - Libertarian Socialist
   };
 
   return (
@@ -46,20 +101,24 @@ export function PoliticalCompassChart({
       <svg width={width} height={height} className="border border-border rounded-md bg-card">
         {/* Gradient backgrounds for quadrants */}
         <defs>
-          <radialGradient id="tl-gradient" cx="25%" cy="25%">
-            <stop offset="0%" stopColor={quadrantColors.topLeft} stopOpacity="0.3" />
+          <radialGradient id="tl-gradient" cx="0%" cy="0%">
+            <stop offset="0%" stopColor={quadrantColors.topLeft} stopOpacity="0.5" />
+            <stop offset="50%" stopColor={quadrantColors.topLeft} stopOpacity="0.2" />
             <stop offset="100%" stopColor={quadrantColors.topLeft} stopOpacity="0.05" />
           </radialGradient>
-          <radialGradient id="tr-gradient" cx="75%" cy="25%">
-            <stop offset="0%" stopColor={quadrantColors.topRight} stopOpacity="0.3" />
+          <radialGradient id="tr-gradient" cx="100%" cy="0%">
+            <stop offset="0%" stopColor={quadrantColors.topRight} stopOpacity="0.5" />
+            <stop offset="50%" stopColor={quadrantColors.topRight} stopOpacity="0.2" />
             <stop offset="100%" stopColor={quadrantColors.topRight} stopOpacity="0.05" />
           </radialGradient>
-          <radialGradient id="bl-gradient" cx="25%" cy="75%">
-            <stop offset="0%" stopColor={quadrantColors.bottomLeft} stopOpacity="0.3" />
+          <radialGradient id="bl-gradient" cx="0%" cy="100%">
+            <stop offset="0%" stopColor={quadrantColors.bottomLeft} stopOpacity="0.5" />
+            <stop offset="50%" stopColor={quadrantColors.bottomLeft} stopOpacity="0.2" />
             <stop offset="100%" stopColor={quadrantColors.bottomLeft} stopOpacity="0.05" />
           </radialGradient>
-          <radialGradient id="br-gradient" cx="75%" cy="75%">
-            <stop offset="0%" stopColor={quadrantColors.bottomRight} stopOpacity="0.3" />
+          <radialGradient id="br-gradient" cx="100%" cy="100%">
+            <stop offset="0%" stopColor={quadrantColors.bottomRight} stopOpacity="0.5" />
+            <stop offset="50%" stopColor={quadrantColors.bottomRight} stopOpacity="0.2" />
             <stop offset="100%" stopColor={quadrantColors.bottomRight} stopOpacity="0.05" />
           </radialGradient>
         </defs>
