@@ -237,7 +237,7 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           ) : (
-            allTopics?.map((topic: any) => (
+            allTopics?.filter((topic: any) => topic.isActive).map((topic: any) => (
               <Card key={topic.id} className="hover-elevate" data-testid={`card-topic-${topic.id}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4">
