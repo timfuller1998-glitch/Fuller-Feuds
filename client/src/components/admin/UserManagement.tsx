@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
-import { Users, Search, Shield, User, Ban, Unlock, Trash2 } from "lucide-react";
+import { Users, Search, Shield, User, Ban, Unlock, Trash2, MoreVertical } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +19,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 export function UserManagement() {
   const [roleFilter, setRoleFilter] = useState<string>("");
@@ -204,39 +211,89 @@ export function UserManagement() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedUser(user);
-                        setNewRole(user.role);
-                      }}
-                      data-testid={`button-manage-role-${user.id}`}
-                    >
-                      <Shield className="h-4 w-4 mr-2" />
-                      Role
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setStatusChangeUser(user);
-                        setNewStatus(user.status);
-                      }}
-                      data-testid={`button-manage-status-${user.id}`}
-                    >
-                      {user.status === 'banned' ? <Unlock className="h-4 w-4 mr-2" /> : <Ban className="h-4 w-4 mr-2" />}
-                      Status
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => setDeleteUser(user)}
-                      data-testid={`button-delete-user-${user.id}`}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
+                    {/* Desktop: Show individual buttons */}
+                    <div className="hidden md:flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setNewRole(user.role);
+                        }}
+                        data-testid={`button-manage-role-${user.id}`}
+                      >
+                        <Shield className="h-4 w-4 mr-2" />
+                        Role
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setStatusChangeUser(user);
+                          setNewStatus(user.status);
+                        }}
+                        data-testid={`button-manage-status-${user.id}`}
+                      >
+                        {user.status === 'banned' ? <Unlock className="h-4 w-4 mr-2" /> : <Ban className="h-4 w-4 mr-2" />}
+                        Status
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setDeleteUser(user)}
+                        data-testid={`button-delete-user-${user.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </div>
+                    
+                    {/* Mobile: Show dropdown menu */}
+                    <div className="md:hidden">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            data-testid={`button-user-options-${user.id}`}
+                          >
+                            <MoreVertical className="h-4 w-4 mr-2" />
+                            Options
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setSelectedUser(user);
+                              setNewRole(user.role);
+                            }}
+                            data-testid={`dropdown-manage-role-${user.id}`}
+                          >
+                            <Shield className="h-4 w-4 mr-2" />
+                            Change Role
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setStatusChangeUser(user);
+                              setNewStatus(user.status);
+                            }}
+                            data-testid={`dropdown-manage-status-${user.id}`}
+                          >
+                            {user.status === 'banned' ? <Unlock className="h-4 w-4 mr-2" /> : <Ban className="h-4 w-4 mr-2" />}
+                            Change Status
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onSelect={() => setDeleteUser(user)}
+                            className="text-destructive focus:text-destructive"
+                            data-testid={`dropdown-delete-user-${user.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete User
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </div>
               </CardContent>
