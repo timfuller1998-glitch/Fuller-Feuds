@@ -9,6 +9,9 @@ import { type Topic } from "@shared/schema";
 type TopicWithCounts = Topic & {
   opinionsCount?: number;
   participantCount?: number;
+  previewContent?: string;
+  previewAuthor?: string;
+  previewIsAI?: boolean;
 };
 
 export default function Trending() {
@@ -139,11 +142,14 @@ export default function Trending() {
                 id={topic.id}
                 title={topic.title}
                 description={topic.description}
-                category={topic.category}
+                categories={topic.categories || []}
                 opinionsCount={topic.opinionsCount || 0}
                 participantCount={topic.participantCount || 0}
                 isActive={topic.isActive ?? true}
                 imageUrl={topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800"}
+                previewContent={topic.previewContent}
+                previewAuthor={topic.previewAuthor}
+                previewIsAI={topic.previewIsAI}
               />
             </div>
           ))}

@@ -49,7 +49,10 @@ export default function CategoryPage() {
     categories: topic.categories,
     participantCount: topic.participantCount,
     opinionsCount: topic.opinionsCount,
-    isActive: topic.isActive ?? true
+    isActive: topic.isActive ?? true,
+    previewContent: topic.previewContent,
+    previewAuthor: topic.previewAuthor,
+    previewIsAI: topic.previewIsAI
   }));
 
   const isLoading = topicsLoading || streamsLoading;

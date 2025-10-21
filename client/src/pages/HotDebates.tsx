@@ -13,6 +13,9 @@ type TopicWithDiversity = Topic & {
   neutralCount?: number;
   diversityScore?: number;
   recentActivity?: number;
+  previewContent?: string;
+  previewAuthor?: string;
+  previewIsAI?: boolean;
 };
 
 export default function HotDebates() {
@@ -171,6 +174,9 @@ export default function HotDebates() {
                       participantCount={topic.participantCount || 0}
                       isActive={topic.isActive ?? true}
                       imageUrl={topic.imageUrl || ""}
+                      previewContent={topic.previewContent}
+                      previewAuthor={topic.previewAuthor}
+                      previewIsAI={topic.previewIsAI}
                     />
                   </div>
                   {/* Diversity Indicator */}

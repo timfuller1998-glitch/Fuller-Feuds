@@ -315,6 +315,9 @@ export default function Home() {
                               participantCount={topic.participantCount}
                               isActive={topic.isActive ?? true}
                               imageUrl={topic.imageUrl ?? climateImage}
+                              previewContent={topic.previewContent}
+                              previewAuthor={topic.previewAuthor}
+                              previewIsAI={topic.previewIsAI}
                             />
                           </div>
                         ))}

@@ -11,6 +11,9 @@ import { Badge } from "@/components/ui/badge";
 type TopicWithCounts = Topic & {
   opinionsCount?: number;
   participantCount?: number;
+  previewContent?: string;
+  previewAuthor?: string;
+  previewIsAI?: boolean;
 };
 
 export default function Search() {
@@ -170,6 +173,9 @@ export default function Search() {
                   participantCount={topic.participantCount || 0}
                   isActive={topic.isActive ?? true}
                   imageUrl={topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800"}
+                  previewContent={topic.previewContent}
+                  previewAuthor={topic.previewAuthor}
+                  previewIsAI={topic.previewIsAI}
                 />
               ))}
             </div>

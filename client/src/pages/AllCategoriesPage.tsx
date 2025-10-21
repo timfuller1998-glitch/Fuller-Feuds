@@ -241,6 +241,9 @@ export default function AllCategoriesPage() {
                             participantCount={topic.participantCount}
                             isActive={topic.isActive ?? true}
                             imageUrl={topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800"}
+                            previewContent={topic.previewContent}
+                            previewAuthor={topic.previewAuthor}
+                            previewIsAI={topic.previewIsAI}
                           />
                         </div>
                       ))}
