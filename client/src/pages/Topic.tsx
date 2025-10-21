@@ -57,6 +57,17 @@ export default function Topic() {
     enabled: !!id,
   });
 
+  // Record topic view when user visits
+  useEffect(() => {
+    if (id && user?.id) {
+      apiRequest(`/api/topics/${id}/view`, {
+        method: 'POST',
+      }).catch(err => {
+        console.error("Failed to record topic view:", err);
+      });
+    }
+  }, [id, user?.id]);
+
   // Fetch opinions for the topic
   const { data: opinions } = useQuery<Opinion[]>({
     queryKey: ["/api/topics", id, "opinions"],

@@ -234,6 +234,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Record topic view
+  app.post('/api/topics/:id/view', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const topicId = req.params.id;
+      
+      await storage.recordTopicView(userId, topicId);
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error recording topic view:", error);
+      res.status(500).json({ message: "Failed to record topic view" });
+    }
+  });
+
+  // Get recently viewed categories for user
+  app.get('/api/users/me/recent-categories', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
+      
+      const categories = await storage.getRecentlyViewedCategories(userId, limit);
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching recent categories:", error);
+      res.status(500).json({ message: "Failed to fetch recent categories" });
+    }
+  });
+
   app.post('/api/topics/generate-categories', isAuthenticated, async (req: any, res) => {
     try {
       const { title } = req.body;
