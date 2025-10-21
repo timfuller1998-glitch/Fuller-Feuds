@@ -2089,6 +2089,7 @@ export class DatabaseStorage implements IStorage {
           .values({
             userId,
             opinionCount: actualCount,
+            totalOpinions: actualCount,
             economicScore: 0,
             authoritarianScore: 0,
             updatedAt: new Date()
@@ -2097,6 +2098,7 @@ export class DatabaseStorage implements IStorage {
             target: userProfiles.userId,
             set: {
               opinionCount: actualCount,
+              totalOpinions: actualCount,
               updatedAt: new Date()
             }
           });
@@ -2114,6 +2116,7 @@ export class DatabaseStorage implements IStorage {
           .update(userProfiles)
           .set({
             opinionCount: 0,
+            totalOpinions: 0,
             updatedAt: new Date()
           })
           .where(eq(userProfiles.userId, profile.userId));
