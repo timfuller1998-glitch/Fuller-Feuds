@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AvatarWithBadge } from "@/components/AvatarWithBadge";
+import { PoliticalCompassChart } from "@/components/PoliticalCompassChart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -71,6 +73,8 @@ interface ProfileData {
     politicalLeaning?: string;
     leaningScore: number;
     leaningConfidence: string;
+    economicScore?: number;
+    authoritarianScore?: number;
     totalOpinions: number;
     totalLikes: number;
     totalDislikes: number;
@@ -447,7 +451,24 @@ export default function Profile() {
                     <p className="text-sm text-muted-foreground" data-testid="political-leaning-label">
                       {getLeaningDescription(profile.leaningScore)}
                       {profile.leaningConfidence && (
-                        <span className="text-xs"> • {profile.leaningConfidence} confidence</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <span className="text-xs cursor-help hover:text-foreground transition-colors" data-testid="confidence-metric"> • {profile.leaningConfidence} confidence</span>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto" data-testid="popover-political-compass">
+                            <div className="space-y-2">
+                              <h4 className="font-medium text-sm">Political Compass Position</h4>
+                              <PoliticalCompassChart 
+                                economicScore={profile.economicScore}
+                                authoritarianScore={profile.authoritarianScore}
+                                size="sm"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Based on analysis of {profile.totalOpinions} opinions
+                              </p>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       )}
                     </p>
                   )}
