@@ -512,21 +512,33 @@ export class DatabaseStorage implements IStorage {
   async createOpinion(opinion: InsertOpinion): Promise<Opinion> {
     const [created] = await db.insert(opinions).values(opinion).returning();
     
-    // Increment opinionCount in user_profiles for political leaning analysis
-    const [updatedProfile] = await db
-      .update(userProfiles)
-      .set({ 
-        opinionCount: sql`${userProfiles.opinionCount} + 1`,
+    // Ensure user profile exists and increment opinionCount using UPSERT
+    const [profile] = await db
+      .insert(userProfiles)
+      .values({
+        userId: opinion.userId,
+        opinionCount: 1,
+        economicScore: 0,
+        authoritarianScore: 0,
         updatedAt: new Date()
       })
-      .where(eq(userProfiles.userId, opinion.userId))
+      .onConflictDoUpdate({
+        target: userProfiles.userId,
+        set: {
+          opinionCount: sql`${userProfiles.opinionCount} + 1`,
+          updatedAt: new Date()
+        }
+      })
       .returning();
     
+    console.log(`[Opinion Created] User ${opinion.userId} now has ${profile.opinionCount} opinions`);
+    
     // Trigger AI political compass analysis every 5 opinions (asynchronously)
-    if (updatedProfile && updatedProfile.opinionCount !== null && updatedProfile.opinionCount % 5 === 0) {
+    if (profile && profile.opinionCount !== null && profile.opinionCount % 5 === 0) {
+      console.log(`[Trigger AI Analysis] User ${opinion.userId} reached ${profile.opinionCount} opinions - triggering 2D political compass analysis`);
       // Run analysis in background without blocking response
       this.analyze2DUserPoliticalCompass(opinion.userId).catch(error => {
-        console.error(`Failed to analyze political compass for user ${opinion.userId}:`, error);
+        console.error(`[AI Analysis ERROR] Failed to analyze political compass for user ${opinion.userId}:`, error);
       });
     }
     
