@@ -88,12 +88,13 @@ export function PoliticalCompassChart({
     return `hsl(${hue} ${saturation}% ${lightness}%)`;
   };
 
-  // Calculate corner colors for gradients
+  // Calculate corner colors for gradients using moderate values (±60)
+  // This prevents fade-to-black from activating on the gradient backgrounds
   const quadrantColors = {
-    topLeft: getQuadrantColor(-100, 100),        // Red - Authoritarian Capitalist
-    topRight: getQuadrantColor(100, 100),        // Blue - Authoritarian Socialist
-    bottomLeft: getQuadrantColor(-100, -100),    // Green - Libertarian Capitalist
-    bottomRight: getQuadrantColor(100, -100)     // Yellow - Libertarian Socialist
+    topLeft: getQuadrantColor(-60, 60),        // Red - Authoritarian Capitalist
+    topRight: getQuadrantColor(60, 60),        // Blue - Authoritarian Socialist
+    bottomLeft: getQuadrantColor(-60, -60),    // Green - Libertarian Capitalist
+    bottomRight: getQuadrantColor(60, -60)     // Yellow - Libertarian Socialist
   };
 
   return (
