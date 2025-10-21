@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AvatarWithBadge } from "./AvatarWithBadge";
 import { 
   Home, 
@@ -39,6 +40,7 @@ import {
 } from "lucide-react";
 import type { Topic } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface CategoryItem {
   title: string;
@@ -79,6 +81,37 @@ export default function AppSidebar({
   });
 
   const activeDebatesCount = activeDebateRooms?.length || 0;
+
+  // Fetch user's saved (followed) categories
+  const { data: userData } = useQuery<{ followedCategories: string[] }>({
+    queryKey: ["/api/users/me"],
+    enabled: !!user,
+  });
+
+  const savedCategories = userData?.followedCategories || [];
+
+  // Fetch recently viewed categories
+  const { data: recentCategories } = useQuery<string[]>({
+    queryKey: ["/api/users/me/recent-categories"],
+    enabled: !!user,
+  });
+
+  // Mutation to toggle category follow status
+  const toggleCategoryMutation = useMutation({
+    mutationFn: async ({ category, isFollowing }: { category: string; isFollowing: boolean }) => {
+      const newFollowedCategories = isFollowing
+        ? savedCategories.filter(c => c !== category)
+        : [...savedCategories, category];
+      
+      return apiRequest("/api/users/me", {
+        method: "PATCH",
+        body: JSON.stringify({ followedCategories: newFollowedCategories }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+  });
 
   // Close sidebar on mobile when link is clicked
   const handleLinkClick = () => {
@@ -122,7 +155,7 @@ export default function AppSidebar({
   };
 
   // Extract all unique categories from all topics with their counts
-  const categories: CategoryItem[] = topics
+  const allCategories: CategoryItem[] = topics
     ? Array.from(
         topics.reduce((acc, topic) => {
           topic.categories.forEach(cat => {
@@ -140,6 +173,31 @@ export default function AppSidebar({
       }))
       .sort((a, b) => b.count - a.count) // Sort by count descending
     : [];
+
+  // Get saved categories with their details (up to 10)
+  const savedCategoryItems = savedCategories
+    .slice(0, 10)
+    .map(cat => {
+      const categoryData = allCategories.find(c => c.title === cat);
+      return {
+        title: cat,
+        icon: getCategoryIcon(cat),
+        count: categoryData?.count || 0,
+      };
+    });
+
+  // Get recently viewed categories that aren't already in saved categories (up to 5)
+  const recentCategoryItems = (recentCategories || [])
+    .filter(cat => !savedCategories.includes(cat))
+    .slice(0, 5)
+    .map(cat => {
+      const categoryData = allCategories.find(c => c.title === cat);
+      return {
+        title: cat,
+        icon: getCategoryIcon(cat),
+        count: categoryData?.count || 0,
+      };
+    });
 
   return (
     <Sidebar>
@@ -196,6 +254,7 @@ export default function AppSidebar({
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {/* Browse All Categories - always at top */}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={location === "/categories"}>
                   <Link href="/categories" onClick={handleLinkClick} data-testid="link-browse-all-categories">
@@ -204,19 +263,69 @@ export default function AppSidebar({
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              {categories.map((category) => (
-                <SidebarMenuItem key={category.title}>
-                  <SidebarMenuButton asChild>
-                    <Link href={`/category/${category.title}`} onClick={handleLinkClick} data-testid={`link-category-${category.title.toLowerCase()}`}>
-                      <category.icon className="w-4 h-4" />
-                      <span>{category.title}</span>
-                      <Badge variant="secondary" className="ml-auto text-xs">
-                        {category.count}
-                      </Badge>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+
+              {/* Saved Categories with checkboxes (up to 10) */}
+              {savedCategoryItems.length > 0 && (
+                <>
+                  {savedCategoryItems.map((category) => (
+                    <SidebarMenuItem key={`saved-${category.title}`}>
+                      <div className="flex items-center gap-2 px-2 py-1.5 w-full">
+                        <Checkbox
+                          checked={savedCategories.includes(category.title)}
+                          onCheckedChange={() => {
+                            toggleCategoryMutation.mutate({
+                              category: category.title,
+                              isFollowing: savedCategories.includes(category.title),
+                            });
+                          }}
+                          data-testid={`checkbox-category-${category.title.toLowerCase()}`}
+                          className="flex-shrink-0"
+                        />
+                        <Link 
+                          href={`/category/${category.title}`} 
+                          onClick={handleLinkClick}
+                          className="flex items-center gap-2 flex-1 min-w-0 hover-elevate active-elevate-2 rounded-md px-2 py-1 -mx-2 -my-1"
+                          data-testid={`link-saved-category-${category.title.toLowerCase()}`}
+                        >
+                          <category.icon className="w-4 h-4 flex-shrink-0" />
+                          <span className="flex-1 truncate text-sm">{category.title}</span>
+                          <Badge variant="secondary" className="text-xs flex-shrink-0">
+                            {category.count}
+                          </Badge>
+                        </Link>
+                      </div>
+                    </SidebarMenuItem>
+                  ))}
+                </>
+              )}
+
+              {/* Recently Viewed Categories (up to 5, excluding saved) */}
+              {recentCategoryItems.length > 0 && (
+                <>
+                  <SidebarMenuItem>
+                    <div className="px-2 py-1 text-xs text-muted-foreground font-medium">
+                      Recently Viewed
+                    </div>
+                  </SidebarMenuItem>
+                  {recentCategoryItems.map((category) => (
+                    <SidebarMenuItem key={`recent-${category.title}`}>
+                      <SidebarMenuButton asChild>
+                        <Link 
+                          href={`/category/${category.title}`} 
+                          onClick={handleLinkClick}
+                          data-testid={`link-recent-category-${category.title.toLowerCase()}`}
+                        >
+                          <category.icon className="w-4 h-4" />
+                          <span>{category.title}</span>
+                          <Badge variant="secondary" className="ml-auto text-xs">
+                            {category.count}
+                          </Badge>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
