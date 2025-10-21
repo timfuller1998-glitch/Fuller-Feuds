@@ -33,12 +33,12 @@ export function PoliticalCompassChart({
   const userX = normalizeX(economicScore || 0);
   const userY = normalizeY(authoritarianScore || 0);
 
-  // Quadrant colors matching the 4-color system
+  // Quadrant colors matching the 4-color system (FLIPPED)
   const quadrantColors = {
-    topLeft: "hsl(210 100% 60%)",     // Blue - Authoritarian Capitalist
-    topRight: "hsl(0 80% 60%)",       // Red - Authoritarian Socialist
-    bottomLeft: "hsl(50 100% 60%)",   // Yellow - Libertarian Capitalist
-    bottomRight: "hsl(140 60% 50%)"   // Green - Libertarian Socialist
+    topLeft: "hsl(0 80% 55%)",        // Red - Authoritarian Capitalist
+    topRight: "hsl(220 80% 55%)",     // Blue - Authoritarian Socialist
+    bottomLeft: "hsl(140 70% 50%)",   // Green - Libertarian Capitalist
+    bottomRight: "hsl(50 80% 55%)"    // Yellow - Libertarian Socialist
   };
 
   return (

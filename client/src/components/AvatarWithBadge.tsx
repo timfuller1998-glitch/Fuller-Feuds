@@ -61,7 +61,7 @@ const hslToHex = (h: number, s: number, l: number): string => {
 // 2D political compass color blending function
 const get2DPoliticalCompassColor = (economicScore: number, authoritarianScore: number): string => {
   // Normalize scores to -1 to 1 range for easier calculation
-  const x = economicScore / 100;  // -1 (socialist) to +1 (capitalist)
+  const x = economicScore / 100;  // -1 (capitalist) to +1 (socialist)
   const y = authoritarianScore / 100;  // -1 (libertarian) to +1 (authoritarian)
   
   // Calculate distance from center (0,0) - used for intensity
@@ -69,43 +69,64 @@ const get2DPoliticalCompassColor = (economicScore: number, authoritarianScore: n
   const intensity = Math.min(distanceFromCenter, 1); // 0 to 1
   
   // Base colors for each quadrant (Hue, Saturation, Lightness)
-  // Blue (authoritarian capitalist): H=220
-  // Yellow (libertarian capitalist): H=50
-  // Green (libertarian socialist): H=140
-  // Red (authoritarian socialist): H=0
+  // FLIPPED COLORS:
+  // Red (authoritarian capitalist): H=0, x < 0, y > 0
+  // Blue (authoritarian socialist): H=220, x > 0, y > 0
+  // Green (libertarian capitalist): H=140, x < 0, y < 0
+  // Yellow (libertarian socialist): H=50, x > 0, y < 0
   
   let hue: number;
   let saturation: number;
   let lightness: number;
   
-  // Determine quadrant and interpolate hue
-  if (x >= 0 && y >= 0) {
-    // Authoritarian Capitalist (Blue) - top right
-    hue = 220;
-    saturation = 60 + (intensity * 30); // 60-90%
-    lightness = 65 - (intensity * 20); // 65-45% (darker at extremes)
-  } else if (x >= 0 && y < 0) {
-    // Libertarian Capitalist (Yellow) - bottom right
-    hue = 50;
-    saturation = 60 + (intensity * 35); // 60-95%
-    lightness = 65 - (intensity * 20); // 65-45%
-  } else if (x < 0 && y < 0) {
-    // Libertarian Socialist (Green) - bottom left
-    hue = 140;
-    saturation = 50 + (intensity * 35); // 50-85%
-    lightness = 60 - (intensity * 20); // 60-40%
-  } else {
-    // Authoritarian Socialist (Red) - top left
+  // Determine quadrant and base color
+  if (x < 0 && y >= 0) {
+    // Authoritarian Capitalist (Red) - top left
     hue = 0;
-    saturation = 60 + (intensity * 30); // 60-90%
-    lightness = 60 - (intensity * 20); // 60-40%
+    saturation = 70 + (intensity * 25); // 70-95%
+    lightness = 55;
+  } else if (x >= 0 && y >= 0) {
+    // Authoritarian Socialist (Blue) - top right
+    hue = 220;
+    saturation = 70 + (intensity * 25); // 70-95%
+    lightness = 55;
+  } else if (x < 0 && y < 0) {
+    // Libertarian Capitalist (Green) - bottom left
+    hue = 140;
+    saturation = 65 + (intensity * 30); // 65-95%
+    lightness = 50;
+  } else {
+    // Libertarian Socialist (Yellow) - bottom right
+    hue = 50;
+    saturation = 70 + (intensity * 25); // 70-95%
+    lightness = 55;
   }
   
-  // For very center positions, reduce saturation further (more gray/purple)
-  if (Math.abs(x) < 0.2 && Math.abs(y) < 0.2) {
-    saturation = 30;
-    lightness = 70;
-    hue = 270; // Purple for centrists
+  // Blend colors more - only a little white in the center
+  if (distanceFromCenter < 0.15) {
+    // Very center - slight desaturation
+    saturation = saturation * 0.6;
+    lightness = 65;
+  } else if (distanceFromCenter < 0.3) {
+    // Near center - moderate blending
+    saturation = saturation * 0.8;
+    lightness = 60;
+  } else {
+    // Further from center - stronger colors
+    lightness = 55 - (intensity * 10);
+  }
+  
+  // Fade to black at extremes (±85 on both axes)
+  const absX = Math.abs(x);
+  const absY = Math.abs(y);
+  if (absX >= 0.85 || absY >= 0.85) {
+    // Calculate how far into the extreme zone (0.85 to 1.0)
+    const maxAbsolute = Math.max(absX, absY);
+    const extremeFactor = (maxAbsolute - 0.85) / 0.15; // 0 at 0.85, 1 at 1.0
+    
+    // Fade to black by reducing lightness dramatically
+    lightness = lightness * (1 - extremeFactor * 0.7); // Reduce lightness up to 70%
+    saturation = saturation * (1 - extremeFactor * 0.3); // Also reduce saturation a bit
   }
   
   return hslToHex(hue, saturation, lightness);
