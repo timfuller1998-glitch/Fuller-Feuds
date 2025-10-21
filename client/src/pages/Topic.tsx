@@ -21,6 +21,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import OpinionCard from "@/components/OpinionCard";
+import { AdoptOpinionDialog } from "@/components/AdoptOpinionDialog";
 import FallacyBadges from "@/components/FallacyBadges";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import { formatDistanceToNow } from "date-fns";
@@ -42,6 +43,8 @@ export default function Topic() {
   const { toast } = useToast();
   const [showOpinionForm, setShowOpinionForm] = useState(false);
   const [showTopicFlagDialog, setShowTopicFlagDialog] = useState(false);
+  const [showAdoptDialog, setShowAdoptDialog] = useState(false);
+  const [opinionToAdopt, setOpinionToAdopt] = useState<any>(null);
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -201,14 +204,25 @@ export default function Topic() {
 
   // Adopt opinion mutation
   const adoptMutation = useMutation({
-    mutationFn: async (opinionId: string) => {
-      return apiRequest('POST', `/api/opinions/${opinionId}/adopt`, {});
+    mutationFn: async ({ opinionId, content, stance }: { opinionId: string, content: string, stance: "for" | "against" | "neutral" }) => {
+      return apiRequest('POST', `/api/opinions/${opinionId}/adopt`, { content, stance });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
+      setShowAdoptDialog(false);
+      setOpinionToAdopt(null);
+      toast({
+        title: "Opinion adopted",
+        description: "Your opinion has been successfully updated.",
+      });
     },
     onError: (error: any) => {
       console.error("Failed to adopt opinion:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to adopt opinion",
+        variant: "destructive",
+      });
     },
   });
 
@@ -646,7 +660,13 @@ export default function Topic() {
                         voteType: 'dislike',
                         currentVote: opinion.userVote?.voteType 
                       })}
-                      onAdopt={(id) => adoptMutation.mutate(id)}
+                      onAdopt={(id) => {
+                        const opinion = opinions?.find(o => o.id === id);
+                        if (opinion) {
+                          setOpinionToAdopt(opinion);
+                          setShowAdoptDialog(true);
+                        }
+                      }}
                       onDebate={opinion.userId !== user?.id ? (id) => startDebateWithOpinionMutation.mutate(id) : undefined}
                       onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
                       isRandomMatchPending={startDebateMutation.isPending}
@@ -691,7 +711,13 @@ export default function Topic() {
                         voteType: 'dislike',
                         currentVote: opinion.userVote?.voteType 
                       })}
-                      onAdopt={(id) => adoptMutation.mutate(id)}
+                      onAdopt={(id) => {
+                        const opinion = opinions?.find(o => o.id === id);
+                        if (opinion) {
+                          setOpinionToAdopt(opinion);
+                          setShowAdoptDialog(true);
+                        }
+                      }}
                       onDebate={opinion.userId !== user?.id ? (id) => startDebateWithOpinionMutation.mutate(id) : undefined}
                       onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
                       isRandomMatchPending={startDebateMutation.isPending}
@@ -736,7 +762,13 @@ export default function Topic() {
                         voteType: 'dislike',
                         currentVote: opinion.userVote?.voteType 
                       })}
-                      onAdopt={(id) => adoptMutation.mutate(id)}
+                      onAdopt={(id) => {
+                        const opinion = opinions?.find(o => o.id === id);
+                        if (opinion) {
+                          setOpinionToAdopt(opinion);
+                          setShowAdoptDialog(true);
+                        }
+                      }}
                       onDebate={opinion.userId !== user?.id ? (id) => startDebateWithOpinionMutation.mutate(id) : undefined}
                       onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
                       isRandomMatchPending={startDebateMutation.isPending}
@@ -951,6 +983,31 @@ export default function Topic() {
         onSubmit={(fallacyType) => flagTopicMutation.mutate(fallacyType)}
         isPending={flagTopicMutation.isPending}
         entityType="topic"
+      />
+
+      {/* Adopt Opinion Dialog */}
+      <AdoptOpinionDialog
+        open={showAdoptDialog}
+        onOpenChange={setShowAdoptDialog}
+        currentOpinion={userOpinion ? {
+          content: userOpinion.content,
+          stance: userOpinion.stance
+        } : null}
+        opinionToAdopt={opinionToAdopt ? {
+          content: opinionToAdopt.content,
+          stance: opinionToAdopt.stance,
+          authorName: opinionToAdopt.author ? `${opinionToAdopt.author.firstName || ''} ${opinionToAdopt.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+        } : null}
+        onAdopt={(content, stance) => {
+          if (opinionToAdopt) {
+            adoptMutation.mutate({ 
+              opinionId: opinionToAdopt.id, 
+              content, 
+              stance 
+            });
+          }
+        }}
+        isPending={adoptMutation.isPending}
       />
     </div>
   );

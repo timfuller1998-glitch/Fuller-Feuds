@@ -521,7 +521,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/opinions/:opinionId/adopt', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const adoptedOpinion = await storage.adoptOpinion(req.params.opinionId, userId);
+      const { content, stance } = req.body;
+      const adoptedOpinion = await storage.adoptOpinion(req.params.opinionId, userId, content, stance);
       res.json(adoptedOpinion);
     } catch (error) {
       console.error("Error adopting opinion:", error);
