@@ -38,6 +38,7 @@ Preferred communication style: Simple, everyday language.
 - **Economic Axis**: Ranges from -100 (capitalist) to +100 (socialist), measuring economic policy preferences
 - **Authoritarian Axis**: Ranges from -100 (libertarian) to +100 (authoritarian), measuring views on government authority
 - **Automatic Updates**: Analysis runs in background every 5 opinions posted, incrementing opinionCount and updating scores asynchronously
+- **Profile Management**: User profiles are created automatically using UPSERT pattern to ensure opinion counts stay synchronized with actual opinion records
 - **Visual Representation**: 
   - **Avatar Rings**: Color-coded rings around user avatars using 4-quadrant blending system
   - **Political Compass Chart**: Interactive SVG visualization showing user position on 2D compass with quadrant gradients
