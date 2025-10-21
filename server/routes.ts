@@ -907,6 +907,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin - Data sync utilities
+  app.post('/api/admin/sync-opinion-counts', requireAdmin, async (req, res) => {
+    try {
+      const result = await storage.syncOpinionCounts();
+      res.json(result);
+    } catch (error) {
+      console.error("Error syncing opinion counts:", error);
+      res.status(500).json({ message: "Failed to sync opinion counts" });
+    }
+  });
+
   // Cumulative opinion routes
   app.get('/api/topics/:topicId/cumulative', async (req, res) => {
     try {

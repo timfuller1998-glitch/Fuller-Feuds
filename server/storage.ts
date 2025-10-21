@@ -223,6 +223,9 @@ export interface IStorage {
   // Admin - Audit log
   getModerationActions(filters?: { actionType?: string; moderatorId?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<any[]>;
   
+  // Admin - Data sync utilities
+  syncOpinionCounts(): Promise<{ updated: number; synced: Array<{ userId: string; oldCount: number; newCount: number }> }>;
+  
   // Banned phrases operations
   getAllBannedPhrases(): Promise<BannedPhrase[]>;
   createBannedPhrase(phrase: InsertBannedPhrase): Promise<BannedPhrase>;
@@ -1954,9 +1957,48 @@ export class DatabaseStorage implements IStorage {
 
   async deleteOpinionAdmin(opinionId: string, adminId: string): Promise<void> {
     await db.transaction(async (tx) => {
+      // Get the opinion to know which user to decrement
+      const [opinion] = await tx.select()
+        .from(opinions)
+        .where(eq(opinions.id, opinionId))
+        .limit(1);
+      
+      if (!opinion) {
+        throw new Error('Opinion not found');
+      }
+      
       // Hard delete the opinion
       await tx.delete(opinions)
         .where(eq(opinions.id, opinionId));
+      
+      // Count remaining opinions for this user (after deletion)
+      const [remainingCount] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(opinions)
+        .where(eq(opinions.userId, opinion.userId));
+      
+      const newCount = Number(remainingCount.count);
+      
+      // Ensure user profile exists and update with correct count using UPSERT
+      // This handles both existing profiles and missing profiles
+      await tx
+        .insert(userProfiles)
+        .values({
+          userId: opinion.userId,
+          opinionCount: newCount,
+          economicScore: 0,
+          authoritarianScore: 0,
+          updatedAt: new Date()
+        })
+        .onConflictDoUpdate({
+          target: userProfiles.userId,
+          set: {
+            opinionCount: newCount,
+            updatedAt: new Date()
+          }
+        });
+      
+      console.log(`[Opinion Deleted] User ${opinion.userId} opinion count set to ${newCount} (${newCount} remaining opinions)`);
       
       // Log the action
       await tx.insert(moderationActions).values({
@@ -2000,6 +2042,86 @@ export class DatabaseStorage implements IStorage {
     }
     
     return await query.orderBy(desc(moderationActions.createdAt)).limit(limit);
+  }
+
+  // Admin - Data sync utilities
+  async syncOpinionCounts(): Promise<{ updated: number; synced: Array<{ userId: string; oldCount: number; newCount: number }> }> {
+    console.log('[Sync Opinion Counts] Starting sync...');
+    
+    // Get all user IDs from opinions table with their counts
+    const opinionCounts = await db
+      .select({
+        userId: opinions.userId,
+        count: sql<number>`count(*)::int`
+      })
+      .from(opinions)
+      .groupBy(opinions.userId);
+    
+    // Create a map of userId -> actual count
+    const actualCountsMap = new Map<string, number>();
+    for (const { userId, count } of opinionCounts) {
+      actualCountsMap.set(userId, Number(count));
+    }
+    
+    // Get ALL user profiles (including those with no opinions)
+    const allProfiles = await db
+      .select({
+        userId: userProfiles.userId,
+        opinionCount: userProfiles.opinionCount
+      })
+      .from(userProfiles);
+    
+    const syncedUsers: Array<{ userId: string; oldCount: number; newCount: number }> = [];
+    let updated = 0;
+    
+    // Sync users who have opinions
+    for (const [userId, actualCount] of actualCountsMap) {
+      const profile = allProfiles.find(p => p.userId === userId);
+      const oldCount = profile?.opinionCount || 0;
+      
+      if (oldCount !== actualCount) {
+        await db
+          .insert(userProfiles)
+          .values({
+            userId,
+            opinionCount: actualCount,
+            economicScore: 0,
+            authoritarianScore: 0,
+            updatedAt: new Date()
+          })
+          .onConflictDoUpdate({
+            target: userProfiles.userId,
+            set: {
+              opinionCount: actualCount,
+              updatedAt: new Date()
+            }
+          });
+        
+        syncedUsers.push({ userId, oldCount, newCount: actualCount });
+        updated++;
+        console.log(`[Sync] User ${userId}: ${oldCount} → ${actualCount}`);
+      }
+    }
+    
+    // Fix profiles that have opinion_count > 0 but no actual opinions
+    for (const profile of allProfiles) {
+      if (profile.opinionCount > 0 && !actualCountsMap.has(profile.userId)) {
+        await db
+          .update(userProfiles)
+          .set({
+            opinionCount: 0,
+            updatedAt: new Date()
+          })
+          .where(eq(userProfiles.userId, profile.userId));
+        
+        syncedUsers.push({ userId: profile.userId, oldCount: profile.opinionCount, newCount: 0 });
+        updated++;
+        console.log(`[Sync] User ${profile.userId}: ${profile.opinionCount} → 0 (no opinions found)`);
+      }
+    }
+    
+    console.log(`[Sync Opinion Counts] Completed. Updated ${updated} users.`);
+    return { updated, synced: syncedUsers };
   }
 
   async getAllBannedPhrases(): Promise<BannedPhrase[]> {
