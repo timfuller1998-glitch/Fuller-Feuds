@@ -298,7 +298,7 @@ export default function SearchBar({
 
       {/* Suggestions Dropdown */}
       {showSuggestions && hasSuggestions && (
-        <Card className="absolute top-full left-0 right-0 mt-2 p-2 max-h-96 overflow-y-auto z-[999999] shadow-lg">
+        <Card className="absolute top-full left-0 right-0 mt-2 p-2 max-h-[85vh] overflow-y-auto z-[999999] shadow-lg">
           {/* Search History (when no query) */}
           {query.length === 0 && searchHistory.length > 0 && (
             <div className="mb-2">
