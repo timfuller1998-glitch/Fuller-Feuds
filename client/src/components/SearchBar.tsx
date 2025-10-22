@@ -411,7 +411,7 @@ export default function SearchBar({
                     value={initialOpinion}
                     onChange={(e) => setInitialOpinion(e.target.value)}
                     placeholder="Share your thoughts on this topic... (required)"
-                    className="min-h-[80px] text-sm resize-none"
+                    className="min-h-[200px] text-sm resize-none"
                     data-testid="input-initial-opinion"
                     required
                   />
