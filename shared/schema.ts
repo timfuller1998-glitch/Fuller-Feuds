@@ -4,6 +4,7 @@ import {
   uniqueIndex,
   jsonb,
   pgTable,
+  pgEnum,
   timestamp,
   varchar,
   text,
@@ -13,6 +14,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Enums
+export const debateStatusEnum = pgEnum('debate_status', ['open', 'closed', 'private']);
 
 // Session storage table for Replit Auth
 export const sessions = pgTable(
@@ -88,6 +92,7 @@ export const opinions = pgTable("opinions", {
   content: text("content").notNull(),
   stance: varchar("stance", { length: 20 }).notNull(), // 'for', 'against', 'neutral'
   status: varchar("status", { length: 20 }).default("approved"), // 'pending', 'approved', 'flagged', 'hidden'
+  debateStatus: debateStatusEnum("debate_status").default("open").notNull(),
   references: text("references").array().default(sql`ARRAY[]::text[]`), // Reference links/URLs
   likesCount: integer("likes_count").default(0),
   dislikesCount: integer("dislikes_count").default(0),
