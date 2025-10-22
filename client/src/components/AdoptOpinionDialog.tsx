@@ -180,7 +180,7 @@ export function AdoptOpinionDialog({
                   value={editedContent}
                   onChange={(e) => setEditedContent(e.target.value)}
                   placeholder="Write or edit your opinion here..."
-                  className="min-h-[150px]"
+                  className="min-h-[300px]"
                   data-testid="textarea-opinion-content"
                 />
               </div>
