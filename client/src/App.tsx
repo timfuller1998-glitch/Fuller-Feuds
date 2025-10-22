@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
 import SearchBar from "@/components/SearchBar";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -67,6 +67,57 @@ function Router() {
   );
 }
 
+function AppWithSidebar({ 
+  user, 
+  displayName, 
+  searchQuery, 
+  handleSearch 
+}: {
+  user: any;
+  displayName: string;
+  searchQuery: string;
+  handleSearch: (query: string) => void;
+}) {
+  const { open } = useSidebar();
+
+  return (
+    <div className="flex h-screen w-full overflow-x-hidden">
+      <AppSidebar
+        currentUser={{
+          id: user?.id || "",
+          name: displayName,
+          avatar: user?.profileImageUrl,
+          isOnline: true
+        }}
+        onNavigate={(path) => console.log('Navigate to:', path)}
+        onLogout={() => {
+          window.location.href = "/api/logout";
+        }}
+      />
+      <div className="flex flex-col flex-1 min-w-0">
+        {!open && (
+          <header className="sticky top-0 z-[100000] flex items-center gap-2 sm:gap-4 p-2 sm:p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex flex-1 max-w-2xl mx-auto px-2 sm:px-0">
+              <SearchBar 
+                value={searchQuery}
+                onSearch={handleSearch}
+                className="w-full"
+              />
+            </div>
+            <ThemeToggle />
+          </header>
+        )}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6">
+          <div className="max-w-7xl mx-auto w-full">
+            <Router />
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
 function AuthenticatedApp() {
   const { user } = useAuth();
   const [location, setLocation] = useLocation();
@@ -118,37 +169,12 @@ function AuthenticatedApp() {
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full overflow-x-hidden">
-        <AppSidebar
-          currentUser={{
-            id: user?.id || "",
-            name: displayName,
-            avatar: user?.profileImageUrl,
-            isOnline: true
-          }}
-          onNavigate={(path) => console.log('Navigate to:', path)}
-          onLogout={() => {
-            window.location.href = "/api/logout";
-          }}
-        />
-        <div className="flex flex-col flex-1 min-w-0">
-          <header className="sticky top-0 z-[100000] flex items-center gap-2 sm:gap-4 p-2 sm:p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="hidden md:flex flex-1 max-w-2xl mx-auto px-2 sm:px-0">
-              <SearchBar 
-                value={searchQuery}
-                onSearch={handleSearch}
-                className=""
-              />
-            </div>
-          </header>
-          <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6">
-            <div className="max-w-7xl mx-auto w-full">
-              <Router />
-            </div>
-          </main>
-        </div>
-      </div>
+      <AppWithSidebar 
+        user={user}
+        displayName={displayName}
+        searchQuery={searchQuery}
+        handleSearch={handleSearch}
+      />
     </SidebarProvider>
   );
 }
