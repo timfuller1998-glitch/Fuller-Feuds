@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
 import SearchBar from "@/components/SearchBar";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import Home from "@/pages/Home";
@@ -102,7 +101,6 @@ function AppWithSidebar({
               className="w-full"
             />
           </div>
-          <ThemeToggle />
         </header>
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6">
           <div className="max-w-7xl mx-auto w-full">
