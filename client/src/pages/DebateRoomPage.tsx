@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import FallacyBadges from "@/components/FallacyBadges";
 import type { FallacyType } from "@shared/fallacies";
+import { useDebateRoom } from "@/hooks/useDebateRoom";
 
 interface DebateRoom {
   id: string;
