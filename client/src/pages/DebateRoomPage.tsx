@@ -66,6 +66,9 @@ export default function DebateRoomPage() {
   const [flaggingMessageId, setFlaggingMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // WebSocket real-time messaging
+  const { roomState, connectionState, joinRoom, leaveRoom, sendChatMessage } = useDebateRoom();
+
   // Fetch debate room
   const { data: room, isLoading: roomLoading } = useQuery<DebateRoom>({
     queryKey: ["/api/debate-rooms", roomId],
@@ -222,14 +225,43 @@ export default function DebateRoomPage() {
     },
   });
 
+  // Join WebSocket room when roomId is available
+  useEffect(() => {
+    if (roomId && currentUser?.id) {
+      joinRoom(roomId);
+    }
+    
+    return () => {
+      if (roomState.isConnected) {
+        leaveRoom();
+      }
+    };
+  }, [roomId, currentUser?.id, joinRoom, leaveRoom]);
+
+  // Combine DB messages with WebSocket real-time messages
+  // DB messages are the source of truth, WebSocket adds real-time updates
+  const allMessages = [...messages, ...roomState.messages.map((wsMsg) => ({
+    id: `ws-${wsMsg.timestamp}`,
+    roomId: wsMsg.roomId,
+    userId: wsMsg.userId,
+    content: wsMsg.content,
+    createdAt: wsMsg.timestamp,
+    fallacyCounts: {}
+  }))];
+
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [allMessages.length]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!messageInput.trim()) return;
+    
+    // Send to DB first (source of truth)
     sendMessageMutation.mutate(messageInput);
+    
+    // Also broadcast via WebSocket for real-time delivery
+    // sendChatMessage(messageInput);
   };
 
   const handleEndDebate = () => {
@@ -395,13 +427,13 @@ export default function DebateRoomPage() {
           {/* Messages */}
           <ScrollArea className="flex-1 px-4">
             <div className="space-y-4 py-4">
-              {messages.length === 0 ? (
+              {allMessages.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No messages yet. Start the debate!</p>
                 </div>
               ) : (
-                messages.map((message) => {
+                allMessages.map((message) => {
                   const isOwnMessage = message.userId === currentUser?.id;
                   const sender = message.userId === room.participant1Id ? participant1 : participant2;
                   const senderName = sender?.firstName && sender?.lastName
@@ -441,7 +473,7 @@ export default function DebateRoomPage() {
                         </div>
                         
                         {/* Fallacy badges */}
-                        {message.fallacyCounts && Object.keys(message.fallacyCounts).some(key => message.fallacyCounts![key] > 0) && (
+                        {message.fallacyCounts && Object.keys(message.fallacyCounts).some(key => (message.fallacyCounts as {[key: string]: number})[key] > 0) && (
                           <div className="mt-2">
                             <FallacyBadges fallacyCounts={message.fallacyCounts} />
                           </div>
