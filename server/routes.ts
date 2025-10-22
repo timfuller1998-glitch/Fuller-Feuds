@@ -443,14 +443,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/opinions/recent', async (req: any, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-      const opinions = await storage.getRecentOpinions(limit, req.userRole);
+      const currentUserId = req.user?.claims?.sub;
+      const opinions = await storage.getRecentOpinions(limit, req.userRole, currentUserId);
       
       // If user is authenticated, include their vote for each opinion
-      if (req.user?.claims?.sub) {
-        const userId = req.user.claims.sub;
+      if (currentUserId) {
         const opinionsWithVotes = await Promise.all(
           opinions.map(async (opinion) => {
-            const userVote = await storage.getUserVoteOnOpinion(opinion.id, userId);
+            const userVote = await storage.getUserVoteOnOpinion(opinion.id, currentUserId);
             return {
               ...opinion,
               userVote: userVote ? { voteType: userVote.voteType } : null
@@ -469,14 +469,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/topics/:topicId/opinions', async (req: any, res) => {
     try {
-      const opinions = await storage.getOpinionsByTopic(req.params.topicId, req.userRole);
+      const currentUserId = req.user?.claims?.sub;
+      const opinions = await storage.getOpinionsByTopic(req.params.topicId, req.userRole, currentUserId);
       
       // If user is authenticated, include their vote for each opinion
-      if (req.user?.claims?.sub) {
-        const userId = req.user.claims.sub;
+      if (currentUserId) {
         const opinionsWithVotes = await Promise.all(
           opinions.map(async (opinion) => {
-            const userVote = await storage.getUserVoteOnOpinion(opinion.id, userId);
+            const userVote = await storage.getUserVoteOnOpinion(opinion.id, currentUserId);
             return {
               ...opinion,
               userVote: userVote ? { voteType: userVote.voteType } : null
@@ -1342,13 +1342,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/profile/:userId/opinions', async (req, res) => {
+  app.get('/api/profile/:userId/opinions', async (req: any, res) => {
     try {
       const { sortBy = 'recent', limit = 20 } = req.query;
+      const viewerUserId = req.user?.claims?.sub;
       const opinions = await storage.getUserOpinions(
         req.params.userId, 
         sortBy as 'recent' | 'oldest' | 'popular' | 'controversial',
-        parseInt(limit as string)
+        parseInt(limit as string),
+        viewerUserId
       );
       res.json(opinions);
     } catch (error) {

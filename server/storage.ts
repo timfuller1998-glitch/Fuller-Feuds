@@ -55,7 +55,7 @@ import {
   type InsertUserBadge,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, and, sql, count, ilike, or, inArray } from "drizzle-orm";
+import { eq, desc, asc, and, sql, count, ilike, or, inArray, ne } from "drizzle-orm";
 import { AIService } from "./aiService";
 import { FALLACY_OPTIONS } from "@shared/fallacies";
 import { BADGE_DEFINITIONS } from "@shared/badgeDefinitions";
@@ -124,8 +124,8 @@ export interface IStorage {
   
   // Opinion operations
   createOpinion(opinion: InsertOpinion): Promise<Opinion>;
-  getOpinionsByTopic(topicId: string, userRole?: string): Promise<Opinion[]>;
-  getRecentOpinions(limit?: number, userRole?: string): Promise<Opinion[]>;
+  getOpinionsByTopic(topicId: string, userRole?: string, currentUserId?: string): Promise<Opinion[]>;
+  getRecentOpinions(limit?: number, userRole?: string, currentUserId?: string): Promise<Opinion[]>;
   getOpinion(id: string): Promise<Opinion | undefined>;
   updateOpinion(opinionId: string, data: Partial<InsertOpinion>): Promise<Opinion>;
   updateOpinionCounts(opinionId: string, likesCount: number, dislikesCount: number): Promise<void>;
@@ -182,7 +182,7 @@ export interface IStorage {
   getUserProfile(userId: string): Promise<UserProfile | undefined>;
   upsertUserProfile(userId: string, data: Partial<UserProfile>): Promise<UserProfile>;
   analyzeUserPoliticalLeaning(userId: string): Promise<UserProfile>;
-  getUserOpinions(userId: string, sortBy?: 'recent' | 'popular' | 'controversial', limit?: number): Promise<Opinion[]>;
+  getUserOpinions(userId: string, sortBy?: 'recent' | 'popular' | 'controversial', limit?: number, viewerUserId?: string): Promise<Opinion[]>;
   
   // User following
   followUser(followerId: string, followingId: string): Promise<UserFollow>;
@@ -555,7 +555,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getOpinionsByTopic(topicId: string, userRole?: string): Promise<Opinion[]> {
+  async getOpinionsByTopic(topicId: string, userRole?: string, currentUserId?: string): Promise<Opinion[]> {
     const isModOrAdmin = userRole === 'admin' || userRole === 'moderator';
     
     // Build where conditions
@@ -564,6 +564,19 @@ export class DatabaseStorage implements IStorage {
     // Regular users only see approved opinions
     if (!isModOrAdmin) {
       whereConditions.push(eq(opinions.status, 'approved'));
+    }
+    
+    // Filter private opinions - only show to the author
+    if (currentUserId) {
+      whereConditions.push(
+        or(
+          ne(opinions.debateStatus, 'private'),
+          eq(opinions.userId, currentUserId)
+        )!
+      );
+    } else {
+      // Not logged in - exclude all private opinions
+      whereConditions.push(ne(opinions.debateStatus, 'private'));
     }
     
     const baseOpinions = await db
@@ -636,7 +649,7 @@ export class DatabaseStorage implements IStorage {
     return enrichedOpinions as Opinion[];
   }
 
-  async getRecentOpinions(limit: number = 50, userRole?: string): Promise<Opinion[]> {
+  async getRecentOpinions(limit: number = 50, userRole?: string, currentUserId?: string): Promise<Opinion[]> {
     const isModOrAdmin = userRole === 'admin' || userRole === 'moderator';
     
     // Build where conditions
@@ -645,6 +658,19 @@ export class DatabaseStorage implements IStorage {
     // Regular users only see approved opinions
     if (!isModOrAdmin) {
       whereConditions.push(eq(opinions.status, 'approved'));
+    }
+    
+    // Filter private opinions - only show to the author
+    if (currentUserId) {
+      whereConditions.push(
+        or(
+          ne(opinions.debateStatus, 'private'),
+          eq(opinions.userId, currentUserId)
+        )!
+      );
+    } else {
+      // Not logged in - exclude all private opinions
+      whereConditions.push(ne(opinions.debateStatus, 'private'));
     }
     
     const baseOpinions = await db
@@ -1440,8 +1466,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async analyzeUserPoliticalLeaning(userId: string): Promise<UserProfile> {
-    // Get user's opinions for analysis
-    const userOpinions = await this.getUserOpinions(userId, 'recent', 50);
+    // Get user's opinions for analysis (including private ones)
+    const userOpinions = await this.getUserOpinions(userId, 'recent', 50, userId);
     
     if (userOpinions.length === 0) {
       // No opinions to analyze, return basic profile
@@ -1468,8 +1494,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async analyze2DUserPoliticalCompass(userId: string): Promise<UserProfile> {
-    // Get user's last 50 opinions for analysis
-    const userOpinions = await this.getUserOpinions(userId, 'recent', 50);
+    // Get user's last 50 opinions for analysis (including private ones)
+    const userOpinions = await this.getUserOpinions(userId, 'recent', 50, userId);
     
     if (userOpinions.length === 0) {
       // No opinions to analyze, return basic profile
@@ -1495,41 +1521,52 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getUserOpinions(userId: string, sortBy: 'recent' | 'oldest' | 'popular' | 'controversial' = 'recent', limit = 20): Promise<Opinion[]> {
+  async getUserOpinions(userId: string, sortBy: 'recent' | 'oldest' | 'popular' | 'controversial' = 'recent', limit = 20, viewerUserId?: string): Promise<Opinion[]> {
+    // Build where conditions
+    const whereConditions = [eq(opinions.userId, userId)];
+    
+    // Filter private opinions unless viewing own profile
+    if (viewerUserId !== userId) {
+      // Not viewing own profile - exclude private opinions
+      whereConditions.push(ne(opinions.debateStatus, 'private'));
+    }
+    
+    const whereClause = and(...whereConditions);
+    
     switch (sortBy) {
       case 'recent':
         return await db
           .select()
           .from(opinions)
-          .where(eq(opinions.userId, userId))
+          .where(whereClause)
           .orderBy(desc(opinions.createdAt))
           .limit(limit);
       case 'oldest':
         return await db
           .select()
           .from(opinions)
-          .where(eq(opinions.userId, userId))
+          .where(whereClause)
           .orderBy(asc(opinions.createdAt))
           .limit(limit);
       case 'popular':
         return await db
           .select()
           .from(opinions)
-          .where(eq(opinions.userId, userId))
+          .where(whereClause)
           .orderBy(desc(opinions.likesCount))
           .limit(limit);
       case 'controversial':
         return await db
           .select()
           .from(opinions)
-          .where(eq(opinions.userId, userId))
+          .where(whereClause)
           .orderBy(desc(sql`${opinions.likesCount} + ${opinions.dislikesCount}`))
           .limit(limit);
       default:
         return await db
           .select()
           .from(opinions)
-          .where(eq(opinions.userId, userId))
+          .where(whereClause)
           .orderBy(desc(opinions.createdAt))
           .limit(limit);
     }
