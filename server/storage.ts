@@ -881,10 +881,33 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Topic not found");
     }
 
-    const opinions = await this.getOpinionsByTopic(topicId);
+    // Get ALL opinions including private ones for cumulative analysis
+    // Private opinions are hidden from individual view but still influence overall sentiment
+    const allOpinions = await db
+      .select({
+        opinion: opinions,
+        author: users,
+        profile: userProfiles
+      })
+      .from(opinions)
+      .leftJoin(users, eq(opinions.userId, users.id))
+      .leftJoin(userProfiles, eq(opinions.userId, userProfiles.userId))
+      .where(
+        and(
+          eq(opinions.topicId, topicId),
+          eq(opinions.status, 'approved')
+        )
+      )
+      .orderBy(desc(opinions.createdAt));
+
+    const formattedOpinions = allOpinions.map(row => ({
+      ...row.opinion,
+      author: row.author,
+      profile: row.profile
+    }));
     
-    // Generate AI analysis
-    const analysis = await AIService.generateCumulativeOpinion(topic, opinions);
+    // Generate AI analysis using all opinions (including private)
+    const analysis = await AIService.generateCumulativeOpinion(topic, formattedOpinions);
     
     // Save the cumulative opinion
     return await this.upsertCumulativeOpinion(topicId, {
