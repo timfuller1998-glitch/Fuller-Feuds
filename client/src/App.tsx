@@ -78,7 +78,10 @@ function AppWithSidebar({
   searchQuery: string;
   handleSearch: (query: string) => void;
 }) {
-  const { open } = useSidebar();
+  const { open, state, isMobile } = useSidebar();
+
+  // Hide header when sidebar is open on mobile, or when it's expanded on desktop
+  const shouldHideHeader = isMobile ? open : false;
 
   return (
     <div className="flex h-screen w-full overflow-x-hidden">
@@ -95,7 +98,7 @@ function AppWithSidebar({
         }}
       />
       <div className="flex flex-col flex-1 min-w-0">
-        {!open && (
+        {!shouldHideHeader && (
           <header className="sticky top-0 z-[100000] flex items-center gap-2 sm:gap-4 p-2 sm:p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex flex-1 max-w-2xl mx-auto px-2 sm:px-0">
