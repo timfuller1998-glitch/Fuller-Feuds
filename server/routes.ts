@@ -1760,6 +1760,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Check if user's opinion is open for debate
+      if (userOpinion.debateStatus !== 'open') {
+        if (userOpinion.debateStatus === 'private') {
+          return res.status(400).json({ 
+            message: "Your opinion is private. Change it to 'open for debate' to start debates" 
+          });
+        } else if (userOpinion.debateStatus === 'closed') {
+          return res.status(400).json({ 
+            message: "Your opinion is not open for debate. Change it to 'open for debate' to start debates" 
+          });
+        }
+      }
+
       // Find users with opposite opinions
       const oppositeUsers = await storage.findOppositeOpinionUsers(topicId, userId, userOpinion.stance);
 

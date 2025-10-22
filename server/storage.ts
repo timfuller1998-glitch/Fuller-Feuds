@@ -949,6 +949,23 @@ export class DatabaseStorage implements IStorage {
       throw new Error("You cannot debate someone with the same stance as you");
     }
 
+    // Check if both opinions are open for debate
+    if (opinion.debateStatus !== 'open') {
+      if (opinion.debateStatus === 'private') {
+        throw new Error("This opinion is private and not available for debate");
+      } else if (opinion.debateStatus === 'closed') {
+        throw new Error("This opinion is not open for debate");
+      }
+    }
+
+    if (userOpinion.debateStatus !== 'open') {
+      if (userOpinion.debateStatus === 'private') {
+        throw new Error("Your opinion is private. Change it to 'open for debate' to start debates");
+      } else if (userOpinion.debateStatus === 'closed') {
+        throw new Error("Your opinion is not open for debate. Change it to 'open for debate' to start debates");
+      }
+    }
+
     // Create the debate room
     const room = await this.createDebateRoom({
       topicId,
@@ -1025,6 +1042,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(opinions.topicId, topicId),
           inArray(opinions.stance, oppositeStances),
+          eq(opinions.debateStatus, 'open'),
           sql`${opinions.userId} != ${userId}`
         )
       )
