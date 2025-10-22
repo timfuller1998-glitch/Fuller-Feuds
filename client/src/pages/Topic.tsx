@@ -33,6 +33,7 @@ const opinionFormSchema = insertOpinionSchema.omit({
 }).extend({
   content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
   stance: z.enum(["for", "against", "neutral"], { required_error: "Please select a stance" }),
+  debateStatus: z.enum(["open", "closed", "private"], { required_error: "Please select debate availability" }),
   references: z.array(z.string().url("Must be a valid URL")).optional().default([]),
 });
 
@@ -308,6 +309,7 @@ export default function Topic() {
     defaultValues: {
       content: "",
       stance: "neutral",
+      debateStatus: "open",
     },
   });
 
@@ -480,6 +482,7 @@ export default function Topic() {
                       onClick={() => {
                         opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
                         opinionForm.setValue('content', userOpinion.content);
+                        opinionForm.setValue('debateStatus', (userOpinion.debateStatus || "open") as "open" | "closed" | "private");
                         opinionForm.setValue('references', userOpinion.references || []);
                         setShowOpinionForm(true);
                       }}
@@ -519,6 +522,34 @@ export default function Topic() {
                               <SelectItem value="for" data-testid="option-stance-for">For</SelectItem>
                               <SelectItem value="against" data-testid="option-stance-against">Against</SelectItem>
                               <SelectItem value="neutral" data-testid="option-stance-neutral">Neutral</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={opinionForm.control}
+                      name="debateStatus"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Debate Availability</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-debate-status">
+                                <SelectValue placeholder="Select debate availability" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="open" data-testid="option-debate-open">
+                                Open for Debate - Others can challenge this opinion
+                              </SelectItem>
+                              <SelectItem value="closed" data-testid="option-debate-closed">
+                                Not Debatable - Opinion is public but read-only
+                              </SelectItem>
+                              <SelectItem value="private" data-testid="option-debate-private">
+                                Private - Only visible to you
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
