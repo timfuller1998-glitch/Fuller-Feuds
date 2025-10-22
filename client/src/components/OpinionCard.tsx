@@ -24,6 +24,7 @@ interface OpinionCardProps {
   authoritarianScore?: number; // -100 (libertarian) to +100 (authoritarian)
   content: string;
   stance: "for" | "against" | "neutral";
+  debateStatus?: "open" | "closed" | "private";
   timestamp: string;
   likesCount: number;
   dislikesCount: number;
@@ -63,6 +64,7 @@ export default function OpinionCard({
   authoritarianScore,
   content,
   stance,
+  debateStatus = "open",
   timestamp,
   likesCount,
   dislikesCount,
@@ -191,9 +193,21 @@ export default function OpinionCard({
               </div>
             </div>
           )}
-          <Badge variant={stanceBadgeVariant[stance]}>
-            {stanceText[stance]}
-          </Badge>
+          <div className="flex flex-col gap-1 items-end">
+            <Badge variant={stanceBadgeVariant[stance]}>
+              {stanceText[stance]}
+            </Badge>
+            {debateStatus === "closed" && (
+              <Badge variant="secondary" className="text-xs">
+                Not Debatable
+              </Badge>
+            )}
+            {debateStatus === "private" && (
+              <Badge variant="outline" className="text-xs">
+                Private
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       
@@ -255,7 +269,7 @@ export default function OpinionCard({
               <span className="hidden sm:inline">Adopt</span>
             </Button>
 
-            {onDebate && (
+            {onDebate && debateStatus === "open" && (
               <Button
                 variant="outline"
                 size="sm"

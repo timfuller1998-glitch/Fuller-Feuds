@@ -260,6 +260,7 @@ export default function Home() {
                               authoritarianScore={(opinion.author as any)?.authoritarianScore}
                               content={opinion.content}
                               stance={opinion.stance}
+                              debateStatus={opinion.debateStatus}
                               timestamp={formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true })}
                               likesCount={opinion.likesCount || 0}
                               dislikesCount={opinion.dislikesCount || 0}

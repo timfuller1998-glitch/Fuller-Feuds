@@ -683,6 +683,7 @@ export default function Topic() {
                       authoritarianScore={(opinion.author as any)?.authoritarianScore}
                       content={opinion.content}
                       stance={opinion.stance}
+                      debateStatus={opinion.debateStatus}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
@@ -734,6 +735,7 @@ export default function Topic() {
                       authoritarianScore={(opinion.author as any)?.authoritarianScore}
                       content={opinion.content}
                       stance={opinion.stance}
+                      debateStatus={opinion.debateStatus}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}
@@ -785,6 +787,7 @@ export default function Topic() {
                       authoritarianScore={(opinion.author as any)?.authoritarianScore}
                       content={opinion.content}
                       stance={opinion.stance}
+                      debateStatus={opinion.debateStatus}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
                       likesCount={opinion.likesCount || 0}
                       dislikesCount={opinion.dislikesCount || 0}

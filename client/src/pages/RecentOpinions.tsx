@@ -270,6 +270,7 @@ export default function RecentOpinionsPage() {
                     authoritarianScore={(opinion.author as any)?.authoritarianScore}
                     content={opinion.content}
                     stance={opinion.stance as "for" | "against" | "neutral"}
+                    debateStatus={opinion.debateStatus}
                     timestamp={formatDistanceToNow(new Date(opinion.createdAt!), { addSuffix: true })}
                     likesCount={opinion.likesCount || 0}
                     dislikesCount={opinion.dislikesCount || 0}
