@@ -626,13 +626,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/opinions/:opinionId/start-debate', isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const { opinionId } = req.params;
+    const { openingMessage } = req.body;
     
     try {
       console.log(`[Debate] User ${userId} attempting to start debate with opinion ${opinionId}`);
 
+      // Validate opening message if provided
+      if (openingMessage && typeof openingMessage !== 'string') {
+        return res.status(400).json({ message: "Opening message must be a string" });
+      }
+
+      if (openingMessage && openingMessage.trim().length === 0) {
+        return res.status(400).json({ message: "Opening message cannot be empty" });
+      }
+
+      // Validate content BEFORE creating the room
+      if (openingMessage && openingMessage.trim()) {
+        const filterResult = await validateContent(openingMessage.trim());
+        if (!filterResult.allowed) {
+          return res.status(400).json({ 
+            message: filterResult.reason || "Your opening message contains inappropriate content" 
+          });
+        }
+      }
+
       const room = await storage.createDebateRoomWithOpinionAuthor(opinionId, userId);
       
       console.log(`[Debate] Successfully created debate room ${room.id} between ${room.participant1Id} and ${room.participant2Id}`);
+
+      // If opening message provided, send it as first message
+      if (openingMessage && openingMessage.trim()) {
+        try {
+          const message = await storage.addDebateMessage(room.id, userId, openingMessage.trim());
+
+          // Update turn count and switch turn to opponent
+          const updatedRoom = await storage.updateDebateRoomTurn(room.id, userId);
+
+          // Broadcast via WebSocket
+          broadcastToRoom(room.id, {
+            type: 'new_message',
+            message,
+            roomId: room.id,
+          });
+
+          broadcastToRoom(room.id, {
+            type: 'turn_update',
+            roomId: room.id,
+            currentTurn: updatedRoom.currentTurn,
+            turnCount1: updatedRoom.turnCount1,
+            turnCount2: updatedRoom.turnCount2,
+          });
+
+          console.log(`[Debate] Sent opening message for room ${room.id}`);
+          
+          // Return updated room with turn info
+          return res.status(201).json(updatedRoom);
+        } catch (msgError: any) {
+          console.error(`[Debate] Failed to send opening message for room ${room.id}:`, msgError);
+          // Still return the room - user can send message manually in debate room
+        }
+      }
+      
       res.status(201).json(room);
     } catch (error: any) {
       console.error(`[Debate] Error starting debate for user ${userId} with opinion ${opinionId}:`, error.message);

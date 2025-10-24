@@ -22,6 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import OpinionCard from "@/components/OpinionCard";
 import { AdoptOpinionDialog } from "@/components/AdoptOpinionDialog";
+import { DebateOnboardingModal } from "@/components/DebateOnboardingModal";
 import FallacyBadges from "@/components/FallacyBadges";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import { formatDistanceToNow } from "date-fns";
@@ -46,6 +47,9 @@ export default function Topic() {
   const [showTopicFlagDialog, setShowTopicFlagDialog] = useState(false);
   const [showAdoptDialog, setShowAdoptDialog] = useState(false);
   const [opinionToAdopt, setOpinionToAdopt] = useState<any>(null);
+  const [showDebateOnboarding, setShowDebateOnboarding] = useState(false);
+  const [debateOpinionId, setDebateOpinionId] = useState<string | null>(null);
+  const [debateOpponentName, setDebateOpponentName] = useState<string>("");
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -238,8 +242,8 @@ export default function Topic() {
 
   // Start debate with opinion author
   const startDebateWithOpinionMutation = useMutation({
-    mutationFn: async (opinionId: string) => {
-      const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, {});
+    mutationFn: async ({ opinionId, openingMessage }: { opinionId: string; openingMessage: string }) => {
+      const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, { openingMessage });
       return response.json();
     },
     onSuccess: (room) => {
@@ -247,6 +251,7 @@ export default function Topic() {
         title: "Debate started!",
         description: "Navigating to debate room...",
       });
+      setShowDebateOnboarding(false);
       navigate(`/debate-room/${room.id}`);
     },
     onError: (error: any) => {
@@ -257,6 +262,20 @@ export default function Topic() {
       });
     },
   });
+
+  // Handler to open debate onboarding modal
+  const handleStartDebate = (opinionId: string, opponentName: string) => {
+    setDebateOpinionId(opinionId);
+    setDebateOpponentName(opponentName);
+    setShowDebateOnboarding(true);
+  };
+
+  // Handler to submit debate with opening message
+  const handleSubmitDebate = (openingMessage: string) => {
+    if (debateOpinionId) {
+      startDebateWithOpinionMutation.mutate({ opinionId: debateOpinionId, openingMessage });
+    }
+  };
 
   // Flag topic mutation
   const flagTopicMutation = useMutation({
@@ -708,7 +727,7 @@ export default function Topic() {
                           setShowAdoptDialog(true);
                         }
                       }}
-                      onDebate={opinion.userId !== user?.id ? (id) => startDebateWithOpinionMutation.mutate(id) : undefined}
+                      onDebate={opinion.userId !== user?.id ? (id) => handleStartDebate(id, opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous') : undefined}
                       onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
                       isRandomMatchPending={startDebateMutation.isPending}
                     />
@@ -760,7 +779,7 @@ export default function Topic() {
                           setShowAdoptDialog(true);
                         }
                       }}
-                      onDebate={opinion.userId !== user?.id ? (id) => startDebateWithOpinionMutation.mutate(id) : undefined}
+                      onDebate={opinion.userId !== user?.id ? (id) => handleStartDebate(id, opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous') : undefined}
                       onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
                       isRandomMatchPending={startDebateMutation.isPending}
                     />
@@ -812,7 +831,7 @@ export default function Topic() {
                           setShowAdoptDialog(true);
                         }
                       }}
-                      onDebate={opinion.userId !== user?.id ? (id) => startDebateWithOpinionMutation.mutate(id) : undefined}
+                      onDebate={opinion.userId !== user?.id ? (id) => handleStartDebate(id, opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous') : undefined}
                       onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
                       isRandomMatchPending={startDebateMutation.isPending}
                     />
@@ -1051,6 +1070,15 @@ export default function Topic() {
           }
         }}
         isPending={adoptMutation.isPending}
+      />
+
+      {/* Debate Onboarding Modal */}
+      <DebateOnboardingModal
+        open={showDebateOnboarding}
+        onOpenChange={setShowDebateOnboarding}
+        onSubmit={handleSubmitDebate}
+        isPending={startDebateWithOpinionMutation.isPending}
+        opponentName={debateOpponentName}
       />
     </div>
   );
