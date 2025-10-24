@@ -84,7 +84,27 @@ Preferred communication style: Simple, everyday language.
 - **Express Session**: Session management
 
 ### AI Services
-- **OpenAI API**: GPT-based AI for cumulative opinion summaries and content analysis.
+- **OpenAI API**: 
+  - **GPT-4o-mini**: AI-generated cumulative opinion summaries with automatic background generation
+  - **text-embedding-3-small**: Semantic embeddings for topic similarity search (1536 dimensions)
+  - **GPT-5**: Political compass analysis and content moderation
+
+### Topic Similarity Search
+- **Semantic Embeddings**: Every topic has a 1536-dimension embedding vector generated using OpenAI's text-embedding-3-small model
+- **Automatic Generation**: Embeddings automatically generated on topic creation
+- **Admin Backfill**: POST /api/admin/backfill-embeddings endpoint to generate embeddings for existing topics
+- **Search Endpoint**: GET /api/topics/search-similar?query=... returns top similar topics using cosine similarity (>0.7 threshold)
+- **Integration**: SearchBar features debounced search (300ms) that shows TopicSimilarityModal when similar topics found
+- **User Experience**: Users can navigate to existing topics or proceed with "Create New Topic Anyway" button
+- **Cost Optimization**: Embeddings trimmed from API responses to reduce bandwidth
+
+### AI Summary Auto-Generation
+- **Automatic Updates**: AI summaries automatically regenerate after each new opinion is posted
+- **Non-Blocking**: Summary generation runs asynchronously without delaying opinion creation
+- **Smart Regeneration**: Only updates summary if new opinions exist since last summary timestamp
+- **Frontend Polling**: UI polls for updates every 3 seconds (max 45 seconds) to detect completed summaries
+- **Loading States**: Shows skeleton loading animation and "Updating..." indicator during generation
+- **No Manual Buttons**: Manual Generate/Refresh buttons removed - everything is automatic
 
 ### UI and Design Libraries
 - **Radix UI**: Accessible component primitives
