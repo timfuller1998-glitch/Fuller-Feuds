@@ -30,6 +30,12 @@ interface DebateRoom {
   status: string;
   startedAt: string;
   endedAt?: string;
+  phase?: 'structured' | 'voting' | 'free-form';
+  currentTurn?: string | null;
+  turnCount1?: number | null;
+  turnCount2?: number | null;
+  votesToContinue1?: boolean | null;
+  votesToContinue2?: boolean | null;
 }
 
 interface Topic {
@@ -496,10 +502,39 @@ export default function DebateRoomPage() {
       {/* Chat Area - Full Width */}
       <Card className="flex flex-col min-h-[400px] max-h-[600px]">
         <CardHeader className="border-b">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <MessageSquare className="w-5 h-5" />
-            Debate Chat
-          </CardTitle>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Debate Chat
+            </CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Phase Badge */}
+              {room.phase && (
+                <Badge 
+                  variant={room.phase === 'structured' ? 'default' : room.phase === 'voting' ? 'secondary' : 'outline'}
+                  data-testid="badge-debate-phase"
+                >
+                  {room.phase === 'structured' ? 'Structured' : room.phase === 'voting' ? 'Voting' : 'Free-form'}
+                </Badge>
+              )}
+              
+              {/* Turn Indicator */}
+              {room.phase === 'structured' && currentUser && isParticipant && (
+                <Badge 
+                  variant={room.currentTurn === currentUser.id ? 'default' : 'secondary'}
+                  data-testid="badge-turn-indicator"
+                  className="gap-1"
+                >
+                  {room.currentTurn === currentUser.id ? 'Your Turn' : "Opponent's Turn"}
+                  {room.currentTurn === currentUser.id && (
+                    <span className="text-xs">
+                      ({(currentUser.id === room.participant1Id ? (room.turnCount1 || 0) : (room.turnCount2 || 0)) + 1}/3)
+                    </span>
+                  )}
+                </Badge>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col p-0">
           {/* Messages */}
@@ -588,9 +623,22 @@ export default function DebateRoomPage() {
                   <span className="italic">Opponent is typing...</span>
                 </div>
               )}
+              {/* Turn restriction notice */}
+              {room.phase === 'structured' && currentUser && room.currentTurn !== currentUser.id && (
+                <div className="text-sm text-muted-foreground mb-2 px-1 text-center bg-muted/50 rounded py-2">
+                  <span className="italic">Wait for your turn to respond</span>
+                </div>
+              )}
+              
               <div className="flex gap-2">
                 <Input
-                  placeholder="Type your message..."
+                  placeholder={
+                    room.phase === 'structured' && currentUser && room.currentTurn !== currentUser.id
+                      ? "Waiting for opponent's turn..."
+                      : room.phase === 'voting'
+                      ? "Please vote on your opponent's performance..."
+                      : "Type your message..."
+                  }
                   value={messageInput}
                   onChange={(e) => {
                     setMessageInput(e.target.value);
@@ -623,12 +671,21 @@ export default function DebateRoomPage() {
                       }
                     }
                   }}
-                  disabled={sendMessageMutation.isPending}
+                  disabled={
+                    sendMessageMutation.isPending || 
+                    (room.phase === 'structured' && currentUser && room.currentTurn !== currentUser.id) ||
+                    room.phase === 'voting'
+                  }
                   data-testid="input-message"
                 />
                 <Button
                   onClick={handleSendMessage}
-                  disabled={!messageInput.trim() || sendMessageMutation.isPending}
+                  disabled={
+                    !messageInput.trim() || 
+                    sendMessageMutation.isPending ||
+                    (room.phase === 'structured' && currentUser && room.currentTurn !== currentUser.id) ||
+                    room.phase === 'voting'
+                  }
                   data-testid="button-send-message"
                 >
                   <Send className="w-4 h-4" />

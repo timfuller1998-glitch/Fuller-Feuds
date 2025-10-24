@@ -95,6 +95,18 @@ export function useDebateRoom() {
           opponentTyping: message.isTyping
         }));
         break;
+
+      case 'turn_update':
+      case 'phase_update':
+        // Invalidate debate room query to refetch updated turn/phase data
+        if (message.roomId) {
+          import('@/lib/queryClient').then(({ queryClient }) => {
+            queryClient.invalidateQueries({ 
+              queryKey: ["/api/debate-rooms", message.roomId] 
+            });
+          });
+        }
+        break;
     }
   }, []);
 
