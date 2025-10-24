@@ -2093,6 +2093,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           case 'stream_update':
             handleStreamUpdate(ws, message);
             break;
+          
+          case 'typing':
+            handleTyping(ws, message);
+            break;
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -2270,6 +2274,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Broadcast moderator action to room
     broadcastToRoom(connection.roomId, modAction);
+  }
+
+  function handleTyping(ws: WebSocket, message: any) {
+    const connection = userConnections.get(ws);
+    if (!connection?.roomId) return;
+    
+    // Broadcast typing event to others in room (not to sender)
+    const typingEvent = {
+      type: 'typing',
+      roomId: connection.roomId,
+      userId: connection.userId,
+      isTyping: message.isTyping,
+      timestamp: new Date().toISOString()
+    };
+    
+    broadcastToRoom(connection.roomId, typingEvent, ws);
   }
 
   function handleStreamUpdate(ws: WebSocket, message: any) {

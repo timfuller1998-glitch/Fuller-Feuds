@@ -65,11 +65,12 @@ export default function DebateRoomPage() {
   const [showChooseOpponentDialog, setShowChooseOpponentDialog] = useState(false);
   const [flaggingMessageId, setFlaggingMessageId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [optimisticMessages, setOptimisticMessages] = useState<Array<{id: string, content: string, timestamp: string}>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // WebSocket real-time messaging
-  const { roomState, connectionState, joinRoom, leaveRoom, sendChatMessage } = useDebateRoom();
+  const { roomState, connectionState, joinRoom, leaveRoom, sendChatMessage, sendTypingEvent } = useDebateRoom();
 
   // Fetch debate room
   const { data: room, isLoading: roomLoading } = useQuery<DebateRoom>({
@@ -94,10 +95,9 @@ export default function DebateRoomPage() {
     enabled: !!room?.participant2Id,
   });
 
-  // Fetch messages
+  // Fetch messages (no polling needed - WebSocket provides real-time updates)
   const { data: messages = [] } = useQuery<DebateMessage[]>({
     queryKey: ["/api/debate-rooms", roomId, "messages"],
-    refetchInterval: 3000, // Poll every 3 seconds
     enabled: !!roomId,
   });
 
@@ -240,16 +240,59 @@ export default function DebateRoomPage() {
     };
   }, [roomId, currentUser?.id, joinRoom, leaveRoom]);
 
-  // Combine DB messages with WebSocket real-time messages
-  // DB messages are the source of truth, WebSocket adds real-time updates
-  const allMessages = [...messages, ...roomState.messages.map((wsMsg) => ({
+  // Combine DB messages with WebSocket real-time messages (deduplicate by content+timestamp)
+  // DB messages are the source of truth, WebSocket adds real-time messages not yet in DB
+  const wsMessages = roomState.messages.map((wsMsg) => ({
     id: `ws-${wsMsg.timestamp}`,
     roomId: wsMsg.roomId,
     userId: wsMsg.userId,
     content: wsMsg.content,
     createdAt: wsMsg.timestamp,
     fallacyCounts: {}
-  }))];
+  }));
+  
+  // Only add WebSocket messages that aren't already in DB (deduplicate by content + userId + similar timestamp)
+  const dedupedWsMessages = wsMessages.filter(wsMsg => {
+    return !messages.some(dbMsg => 
+      dbMsg.userId === wsMsg.userId && 
+      dbMsg.content === wsMsg.content &&
+      Math.abs(new Date(dbMsg.createdAt).getTime() - new Date(wsMsg.createdAt).getTime()) < 5000 // Within 5 seconds
+    );
+  });
+  
+  // Add optimistic messages (pending local messages)
+  const optimisticMsgs = optimisticMessages.map(opt => ({
+    id: opt.id,
+    roomId: roomId || '',
+    userId: currentUser?.id || '',
+    content: opt.content,
+    createdAt: opt.timestamp,
+    fallacyCounts: {}
+  }));
+  
+  const allMessages = [...messages, ...dedupedWsMessages, ...optimisticMsgs].sort((a, b) => 
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+  
+  // Clean up optimistic messages when they appear in DB or WebSocket (use effect to avoid render mutation)
+  useEffect(() => {
+    if (optimisticMessages.length === 0) return;
+    
+    const allRealMessages = [...messages, ...dedupedWsMessages];
+    const duplicateIds = optimisticMessages
+      .filter(optMsg => {
+        return allRealMessages.some(msg => 
+          msg.content === optMsg.content &&
+          msg.userId === (currentUser?.id || '') &&
+          Math.abs(new Date(msg.createdAt).getTime() - new Date(optMsg.timestamp).getTime()) < 5000
+        );
+      })
+      .map(opt => opt.id);
+    
+    if (duplicateIds.length > 0) {
+      setOptimisticMessages(prev => prev.filter(p => !duplicateIds.includes(p.id)));
+    }
+  }, [messages, roomState.messages, optimisticMessages, currentUser?.id]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -257,13 +300,29 @@ export default function DebateRoomPage() {
   }, [allMessages.length]);
 
   const handleSendMessage = async () => {
-    if (!messageInput.trim()) return;
+    if (!messageInput.trim() || !currentUser) return;
     
-    // Send to DB first (source of truth)
-    sendMessageMutation.mutate(messageInput);
+    const content = messageInput;
+    const optimisticId = `optimistic-${Date.now()}`;
+    const timestamp = new Date().toISOString();
     
-    // Also broadcast via WebSocket for real-time delivery
-    // sendChatMessage(messageInput);
+    // Clear input and add optimistic message immediately
+    setMessageInput("");
+    setOptimisticMessages(prev => [...prev, { id: optimisticId, content, timestamp }]);
+    
+    // Send to DB (backend will broadcast via WebSocket)
+    sendMessageMutation.mutate(content, {
+      onError: () => {
+        // Remove optimistic message and restore input on error
+        setOptimisticMessages(prev => prev.filter(m => m.id !== optimisticId));
+        setMessageInput(content);
+        toast({
+          title: "Failed to send message",
+          description: "Please try again",
+          variant: "destructive"
+        });
+      }
+    });
   };
 
   const handleEndDebate = () => {
@@ -322,6 +381,23 @@ export default function DebateRoomPage() {
           <Badge variant={isEnded ? "secondary" : "default"} data-testid="badge-debate-status">
             {room.status}
           </Badge>
+          {/* Connection Status Indicator */}
+          {connectionState === 'connected' && (
+            <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-1.5 animate-pulse" />
+              Live
+            </Badge>
+          )}
+          {connectionState === 'connecting' && (
+            <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800">
+              Connecting...
+            </Badge>
+          )}
+          {connectionState === 'disconnected' && (
+            <Badge variant="outline" className="bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800">
+              Offline
+            </Badge>
+          )}
         </div>
         {topic?.description && (
           <p className="text-muted-foreground text-sm max-w-2xl mx-auto">{topic.description}</p>
@@ -506,15 +582,45 @@ export default function DebateRoomPage() {
           {/* Message Input */}
           {isParticipant && !isEnded && (
             <div className="border-t p-4">
+              {/* Typing Indicator */}
+              {roomState.opponentTyping && (
+                <div className="text-sm text-muted-foreground mb-2 px-1">
+                  <span className="italic">Opponent is typing...</span>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Input
                   placeholder="Type your message..."
                   value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
+                  onChange={(e) => {
+                    setMessageInput(e.target.value);
+                    
+                    // Send typing event
+                    if (e.target.value.length > 0) {
+                      sendTypingEvent(true);
+                      
+                      // Clear typing timeout and set new one
+                      if (typingTimeoutRef.current) {
+                        clearTimeout(typingTimeoutRef.current);
+                      }
+                      typingTimeoutRef.current = setTimeout(() => {
+                        sendTypingEvent(false);
+                      }, 2000);
+                    } else {
+                      sendTypingEvent(false);
+                      if (typingTimeoutRef.current) {
+                        clearTimeout(typingTimeoutRef.current);
+                      }
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSendMessage();
+                      sendTypingEvent(false); // Stop typing when sending
+                      if (typingTimeoutRef.current) {
+                        clearTimeout(typingTimeoutRef.current);
+                      }
                     }
                   }}
                   disabled={sendMessageMutation.isPending}

@@ -30,6 +30,7 @@ export interface DebateRoomState {
   messages: ChatMessage[];
   liveVotes: LiveVote[];
   participants: RoomParticipant[];
+  opponentTyping: boolean;
 }
 
 export function useDebateRoom() {
@@ -40,7 +41,8 @@ export function useDebateRoom() {
     participantCount: 0,
     messages: [],
     liveVotes: [],
-    participants: []
+    participants: [],
+    opponentTyping: false
   });
 
   const handleMessage = useCallback((message: WebSocketMessage) => {
@@ -84,6 +86,13 @@ export function useDebateRoom() {
         setRoomState(prev => ({
           ...prev,
           liveVotes: [...prev.liveVotes, message as LiveVote]
+        }));
+        break;
+
+      case 'typing':
+        setRoomState(prev => ({
+          ...prev,
+          opponentTyping: message.isTyping
         }));
         break;
     }
@@ -170,6 +179,15 @@ export function useDebateRoom() {
     });
   }, [roomState.roomId, sendMessage]);
 
+  const sendTypingEvent = useCallback((isTyping: boolean) => {
+    if (!roomState.roomId) return false;
+    
+    return sendMessage({
+      type: 'typing',
+      isTyping
+    });
+  }, [roomState.roomId, sendMessage]);
+
   useEffect(() => {
     return () => {
       if (roomState.isConnected) {
@@ -184,6 +202,7 @@ export function useDebateRoom() {
     joinRoom,
     leaveRoom,
     sendChatMessage,
-    castLiveVote
+    castLiveVote,
+    sendTypingEvent
   };
 }
