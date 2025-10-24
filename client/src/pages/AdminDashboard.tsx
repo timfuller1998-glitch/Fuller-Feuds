@@ -176,6 +176,28 @@ export default function AdminDashboard() {
     },
   });
 
+  // Backfill opinion political scores mutation
+  const backfillOpinionScoresMutation = useMutation({
+    mutationFn: async (model: 'gpt-4o-mini' | 'gpt-5') => {
+      const response = await apiRequest('POST', '/api/admin/backfill-opinion-scores', { model });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/opinions'] });
+      toast({
+        title: "Political Score Analysis Started!",
+        description: `Processing ${data.totalOpinions} opinions using ${data.model}. This may take a few minutes.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start opinion political score backfill",
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="flex items-center gap-3 mb-6">
@@ -242,7 +264,7 @@ export default function AdminDashboard() {
         <TabsContent value="topics" className="space-y-4">
           <Card>
             <CardHeader>
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <BookOpen className="h-5 w-5" />
@@ -250,16 +272,38 @@ export default function AdminDashboard() {
                   </CardTitle>
                   <CardDescription>View and moderate all platform topics</CardDescription>
                 </div>
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => backfillEmbeddingsMutation.mutate()}
-                  disabled={backfillEmbeddingsMutation.isPending}
-                  data-testid="button-generate-embeddings"
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {backfillEmbeddingsMutation.isPending ? "Generating..." : "Generate Embeddings"}
-                </Button>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => backfillEmbeddingsMutation.mutate()}
+                    disabled={backfillEmbeddingsMutation.isPending}
+                    data-testid="button-generate-embeddings"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {backfillEmbeddingsMutation.isPending ? "Generating..." : "Generate Embeddings"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => backfillOpinionScoresMutation.mutate('gpt-4o-mini')}
+                    disabled={backfillOpinionScoresMutation.isPending}
+                    data-testid="button-backfill-scores-gpt4"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {backfillOpinionScoresMutation.isPending ? "Analyzing..." : "Analyze Opinions (GPT-4)"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => backfillOpinionScoresMutation.mutate('gpt-5')}
+                    disabled={backfillOpinionScoresMutation.isPending}
+                    data-testid="button-backfill-scores-gpt5"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {backfillOpinionScoresMutation.isPending ? "Analyzing..." : "Analyze Opinions (GPT-5)"}
+                  </Button>
+                </div>
               </div>
             </CardHeader>
           </Card>
