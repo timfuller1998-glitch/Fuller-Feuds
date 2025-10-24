@@ -74,14 +74,15 @@ export default function SearchBar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch topic suggestions when debounced query changes
+  // Fetch topic suggestions using semantic search when debounced query changes
   const { data: topics } = useQuery<Topic[]>({
-    queryKey: ["/api/topics", { search: debouncedQuery }],
+    queryKey: ["/api/topics/search-similar", { query: debouncedQuery, dropdown: true }],
     queryFn: async () => {
       if (!debouncedQuery || debouncedQuery.length < 2) return [];
       const params = new URLSearchParams();
-      params.append("search", debouncedQuery);
-      const response = await fetch(`/api/topics?${params}`);
+      params.append("query", debouncedQuery);
+      params.append("threshold", "0.3"); // Very broad for dropdown suggestions
+      const response = await fetch(`/api/topics/search-similar?${params}`);
       if (!response.ok) return [];
       return response.json();
     },
@@ -123,13 +124,8 @@ export default function SearchBar({
     }
   }, [pendingEnterKey, debouncedQuery, topics]);
 
-  // Auto-trigger similarity check when no exact matches found
-  useEffect(() => {
-    if (hasNoResults && !showCreateForm && !showSimilarityModal && !pendingSimilarityCheck && debouncedQuery.length >= 3 && dismissedQuery !== debouncedQuery) {
-      setTopicTitle(debouncedQuery);
-      setPendingSimilarityCheck(debouncedQuery);
-    }
-  }, [hasNoResults, debouncedQuery, showCreateForm, showSimilarityModal, pendingSimilarityCheck, dismissedQuery]);
+  // Don't auto-trigger similarity check - let users manually click "Create Topic" in dropdown
+  // (Removed auto-trigger since dropdown now uses semantic search and has manual create option)
 
   // Show similarity modal or create form based on similarity check results
   useEffect(() => {
@@ -337,7 +333,7 @@ export default function SearchBar({
       />
 
       {/* Suggestions Dropdown */}
-      {showSuggestions && hasSuggestions && (
+      {showSuggestions && (hasSuggestions || query.length >= 2) && (
         <Card className="absolute top-full left-0 right-0 mt-2 p-2 max-h-[85vh] overflow-y-auto z-[999999] shadow-lg">
           {/* Search History (when no query) */}
           {query.length === 0 && searchHistory.length > 0 && (
@@ -431,16 +427,27 @@ export default function SearchBar({
             </div>
           )}
 
-          {/* Loading State */}
-          {hasNoResults && generateCategoriesMutation.isPending && !showCreateForm && (
-            <div className="p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3"></div>
-              <p className="text-sm text-muted-foreground">Preparing topic creation...</p>
+          {/* Create New Topic Button */}
+          {query.length >= 2 && !showCreateForm && (
+            <div className="mt-2 pt-2 border-t">
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2"
+                onClick={() => {
+                  setTopicTitle(query);
+                  setPendingSimilarityCheck(query);
+                }}
+                disabled={generateCategoriesMutation.isPending}
+                data-testid="button-create-new-topic-dropdown"
+              >
+                <Plus className="w-4 h-4" />
+                {generateCategoriesMutation.isPending ? "Checking for similar topics..." : `Create new topic: "${query}"`}
+              </Button>
             </div>
           )}
 
           {/* Inline Topic Creation Form */}
-          {hasNoResults && showCreateForm && (
+          {showCreateForm && (
             <div className="p-4 space-y-3">
               <div className="space-y-3">
                 <div>

@@ -95,10 +95,14 @@ Preferred communication style: Simple, everyday language.
 - **Admin Backfill**: POST /api/admin/backfill-embeddings endpoint to generate embeddings for existing topics (accessible via button in Admin Dashboard Topics tab)
 - **Search Endpoint**: GET /api/topics/search-similar?query=...&threshold=... returns top similar topics using cosine similarity
 - **Similarity Thresholds**:
-  - **Topic Page "Similar Topics"**: 0.4 (default, broad recommendations for discovering related content)
-  - **SearchBar Duplicate Detection**: 0.5 (fairly broad to catch topics like "climate crisis" and "global warming effects")
-- **Integration**: SearchBar features debounced search (300ms) that shows TopicSimilarityModal when similar topics found
-- **User Experience**: Users can navigate to existing topics or proceed with "Create New Topic Anyway" button
+  - **SearchBar Dropdown**: 0.3 (very broad for showing semantically related topics while typing)
+  - **Topic Page "Similar Topics"**: 0.4 (broad recommendations for discovering related content)
+  - **Duplicate Detection**: 0.5 (fairly broad to catch topics like "climate crisis" and "global warming effects")
+- **SearchBar Integration**: 
+  - Dropdown uses semantic search to show related topics (not just exact text matches)
+  - "Create New Topic" button always visible when typing 2+ characters
+  - Clicking "Create New Topic" triggers duplicate detection modal if similar topics exist
+  - Users can navigate to existing topics or proceed with "Create New Topic Anyway" button
 - **Cost Optimization**: Embeddings trimmed from API responses to reduce bandwidth
 
 ### AI Summary Auto-Generation
