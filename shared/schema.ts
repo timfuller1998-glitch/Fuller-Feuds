@@ -96,6 +96,8 @@ export const opinions = pgTable("opinions", {
   status: varchar("status", { length: 20 }).default("approved"), // 'pending', 'approved', 'flagged', 'hidden'
   debateStatus: debateStatusEnum("debate_status").default("open").notNull(),
   references: text("references").array().default(sql`ARRAY[]::text[]`), // Reference links/URLs
+  topicEconomicScore: integer("topic_economic_score"), // -100 (capitalist) to +100 (socialist) - this opinion's political stance on economic axis
+  topicAuthoritarianScore: integer("topic_authoritarian_score"), // -100 (libertarian) to +100 (authoritarian) - this opinion's political stance on authoritarian axis
   likesCount: integer("likes_count").default(0),
   dislikesCount: integer("dislikes_count").default(0),
   repliesCount: integer("replies_count").default(0),

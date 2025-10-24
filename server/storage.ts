@@ -122,6 +122,12 @@ export interface IStorage {
   deleteTopic(id: string): Promise<void>;
   countTopicsByUser(userId: string): Promise<number>;
   updateTopicEmbedding(topicId: string, embedding: number[]): Promise<void>;
+  getTopicPoliticalDistribution(topicId: string): Promise<{
+    authoritarianCapitalist: number;
+    authoritarianSocialist: number;
+    libertarianCapitalist: number;
+    libertarianSocialist: number;
+  }>;
   
   // Opinion operations
   createOpinion(opinion: InsertOpinion): Promise<Opinion>;
@@ -498,6 +504,94 @@ export class DatabaseStorage implements IStorage {
       ...topic,
       fallacyCounts: fallacyCountsMap.get(topic.id) || {},
     } as any;
+  }
+
+  async getTopicPoliticalDistribution(topicId: string): Promise<{
+    authoritarianCapitalist: number;
+    authoritarianSocialist: number;
+    libertarianCapitalist: number;
+    libertarianSocialist: number;
+  }> {
+    // Get all opinions for this topic that have political scores
+    const topicOpinions = await db
+      .select()
+      .from(opinions)
+      .where(and(
+        eq(opinions.topicId, topicId),
+        sql`${opinions.topicEconomicScore} IS NOT NULL`,
+        sql`${opinions.topicAuthoritarianScore} IS NOT NULL`
+      ));
+
+    if (topicOpinions.length === 0) {
+      // No opinions with political scores yet
+      return {
+        authoritarianCapitalist: 0,
+        authoritarianSocialist: 0,
+        libertarianCapitalist: 0,
+        libertarianSocialist: 0
+      };
+    }
+
+    // Count opinions in each quadrant
+    // Schema: economicScore -100 (socialist) to +100 (capitalist)
+    // authoritarianScore -100 (libertarian) to +100 (authoritarian)
+    // Tie-breaking: 0 on either axis is treated as the positive side (capitalist/authoritarian)
+    let authoritarianCapitalist = 0;  // economic >= 0, authoritarian >= 0
+    let authoritarianSocialist = 0;   // economic < 0, authoritarian >= 0
+    let libertarianCapitalist = 0;    // economic >= 0, authoritarian < 0
+    let libertarianSocialist = 0;     // economic < 0, authoritarian < 0
+
+    for (const opinion of topicOpinions) {
+      const economic = opinion.topicEconomicScore || 0;
+      const authoritarian = opinion.topicAuthoritarianScore || 0;
+
+      if (economic >= 0 && authoritarian >= 0) {
+        authoritarianCapitalist++;
+      } else if (economic < 0 && authoritarian >= 0) {
+        authoritarianSocialist++;
+      } else if (economic >= 0 && authoritarian < 0) {
+        libertarianCapitalist++;
+      } else {
+        libertarianSocialist++;
+      }
+    }
+
+    const total = topicOpinions.length;
+
+    // Calculate percentages with proper rounding to ensure sum = 100
+    const percentages = {
+      authoritarianCapitalist: (authoritarianCapitalist / total) * 100,
+      authoritarianSocialist: (authoritarianSocialist / total) * 100,
+      libertarianCapitalist: (libertarianCapitalist / total) * 100,
+      libertarianSocialist: (libertarianSocialist / total) * 100
+    };
+
+    // Round each value
+    const rounded = {
+      authoritarianCapitalist: Math.round(percentages.authoritarianCapitalist),
+      authoritarianSocialist: Math.round(percentages.authoritarianSocialist),
+      libertarianCapitalist: Math.round(percentages.libertarianCapitalist),
+      libertarianSocialist: Math.round(percentages.libertarianSocialist)
+    };
+
+    // Adjust to ensure sum = 100 (distribute rounding error)
+    const sum = rounded.authoritarianCapitalist + rounded.authoritarianSocialist + 
+                rounded.libertarianCapitalist + rounded.libertarianSocialist;
+    const diff = 100 - sum;
+
+    if (diff !== 0) {
+      // Find the quadrant with the largest fractional part and adjust it
+      const fractionals = [
+        { key: 'authoritarianCapitalist' as const, frac: percentages.authoritarianCapitalist - rounded.authoritarianCapitalist },
+        { key: 'authoritarianSocialist' as const, frac: percentages.authoritarianSocialist - rounded.authoritarianSocialist },
+        { key: 'libertarianCapitalist' as const, frac: percentages.libertarianCapitalist - rounded.libertarianCapitalist },
+        { key: 'libertarianSocialist' as const, frac: percentages.libertarianSocialist - rounded.libertarianSocialist }
+      ].sort((a, b) => Math.abs(b.frac) - Math.abs(a.frac));
+
+      rounded[fractionals[0].key] += diff;
+    }
+
+    return rounded;
   }
 
   async getTopicsWithEmbeddings(): Promise<Topic[]> {

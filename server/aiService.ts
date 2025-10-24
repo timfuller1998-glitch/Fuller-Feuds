@@ -380,6 +380,8 @@ ECONOMIC AXIS (-100 to +100):
 +21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
 +51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
 
+NOTE: -100 = Socialist, +100 = Capitalist
+
 AUTHORITARIAN AXIS (-100 to +100):
 -100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
 -50 to -21: Libertarian (personal freedom priority, limited government power, strong individual rights)
@@ -488,6 +490,97 @@ Return only valid JSON.`;
         reasoning: `Fallback analysis based on ${opinions.length} opinions with stance distribution: ${forCount} supportive, ${againstCount} opposing`,
         quadrant: 'centrist'
       };
+    }
+  }
+
+  /**
+   * Analyze the political stance of a single opinion
+   * Returns economic and authoritarian scores from -100 to +100
+   * Uses GPT-4o-mini for cost efficiency
+   */
+  static async analyzeOpinionPoliticalStance(
+    opinionContent: string,
+    topicTitle: string
+  ): Promise<{ economicScore: number; authoritarianScore: number }> {
+    const prompt = `
+Analyze this opinion on the topic "${topicTitle}" and determine its political position on a 2-dimensional political compass.
+
+Opinion: "${opinionContent}"
+
+Provide analysis in the following JSON format:
+{
+  "economicScore": -50,
+  "authoritarianScore": 25
+}
+
+ECONOMIC AXIS (-100 to +100):
+-100 to -51: Very Socialist (strong wealth redistribution, extensive government control of economy, anti-capitalist)
+-50 to -21: Socialist (supports wealth redistribution, market regulation, public ownership of key industries)
+-20 to +20: Mixed Economy (balanced approach, regulated capitalism, some social programs)
++21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
++51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
+
+NOTE: -100 = Socialist, +100 = Capitalist
+
+AUTHORITARIAN AXIS (-100 to +100):
+-100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
+-50 to -21: Libertarian (personal freedom priority, limited government power, strong individual rights)
+-20 to +20: Moderate (balanced authority and freedom, pragmatic governance)
++21 to +50: Authoritarian (strong government control, order over freedom, limited civil liberties)
++51 to +100: Very Authoritarian (total state control, strict social order, minimal individual freedoms)
+
+ECONOMIC indicators:
+- Views on taxation, welfare, healthcare, education funding
+- Stance on business regulation, labor rights, unions
+- Opinions on wealth inequality and redistribution
+- Free market vs. planned economy preferences
+
+AUTHORITARIAN indicators:
+- Views on government surveillance, law enforcement, military
+- Stance on censorship, free speech, personal privacy
+- Opinions on drug policy, gun rights, personal freedoms
+- Traditional values vs. progressive social policies
+
+Return only valid JSON with economicScore and authoritarianScore fields.`;
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a political science expert who analyzes ideological positions on a 2D political compass objectively and accurately. Always respond with valid JSON only."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 200,
+        temperature: 0.3
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      
+      if (!responseContent) {
+        console.error("[Opinion Analysis] No response from OpenAI");
+        return { economicScore: 0, authoritarianScore: 0 };
+      }
+
+      const aiAnalysis = JSON.parse(responseContent);
+      const economicScore = Math.max(-100, Math.min(100, aiAnalysis.economicScore || 0));
+      const authoritarianScore = Math.max(-100, Math.min(100, aiAnalysis.authoritarianScore || 0));
+
+      return {
+        economicScore: Math.round(economicScore),
+        authoritarianScore: Math.round(authoritarianScore)
+      };
+
+    } catch (error) {
+      console.error("[Opinion Analysis] Error analyzing opinion political stance:", error);
+      // Return neutral scores on error
+      return { economicScore: 0, authoritarianScore: 0 };
     }
   }
 

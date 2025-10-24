@@ -12,6 +12,7 @@ import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getOpinionGradientStyle } from "@/lib/politicalColors";
 import type { FallacyType } from "@shared/fallacies";
 
 interface OpinionCardProps {
@@ -23,6 +24,8 @@ interface OpinionCardProps {
   politicalLeaningScore?: number;
   economicScore?: number;
   authoritarianScore?: number;
+  topicEconomicScore?: number;
+  topicAuthoritarianScore?: number;
   content: string;
   stance: "for" | "against" | "neutral";
   debateStatus?: "open" | "closed" | "private";
@@ -63,6 +66,8 @@ export default function OpinionCard({
   politicalLeaningScore,
   economicScore,
   authoritarianScore,
+  topicEconomicScore,
+  topicAuthoritarianScore,
   content,
   stance,
   debateStatus = "open",
@@ -85,6 +90,9 @@ export default function OpinionCard({
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showFlagDialog, setShowFlagDialog] = useState(false);
   const { toast } = useToast();
+
+  // Get political gradient style for this opinion
+  const gradientStyle = getOpinionGradientStyle(topicEconomicScore, topicAuthoritarianScore);
 
   // Flag mutation
   const flagMutation = useMutation({
@@ -147,6 +155,7 @@ export default function OpinionCard({
         className="hover-elevate active-elevate-2 cursor-pointer h-full flex flex-col" 
         onClick={() => setShowDetailsDialog(true)}
         data-testid={`card-opinion-${id}`}
+        style={gradientStyle}
       >
         <CardHeader className="pb-3 flex-shrink-0">
           <div className="flex items-start justify-between gap-2">

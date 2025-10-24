@@ -2,6 +2,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Users, TrendingUp, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { getTopicCornerGradient } from "@/lib/politicalColors";
 
 interface TopicCardProps {
   id: string;
@@ -32,6 +34,22 @@ export default function TopicCard({
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
 
+  // Fetch political distribution for this topic
+  const { data: distribution } = useQuery<{
+    authoritarianCapitalist: number;
+    authoritarianSocialist: number;
+    libertarianCapitalist: number;
+    libertarianSocialist: number;
+  }>({
+    queryKey: ['/api/topics', id, 'political-distribution'],
+    enabled: opinionsCount > 0, // Only fetch if there are opinions
+  });
+
+  // Get gradient style based on political distribution
+  const gradientStyle = distribution && opinionsCount > 0
+    ? getTopicCornerGradient(distribution)
+    : { background: 'linear-gradient(135deg, hsl(var(--muted)) 0%, hsl(var(--muted) / 0.5) 100%)' };
+
   // Truncate preview content to fit card with ellipsis
   const truncateContent = (content: string, maxLength: number = 180) => {
     if (content.length <= maxLength) return content + '...';
@@ -44,9 +62,10 @@ export default function TopicCard({
       onClick={() => setLocation(`/topic/${id}`)}
       data-testid={`card-topic-${id}`}
     >
-      {/* Theme-based gradient section with preview content */}
+      {/* Political gradient section with preview content */}
       <div 
-        className="relative p-4 sm:p-6 min-h-[180px] flex flex-col justify-between bg-gradient-to-br from-primary/10 to-primary/5"
+        className="relative p-4 sm:p-6 min-h-[180px] flex flex-col justify-between"
+        style={gradientStyle}
       >
         <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
           {categories?.slice(0, 2).map((category) => (

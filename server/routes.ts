@@ -328,6 +328,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get political distribution for a topic
+  app.get('/api/topics/:id/political-distribution', async (req, res) => {
+    try {
+      const distribution = await storage.getTopicPoliticalDistribution(req.params.id);
+      res.json(distribution);
+    } catch (error) {
+      console.error("Error fetching topic political distribution:", error);
+      res.status(500).json({ message: "Failed to fetch political distribution" });
+    }
+  });
+
   // Record topic view
   app.post('/api/topics/:id/view', isAuthenticated, async (req: any, res) => {
     try {
@@ -570,6 +581,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const opinion = await storage.createOpinion(validatedData);
+      
+      // Analyze opinion's political stance asynchronously (don't block the response)
+      const topic = await storage.getTopic(req.params.topicId);
+      if (topic) {
+        AIService.analyzeOpinionPoliticalStance(validatedData.content, topic.title)
+          .then(async (scores) => {
+            // Update the opinion with political scores after creation
+            await storage.updateOpinion(opinion.id, {
+              topicEconomicScore: scores.economicScore,
+              topicAuthoritarianScore: scores.authoritarianScore
+            });
+          })
+          .catch(err => {
+            console.error("Error analyzing opinion political stance:", err);
+          });
+      }
       
       // Auto-update political leaning analysis after creating opinion
       // Do this asynchronously without blocking the response
