@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { ThumbsUp, ThumbsDown, Brain, Flag } from "lucide-react";
 import { ArrowLeft, MessageCircle, Users, TrendingUp, RefreshCw, Video, Calendar, Clock, Eye, Link as LinkIcon, Plus, X } from "lucide-react";
 import { Link } from "wouter";
@@ -21,6 +21,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import OpinionCard from "@/components/OpinionCard";
+import TopicCard from "@/components/TopicCard";
 import { AdoptOpinionDialog } from "@/components/AdoptOpinionDialog";
 import { DebateOnboardingModal } from "@/components/DebateOnboardingModal";
 import FallacyBadges from "@/components/FallacyBadges";
@@ -109,10 +110,22 @@ export default function Topic() {
     enabled: !!user?.id,
   });
 
-  // Fetch live streams for this topic
-  const { data: liveStreams } = useQuery<any[]>({
-    queryKey: [`/api/live-streams?topicId=${id}`],
-    enabled: !!id,
+  // Fetch user's debate rooms
+  const { data: debateRooms } = useQuery<any[]>({
+    queryKey: ["/api/users/me/debate-rooms"],
+    enabled: !!user?.id,
+  });
+
+  // Fetch similar topics
+  const { data: similarTopics } = useQuery<TopicType[]>({
+    queryKey: ["/api/topics/search-similar", topic?.title],
+    queryFn: async () => {
+      if (!topic?.title) return [];
+      const response = await fetch(`/api/topics/search-similar?query=${encodeURIComponent(topic.title)}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!topic?.title,
   });
 
   // Get user's opinion on this topic to determine stance
@@ -152,6 +165,9 @@ export default function Topic() {
   const supportingOpinions = sortOpinions(opinions?.filter(o => o.stance === 'for' && o.userId !== user?.id) || []);
   const neutralOpinions = sortOpinions(opinions?.filter(o => o.stance === 'neutral' && o.userId !== user?.id) || []);
   const opposingOpinions = sortOpinions(opinions?.filter(o => o.stance === 'against' && o.userId !== user?.id) || []);
+
+  // Filter debate rooms for this topic
+  const topicDebateRooms = debateRooms?.filter(room => room.topicId === id) || [];
 
   // Create opinion mutation
   const createOpinionMutation = useMutation({
@@ -352,11 +368,6 @@ export default function Topic() {
     );
   }
 
-  // Group live streams by status
-  const pastStreams = liveStreams?.filter(s => s.status === 'ended') || [];
-  const currentStreams = liveStreams?.filter(s => s.status === 'live') || [];
-  const upcomingStreams = liveStreams?.filter(s => s.status === 'scheduled') || [];
-
   // Get opposite opinion users for chat
   const oppositeOpinions = userOpinion 
     ? opinions?.filter(o => 
@@ -367,648 +378,519 @@ export default function Topic() {
     : [];
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-8">
       {/* Back Button */}
       <Link href="/">
-        <Button variant="ghost" size="sm" data-testid="button-back-home" className="transition-smooth">
+        <Button variant="ghost" size="sm" data-testid="button-back-home">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Topics
         </Button>
       </Link>
 
-      {/* Topic Title Above Image */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          {topic.categories.map((cat) => (
-            <Badge key={cat} variant="secondary" className="shadow-sm">{cat}</Badge>
-          ))}
-          {topic.isActive && (
-            <Badge className="bg-chart-1 text-white shadow-sm">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              Active
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight flex-1" data-testid="text-topic-title">
-            {topic.title}
-          </h1>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowTopicFlagDialog(true)}
-            data-testid="button-flag-topic"
-            className="flex-shrink-0"
-          >
-            <Flag className="w-4 h-4 mr-2" />
-            Flag Topic
-          </Button>
-        </div>
-        
-        {/* Display fallacy badges if any */}
-        {topic.fallacyCounts && Object.keys(topic.fallacyCounts).some(key => (topic.fallacyCounts?.[key] || 0) > 0) && (
-          <div className="mt-3">
-            <FallacyBadges fallacyCounts={topic.fallacyCounts} />
+      {/* Header Section with Title and AI Summary Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          {/* Categories and Active Badge */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {topic.categories.map((cat) => (
+              <Badge key={cat} variant="secondary">{cat}</Badge>
+            ))}
+            {topic.isActive && (
+              <Badge className="bg-chart-1 text-white">
+                <TrendingUp className="w-3 h-3 mr-1" />
+                Active
+              </Badge>
+            )}
           </div>
-        )}
 
-        <div className="flex items-center gap-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="w-4 h-4" />
-            <span data-testid="text-opinions-count">{opinions?.length || 0} opinions</span>
+          {/* Title and Flag Button */}
+          <div className="flex items-start justify-between gap-4">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight" data-testid="text-topic-title">
+              {topic.title}
+            </h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTopicFlagDialog(true)}
+              data-testid="button-flag-topic"
+              className="flex-shrink-0"
+            >
+              <Flag className="w-4 h-4 mr-2" />
+              Flag
+            </Button>
           </div>
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            <span data-testid="text-participants-count">
-              {opinions ? new Set(opinions.map(o => o.userId)).size : 0} participants
-            </span>
+          
+          {/* Display fallacy badges if any */}
+          {topic.fallacyCounts && Object.keys(topic.fallacyCounts).some(key => (topic.fallacyCounts?.[key] || 0) > 0) && (
+            <div>
+              <FallacyBadges fallacyCounts={topic.fallacyCounts} />
+            </div>
+          )}
+
+          {/* Stats */}
+          <div className="flex items-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="w-4 h-4" />
+              <span data-testid="text-opinions-count">{opinions?.length || 0} opinions</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              <span data-testid="text-participants-count">
+                {opinions ? new Set(opinions.map(o => o.userId)).size : 0} participants
+              </span>
+            </div>
           </div>
         </div>
+
+        {/* AI Summary Card */}
+        {cumulativeData && (
+          <Card className="lg:col-span-1">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Brain className="w-4 h-4 text-primary" />
+                AI Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm leading-relaxed">{cumulativeData.summary}</p>
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-primary">{cumulativeData.forCount || 0}</div>
+                  <div className="text-xs text-muted-foreground">For</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-muted-foreground">{cumulativeData.neutralCount || 0}</div>
+                  <div className="text-xs text-muted-foreground">Neutral</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-destructive">{cumulativeData.againstCount || 0}</div>
+                  <div className="text-xs text-muted-foreground">Against</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Opinions Section with Tabs */}
-      <Card className="border border-border/50" style={{ boxShadow: 'var(--shadow-md)' }}>
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
-              <MessageCircle className="w-5 h-5 text-primary" />
-            </div>
-            Opinions
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="your-opinion" className="w-full">
-            <TabsList className="w-full h-auto p-0 bg-transparent border-b rounded-none mb-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 w-full gap-0">
-                <TabsTrigger 
-                  value="your-opinion" 
-                  data-testid="tab-your-opinion"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2 sm:px-4 py-3 text-xs sm:text-sm"
-                >
-                  <span className="hidden sm:inline">Your Opinion</span>
-                  <span className="sm:hidden">Yours</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="supporting" 
-                  data-testid="tab-supporting"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2 sm:px-4 py-3 text-xs sm:text-sm"
-                >
-                  <span className="hidden sm:inline">Supporting ({supportingOpinions.length})</span>
-                  <span className="sm:hidden">For ({supportingOpinions.length})</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="neutral" 
-                  data-testid="tab-neutral"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2 sm:px-4 py-3 text-xs sm:text-sm"
-                >
-                  Neutral ({neutralOpinions.length})
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="opposing" 
-                  data-testid="tab-opposing"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2 sm:px-4 py-3 text-xs sm:text-sm"
-                >
-                  <span className="hidden sm:inline">Opposing ({opposingOpinions.length})</span>
-                  <span className="sm:hidden">Against ({opposingOpinions.length})</span>
-                </TabsTrigger>
-              </div>
-            </TabsList>
-
-            <TabsContent value="your-opinion" className="space-y-4">
+      {/* "You" Section */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-semibold">You</h2>
+          <Badge variant="outline">{(userOpinion ? 1 : 0) + topicDebateRooms.length}</Badge>
+        </div>
+        
+        <ScrollArea className="w-full whitespace-nowrap">
+          <div className="flex gap-4 pb-4">
+            {/* User's Opinion Card or Share Opinion Button */}
+            <div className="min-w-[320px] max-w-[400px]">
               {userOpinion && !showOpinionForm ? (
-                <div className="space-y-4">
-                  <div className="p-4 bg-muted rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">Your Opinion</CardTitle>
                       <Badge variant={userOpinion.stance === 'for' ? 'default' : userOpinion.stance === 'against' ? 'destructive' : 'secondary'}>
                         {userOpinion.stance}
                       </Badge>
-                      <span className="text-sm text-muted-foreground">Your current opinion</span>
                     </div>
-                    <p className="text-sm">{userOpinion.content}</p>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
-                        opinionForm.setValue('content', userOpinion.content);
-                        opinionForm.setValue('debateStatus', (userOpinion.debateStatus || "open") as "open" | "closed" | "private");
-                        opinionForm.setValue('references', userOpinion.references || []);
-                        setShowOpinionForm(true);
-                      }}
-                      data-testid="button-change-opinion"
-                    >
-                      Update Opinion
-                    </Button>
-                    {oppositeOpinions.length > 0 && (
-                      <Button
-                        variant="default"
-                        onClick={() => startDebateMutation.mutate()}
-                        disabled={startDebateMutation.isPending}
-                        data-testid="button-find-random-debate"
-                      >
-                        <MessageCircle className="w-4 h-4 mr-2" />
-                        {startDebateMutation.isPending ? "Matching..." : "Find Random Debate"}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ) : showOpinionForm ? (
-                <Form {...opinionForm}>
-                  <form onSubmit={opinionForm.handleSubmit(onSubmitOpinion)} className="space-y-4">
-                    <FormField
-                      control={opinionForm.control}
-                      name="stance"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Your Stance</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-stance">
-                                <SelectValue placeholder="Select your stance" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="for" data-testid="option-stance-for">For</SelectItem>
-                              <SelectItem value="against" data-testid="option-stance-against">Against</SelectItem>
-                              <SelectItem value="neutral" data-testid="option-stance-neutral">Neutral</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={opinionForm.control}
-                      name="debateStatus"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Debate Availability</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-debate-status">
-                                <SelectValue placeholder="Select debate availability" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="open" data-testid="option-debate-open">
-                                Open for Debate - Others can challenge this opinion
-                              </SelectItem>
-                              <SelectItem value="closed" data-testid="option-debate-closed">
-                                Not Debatable - Opinion is public but read-only
-                              </SelectItem>
-                              <SelectItem value="private" data-testid="option-debate-private">
-                                Private - Only visible to you
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={opinionForm.control}
-                      name="content"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Your Opinion</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Share your thoughts..."
-                              className="min-h-[120px]"
-                              data-testid="input-opinion-content"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* References Section */}
-                    <FormField
-                      control={opinionForm.control}
-                      name="references"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-2">
-                            <LinkIcon className="w-4 h-4" />
-                            Reference Links (Optional)
-                          </FormLabel>
-                          <div className="space-y-2">
-                            {(field.value || []).map((ref, index) => (
-                              <div key={index} className="flex gap-2">
-                                <FormControl>
-                                  <input
-                                    type="url"
-                                    placeholder="https://example.com/source"
-                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                    value={ref}
-                                    onChange={(e) => {
-                                      const newRefs = [...(field.value || [])];
-                                      newRefs[index] = e.target.value;
-                                      field.onChange(newRefs);
-                                    }}
-                                    data-testid={`input-reference-${index}`}
-                                  />
-                                </FormControl>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    const newRefs = (field.value || []).filter((_, i) => i !== index);
-                                    field.onChange(newRefs);
-                                  }}
-                                  data-testid={`button-remove-reference-${index}`}
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ))}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                field.onChange([...(field.value || []), '']);
-                              }}
-                              data-testid="button-add-reference"
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Add Reference Link
-                            </Button>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm leading-relaxed">{userOpinion.content}</p>
                     <div className="flex gap-2">
                       <Button 
-                        type="button" 
                         variant="outline" 
+                        size="sm"
                         onClick={() => {
-                          opinionForm.reset();
-                          setShowOpinionForm(false);
+                          opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
+                          opinionForm.setValue('content', userOpinion.content);
+                          opinionForm.setValue('debateStatus', (userOpinion.debateStatus || "open") as "open" | "closed" | "private");
+                          opinionForm.setValue('references', userOpinion.references || []);
+                          setShowOpinionForm(true);
                         }}
-                        data-testid="button-cancel-opinion"
+                        data-testid="button-change-opinion"
                       >
-                        Cancel
+                        Update
                       </Button>
-                      <Button 
-                        type="submit" 
-                        disabled={createOpinionMutation.isPending}
-                        data-testid="button-submit-opinion"
-                      >
-                        {createOpinionMutation.isPending ? "Sharing..." : "Share Opinion"}
-                      </Button>
+                      {oppositeOpinions.length > 0 && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => startDebateMutation.mutate()}
+                          disabled={startDebateMutation.isPending}
+                          data-testid="button-find-random-debate"
+                        >
+                          <MessageCircle className="w-3 h-3 mr-1" />
+                          {startDebateMutation.isPending ? "Matching..." : "Find Debate"}
+                        </Button>
+                      )}
                     </div>
-                  </form>
-                </Form>
+                  </CardContent>
+                </Card>
               ) : (
-                <Button 
-                  onClick={() => setShowOpinionForm(true)}
-                  data-testid="button-add-opinion"
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Add Your Opinion
-                </Button>
+                <Card className="h-full flex items-center justify-center min-h-[200px]">
+                  <CardContent className="text-center">
+                    <Button 
+                      variant="default" 
+                      onClick={() => setShowOpinionForm(true)}
+                      data-testid="button-share-opinion"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Share Your Opinion
+                    </Button>
+                  </CardContent>
+                </Card>
               )}
-            </TabsContent>
-
-            <TabsContent value="supporting" className="space-y-3">
-              {supportingOpinions.length > 0 ? (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {supportingOpinions.map((opinion: any) => (
-                    <OpinionCard
-                      key={opinion.id}
-                      id={opinion.id}
-                      topicId={opinion.topicId}
-                      userId={opinion.userId}
-                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                      userAvatar={opinion.author?.profileImageUrl}
-                      politicalLeaningScore={opinion.author?.politicalLeaningScore}
-                      economicScore={(opinion.author as any)?.economicScore}
-                      authoritarianScore={(opinion.author as any)?.authoritarianScore}
-                      content={opinion.content}
-                      stance={opinion.stance}
-                      debateStatus={opinion.debateStatus}
-                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
-                      likesCount={opinion.likesCount || 0}
-                      dislikesCount={opinion.dislikesCount || 0}
-                      references={opinion.references || []}
-                      fallacyCounts={opinion.fallacyCounts || {}}
-                      isLiked={opinion.userVote?.voteType === 'like'}
-                      isDisliked={opinion.userVote?.voteType === 'dislike'}
-                      onLike={(id) => voteMutation.mutate({ 
-                        opinionId: id, 
-                        voteType: 'like',
-                        currentVote: opinion.userVote?.voteType 
-                      })}
-                      onDislike={(id) => voteMutation.mutate({ 
-                        opinionId: id, 
-                        voteType: 'dislike',
-                        currentVote: opinion.userVote?.voteType 
-                      })}
-                      onAdopt={(id) => {
-                        const opinion = opinions?.find(o => o.id === id);
-                        if (opinion) {
-                          setOpinionToAdopt(opinion);
-                          setShowAdoptDialog(true);
-                        }
-                      }}
-                      onDebate={opinion.userId !== user?.id ? (id) => handleStartDebate(id, opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous') : undefined}
-                      onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
-                      isRandomMatchPending={startDebateMutation.isPending}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">No supporting opinions yet</p>
-              )}
-            </TabsContent>
-
-            <TabsContent value="neutral" className="space-y-3">
-              {neutralOpinions.length > 0 ? (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {neutralOpinions.map((opinion: any) => (
-                    <OpinionCard
-                      key={opinion.id}
-                      id={opinion.id}
-                      topicId={opinion.topicId}
-                      userId={opinion.userId}
-                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                      userAvatar={opinion.author?.profileImageUrl}
-                      politicalLeaningScore={opinion.author?.politicalLeaningScore}
-                      economicScore={(opinion.author as any)?.economicScore}
-                      authoritarianScore={(opinion.author as any)?.authoritarianScore}
-                      content={opinion.content}
-                      stance={opinion.stance}
-                      debateStatus={opinion.debateStatus}
-                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
-                      likesCount={opinion.likesCount || 0}
-                      dislikesCount={opinion.dislikesCount || 0}
-                      references={opinion.references || []}
-                      fallacyCounts={opinion.fallacyCounts || {}}
-                      isLiked={opinion.userVote?.voteType === 'like'}
-                      isDisliked={opinion.userVote?.voteType === 'dislike'}
-                      onLike={(id) => voteMutation.mutate({ 
-                        opinionId: id, 
-                        voteType: 'like',
-                        currentVote: opinion.userVote?.voteType 
-                      })}
-                      onDislike={(id) => voteMutation.mutate({ 
-                        opinionId: id, 
-                        voteType: 'dislike',
-                        currentVote: opinion.userVote?.voteType 
-                      })}
-                      onAdopt={(id) => {
-                        const opinion = opinions?.find(o => o.id === id);
-                        if (opinion) {
-                          setOpinionToAdopt(opinion);
-                          setShowAdoptDialog(true);
-                        }
-                      }}
-                      onDebate={opinion.userId !== user?.id ? (id) => handleStartDebate(id, opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous') : undefined}
-                      onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
-                      isRandomMatchPending={startDebateMutation.isPending}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">No neutral opinions yet</p>
-              )}
-            </TabsContent>
-
-            <TabsContent value="opposing" className="space-y-3">
-              {opposingOpinions.length > 0 ? (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {opposingOpinions.map((opinion: any) => (
-                    <OpinionCard
-                      key={opinion.id}
-                      id={opinion.id}
-                      topicId={opinion.topicId}
-                      userId={opinion.userId}
-                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                      userAvatar={opinion.author?.profileImageUrl}
-                      politicalLeaningScore={opinion.author?.politicalLeaningScore}
-                      economicScore={(opinion.author as any)?.economicScore}
-                      authoritarianScore={(opinion.author as any)?.authoritarianScore}
-                      content={opinion.content}
-                      stance={opinion.stance}
-                      debateStatus={opinion.debateStatus}
-                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'Unknown'}
-                      likesCount={opinion.likesCount || 0}
-                      dislikesCount={opinion.dislikesCount || 0}
-                      references={opinion.references || []}
-                      fallacyCounts={opinion.fallacyCounts || {}}
-                      isLiked={opinion.userVote?.voteType === 'like'}
-                      isDisliked={opinion.userVote?.voteType === 'dislike'}
-                      onLike={(id) => voteMutation.mutate({ 
-                        opinionId: id, 
-                        voteType: 'like',
-                        currentVote: opinion.userVote?.voteType 
-                      })}
-                      onDislike={(id) => voteMutation.mutate({ 
-                        opinionId: id, 
-                        voteType: 'dislike',
-                        currentVote: opinion.userVote?.voteType 
-                      })}
-                      onAdopt={(id) => {
-                        const opinion = opinions?.find(o => o.id === id);
-                        if (opinion) {
-                          setOpinionToAdopt(opinion);
-                          setShowAdoptDialog(true);
-                        }
-                      }}
-                      onDebate={opinion.userId !== user?.id ? (id) => handleStartDebate(id, opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous') : undefined}
-                      onRandomMatch={opinion.userId === user?.id && oppositeOpinions.length > 0 ? () => startDebateMutation.mutate() : undefined}
-                      isRandomMatchPending={startDebateMutation.isPending}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">No opposing opinions yet</p>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {/* AI Summary Section */}
-      <Card className="border border-border/50" style={{ boxShadow: 'var(--shadow-md)' }}>
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-chart-3/10 border border-chart-3/20">
-              <Brain className="w-5 h-5 text-chart-3" />
             </div>
-            AI-Generated Summary
-            {cumulativeLoading && (
-              <span className="text-sm font-normal text-muted-foreground ml-2">Updating...</span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {cumulativeLoading ? (
-            <div className="space-y-4 animate-pulse">
-              <div className="h-4 bg-muted rounded w-full"></div>
-              <div className="h-4 bg-muted rounded w-5/6"></div>
-              <div className="h-4 bg-muted rounded w-4/6"></div>
-            </div>
-          ) : cumulativeData ? (
-            <div className="space-y-4">
-              <p className="text-base leading-relaxed">{cumulativeData.summary}</p>
-              {cumulativeData.keyPoints && cumulativeData.keyPoints.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-sm">Key Points:</h4>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                    {cumulativeData.keyPoints.map((point, idx) => (
-                      <li key={idx}>{point}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className="flex items-center gap-4 text-sm flex-wrap">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="default" className="bg-chart-2">For {cumulativeData.supportingPercentage}%</Badge>
-                  <Badge variant="destructive">Against {cumulativeData.opposingPercentage}%</Badge>
-                  <Badge variant="secondary">Neutral {cumulativeData.neutralPercentage}%</Badge>
-                </div>
-                <span className="text-muted-foreground">
-                  Based on {cumulativeData.totalOpinions} opinions
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-6">
-              <p className="text-muted-foreground">
-                No AI summary yet. Summary will be automatically generated after opinions are posted.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Live Streams Section */}
-      {(currentStreams.length > 0 || upcomingStreams.length > 0 || pastStreams.length > 0) && (
-        <div className="space-y-4">
-          <h2 className="text-2xl font-bold">Live Debates</h2>
+            {/* User's Active Debate Cards */}
+            {topicDebateRooms.map((room) => {
+              const opponent = room.participants?.find((p: any) => p.userId !== user?.id);
+              return (
+                <Link key={room.id} href={`/debate-room/${room.id}`}>
+                  <Card className="min-w-[320px] max-w-[400px] hover-elevate active-elevate-2 cursor-pointer h-full">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Debate</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={opponent?.user?.profileImageUrl} />
+                          <AvatarFallback>
+                            {opponent?.user?.firstName?.[0]}{opponent?.user?.lastName?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium">
+                            vs {opponent?.user?.firstName} {opponent?.user?.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {room.phase} • {room.turnCount || 0} turns
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+      </div>
+
+      {/* "For" Section */}
+      {supportingOpinions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">For</h2>
+            <Badge variant="default">{supportingOpinions.length}</Badge>
+          </div>
           
-          {/* Current Streams */}
-          {currentStreams.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Badge className="bg-red-500 text-white animate-pulse">Live Now</Badge>
-              </h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                {currentStreams.map((stream) => (
-                  <Link key={stream.id} href={`/live-stream/${stream.id}`}>
-                    <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-stream-${stream.id}`}>
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-lg">{stream.title}</CardTitle>
-                          <Badge className="bg-red-500 text-white shrink-0">
-                            <Video className="w-3 h-3 mr-1" />
-                            LIVE
-                          </Badge>
-                        </div>
-                        {stream.description && (
-                          <p className="text-sm text-muted-foreground mt-2">{stream.description}</p>
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Eye className="w-4 h-4" />
-                            <span>{stream.viewerCount || 0} viewers</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-4 pb-4">
+              {supportingOpinions.map((opinion: any) => (
+                <div key={opinion.id} className="min-w-[320px] max-w-[400px]">
+                  <OpinionCard
+                    id={opinion.id}
+                    topicId={id!}
+                    userId={opinion.userId}
+                    userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                    userAvatar={opinion.author?.profileImageUrl}
+                    economicScore={opinion.author?.economicScore}
+                    authoritarianScore={opinion.author?.authoritarianScore}
+                    content={opinion.content}
+                    stance={opinion.stance}
+                    debateStatus={opinion.debateStatus}
+                    timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
+                    likesCount={opinion.likesCount || 0}
+                    dislikesCount={opinion.dislikesCount || 0}
+                    references={opinion.references}
+                    fallacyCounts={opinion.fallacyCounts}
+                    isLiked={opinion.userVote === 'like'}
+                    isDisliked={opinion.userVote === 'dislike'}
+                    onLike={(opinionId) => voteMutation.mutate({ 
+                      opinionId, 
+                      voteType: 'like', 
+                      currentVote: opinion.userVote 
+                    })}
+                    onDislike={(opinionId) => voteMutation.mutate({ 
+                      opinionId, 
+                      voteType: 'dislike', 
+                      currentVote: opinion.userVote 
+                    })}
+                    onAdopt={(opinionId) => {
+                      const opinionData = opinions?.find(o => o.id === opinionId);
+                      setOpinionToAdopt(opinionData);
+                      setShowAdoptDialog(true);
+                    }}
+                    onDebate={(opinionId) => {
+                      const opinionData = opinions?.find(o => o.id === opinionId);
+                      handleStartDebate(
+                        opinionId, 
+                        opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+                      );
+                    }}
+                  />
+                </div>
+              ))}
             </div>
-          )}
-
-          {/* Upcoming Streams */}
-          {upcomingStreams.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                Upcoming
-              </h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                {upcomingStreams.map((stream) => (
-                  <Link key={stream.id} href={`/live-stream/${stream.id}`}>
-                    <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-stream-${stream.id}`}>
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-lg">{stream.title}</CardTitle>
-                          <Badge variant="secondary" className="shrink-0">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            Scheduled
-                          </Badge>
-                        </div>
-                        {stream.description && (
-                          <p className="text-sm text-muted-foreground mt-2">{stream.description}</p>
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        {stream.scheduledAt && (
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Clock className="w-4 h-4" />
-                            <span>{new Date(stream.scheduledAt).toLocaleString()}</span>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Past Streams */}
-          {pastStreams.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                Past Debates
-              </h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                {pastStreams.slice(0, 4).map((stream) => (
-                  <Link key={stream.id} href={`/live-stream/${stream.id}`}>
-                    <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-stream-${stream.id}`}>
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-lg">{stream.title}</CardTitle>
-                          <Badge variant="secondary" className="shrink-0">
-                            Ended
-                          </Badge>
-                        </div>
-                        {stream.description && (
-                          <p className="text-sm text-muted-foreground mt-2">{stream.description}</p>
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Eye className="w-4 h-4" />
-                            <span>{stream.viewerCount || 0} viewers</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
         </div>
       )}
 
+      {/* "Neutral" Section */}
+      {neutralOpinions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Neutral</h2>
+            <Badge variant="secondary">{neutralOpinions.length}</Badge>
+          </div>
+          
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-4 pb-4">
+              {neutralOpinions.map((opinion: any) => (
+                <div key={opinion.id} className="min-w-[320px] max-w-[400px]">
+                  <OpinionCard
+                    id={opinion.id}
+                    topicId={id!}
+                    userId={opinion.userId}
+                    userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                    userAvatar={opinion.author?.profileImageUrl}
+                    economicScore={opinion.author?.economicScore}
+                    authoritarianScore={opinion.author?.authoritarianScore}
+                    content={opinion.content}
+                    stance={opinion.stance}
+                    debateStatus={opinion.debateStatus}
+                    timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
+                    likesCount={opinion.likesCount || 0}
+                    dislikesCount={opinion.dislikesCount || 0}
+                    references={opinion.references}
+                    fallacyCounts={opinion.fallacyCounts}
+                    isLiked={opinion.userVote === 'like'}
+                    isDisliked={opinion.userVote === 'dislike'}
+                    onLike={(opinionId) => voteMutation.mutate({ 
+                      opinionId, 
+                      voteType: 'like', 
+                      currentVote: opinion.userVote 
+                    })}
+                    onDislike={(opinionId) => voteMutation.mutate({ 
+                      opinionId, 
+                      voteType: 'dislike', 
+                      currentVote: opinion.userVote 
+                    })}
+                    onAdopt={(opinionId) => {
+                      const opinionData = opinions?.find(o => o.id === opinionId);
+                      setOpinionToAdopt(opinionData);
+                      setShowAdoptDialog(true);
+                    }}
+                    onDebate={(opinionId) => {
+                      const opinionData = opinions?.find(o => o.id === opinionId);
+                      handleStartDebate(
+                        opinionId, 
+                        opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+                      );
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* "Against" Section */}
+      {opposingOpinions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Against</h2>
+            <Badge variant="destructive">{opposingOpinions.length}</Badge>
+          </div>
+          
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-4 pb-4">
+              {opposingOpinions.map((opinion: any) => (
+                <div key={opinion.id} className="min-w-[320px] max-w-[400px]">
+                  <OpinionCard
+                    id={opinion.id}
+                    topicId={id!}
+                    userId={opinion.userId}
+                    userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                    userAvatar={opinion.author?.profileImageUrl}
+                    economicScore={opinion.author?.economicScore}
+                    authoritarianScore={opinion.author?.authoritarianScore}
+                    content={opinion.content}
+                    stance={opinion.stance}
+                    debateStatus={opinion.debateStatus}
+                    timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
+                    likesCount={opinion.likesCount || 0}
+                    dislikesCount={opinion.dislikesCount || 0}
+                    references={opinion.references}
+                    fallacyCounts={opinion.fallacyCounts}
+                    isLiked={opinion.userVote === 'like'}
+                    isDisliked={opinion.userVote === 'dislike'}
+                    onLike={(opinionId) => voteMutation.mutate({ 
+                      opinionId, 
+                      voteType: 'like', 
+                      currentVote: opinion.userVote 
+                    })}
+                    onDislike={(opinionId) => voteMutation.mutate({ 
+                      opinionId, 
+                      voteType: 'dislike', 
+                      currentVote: opinion.userVote 
+                    })}
+                    onAdopt={(opinionId) => {
+                      const opinionData = opinions?.find(o => o.id === opinionId);
+                      setOpinionToAdopt(opinionData);
+                      setShowAdoptDialog(true);
+                    }}
+                    onDebate={(opinionId) => {
+                      const opinionData = opinions?.find(o => o.id === opinionId);
+                      handleStartDebate(
+                        opinionId, 
+                        opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+                      );
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Similar Topics Section */}
+      {similarTopics && similarTopics.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Similar Topics</h2>
+            <Badge variant="outline">{similarTopics.length}</Badge>
+          </div>
+          
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-4 pb-4">
+              {similarTopics.slice(0, 10).map((similarTopic) => (
+                <div key={similarTopic.id} className="min-w-[320px] max-w-[400px]">
+                  <TopicCard
+                    id={similarTopic.id}
+                    title={similarTopic.title}
+                    description={similarTopic.description}
+                    imageUrl={similarTopic.imageUrl}
+                    categories={similarTopic.categories}
+                    participantCount={similarTopic.participantCount || 0}
+                    opinionsCount={similarTopic.opinionsCount || 0}
+                    isActive={similarTopic.isActive}
+                  />
+                </div>
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Opinion Form Dialog */}
+      <Dialog open={showOpinionForm} onOpenChange={setShowOpinionForm}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{userOpinion ? 'Update Your Opinion' : 'Share Your Opinion'}</DialogTitle>
+            <DialogDescription>
+              {userOpinion ? 'Modify your existing opinion on this topic.' : 'Share your thoughts on this topic.'}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...opinionForm}>
+            <form onSubmit={opinionForm.handleSubmit(onSubmitOpinion)} className="space-y-4">
+              <FormField
+                control={opinionForm.control}
+                name="stance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Stance</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-stance">
+                          <SelectValue placeholder="Select your stance" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="for" data-testid="option-stance-for">For</SelectItem>
+                        <SelectItem value="against" data-testid="option-stance-against">Against</SelectItem>
+                        <SelectItem value="neutral" data-testid="option-stance-neutral">Neutral</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={opinionForm.control}
+                name="debateStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Debate Availability</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-debate-status">
+                          <SelectValue placeholder="Select debate availability" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="open" data-testid="option-debate-open">
+                          Open for Debate - Others can challenge this opinion
+                        </SelectItem>
+                        <SelectItem value="closed" data-testid="option-debate-closed">
+                          Not Debatable - Opinion is public but read-only
+                        </SelectItem>
+                        <SelectItem value="private" data-testid="option-debate-private">
+                          Private - Only visible to you
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={opinionForm.control}
+                name="content"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Opinion</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Share your thoughts..."
+                        className="min-h-[120px]"
+                        data-testid="input-opinion-content"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex gap-2 justify-end pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowOpinionForm(false)}
+                  data-testid="button-cancel-opinion"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createOpinionMutation.isPending}
+                  data-testid="button-submit-opinion"
+                >
+                  {createOpinionMutation.isPending ? 'Saving...' : userOpinion ? 'Update Opinion' : 'Share Opinion'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       {/* Topic Flag Dialog */}
       <FallacyFlagDialog

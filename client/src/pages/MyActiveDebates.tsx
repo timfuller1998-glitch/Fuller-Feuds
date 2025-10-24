@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MessageSquare, Users, Clock, ArrowRight, AlertCircle } from "lucide-react";
-import { useLocation } from "wouter";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { MessageSquare, Users, Clock, ArrowRight, AlertCircle, ExternalLink } from "lucide-react";
+import { useLocation, Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 
 type EnrichedDebateRoom = {
@@ -17,6 +18,10 @@ type EnrichedDebateRoom = {
   participant1Privacy: string;
   participant2Privacy: string;
   status: string;
+  phase: string;
+  currentTurn: string;
+  participant1TurnCount: number;
+  participant2TurnCount: number;
   startedAt: string;
   endedAt: string | null;
   topic: {
@@ -35,6 +40,13 @@ type EnrichedDebateRoom = {
   messageCount: number;
   userStance: string;
   opponentStance: string;
+};
+
+type GroupedDebates = {
+  [topicId: string]: {
+    topic: EnrichedDebateRoom['topic'];
+    debates: EnrichedDebateRoom[];
+  };
 };
 
 export default function MyActiveDebates() {
@@ -58,35 +70,68 @@ export default function MyActiveDebates() {
     return 'Neutral';
   };
 
+  const getPhaseLabel = (phase: string) => {
+    if (phase === 'opening') return 'Opening';
+    if (phase === 'structured') return 'Structured';
+    if (phase === 'freeform') return 'Free Discussion';
+    return 'Debate';
+  };
+
+  // Group debates by topic
+  const groupedDebates: GroupedDebates = (debateRooms || []).reduce((acc, room) => {
+    const topicId = room.topicId;
+    if (!acc[topicId]) {
+      acc[topicId] = {
+        topic: room.topic,
+        debates: [],
+      };
+    }
+    acc[topicId].debates.push(room);
+    return acc;
+  }, {} as GroupedDebates);
+
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-6">
       {/* Page Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 sm:p-3 rounded-lg bg-primary/10">
-          <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+        <div className="p-3 rounded-lg bg-primary/10">
+          <MessageSquare className="w-6 h-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="heading-my-active-debates">
+          <h1 className="text-3xl font-bold" data-testid="heading-my-active-debates">
             My Active Debates
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Your ongoing one-on-one debate conversations
+          <p className="text-base text-muted-foreground">
+            Your ongoing one-on-one debate conversations, grouped by topic
           </p>
         </div>
       </div>
 
       {/* Stats Card */}
       <Card>
-        <CardContent className="pt-4 sm:pt-6">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="p-2 sm:p-3 rounded-lg bg-primary/10">
-              <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-2 gap-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-lg bg-primary/10">
+                <MessageSquare className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold" data-testid="stat-active-debates-count">
+                  {debateRooms?.length || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">Active Debates</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xl sm:text-2xl font-bold" data-testid="stat-active-debates-count">
-                {debateRooms?.length || 0}
-              </p>
-              <p className="text-xs sm:text-sm text-muted-foreground">Active Debates</p>
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-lg bg-chart-2/10">
+                <Users className="w-5 h-5 text-chart-2" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold" data-testid="stat-topics-count">
+                  {Object.keys(groupedDebates).length}
+                </p>
+                <p className="text-sm text-muted-foreground">Topics with Debates</p>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -117,101 +162,140 @@ export default function MyActiveDebates() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4" data-testid="list-active-debates">
-          {debateRooms.map((room) => (
-            <Card
-              key={room.id}
-              className="cursor-pointer hover-elevate active-elevate-2"
-              onClick={() => setLocation(`/debate-room/${room.id}`)}
-              data-testid={`card-debate-${room.id}`}
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="secondary" data-testid={`badge-topic-category-${room.id}`}>
-                        {room.topic?.categories?.[0] || 'General'}
+        <div className="space-y-8" data-testid="list-grouped-debates">
+          {Object.entries(groupedDebates).map(([topicId, { topic, debates }]) => (
+            <div key={topicId} className="space-y-4">
+              {/* Topic Header */}
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    {topic.categories.map((cat) => (
+                      <Badge key={cat} variant="secondary" className="text-xs">
+                        {cat}
                       </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        <Clock className="w-3 h-3 mr-1" />
-                        Started {formatDistanceToNow(new Date(room.startedAt), { addSuffix: true })}
-                      </Badge>
-                      {room.participant1Privacy === 'private' || room.participant2Privacy === 'private' ? (
-                        <Badge variant="secondary" className="text-xs">
-                          <AlertCircle className="w-3 h-3 mr-1" />
-                          Private
-                        </Badge>
-                      ) : null}
-                    </div>
-                    <CardTitle className="text-lg sm:text-xl" data-testid={`text-topic-title-${room.id}`}>
-                      {room.topic?.title || 'Unknown Topic'}
-                    </CardTitle>
-                    {room.topic?.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {room.topic.description}
-                      </p>
-                    )}
+                    ))}
                   </div>
+                  <h2 className="text-xl font-bold" data-testid={`heading-topic-${topicId}`}>
+                    {topic.title}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {debates.length} {debates.length === 1 ? 'debate' : 'debates'}
+                  </p>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Debate Participants */}
-                <div className="flex items-center justify-between gap-4 p-3 sm:p-4 rounded-lg bg-muted/30">
-                  {/* Current User */}
-                  <div className="flex items-center gap-3 flex-1">
-                    <Badge variant={getStanceBadgeVariant(room.userStance)}>
-                      {getStanceLabel(room.userStance)}
-                    </Badge>
-                    <span className="text-sm font-medium">You</span>
-                  </div>
-
-                  {/* VS Indicator */}
-                  <div className="px-2">
-                    <span className="text-sm font-bold text-muted-foreground">VS</span>
-                  </div>
-
-                  {/* Opponent */}
-                  <div className="flex items-center gap-3 flex-1 justify-end">
-                    <span className="text-sm font-medium" data-testid={`text-opponent-name-${room.id}`}>
-                      {room.opponent?.firstName || 'Unknown'} {room.opponent?.lastName || 'User'}
-                    </span>
-                    <Badge variant={getStanceBadgeVariant(room.opponentStance)}>
-                      {getStanceLabel(room.opponentStance)}
-                    </Badge>
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={room.opponent?.profileImageUrl || undefined} />
-                      <AvatarFallback>
-                        {room.opponent?.firstName?.[0] || 'U'}{room.opponent?.lastName?.[0] || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                </div>
-
-                {/* Stats and Action */}
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <MessageSquare className="w-4 h-4" />
-                      <span data-testid={`text-message-count-${room.id}`}>
-                        {room.messageCount} {room.messageCount === 1 ? 'message' : 'messages'}
-                      </span>
-                    </div>
-                  </div>
+                <Link href={`/topic/${topicId}`}>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setLocation(`/debate-room/${room.id}`);
-                    }}
-                    data-testid={`button-continue-debate-${room.id}`}
+                    data-testid={`button-view-topic-${topicId}`}
                   >
-                    Continue Debate
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    View Topic Page
+                    <ExternalLink className="w-4 h-4 ml-2" />
                   </Button>
+                </Link>
+              </div>
+
+              {/* Horizontal Scrolling Debate Cards */}
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex gap-4 pb-4">
+                  {debates.slice(0, 5).map((room) => (
+                    <Card
+                      key={room.id}
+                      className="min-w-[320px] max-w-[400px] cursor-pointer hover-elevate active-elevate-2"
+                      onClick={() => setLocation(`/debate-room/${room.id}`)}
+                      data-testid={`card-debate-${room.id}`}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <Badge variant="outline" className="text-xs">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {formatDistanceToNow(new Date(room.startedAt), { addSuffix: true })}
+                          </Badge>
+                          {(room.participant1Privacy === 'private' || room.participant2Privacy === 'private') && (
+                            <Badge variant="secondary" className="text-xs">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Private
+                            </Badge>
+                          )}
+                          <Badge variant="secondary" className="text-xs">
+                            {getPhaseLabel(room.phase)}
+                          </Badge>
+                        </div>
+                        <CardTitle className="text-base line-clamp-2" data-testid={`text-debate-title-${room.id}`}>
+                          Debate with {room.opponent?.firstName || 'Unknown'} {room.opponent?.lastName || 'User'}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {/* Opponent Info */}
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={room.opponent?.profileImageUrl || undefined} />
+                            <AvatarFallback>
+                              {room.opponent?.firstName?.[0] || 'U'}{room.opponent?.lastName?.[0] || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate" data-testid={`text-opponent-name-${room.id}`}>
+                              {room.opponent?.firstName || 'Unknown'} {room.opponent?.lastName || 'User'}
+                            </p>
+                            <Badge variant={getStanceBadgeVariant(room.opponentStance)} className="text-xs mt-1">
+                              {getStanceLabel(room.opponentStance)}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Debate Stats */}
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3" />
+                            <span data-testid={`text-message-count-${room.id}`}>
+                              {room.messageCount} msg
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            <span data-testid={`text-turn-count-${room.id}`}>
+                              Turn {Math.max(room.participant1TurnCount, room.participant2TurnCount)}/3
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocation(`/debate-room/${room.id}`);
+                          }}
+                          data-testid={`button-continue-debate-${room.id}`}
+                        >
+                          Continue Debate
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+
+              {/* Show More Debates Link */}
+              {debates.length > 5 && (
+                <div className="text-center">
+                  <Link href={`/topic/${topicId}`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      data-testid={`button-more-debates-${topicId}`}
+                    >
+                      View All {debates.length} Debates on This Topic
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
