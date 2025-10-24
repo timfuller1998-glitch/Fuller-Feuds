@@ -458,15 +458,15 @@ export default function Topic() {
               <p className="text-sm leading-relaxed">{cumulativeData.summary}</p>
               <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-primary">{cumulativeData.forCount || 0}</div>
+                  <div className="text-lg font-bold text-primary">{cumulativeData.supportingPercentage || 0}%</div>
                   <div className="text-xs text-muted-foreground">For</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-muted-foreground">{cumulativeData.neutralCount || 0}</div>
+                  <div className="text-lg font-bold text-muted-foreground">{cumulativeData.neutralPercentage || 0}%</div>
                   <div className="text-xs text-muted-foreground">Neutral</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-destructive">{cumulativeData.againstCount || 0}</div>
+                  <div className="text-lg font-bold text-destructive">{cumulativeData.opposingPercentage || 0}%</div>
                   <div className="text-xs text-muted-foreground">Against</div>
                 </div>
               </div>
@@ -773,17 +773,17 @@ export default function Topic() {
           
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
-              {similarTopics.slice(0, 10).map((similarTopic) => (
+              {similarTopics.slice(0, 10).map((similarTopic: any) => (
                 <div key={similarTopic.id} className="min-w-[320px] max-w-[400px]">
                   <TopicCard
                     id={similarTopic.id}
                     title={similarTopic.title}
-                    description={similarTopic.description}
-                    imageUrl={similarTopic.imageUrl}
+                    description={similarTopic.description || ''}
+                    imageUrl={similarTopic.imageUrl || ''}
                     categories={similarTopic.categories}
                     participantCount={similarTopic.participantCount || 0}
                     opinionsCount={similarTopic.opinionsCount || 0}
-                    isActive={similarTopic.isActive}
+                    isActive={similarTopic.isActive || false}
                   />
                 </div>
               ))}
@@ -910,7 +910,7 @@ export default function Topic() {
         onOpenChange={setShowAdoptDialog}
         currentOpinion={userOpinion ? {
           content: userOpinion.content,
-          stance: userOpinion.stance
+          stance: userOpinion.stance as "for" | "against" | "neutral"
         } : null}
         opinionToAdopt={opinionToAdopt ? {
           content: opinionToAdopt.content,

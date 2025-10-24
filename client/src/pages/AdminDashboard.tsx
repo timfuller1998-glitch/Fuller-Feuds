@@ -26,8 +26,10 @@ import {
   FileText,
   MessageSquare,
   Trash2,
-  BookOpen
+  BookOpen,
+  Sparkles
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { DashboardOverview } from "@/components/admin/DashboardOverview";
@@ -46,6 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function AdminDashboard() {
+  const { toast } = useToast();
   const [selectedOpinion, setSelectedOpinion] = useState<string | null>(null);
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
   const [opinionModerationReason, setOpinionModerationReason] = useState("");
@@ -151,6 +154,28 @@ export default function AdminDashboard() {
     },
   });
 
+  // Backfill embeddings mutation
+  const backfillEmbeddingsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/admin/backfill-embeddings', {});
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/topics'] });
+      toast({
+        title: "Embeddings Generated!",
+        description: `Successfully generated embeddings for ${data.updated} topics. ${data.failed} failed.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate embeddings",
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="flex items-center gap-3 mb-6">
@@ -217,11 +242,25 @@ export default function AdminDashboard() {
         <TabsContent value="topics" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
-                All Topics
-              </CardTitle>
-              <CardDescription>View and moderate all platform topics</CardDescription>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5" />
+                    All Topics
+                  </CardTitle>
+                  <CardDescription>View and moderate all platform topics</CardDescription>
+                </div>
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => backfillEmbeddingsMutation.mutate()}
+                  disabled={backfillEmbeddingsMutation.isPending}
+                  data-testid="button-generate-embeddings"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {backfillEmbeddingsMutation.isPending ? "Generating..." : "Generate Embeddings"}
+                </Button>
+              </div>
             </CardHeader>
           </Card>
           {loadingTopics ? (
