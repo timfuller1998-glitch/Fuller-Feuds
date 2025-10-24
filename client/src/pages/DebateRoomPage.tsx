@@ -64,7 +64,9 @@ export default function DebateRoomPage() {
   const [messageInput, setMessageInput] = useState("");
   const [showChooseOpponentDialog, setShowChooseOpponentDialog] = useState(false);
   const [flaggingMessageId, setFlaggingMessageId] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // WebSocket real-time messaging
   const { roomState, connectionState, joinRoom, leaveRoom, sendChatMessage } = useDebateRoom();

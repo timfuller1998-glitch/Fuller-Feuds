@@ -1737,6 +1737,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If content should be flagged, mark message as flagged
       const messageStatus = filterResult.shouldFlag ? 'flagged' : 'approved';
       const message = await storage.addDebateMessage(req.params.roomId, userId, content, messageStatus);
+      
+      // Broadcast message to room via WebSocket for real-time delivery
+      broadcastToRoom(req.params.roomId, {
+        type: 'chat_message',
+        roomId: req.params.roomId,
+        userId: userId,
+        content: content,
+        timestamp: new Date().toISOString()
+      });
+      
       res.status(201).json(message);
     } catch (error) {
       console.error("Error adding debate message:", error);
