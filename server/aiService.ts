@@ -496,11 +496,14 @@ Return only valid JSON.`;
   /**
    * Analyze the political stance of a single opinion
    * Returns economic and authoritarian scores from -100 to +100
-   * Uses GPT-4o-mini for cost efficiency
+   * @param opinionContent - The text content of the opinion
+   * @param topicTitle - The title of the topic being discussed
+   * @param model - The OpenAI model to use (default: gpt-4o-mini for cost efficiency)
    */
   static async analyzeOpinionPoliticalStance(
     opinionContent: string,
-    topicTitle: string
+    topicTitle: string,
+    model: "gpt-4o-mini" | "gpt-5" = "gpt-4o-mini"
   ): Promise<{ economicScore: number; authoritarianScore: number }> {
     const prompt = `
 Analyze this opinion on the topic "${topicTitle}" and determine its political position on a 2-dimensional political compass.
@@ -544,8 +547,9 @@ AUTHORITARIAN indicators:
 Return only valid JSON with economicScore and authoritarianScore fields.`;
 
     try {
+      console.log(`[Opinion Analysis] Analyzing opinion using model: ${model}`);
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model,
         messages: [
           {
             role: "system",
