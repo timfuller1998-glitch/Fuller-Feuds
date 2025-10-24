@@ -92,8 +92,11 @@ Preferred communication style: Simple, everyday language.
 ### Topic Similarity Search
 - **Semantic Embeddings**: Every topic has a 1536-dimension embedding vector generated using OpenAI's text-embedding-3-small model
 - **Automatic Generation**: Embeddings automatically generated on topic creation
-- **Admin Backfill**: POST /api/admin/backfill-embeddings endpoint to generate embeddings for existing topics
-- **Search Endpoint**: GET /api/topics/search-similar?query=... returns top similar topics using cosine similarity (>0.7 threshold)
+- **Admin Backfill**: POST /api/admin/backfill-embeddings endpoint to generate embeddings for existing topics (accessible via button in Admin Dashboard Topics tab)
+- **Search Endpoint**: GET /api/topics/search-similar?query=...&threshold=... returns top similar topics using cosine similarity
+- **Similarity Thresholds**:
+  - **Topic Page "Similar Topics"**: 0.4 (default, broad recommendations for discovering related content)
+  - **SearchBar Duplicate Detection**: 0.5 (fairly broad to catch topics like "climate crisis" and "global warming effects")
 - **Integration**: SearchBar features debounced search (300ms) that shows TopicSimilarityModal when similar topics found
 - **User Experience**: Users can navigate to existing topics or proceed with "Create New Topic Anyway" button
 - **Cost Optimization**: Embeddings trimmed from API responses to reduce bandwidth

@@ -270,7 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Search for similar topics using semantic similarity
   app.get('/api/topics/search-similar', async (req, res) => {
     try {
-      const { query } = req.query;
+      const { query, threshold } = req.query;
 
       if (!query || typeof query !== 'string') {
         return res.status(400).json({ message: "Query parameter is required" });
@@ -279,6 +279,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (query.trim().length < 3) {
         return res.json([]); // Return empty array for short queries
       }
+
+      // Parse threshold or use default of 0.4 (broad recommendations)
+      const similarityThreshold = threshold ? parseFloat(threshold as string) : 0.4;
 
       // Generate embedding for the query
       const queryEmbedding = await AIService.generateEmbedding(query);
@@ -299,8 +302,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .sort((a, b) => b.similarityScore - a.similarityScore)
         .slice(0, 10); // Return top 10 similar topics
 
-      // Filter out very low similarity scores (below 0.7 threshold)
-      const relevantTopics = topicsWithScores.filter(t => t.similarityScore > 0.7);
+      // Filter by similarity threshold
+      const relevantTopics = topicsWithScores.filter(t => t.similarityScore > similarityThreshold);
 
       // Remove embedding vectors from response to reduce payload size
       const topicsWithoutEmbeddings = relevantTopics.map(({ embedding, ...topic }) => topic);
@@ -1050,13 +1053,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin - Backfill embeddings for existing topics
   app.post('/api/admin/backfill-embeddings', requireAdmin, async (req, res) => {
     try {
-      // Get all topics
-      const allTopics = await storage.getTopicsWithEmbeddings();
+      // Get ALL topics (not just those with embeddings)
+      const allTopics = await storage.getTopics({});
       
       // Filter topics without embeddings
       const topicsWithoutEmbeddings = allTopics.filter(topic => !topic.embedding);
       
-      console.log(`Found ${topicsWithoutEmbeddings.length} topics without embeddings`);
+      console.log(`Found ${topicsWithoutEmbeddings.length} topics without embeddings out of ${allTopics.length} total topics`);
       
       if (topicsWithoutEmbeddings.length === 0) {
         return res.json({ 
@@ -1075,6 +1078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const embedding = await AIService.generateEmbedding(topic.title);
           await storage.updateTopicEmbedding(topic.id, embedding);
           successCount++;
+          console.log(`Generated embedding for topic: ${topic.title}`);
         } catch (error) {
           console.error(`Failed to generate embedding for topic ${topic.id}:`, error);
           failureCount++;

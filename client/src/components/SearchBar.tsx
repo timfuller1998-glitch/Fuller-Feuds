@@ -95,6 +95,7 @@ export default function SearchBar({
       if (!pendingSimilarityCheck || pendingSimilarityCheck.length < 3) return [];
       const params = new URLSearchParams();
       params.append("query", pendingSimilarityCheck);
+      params.append("threshold", "0.5"); // Fairly broad for duplicate detection
       const response = await fetch(`/api/topics/search-similar?${params}`);
       if (!response.ok) return [];
       return response.json();
