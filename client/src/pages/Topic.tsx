@@ -163,41 +163,32 @@ export default function Topic() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
       queryClient.invalidateQueries({ queryKey: ["/api/topics", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/topics"] }); // Invalidate topics list for updated counts
       queryClient.invalidateQueries({ queryKey: ["/api/stats/platform"] });
       opinionForm.reset();
       setShowOpinionForm(false);
+      
+      // Poll for summary updates after opinion creation
+      // Start polling after a short delay to give AI time to start processing
+      let pollAttempts = 0;
+      const maxAttempts = 15; // 15 attempts = 45 seconds max
+      const pollInterval = 3000; // 3 seconds
+      
+      const pollForSummary = setInterval(() => {
+        pollAttempts++;
+        queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
+        
+        if (pollAttempts >= maxAttempts) {
+          clearInterval(pollForSummary);
+        }
+      }, pollInterval);
+      
+      // Clear interval when component unmounts or after max time
+      setTimeout(() => clearInterval(pollForSummary), pollInterval * maxAttempts);
     },
     onError: (error: any) => {
       console.error("Failed to save opinion:", error);
-    },
-  });
-
-  // Generate cumulative opinion mutation
-  const generateCumulativeMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest('POST', `/api/topics/${id}/cumulative/generate`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
-    },
-    onError: (error: any) => {
-      console.error("Failed to generate summary:", error);
-    },
-  });
-
-  // Refresh cumulative opinion mutation
-  const refreshCumulativeMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest('PATCH', `/api/topics/${id}/cumulative/refresh`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
-    },
-    onError: (error: any) => {
-      console.error("Failed to refresh summary:", error);
     },
   });
 
@@ -848,30 +839,24 @@ export default function Topic() {
       {/* AI Summary Section */}
       <Card className="border border-border/50" style={{ boxShadow: 'var(--shadow-md)' }}>
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <CardTitle className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-chart-3/10 border border-chart-3/20">
-                <Brain className="w-5 h-5 text-chart-3" />
-              </div>
-              AI-Generated Summary
-            </CardTitle>
-            {cumulativeData && (
-              <Button 
-                variant="outline"
-                size="sm"
-                onClick={() => refreshCumulativeMutation.mutate()}
-                disabled={refreshCumulativeMutation.isPending}
-                data-testid="button-refresh-summary"
-                className="transition-smooth"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                {refreshCumulativeMutation.isPending ? "Updating..." : "Refresh"}
-              </Button>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-chart-3/10 border border-chart-3/20">
+              <Brain className="w-5 h-5 text-chart-3" />
+            </div>
+            AI-Generated Summary
+            {cumulativeLoading && (
+              <span className="text-sm font-normal text-muted-foreground ml-2">Updating...</span>
             )}
-          </div>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {cumulativeData ? (
+          {cumulativeLoading ? (
+            <div className="space-y-4 animate-pulse">
+              <div className="h-4 bg-muted rounded w-full"></div>
+              <div className="h-4 bg-muted rounded w-5/6"></div>
+              <div className="h-4 bg-muted rounded w-4/6"></div>
+            </div>
+          ) : cumulativeData ? (
             <div className="space-y-4">
               <p className="text-base leading-relaxed">{cumulativeData.summary}</p>
               {cumulativeData.keyPoints && cumulativeData.keyPoints.length > 0 && (
@@ -884,8 +869,8 @@ export default function Topic() {
                   </ul>
                 </div>
               )}
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-4 text-sm flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="default" className="bg-chart-2">For {cumulativeData.supportingPercentage}%</Badge>
                   <Badge variant="destructive">Against {cumulativeData.opposingPercentage}%</Badge>
                   <Badge variant="secondary">Neutral {cumulativeData.neutralPercentage}%</Badge>
@@ -897,22 +882,9 @@ export default function Topic() {
             </div>
           ) : (
             <div className="text-center py-6">
-              <p className="text-muted-foreground mb-4">
-                No AI summary available yet. Generate one to see the community perspective!
+              <p className="text-muted-foreground">
+                No AI summary yet. Summary will be automatically generated after opinions are posted.
               </p>
-              <Button 
-                onClick={() => generateCumulativeMutation.mutate()}
-                disabled={generateCumulativeMutation.isPending || !opinions || opinions.length === 0}
-                data-testid="button-generate-summary"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                {generateCumulativeMutation.isPending ? "Generating..." : "Generate AI Summary"}
-              </Button>
-              {(!opinions || opinions.length === 0) && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  At least one opinion is needed to generate a summary
-                </p>
-              )}
             </div>
           )}
         </CardContent>

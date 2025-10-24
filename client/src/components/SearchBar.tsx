@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { TopicSimilarityModal } from "./TopicSimilarityModal";
 
 interface SearchBarProps {
   onSearch?: (query: string) => void;
@@ -28,6 +29,7 @@ export default function SearchBar({
   const [debouncedQuery, setDebouncedQuery] = useState(query);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showSimilarityModal, setShowSimilarityModal] = useState(false);
   const [topicTitle, setTopicTitle] = useState("");
   const [initialOpinion, setInitialOpinion] = useState("");
   const [stance, setStance] = useState<'for' | 'against' | 'neutral'>('neutral');
@@ -36,6 +38,7 @@ export default function SearchBar({
   const [references, setReferences] = useState<string[]>([]);
   const [pendingEnterKey, setPendingEnterKey] = useState<string | null>(null);
   const [dismissedQuery, setDismissedQuery] = useState<string | null>(null);
+  const [pendingSimilarityCheck, setPendingSimilarityCheck] = useState<string | null>(null);
   const [pendingMutationQuery, setPendingMutationQuery] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
@@ -85,6 +88,20 @@ export default function SearchBar({
     enabled: debouncedQuery.length >= 2,
   });
 
+  // Fetch similar topics using AI embeddings when checking for duplicates
+  const { data: similarTopics } = useQuery<(Topic & { similarityScore: number })[]>({
+    queryKey: ["/api/topics/search-similar", { query: pendingSimilarityCheck }],
+    queryFn: async () => {
+      if (!pendingSimilarityCheck || pendingSimilarityCheck.length < 3) return [];
+      const params = new URLSearchParams();
+      params.append("query", pendingSimilarityCheck);
+      const response = await fetch(`/api/topics/search-similar?${params}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!pendingSimilarityCheck && pendingSimilarityCheck.length >= 3,
+  });
+
   // Calculate search state variables (must be before useEffect that uses them)
   const hasResults = topics && topics.length > 0;
   const hasNoResults = query.length >= 2 && topics !== undefined && topics.length === 0;
@@ -105,14 +122,28 @@ export default function SearchBar({
     }
   }, [pendingEnterKey, debouncedQuery, topics]);
 
-  // Auto-trigger topic creation form when no results are found (handles both passive typing and Enter key)
+  // Auto-trigger similarity check when no exact matches found
   useEffect(() => {
-    if (hasNoResults && !showCreateForm && !generateCategoriesMutation.isPending && debouncedQuery.length >= 2 && dismissedQuery !== debouncedQuery) {
+    if (hasNoResults && !showCreateForm && !showSimilarityModal && !pendingSimilarityCheck && debouncedQuery.length >= 3 && dismissedQuery !== debouncedQuery) {
       setTopicTitle(debouncedQuery);
-      setPendingMutationQuery(debouncedQuery);
-      generateCategoriesMutation.mutate(debouncedQuery);
+      setPendingSimilarityCheck(debouncedQuery);
     }
-  }, [hasNoResults, debouncedQuery, showCreateForm, dismissedQuery]);
+  }, [hasNoResults, debouncedQuery, showCreateForm, showSimilarityModal, pendingSimilarityCheck, dismissedQuery]);
+
+  // Show similarity modal or create form based on similarity check results
+  useEffect(() => {
+    if (pendingSimilarityCheck && similarTopics !== undefined) {
+      if (similarTopics.length > 0) {
+        // Found similar topics, show modal
+        setShowSimilarityModal(true);
+      } else {
+        // No similar topics, proceed with category generation and create form
+        setPendingMutationQuery(pendingSimilarityCheck);
+        generateCategoriesMutation.mutate(pendingSimilarityCheck);
+      }
+      setPendingSimilarityCheck(null);
+    }
+  }, [pendingSimilarityCheck, similarTopics]);
 
   // Get search history from localStorage
   const getSearchHistory = (): string[] => {
@@ -233,6 +264,14 @@ export default function SearchBar({
       categories: topicCategories,
       references: validReferences.length > 0 ? validReferences : undefined,
     });
+  };
+
+  // Handle proceeding with topic creation after similarity warning
+  const handleProceedWithCreation = () => {
+    setShowSimilarityModal(false);
+    // Generate categories and show create form
+    setPendingMutationQuery(debouncedQuery);
+    generateCategoriesMutation.mutate(debouncedQuery);
   };
 
   const handleSearch = (value: string) => {
@@ -573,6 +612,19 @@ export default function SearchBar({
           )}
         </Card>
       )}
+
+      {/* Topic Similarity Modal */}
+      <TopicSimilarityModal
+        open={showSimilarityModal}
+        onOpenChange={(open) => {
+          setShowSimilarityModal(open);
+          if (!open) {
+            setDismissedQuery(debouncedQuery);
+          }
+        }}
+        similarTopics={similarTopics || []}
+        onCreateNew={handleProceedWithCreation}
+      />
     </div>
   );
 }

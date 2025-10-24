@@ -426,6 +426,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: shouldFlagTopic ? 'hidden' : 'active' // Flag topic if content needs review
       });
       
+      // Generate and store embedding for topic (async, don't block creation)
+      AIService.generateEmbedding(validatedData.title)
+        .then(embedding => storage.updateTopicEmbedding(topic.id, embedding))
+        .catch(err => console.error("Error generating topic embedding:", err));
+      
       // Create initial opinion (required)
       try {
         const opinionStatus = opinionFilterResult.shouldFlag ? 'flagged' : 'approved';
@@ -572,6 +577,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check and award badges asynchronously
       storage.checkAndAwardBadges(userId).catch(err => {
         console.error("Error checking badges:", err);
+      });
+      
+      // Auto-generate/update AI summary for the topic asynchronously
+      storage.refreshCumulativeOpinion(req.params.topicId).catch(err => {
+        console.error("Error auto-updating cumulative opinion:", err);
       });
       
       res.status(201).json(opinion);
@@ -1034,6 +1044,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching opinions:", error);
       res.status(500).json({ message: "Failed to fetch opinions" });
+    }
+  });
+
+  // Admin - Backfill embeddings for existing topics
+  app.post('/api/admin/backfill-embeddings', requireAdmin, async (req, res) => {
+    try {
+      // Get all topics
+      const allTopics = await storage.getTopicsWithEmbeddings();
+      
+      // Filter topics without embeddings
+      const topicsWithoutEmbeddings = allTopics.filter(topic => !topic.embedding);
+      
+      console.log(`Found ${topicsWithoutEmbeddings.length} topics without embeddings`);
+      
+      if (topicsWithoutEmbeddings.length === 0) {
+        return res.json({ 
+          message: "All topics already have embeddings",
+          updated: 0,
+          total: allTopics.length
+        });
+      }
+      
+      // Generate embeddings for all topics without them
+      let successCount = 0;
+      let failureCount = 0;
+      
+      for (const topic of topicsWithoutEmbeddings) {
+        try {
+          const embedding = await AIService.generateEmbedding(topic.title);
+          await storage.updateTopicEmbedding(topic.id, embedding);
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to generate embedding for topic ${topic.id}:`, error);
+          failureCount++;
+        }
+      }
+      
+      res.json({
+        message: `Successfully generated embeddings for ${successCount} topics`,
+        updated: successCount,
+        failed: failureCount,
+        total: allTopics.length
+      });
+    } catch (error) {
+      console.error("Error backfilling embeddings:", error);
+      res.status(500).json({ message: "Failed to backfill embeddings" });
     }
   });
 

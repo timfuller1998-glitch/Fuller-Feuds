@@ -127,6 +127,7 @@ export interface IStorage {
   getTopic(id: string): Promise<Topic | undefined>;
   deleteTopic(id: string): Promise<void>;
   countTopicsByUser(userId: string): Promise<number>;
+  updateTopicEmbedding(topicId: string, embedding: number[]): Promise<void>;
   
   // Opinion operations
   createOpinion(opinion: InsertOpinion): Promise<Opinion>;
@@ -375,6 +376,13 @@ export class DatabaseStorage implements IStorage {
   async createTopic(topic: InsertTopic): Promise<Topic> {
     const [created] = await db.insert(topics).values(topic).returning();
     return created;
+  }
+
+  async updateTopicEmbedding(topicId: string, embedding: number[]): Promise<void> {
+    await db
+      .update(topics)
+      .set({ embedding: embedding as any })
+      .where(eq(topics.id, topicId));
   }
 
   async getTopics(options?: { limit?: number; category?: string; search?: string; createdBy?: string }): Promise<TopicWithCounts[]> {
@@ -947,7 +955,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async refreshCumulativeOpinion(topicId: string): Promise<CumulativeOpinion> {
-    // This is the same as generate - refresh regenerates the analysis
+    // Smart regeneration: only update if new opinions exist since last summary
+    const existingSummary = await this.getCumulativeOpinion(topicId);
+    
+    if (existingSummary) {
+      // Check if there are any new opinions since the last summary update
+      const latestOpinion = await db
+        .select({ createdAt: opinions.createdAt })
+        .from(opinions)
+        .where(
+          and(
+            eq(opinions.topicId, topicId),
+            eq(opinions.status, 'approved')
+          )
+        )
+        .orderBy(desc(opinions.createdAt))
+        .limit(1);
+      
+      if (latestOpinion.length === 0) {
+        // No opinions exist, return existing summary
+        return existingSummary;
+      }
+      
+      const latestOpinionDate = latestOpinion[0].createdAt;
+      const summaryDate = existingSummary.updatedAt;
+      
+      // Only regenerate if there are new opinions since the last update
+      if (latestOpinionDate && summaryDate && latestOpinionDate <= summaryDate) {
+        console.log(`[AI Summary] No new opinions for topic ${topicId} since last summary, skipping regeneration`);
+        return existingSummary;
+      }
+    }
+    
+    // Generate new summary (either no existing summary or new opinions exist)
     return await this.generateCumulativeOpinion(topicId);
   }
 
