@@ -267,6 +267,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Search for similar topics using semantic similarity
+  app.get('/api/topics/search-similar', async (req, res) => {
+    try {
+      const { query } = req.query;
+
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ message: "Query parameter is required" });
+      }
+
+      if (query.trim().length < 3) {
+        return res.json([]); // Return empty array for short queries
+      }
+
+      // Generate embedding for the query
+      const queryEmbedding = await AIService.generateEmbedding(query);
+
+      // Get all topics with embeddings
+      const topics = await storage.getTopicsWithEmbeddings();
+
+      // Calculate similarity scores and sort
+      const topicsWithScores = topics
+        .filter(topic => topic.embedding) // Only topics with embeddings
+        .map(topic => ({
+          ...topic,
+          similarityScore: AIService.cosineSimilarity(
+            queryEmbedding,
+            topic.embedding as number[]
+          )
+        }))
+        .sort((a, b) => b.similarityScore - a.similarityScore)
+        .slice(0, 10); // Return top 10 similar topics
+
+      // Filter out very low similarity scores (below 0.7 threshold)
+      const relevantTopics = topicsWithScores.filter(t => t.similarityScore > 0.7);
+
+      // Remove embedding vectors from response to reduce payload size
+      const topicsWithoutEmbeddings = relevantTopics.map(({ embedding, ...topic }) => topic);
+
+      res.json(topicsWithoutEmbeddings);
+    } catch (error) {
+      console.error("Error searching similar topics:", error);
+      res.status(500).json({ message: "Failed to search similar topics" });
+    }
+  });
+
   app.get('/api/topics/:id', async (req, res) => {
     try {
       const topic = await storage.getTopic(req.params.id);

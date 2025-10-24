@@ -512,6 +512,16 @@ export class DatabaseStorage implements IStorage {
     } as any;
   }
 
+  async getTopicsWithEmbeddings(): Promise<Topic[]> {
+    return await db
+      .select()
+      .from(topics)
+      .where(and(
+        eq(topics.isActive, true),
+        sql`${topics.embedding} IS NOT NULL`
+      ));
+  }
+
   async deleteTopic(id: string): Promise<void> {
     // Soft delete the topic by setting isActive to false
     await db

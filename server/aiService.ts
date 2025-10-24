@@ -490,4 +490,52 @@ Return only valid JSON.`;
       };
     }
   }
+
+  /**
+   * Generate embedding vector for text using OpenAI's text-embedding-3-small model
+   * Returns a 1536-dimension vector for semantic similarity search
+   */
+  static async generateEmbedding(text: string): Promise<number[]> {
+    try {
+      const response = await openai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: text.trim(),
+        encoding_format: "float"
+      });
+
+      return response.data[0].embedding;
+    } catch (error) {
+      console.error("Error generating embedding:", error);
+      throw new Error("Failed to generate embedding");
+    }
+  }
+
+  /**
+   * Calculate cosine similarity between two embedding vectors
+   * Returns a value between -1 and 1, where 1 means identical, 0 means orthogonal, -1 means opposite
+   */
+  static cosineSimilarity(vecA: number[], vecB: number[]): number {
+    if (vecA.length !== vecB.length) {
+      throw new Error("Vectors must have the same length");
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
+    }
+
+    normA = Math.sqrt(normA);
+    normB = Math.sqrt(normB);
+
+    if (normA === 0 || normB === 0) {
+      return 0;
+    }
+
+    return dotProduct / (normA * normB);
+  }
 }
