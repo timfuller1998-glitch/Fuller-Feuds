@@ -42,46 +42,46 @@ export function get2DPoliticalCompassColor(economicScore: number, authoritarianS
   let saturation: number;
   let lightness: number;
   
-  // Determine quadrant and base color
+  // Determine quadrant and base color - SOFT VIBRANT COLORS for text legibility
   // Tie-breaking: 0 on either axis is treated as the positive side (capitalist/authoritarian)
   // This matches the backend quadrant classification logic
   if (x >= 0 && y >= 0) {
     // Authoritarian Capitalist (Red) - top right
     hue = 0;
-    saturation = 70 + (intensity * 25); // 70-95%
-    lightness = 55;
+    saturation = 35 + (intensity * 15); // 35-50% - softer saturation
+    lightness = 75; // Higher lightness for softer colors
   } else if (x < 0 && y >= 0) {
     // Authoritarian Socialist (Blue) - top left
     hue = 220;
-    saturation = 70 + (intensity * 25); // 70-95%
-    lightness = 55;
+    saturation = 35 + (intensity * 15); // 35-50% - softer saturation
+    lightness = 75; // Higher lightness for softer colors
   } else if (x >= 0 && y < 0) {
     // Libertarian Capitalist (Green) - bottom right
     hue = 140;
-    saturation = 65 + (intensity * 30); // 65-95%
-    lightness = 50;
+    saturation = 35 + (intensity * 15); // 35-50% - softer saturation
+    lightness = 75; // Higher lightness for softer colors
   } else {
     // Libertarian Socialist (Yellow) - bottom left
     hue = 50;
-    saturation = 70 + (intensity * 25); // 70-95%
-    lightness = 55;
+    saturation = 35 + (intensity * 15); // 35-50% - softer saturation
+    lightness = 75; // Higher lightness for softer colors
   }
   
   // Blend colors more - only a little white in the center
   if (distanceFromCenter < 0.15) {
     // Very center - slight desaturation
-    saturation = saturation * 0.6;
-    lightness = 65;
+    saturation = saturation * 0.5;
+    lightness = 85; // Very light at center
   } else if (distanceFromCenter < 0.3) {
     // Near center - moderate blending
-    saturation = saturation * 0.8;
-    lightness = 60;
+    saturation = saturation * 0.7;
+    lightness = 80; // Light near center
   } else {
-    // Further from center - stronger colors
-    lightness = 55 - (intensity * 10);
+    // Further from center - still soft but with more color
+    lightness = 75 - (intensity * 5); // Subtle darkening with intensity
   }
   
-  // Fade to black at extremes (±85 on both axes)
+  // Fade to darker (not black) at extremes (±85 on both axes)
   const absX = Math.abs(x);
   const absY = Math.abs(y);
   if (absX >= 0.85 || absY >= 0.85) {
@@ -89,9 +89,9 @@ export function get2DPoliticalCompassColor(economicScore: number, authoritarianS
     const maxAbsolute = Math.max(absX, absY);
     const extremeFactor = (maxAbsolute - 0.85) / 0.15; // 0 at 0.85, 1 at 1.0
     
-    // Fade to black by reducing lightness dramatically
-    lightness = lightness * (1 - extremeFactor * 0.7); // Reduce lightness up to 70%
-    saturation = saturation * (1 - extremeFactor * 0.3); // Also reduce saturation a bit
+    // Fade to darker by reducing lightness moderately (not as dramatic)
+    lightness = lightness * (1 - extremeFactor * 0.4); // Reduce lightness up to 40%
+    saturation = saturation * (1 + extremeFactor * 0.3); // Slightly increase saturation at extremes
   }
   
   return hslToHex(hue, saturation, lightness);
@@ -115,9 +115,9 @@ export function getOpinionGradientStyle(
 
   const baseColor = get2DPoliticalCompassColor(economicScore, authoritarianScore);
   
-  // Create a subtle gradient from the political color to transparent
+  // Create a very subtle gradient from the political color to transparent
   return {
-    background: `linear-gradient(135deg, ${baseColor}15 0%, ${baseColor}05 100%)`
+    background: `linear-gradient(135deg, ${baseColor}25 0%, ${baseColor}10 100%)`
   };
 }
 
@@ -131,14 +131,15 @@ export function getTopicCornerGradient(distribution: {
   libertarianCapitalist: number;    // % of opinions (Green) - bottom-right corner
   libertarianSocialist: number;     // % of opinions (Yellow) - bottom-left corner
 }): React.CSSProperties {
-  // Quadrant colors (same as political compass)
-  // Convert percentages (0-100) to opacity (0-1)
-  const toOpacity = (percent: number) => (percent / 100).toFixed(2);
+  // Quadrant colors - softer, more pastel versions for text legibility
+  // Convert percentages (0-100) to reduced opacity (max 0.4 instead of 1.0)
+  const toOpacity = (percent: number) => ((percent / 100) * 0.4).toFixed(2);
 
-  const topLeft = `rgba(13, 110, 253, ${toOpacity(distribution.authoritarianSocialist)})`;      // Blue
-  const topRight = `rgba(220, 53, 69, ${toOpacity(distribution.authoritarianCapitalist)})`;     // Red
-  const bottomLeft = `rgba(255, 193, 7, ${toOpacity(distribution.libertarianSocialist)})`;      // Yellow
-  const bottomRight = `rgba(25, 135, 84, ${toOpacity(distribution.libertarianCapitalist)})`;    // Green
+  // Softer color variants with higher lightness
+  const topLeft = `rgba(100, 150, 255, ${toOpacity(distribution.authoritarianSocialist)})`;      // Soft Blue
+  const topRight = `rgba(255, 120, 130, ${toOpacity(distribution.authoritarianCapitalist)})`;     // Soft Red
+  const bottomLeft = `rgba(255, 220, 100, ${toOpacity(distribution.libertarianSocialist)})`;      // Soft Yellow
+  const bottomRight = `rgba(100, 200, 150, ${toOpacity(distribution.libertarianCapitalist)})`;    // Soft Green
 
   // Create a radial gradient for each corner and blend them
   return {
