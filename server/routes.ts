@@ -1725,6 +1725,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Message content is required" });
       }
 
+      // Get debate room to check turn and phase
+      const room = await storage.getDebateRoom(req.params.roomId);
+      if (!room) {
+        return res.status(404).json({ message: "Debate room not found" });
+      }
+
+      // Determine which participant this user is
+      const isParticipant1 = userId === room.participant1Id;
+      const isParticipant2 = userId === room.participant2Id;
+
+      if (!isParticipant1 && !isParticipant2) {
+        return res.status(403).json({ message: "You are not a participant in this debate" });
+      }
+
+      // Turn enforcement for structured phase
+      if (room.phase === 'structured') {
+        // Check if it's the user's turn
+        if (room.currentTurn && room.currentTurn !== userId) {
+          return res.status(400).json({ 
+            message: "It's not your turn to speak. Please wait for your opponent's response." 
+          });
+        }
+
+        // Check if user has exceeded turn limit (3 turns max)
+        const userTurnCount = isParticipant1 ? (room.turnCount1 || 0) : (room.turnCount2 || 0);
+        if (userTurnCount >= 3) {
+          return res.status(400).json({ 
+            message: "You have reached the maximum of 3 turns. Waiting for voting phase." 
+          });
+        }
+      }
+
       // Content filter validation
       const filterResult = await validateContent(content.trim());
       if (!filterResult.isAllowed) {
@@ -1738,6 +1770,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const messageStatus = filterResult.shouldFlag ? 'flagged' : 'approved';
       const message = await storage.addDebateMessage(req.params.roomId, userId, content, messageStatus);
       
+      // Update turn tracking if in structured phase
+      let updatedRoom = room;
+      if (room.phase === 'structured') {
+        updatedRoom = await storage.updateDebateRoomTurn(req.params.roomId, userId);
+        
+        // Broadcast turn update
+        broadcastToRoom(req.params.roomId, {
+          type: 'turn_update',
+          roomId: req.params.roomId,
+          currentTurn: updatedRoom.currentTurn,
+          turnCount1: updatedRoom.turnCount1,
+          turnCount2: updatedRoom.turnCount2,
+          phase: updatedRoom.phase,
+          timestamp: new Date().toISOString()
+        });
+      }
+
       // Broadcast message to room via WebSocket for real-time delivery
       broadcastToRoom(req.params.roomId, {
         type: 'chat_message',
@@ -1747,10 +1796,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timestamp: new Date().toISOString()
       });
       
-      res.status(201).json(message);
+      res.status(201).json({ message, room: updatedRoom });
     } catch (error) {
       console.error("Error adding debate message:", error);
       res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // Debate voting endpoints
+  app.post('/api/debate-rooms/:roomId/vote', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { roomId } = req.params;
+      const { logicalReasoning, politeness, opennessToChange, voteToContinue } = req.body;
+
+      // Validate ratings
+      if (!logicalReasoning || !politeness || !opennessToChange || 
+          logicalReasoning < 1 || logicalReasoning > 5 ||
+          politeness < 1 || politeness > 5 ||
+          opennessToChange < 1 || opennessToChange > 5) {
+        return res.status(400).json({ 
+          message: "All ratings must be provided and between 1-5" 
+        });
+      }
+
+      if (typeof voteToContinue !== 'boolean') {
+        return res.status(400).json({ 
+          message: "Vote to continue must be true or false" 
+        });
+      }
+
+      // Get debate room to determine opponent
+      const room = await storage.getDebateRoom(roomId);
+      if (!room) {
+        return res.status(404).json({ message: "Debate room not found" });
+      }
+
+      // Verify user is a participant
+      const isParticipant1 = userId === room.participant1Id;
+      const isParticipant2 = userId === room.participant2Id;
+
+      if (!isParticipant1 && !isParticipant2) {
+        return res.status(403).json({ message: "You are not a participant in this debate" });
+      }
+
+      // Check if debate is in voting phase
+      if (room.phase !== 'voting') {
+        return res.status(400).json({ 
+          message: "Voting is only allowed in the voting phase" 
+        });
+      }
+
+      // Determine opponent
+      const votedForUserId = isParticipant1 ? room.participant2Id : room.participant1Id;
+
+      // Submit the vote (ratings)
+      const vote = await storage.submitDebateVote({
+        roomId,
+        voterId: userId,
+        votedForUserId,
+        logicalReasoning,
+        politeness,
+        opennessToChange,
+      });
+
+      // Submit vote to continue
+      const updatedRoom = await storage.submitVoteToContinue(roomId, userId, voteToContinue);
+
+      // Broadcast phase change if both voted
+      if (updatedRoom.phase !== room.phase || updatedRoom.status !== room.status) {
+        broadcastToRoom(roomId, {
+          type: 'phase_update',
+          roomId,
+          phase: updatedRoom.phase,
+          status: updatedRoom.status,
+          votesToContinue1: updatedRoom.votesToContinue1,
+          votesToContinue2: updatedRoom.votesToContinue2,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      res.json({ vote, room: updatedRoom });
+    } catch (error) {
+      console.error("Error submitting debate vote:", error);
+      res.status(500).json({ message: "Failed to submit vote" });
+    }
+  });
+
+  app.get('/api/debate-rooms/:roomId/votes', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { roomId } = req.params;
+
+      // Get debate room to verify participant
+      const room = await storage.getDebateRoom(roomId);
+      if (!room) {
+        return res.status(404).json({ message: "Debate room not found" });
+      }
+
+      // Verify user is a participant
+      const isParticipant = userId === room.participant1Id || userId === room.participant2Id;
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant in this debate" });
+      }
+
+      // Get all votes for this room
+      const votes = await storage.getDebateVotes(roomId);
+
+      res.json(votes);
+    } catch (error) {
+      console.error("Error fetching debate votes:", error);
+      res.status(500).json({ message: "Failed to fetch votes" });
+    }
+  });
+
+  app.get('/api/users/:userId/debate-stats', async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+
+      const stats = await storage.getUserDebateStats(userId);
+
+      // Return empty stats if not found
+      if (!stats) {
+        return res.json({
+          userId,
+          totalDebates: 0,
+          avgLogicalReasoning: 0,
+          avgPoliteness: 0,
+          avgOpennessToChange: 0,
+          totalVotesReceived: 0,
+        });
+      }
+
+      // Convert averages back to decimal (they're stored as integers * 100)
+      res.json({
+        ...stats,
+        avgLogicalReasoning: stats.avgLogicalReasoning / 100,
+        avgPoliteness: stats.avgPoliteness / 100,
+        avgOpennessToChange: stats.avgOpennessToChange / 100,
+      });
+    } catch (error) {
+      console.error("Error fetching user debate stats:", error);
+      res.status(500).json({ message: "Failed to fetch debate stats" });
     }
   });
 
