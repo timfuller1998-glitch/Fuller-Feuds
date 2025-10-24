@@ -1,14 +1,15 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { AvatarWithBadge } from "./AvatarWithBadge";
 import FallacyBadges from "./FallacyBadges";
 import FallacyFlagDialog from "./FallacyFlagDialog";
-import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag, Link as LinkIcon, ExternalLink, ChevronDown, MessageCircle } from "lucide-react";
+import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag, Link as LinkIcon, ExternalLink, MessageCircle, Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { FallacyType } from "@shared/fallacies";
@@ -19,9 +20,9 @@ interface OpinionCardProps {
   userId?: string;
   userName: string;
   userAvatar?: string;
-  politicalLeaningScore?: number; // DEPRECATED: Legacy single-axis score
-  economicScore?: number; // -100 (socialist) to +100 (capitalist)
-  authoritarianScore?: number; // -100 (libertarian) to +100 (authoritarian)
+  politicalLeaningScore?: number;
+  economicScore?: number;
+  authoritarianScore?: number;
   content: string;
   stance: "for" | "against" | "neutral";
   debateStatus?: "open" | "closed" | "private";
@@ -81,8 +82,8 @@ export default function OpinionCard({
   isRandomMatchPending = false
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showFlagDialog, setShowFlagDialog] = useState(false);
-  const [showReferences, setShowReferences] = useState(false);
   const { toast } = useToast();
 
   // Flag mutation
@@ -104,7 +105,6 @@ export default function OpinionCard({
         description: "Thank you for helping keep debates productive.",
       });
       setShowFlagDialog(false);
-      // Invalidate queries to refetch with updated flag counts
       queryClient.invalidateQueries({ queryKey: ["/api/topics", topicId, "opinions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/opinions/recent"] });
     },
@@ -117,7 +117,6 @@ export default function OpinionCard({
     },
   });
 
-  // Use props directly - no local state for vote counts
   const liked = isLiked;
   const disliked = isDisliked;
   const currentLikes = likesCount;
@@ -135,238 +134,344 @@ export default function OpinionCard({
     setShowFlagDialog(true);
   };
 
+  // Truncate content for card preview
+  const truncateContent = (text: string, maxLength: number = 120) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength).trim() + '...';
+  };
+
   return (
-    <Card 
-      className="hover-elevate active-elevate-2 cursor-pointer" 
-      onClick={() => setLocation(`/topic/${topicId}`)}
-      data-testid={`card-opinion-${id}`}
-    >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          {userId ? (
-            <Link 
-              href={`/profile/${userId}`} 
-              className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-1 -m-1" 
-              onClick={(e) => e.stopPropagation()}
-              data-testid={`link-profile-${userId}`}
-            >
-              <AvatarWithBadge 
-                userId={userId}
-                name={userName} 
-                profileImageUrl={userAvatar} 
-                size="sm"
-                politicalLeaningScore={politicalLeaningScore}
-                economicScore={economicScore}
-                authoritarianScore={authoritarianScore}
-                showPoliticalLeaning={true}
-              />
-              <div>
-                <h4 className="font-medium" data-testid={`text-opinion-author-${id}`}>
-                  {userName}
-                </h4>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  <span>{timestamp}</span>
+    <>
+      {/* Compact Card with Preview */}
+      <Card 
+        className="hover-elevate active-elevate-2 cursor-pointer h-full flex flex-col" 
+        onClick={() => setShowDetailsDialog(true)}
+        data-testid={`card-opinion-${id}`}
+      >
+        <CardHeader className="pb-3 flex-shrink-0">
+          <div className="flex items-start justify-between gap-2">
+            {userId ? (
+              <Link 
+                href={`/profile/${userId}`} 
+                className="flex items-center gap-2 hover-elevate active-elevate-2 rounded-lg p-1 -m-1 min-w-0 flex-1" 
+                onClick={(e) => e.stopPropagation()}
+                data-testid={`link-profile-${userId}`}
+              >
+                <AvatarWithBadge 
+                  userId={userId}
+                  name={userName} 
+                  profileImageUrl={userAvatar} 
+                  size="sm"
+                  politicalLeaningScore={politicalLeaningScore}
+                  economicScore={economicScore}
+                  authoritarianScore={authoritarianScore}
+                  showPoliticalLeaning={true}
+                />
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-medium text-sm truncate" data-testid={`text-opinion-author-${id}`}>
+                    {userName}
+                  </h4>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{timestamp}</span>
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <AvatarWithBadge 
+                  userId={userId || "unknown"}
+                  name={userName} 
+                  profileImageUrl={userAvatar} 
+                  size="sm"
+                  politicalLeaningScore={politicalLeaningScore}
+                  economicScore={economicScore}
+                  authoritarianScore={authoritarianScore}
+                  showPoliticalLeaning={true}
+                />
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-medium text-sm truncate" data-testid={`text-opinion-author-${id}`}>
+                    {userName}
+                  </h4>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{timestamp}</span>
+                  </div>
                 </div>
               </div>
-            </Link>
-          ) : (
-            <div className="flex items-center gap-3">
-              <AvatarWithBadge 
-                userId={userId || "unknown"}
-                name={userName} 
-                profileImageUrl={userAvatar} 
-                size="sm"
-                politicalLeaningScore={politicalLeaningScore}
-                economicScore={economicScore}
-                authoritarianScore={authoritarianScore}
-                showPoliticalLeaning={true}
-              />
-              <div>
-                <h4 className="font-medium" data-testid={`text-opinion-author-${id}`}>
-                  {userName}
-                </h4>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  <span>{timestamp}</span>
-                </div>
-              </div>
-            </div>
-          )}
-          <div className="flex flex-col gap-1 items-end">
-            <Badge variant={stanceBadgeVariant[stance]}>
+            )}
+            <Badge variant={stanceBadgeVariant[stance]} className="flex-shrink-0 text-xs">
               {stanceText[stance]}
             </Badge>
-            {debateStatus === "closed" && (
-              <Badge variant="secondary" className="text-xs">
-                Not Debatable
-              </Badge>
-            )}
-            {debateStatus === "private" && (
-              <Badge variant="outline" className="text-xs">
-                Private
-              </Badge>
-            )}
           </div>
-        </div>
-      </CardHeader>
-      
-      <CardContent className="pt-0">
-        <p className="text-sm leading-relaxed mb-4" data-testid={`text-opinion-content-${id}`}>
-          {content}
-        </p>
-
-        {/* Display fallacy badges if any */}
-        {Object.keys(fallacyCounts).some(key => fallacyCounts[key] > 0) && (
-          <div className="mb-3">
-            <FallacyBadges fallacyCounts={fallacyCounts} />
-          </div>
-        )}
+        </CardHeader>
         
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <Button
-              variant={liked ? "default" : "ghost"}
-              size="sm"
-              className="h-8 px-3"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLike();
-              }}
-              data-testid={`button-like-${id}`}
-            >
-              <ThumbsUp className="w-3 h-3 mr-1" />
-              {currentLikes}
-            </Button>
-            
-            <Button
-              variant={disliked ? "destructive" : "ghost"}
-              size="sm"
-              className="h-8 px-3"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDislike();
-              }}
-              data-testid={`button-dislike-${id}`}
-            >
-              <ThumbsDown className="w-3 h-3 mr-1" />
-              {currentDislikes}
-            </Button>
-          </div>
+        <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
+          {/* Truncated Content Preview */}
+          <p className="text-sm leading-relaxed line-clamp-3 mb-3" data-testid={`text-opinion-content-${id}`}>
+            {truncateContent(content, 150)}
+          </p>
+
+          {/* Display fallacy badges if any */}
+          {Object.keys(fallacyCounts).some(key => fallacyCounts[key] > 0) && (
+            <div className="mb-2">
+              <FallacyBadges fallacyCounts={fallacyCounts} />
+            </div>
+          )}
           
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-3"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAdopt?.(id);
-              }}
-              data-testid={`button-adopt-${id}`}
-            >
-              <UserPlus className="w-3 h-3 mr-1" />
-              <span className="hidden sm:inline">Adopt</span>
-            </Button>
-
-            {onDebate && debateStatus === "open" && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-3"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDebate(id);
-                }}
-                data-testid={`button-debate-${id}`}
-              >
-                <MessageCircle className="w-3 h-3 mr-1" />
-                <span className="hidden sm:inline">Change My Mind</span>
-              </Button>
-            )}
-
-            {onRandomMatch && (
-              <Button
-                variant="default"
-                size="sm"
-                className="h-8 px-3"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRandomMatch();
-                }}
-                disabled={isRandomMatchPending}
-                data-testid={`button-random-match-${id}`}
-              >
-                <MessageCircle className="w-3 h-3 mr-1" />
-                <span className="hidden sm:inline">
-                  {isRandomMatchPending ? "Matching..." : "Find Random Debate"}
-                </span>
-              </Button>
-            )}
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-3"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleFlag();
-              }}
-              data-testid={`button-flag-${id}`}
-            >
-              <Flag className="w-3 h-3 mr-1" />
-              <span className="hidden sm:inline">Flag</span>
-            </Button>
-
-            {/* Show references button if there are any */}
-            {references && references.length > 0 && (
-              <Button
-                variant={showReferences ? "default" : "outline"}
-                size="sm"
-                className="h-8 px-3 gap-1.5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowReferences(!showReferences);
-                }}
-                data-testid={`button-show-references-${id}`}
-              >
-                <LinkIcon className="w-3.5 h-3.5" />
-                <span>References</span>
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
-                  {references.length}
-                </Badge>
-                <ChevronDown className={`w-3 h-3 ml-0.5 transition-transform ${showReferences ? 'rotate-180' : ''}`} />
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* References Section */}
-        {showReferences && references && references.length > 0 && (
-          <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-2 mb-2">
-              <LinkIcon className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Reference Links</span>
+          {/* Quick Stats */}
+          <div className="flex items-center justify-between gap-2 mt-auto pt-2 border-t">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <ThumbsUp className="w-3 h-3" />
+                <span>{currentLikes}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <ThumbsDown className="w-3 h-3" />
+                <span>{currentDislikes}</span>
+              </div>
+              {references && references.length > 0 && (
+                <div className="flex items-center gap-1">
+                  <LinkIcon className="w-3 h-3" />
+                  <span>{references.length}</span>
+                </div>
+              )}
             </div>
-            <div className="space-y-2">
-              {references.filter(ref => ref.trim()).map((ref, index) => (
-                <a
-                  key={index}
-                  href={ref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                  data-testid={`link-reference-${index}`}
-                  onClick={(e) => e.stopPropagation()}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 px-2 text-xs gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDetailsDialog(true);
+              }}
+              data-testid={`button-expand-${id}`}
+            >
+              <Maximize2 className="w-3 h-3" />
+              View Full
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Full Details Dialog */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] p-0" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="sr-only">Opinion Details</DialogTitle>
+            <div className="flex items-start justify-between gap-4">
+              {userId ? (
+                <Link 
+                  href={`/profile/${userId}`} 
+                  className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-1 -m-1" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDetailsDialog(false);
+                  }}
+                  data-testid={`link-profile-dialog-${userId}`}
                 >
-                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                  <span className="truncate">{ref}</span>
-                </a>
-              ))}
+                  <AvatarWithBadge 
+                    userId={userId}
+                    name={userName} 
+                    profileImageUrl={userAvatar} 
+                    size="md"
+                    politicalLeaningScore={politicalLeaningScore}
+                    economicScore={economicScore}
+                    authoritarianScore={authoritarianScore}
+                    showPoliticalLeaning={true}
+                  />
+                  <div>
+                    <h4 className="font-medium" data-testid={`text-opinion-author-dialog-${id}`}>
+                      {userName}
+                    </h4>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      <span>{timestamp}</span>
+                    </div>
+                  </div>
+                </Link>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <AvatarWithBadge 
+                    userId={userId || "unknown"}
+                    name={userName} 
+                    profileImageUrl={userAvatar} 
+                    size="md"
+                    politicalLeaningScore={politicalLeaningScore}
+                    economicScore={economicScore}
+                    authoritarianScore={authoritarianScore}
+                    showPoliticalLeaning={true}
+                  />
+                  <div>
+                    <h4 className="font-medium" data-testid={`text-opinion-author-dialog-${id}`}>
+                      {userName}
+                    </h4>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      <span>{timestamp}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-col gap-1 items-end flex-shrink-0">
+                <Badge variant={stanceBadgeVariant[stance]}>
+                  {stanceText[stance]}
+                </Badge>
+                {debateStatus === "closed" && (
+                  <Badge variant="secondary" className="text-xs">
+                    Not Debatable
+                  </Badge>
+                )}
+                {debateStatus === "private" && (
+                  <Badge variant="outline" className="text-xs">
+                    Private
+                  </Badge>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </CardContent>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[calc(90vh-200px)] px-6">
+            <div className="space-y-4 pb-6">
+              {/* Full Content */}
+              <div>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap" data-testid={`text-opinion-content-dialog-${id}`}>
+                  {content}
+                </p>
+              </div>
+
+              {/* Display fallacy badges if any */}
+              {Object.keys(fallacyCounts).some(key => fallacyCounts[key] > 0) && (
+                <div>
+                  <FallacyBadges fallacyCounts={fallacyCounts} />
+                </div>
+              )}
+
+              {/* References Section */}
+              {references && references.length > 0 && (
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <LinkIcon className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Reference Links</span>
+                  </div>
+                  <div className="space-y-2">
+                    {references.filter(ref => ref.trim()).map((ref, index) => (
+                      <a
+                        key={index}
+                        href={ref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-primary hover:underline break-all"
+                        data-testid={`link-reference-dialog-${index}`}
+                      >
+                        <ExternalLink className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                        <span>{ref}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-3 pt-2 border-t">
+                {/* Vote Buttons */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={liked ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLike();
+                    }}
+                    data-testid={`button-like-dialog-${id}`}
+                  >
+                    <ThumbsUp className="w-4 h-4 mr-2" />
+                    Like ({currentLikes})
+                  </Button>
+                  
+                  <Button
+                    variant={disliked ? "destructive" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDislike();
+                    }}
+                    data-testid={`button-dislike-dialog-${id}`}
+                  >
+                    <ThumbsDown className="w-4 h-4 mr-2" />
+                    Dislike ({currentDislikes})
+                  </Button>
+                </div>
+
+                {/* Action Buttons Row 2 */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAdopt?.(id);
+                      setShowDetailsDialog(false);
+                    }}
+                    data-testid={`button-adopt-dialog-${id}`}
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Adopt This Opinion
+                  </Button>
+
+                  {onDebate && debateStatus === "open" && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDebate(id);
+                        setShowDetailsDialog(false);
+                      }}
+                      data-testid={`button-debate-dialog-${id}`}
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Change My Mind
+                    </Button>
+                  )}
+
+                  {onRandomMatch && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRandomMatch();
+                        setShowDetailsDialog(false);
+                      }}
+                      disabled={isRandomMatchPending}
+                      data-testid={`button-random-match-dialog-${id}`}
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      {isRandomMatchPending ? "Matching..." : "Find Random Debate"}
+                    </Button>
+                  )}
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleFlag();
+                    }}
+                    data-testid={`button-flag-dialog-${id}`}
+                  >
+                    <Flag className="w-4 h-4 mr-2" />
+                    Flag for Fallacy
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Fallacy Flag Dialog */}
       <FallacyFlagDialog
@@ -376,6 +481,6 @@ export default function OpinionCard({
         isPending={flagMutation.isPending}
         entityType="opinion"
       />
-    </Card>
+    </>
   );
 }
