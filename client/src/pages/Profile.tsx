@@ -1103,7 +1103,16 @@ export default function Profile() {
                           <p className="text-sm text-muted-foreground mb-2">{topic.description}</p>
                           <div className="flex items-center gap-2 flex-wrap">
                             {topic.categories?.map((cat: string) => (
-                              <Badge key={cat} variant="secondary" className="text-xs">
+                              <Badge 
+                                key={cat} 
+                                variant="secondary" 
+                                className="text-xs cursor-pointer hover-elevate"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/?category=${encodeURIComponent(cat)}`);
+                                }}
+                                data-testid={`badge-category-${cat.toLowerCase()}`}
+                              >
                                 {cat}
                               </Badge>
                             ))}

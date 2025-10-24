@@ -50,7 +50,16 @@ export default function TopicCard({
       >
         <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
           {categories?.slice(0, 2).map((category) => (
-            <Badge key={category} variant="secondary" className="bg-background/80 backdrop-blur-sm">
+            <Badge 
+              key={category} 
+              variant="secondary" 
+              className="bg-background/80 backdrop-blur-sm cursor-pointer hover-elevate"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLocation(`/?category=${encodeURIComponent(category)}`);
+              }}
+              data-testid={`badge-category-${category.toLowerCase()}`}
+            >
               {category}
             </Badge>
           ))}

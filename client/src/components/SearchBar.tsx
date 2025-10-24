@@ -387,7 +387,17 @@ export default function SearchBar({
                   <div className="font-medium line-clamp-1">{topic.title}</div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                     {topic.categories.slice(0, 2).map((cat) => (
-                      <Badge key={cat} variant="secondary" className="text-xs px-1 py-0">
+                      <Badge 
+                        key={cat} 
+                        variant="secondary" 
+                        className="text-xs px-1 py-0 cursor-pointer hover-elevate"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowSuggestions(false);
+                          setLocation(`/?category=${encodeURIComponent(cat)}`);
+                        }}
+                        data-testid={`badge-category-${cat.toLowerCase()}`}
+                      >
                         {cat}
                       </Badge>
                     ))}

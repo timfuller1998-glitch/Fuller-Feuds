@@ -89,7 +89,17 @@ export function TopicSimilarityModal({
                     {topic.categories && topic.categories.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {topic.categories.slice(0, 3).map((category) => (
-                          <Badge key={category} variant="secondary" className="text-xs">
+                          <Badge 
+                            key={category} 
+                            variant="secondary" 
+                            className="text-xs cursor-pointer hover-elevate"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              window.location.href = `/?category=${encodeURIComponent(category)}`;
+                            }}
+                            data-testid={`badge-category-${category.toLowerCase()}`}
+                          >
                             {category}
                           </Badge>
                         ))}

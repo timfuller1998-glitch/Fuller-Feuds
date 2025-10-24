@@ -237,7 +237,13 @@ export default function RecentOpinionsPage() {
               <p className="text-muted-foreground mt-1">{group.topic.description}</p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 {group.topic.categories.map((cat) => (
-                  <Badge key={cat} variant="secondary" data-testid={`badge-category-${cat}`}>
+                  <Badge 
+                    key={cat} 
+                    variant="secondary" 
+                    className="cursor-pointer hover-elevate"
+                    onClick={() => setLocation(`/?category=${encodeURIComponent(cat)}`)}
+                    data-testid={`badge-category-${cat.toLowerCase()}`}
+                  >
                     {cat}
                   </Badge>
                 ))}

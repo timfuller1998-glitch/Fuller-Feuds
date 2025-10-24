@@ -396,7 +396,15 @@ export default function Topic() {
           {/* Categories and Active Badge */}
           <div className="flex items-center gap-2 flex-wrap">
             {topic.categories.map((cat) => (
-              <Badge key={cat} variant="secondary">{cat}</Badge>
+              <Badge 
+                key={cat} 
+                variant="secondary"
+                className="cursor-pointer hover-elevate"
+                onClick={() => navigate(`/?category=${encodeURIComponent(cat)}`)}
+                data-testid={`badge-category-${cat.toLowerCase()}`}
+              >
+                {cat}
+              </Badge>
             ))}
             {topic.isActive && (
               <Badge className="bg-chart-1 text-white">

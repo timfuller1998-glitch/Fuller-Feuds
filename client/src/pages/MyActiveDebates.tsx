@@ -170,7 +170,13 @@ export default function MyActiveDebates() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     {topic.categories.map((cat) => (
-                      <Badge key={cat} variant="secondary" className="text-xs">
+                      <Badge 
+                        key={cat} 
+                        variant="secondary" 
+                        className="text-xs cursor-pointer hover-elevate"
+                        onClick={() => setLocation(`/?category=${encodeURIComponent(cat)}`)}
+                        data-testid={`badge-category-${cat.toLowerCase()}`}
+                      >
                         {cat}
                       </Badge>
                     ))}
