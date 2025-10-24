@@ -1041,7 +1041,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const validatedData = insertDebateRoomSchema.parse({
         ...req.body,
-        participant1Id: userId
+        participant1Id: userId,
+        // Set defaults for structured debate if not provided
+        phase: req.body.phase || 'structured',
+        currentTurn: req.body.currentTurn || userId,
+        turnCount1: req.body.turnCount1 ?? 0,
+        turnCount2: req.body.turnCount2 ?? 0,
       });
       
       const room = await storage.createDebateRoom(validatedData);
@@ -1200,7 +1205,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const validatedData = insertDebateRoomSchema.parse({
         ...req.body,
-        participant1Id: userId
+        participant1Id: userId,
+        // Set defaults for structured debate if not provided
+        phase: req.body.phase || 'structured',
+        currentTurn: req.body.currentTurn || userId,
+        turnCount1: req.body.turnCount1 ?? 0,
+        turnCount2: req.body.turnCount2 ?? 0,
       });
       
       const room = await storage.createDebateRoom(validatedData);
@@ -1689,7 +1699,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const validatedData = insertDebateRoomSchema.parse({
         ...req.body,
-        participant1Id: userId
+        participant1Id: userId,
+        // Set defaults for structured debate if not provided
+        phase: req.body.phase || 'structured',
+        currentTurn: req.body.currentTurn || userId,
+        turnCount1: req.body.turnCount1 ?? 0,
+        turnCount2: req.body.turnCount2 ?? 0,
       });
       
       const room = await storage.createDebateRoom(validatedData);
@@ -1986,13 +2001,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const opponentOpinion = userOpinions.find(o => o.userId === opponent.id);
       const opponentStance = opponentOpinion?.stance || (userOpinion.stance === 'for' ? 'against' : 'for');
 
-      // Create the debate room
+      // Create the debate room with structured phase initialization
       const room = await storage.createDebateRoom({
         topicId,
         participant1Id: userId,
         participant2Id: opponent.id,
         participant1Stance: userOpinion.stance,
         participant2Stance: opponentStance,
+        phase: 'structured',
+        currentTurn: userId, // Initiator goes first
+        turnCount1: 0,
+        turnCount2: 0,
       });
 
       // Check and award badges asynchronously for both participants
@@ -2094,13 +2113,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newOpponentStance = opponentOpinion?.stance || (userStance === 'for' ? 'against' : 'for');
       }
 
-      // Create new debate room
+      // Create new debate room with structured phase initialization
       const newRoom = await storage.createDebateRoom({
         topicId: currentRoom.topicId,
         participant1Id: userId,
         participant2Id: newOpponentId,
         participant1Stance: userStance,
         participant2Stance: newOpponentStance,
+        phase: 'structured',
+        currentTurn: userId, // Initiator goes first
+        turnCount1: 0,
+        turnCount2: 0,
       });
 
       res.status(201).json(newRoom);

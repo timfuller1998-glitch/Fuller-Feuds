@@ -1004,7 +1004,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Create the debate room
+    // Create the debate room with structured phase initialization
     const room = await this.createDebateRoom({
       topicId,
       participant1Id: userId,
@@ -1013,6 +1013,10 @@ export class DatabaseStorage implements IStorage {
       participant2Stance: opinion.stance,
       participant1Privacy: "public",
       participant2Privacy: "public",
+      phase: 'structured',
+      currentTurn: userId, // Initiator goes first
+      turnCount1: 0,
+      turnCount2: 0,
     });
 
     return room;
