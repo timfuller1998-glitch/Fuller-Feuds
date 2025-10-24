@@ -15,6 +15,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import FallacyBadges from "@/components/FallacyBadges";
+import { VotingModal } from "@/components/VotingModal";
 import type { FallacyType } from "@shared/fallacies";
 import { useDebateRoom } from "@/hooks/useDebateRoom";
 
@@ -72,6 +73,7 @@ export default function DebateRoomPage() {
   const [flaggingMessageId, setFlaggingMessageId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{id: string, content: string, timestamp: string}>>([]);
+  const [showVotingModal, setShowVotingModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -304,6 +306,13 @@ export default function DebateRoomPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [allMessages.length]);
+
+  // Auto-open voting modal when phase transitions to 'voting'
+  useEffect(() => {
+    if (room?.phase === 'voting' && isParticipant && !showVotingModal) {
+      setShowVotingModal(true);
+    }
+  }, [room?.phase, isParticipant, showVotingModal]);
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() || !currentUser) return;
@@ -773,6 +782,26 @@ export default function DebateRoomPage() {
         isPending={flagMessageMutation.isPending}
         entityType="message"
       />
+
+      {/* Voting Modal */}
+      {room && currentUser && isParticipant && (
+        <VotingModal
+          isOpen={showVotingModal}
+          roomId={room.id}
+          opponentName={
+            currentUser.id === room.participant1Id
+              ? participant2?.firstName && participant2?.lastName
+                ? `${participant2.firstName} ${participant2.lastName}`
+                : participant2?.email || 'Unknown'
+              : participant1?.firstName && participant1?.lastName
+              ? `${participant1.firstName} ${participant1.lastName}`
+              : participant1?.email || 'Unknown'
+          }
+          opponentId={currentUser.id === room.participant1Id ? room.participant2Id : room.participant1Id}
+          currentUserId={currentUser.id}
+          onClose={() => setShowVotingModal(false)}
+        />
+      )}
     </div>
   );
 }
