@@ -394,7 +394,7 @@ export default function SearchBar({
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowSuggestions(false);
-                          setLocation(`/?category=${encodeURIComponent(cat)}`);
+                          setLocation(`/category/${encodeURIComponent(cat)}`);
                         }}
                         data-testid={`badge-category-${cat.toLowerCase()}`}
                       >
@@ -426,7 +426,7 @@ export default function SearchBar({
                     className="cursor-pointer hover-elevate text-xs"
                     onClick={() => {
                       setShowSuggestions(false);
-                      setLocation(`/?category=${encodeURIComponent(category)}`);
+                      setLocation(`/category/${encodeURIComponent(category)}`);
                     }}
                     data-testid={`suggestion-category-${category.toLowerCase()}`}
                   >

@@ -96,7 +96,7 @@ export function TopicSimilarityModal({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              window.location.href = `/?category=${encodeURIComponent(category)}`;
+                              window.location.href = `/category/${encodeURIComponent(category)}`;
                             }}
                             data-testid={`badge-category-${category.toLowerCase()}`}
                           >

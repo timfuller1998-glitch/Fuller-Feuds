@@ -1109,7 +1109,7 @@ export default function Profile() {
                                 className="text-xs cursor-pointer hover-elevate"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  navigate(`/?category=${encodeURIComponent(cat)}`);
+                                  navigate(`/category/${encodeURIComponent(cat)}`);
                                 }}
                                 data-testid={`badge-category-${cat.toLowerCase()}`}
                               >

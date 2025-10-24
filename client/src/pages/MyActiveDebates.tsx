@@ -174,7 +174,7 @@ export default function MyActiveDebates() {
                         key={cat} 
                         variant="secondary" 
                         className="text-xs cursor-pointer hover-elevate"
-                        onClick={() => setLocation(`/?category=${encodeURIComponent(cat)}`)}
+                        onClick={() => setLocation(`/category/${encodeURIComponent(cat)}`)}
                         data-testid={`badge-category-${cat.toLowerCase()}`}
                       >
                         {cat}
