@@ -2861,6 +2861,26 @@ export class DatabaseStorage implements IStorage {
 
     return categoryOrder;
   }
+
+  async getAllOpinionsForBackfill(): Promise<Array<{ id: string; content: string; topicId: string; topicTitle: string }>> {
+    const opinionsData = await db
+      .select({
+        id: opinions.id,
+        content: opinions.content,
+        topicId: opinions.topicId,
+        topicTitle: topics.title
+      })
+      .from(opinions)
+      .leftJoin(topics, eq(opinions.topicId, topics.id))
+      .where(eq(opinions.status, 'approved'));
+
+    return opinionsData.map(row => ({
+      id: row.id,
+      content: row.content,
+      topicId: row.topicId,
+      topicTitle: row.topicTitle || 'Unknown Topic'
+    }));
+  }
 }
 
 export const storage = new DatabaseStorage();

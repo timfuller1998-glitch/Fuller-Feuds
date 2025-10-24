@@ -1179,6 +1179,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin - Backfill political scores for all opinions
+  app.post('/api/admin/backfill-opinion-scores', requireAdmin, async (req, res) => {
+    try {
+      const { model = 'gpt-4o-mini' } = req.body;
+      
+      // Validate model parameter
+      if (model !== 'gpt-4o-mini' && model !== 'gpt-5') {
+        return res.status(400).json({ message: 'Invalid model. Must be gpt-4o-mini or gpt-5' });
+      }
+
+      console.log(`[Admin] Starting opinion political score backfill using ${model}`);
+      
+      // Get all opinions that need political scores
+      const opinionsToProcess = await storage.getAllOpinionsForBackfill();
+      
+      console.log(`[Admin] Found ${opinionsToProcess.length} opinions to process`);
+
+      // Process opinions in batches to avoid timeout
+      const batchSize = 10;
+      let processed = 0;
+      let errors = 0;
+
+      // Process in background and return immediately
+      res.json({
+        message: `Started backfill process for ${opinionsToProcess.length} opinions using ${model}`,
+        totalOpinions: opinionsToProcess.length,
+        model
+      });
+
+      // Process asynchronously
+      (async () => {
+        for (let i = 0; i < opinionsToProcess.length; i += batchSize) {
+          const batch = opinionsToProcess.slice(i, i + batchSize);
+          
+          await Promise.all(
+            batch.map(async (opinion) => {
+              try {
+                const scores = await AIService.analyzeOpinionPoliticalStance(
+                  opinion.content,
+                  opinion.topicTitle,
+                  model as "gpt-4o-mini" | "gpt-5"
+                );
+                
+                await storage.updateOpinion(opinion.id, {
+                  topicEconomicScore: scores.economicScore,
+                  topicAuthoritarianScore: scores.authoritarianScore
+                });
+                
+                processed++;
+                
+                if (processed % 10 === 0) {
+                  console.log(`[Admin Backfill] Processed ${processed}/${opinionsToProcess.length} opinions`);
+                }
+              } catch (error) {
+                console.error(`[Admin Backfill] Error processing opinion ${opinion.id}:`, error);
+                errors++;
+              }
+            })
+          );
+
+          // Small delay between batches to avoid rate limiting
+          if (i + batchSize < opinionsToProcess.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+
+        console.log(`[Admin Backfill] Complete! Processed: ${processed}, Errors: ${errors}`);
+      })();
+
+    } catch (error) {
+      console.error("Error backfilling opinion scores:", error);
+      res.status(500).json({ message: "Failed to start backfill process" });
+    }
+  });
+
   // Cumulative opinion routes
   app.get('/api/topics/:topicId/cumulative', async (req, res) => {
     try {
