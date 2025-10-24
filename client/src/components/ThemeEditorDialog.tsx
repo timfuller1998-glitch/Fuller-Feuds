@@ -107,7 +107,7 @@ function ThemePreview({ colors }: { colors: ThemeColors }) {
           className="font-bold text-sm"
           style={{ color: fg }}
         >
-          Kirk Debates
+          Opinion Feud
         </span>
         <div className="flex items-center gap-2">
           <button

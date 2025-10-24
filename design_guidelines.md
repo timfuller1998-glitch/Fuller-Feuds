@@ -1,4 +1,4 @@
-# Design Guidelines: Kirk Debates Platform
+# Design Guidelines: Opinion Feud Platform
 
 ## Design Approach: Reference-Based (Linear/Vercel Aesthetic)
 **Selected References**: Linear, Vercel, Arc Browser

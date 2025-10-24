@@ -49,7 +49,7 @@ export function DebateOnboardingModal({
         <DialogHeader>
           <DialogTitle className="text-2xl">Start a Debate{opponentName ? ` with ${opponentName}` : ''}</DialogTitle>
           <DialogDescription>
-            Kirk Debates uses a structured format to ensure productive discussions
+            Opinion Feud uses a structured format to ensure productive discussions
           </DialogDescription>
         </DialogHeader>
 

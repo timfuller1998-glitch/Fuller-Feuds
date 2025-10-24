@@ -206,7 +206,7 @@ export default function AppSidebar({
               <MessageCircle className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-lg">Kirk Debates</h2>
+              <h2 className="font-bold text-lg">Opinion Feud</h2>
               <p className="text-xs text-muted-foreground">Where Ideas Collide</p>
             </div>
           </div>

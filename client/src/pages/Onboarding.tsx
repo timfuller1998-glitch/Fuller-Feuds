@@ -319,7 +319,7 @@ export default function Onboarding() {
         {/* Header with progress */}
         <div className="space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <h1 className="text-4xl font-bold tracking-tight">Welcome to Kirk Debates</h1>
+            <h1 className="text-4xl font-bold tracking-tight">Welcome to Opinion Feud</h1>
             <Button
               variant="ghost"
               size="sm"
@@ -576,7 +576,7 @@ export default function Onboarding() {
             <CardHeader>
               <CardTitle>You're All Set!</CardTitle>
               <CardDescription>
-                Here's what you can do on Kirk Debates
+                Here's what you can do on Opinion Feud
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

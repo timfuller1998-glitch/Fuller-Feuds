@@ -43,7 +43,7 @@ export default function Landing() {
               <MessageCircle className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="font-bold text-lg">Kirk Debates</h1>
+              <h1 className="font-bold text-lg">Opinion Feud</h1>
               <p className="text-xs text-muted-foreground">Where Ideas Collide</p>
             </div>
           </div>
@@ -248,7 +248,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t border-border/40 py-12 px-6">
         <div className="max-w-6xl mx-auto text-center">
-          <p className="text-muted-foreground">&copy; 2024 Kirk Debates. Where Ideas Collide.</p>
+          <p className="text-muted-foreground">&copy; 2024 Opinion Feud. Where Ideas Collide.</p>
         </div>
       </footer>
     </div>
