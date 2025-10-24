@@ -81,6 +81,7 @@ export const topics = pgTable("topics", {
   createdById: varchar("created_by_id").notNull().references(() => users.id),
   isActive: boolean("is_active").default(true),
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'hidden', 'archived'
+  embedding: jsonb("embedding"), // OpenAI embedding vector (1536 dimensions) stored as JSON array
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
