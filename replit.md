@@ -3,6 +3,9 @@
 ## Overview
 Opinion Feud is a modern platform designed to facilitate meaningful discussions on important topics. It combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats. The platform features topic-based debate matching that automatically connects users with opposing viewpoints, privacy controls for debate participants, AI-generated cumulative opinions that summarize community perspectives and track debate sentiment, and support for attaching reference links to opinions to cite sources.
 
+## Recent Changes
+- **October 24, 2025**: Removed user-created theme personalization system. Platform now uses uniform design with basic light/dark/medium theme preferences. Removed `themes` and `themeLikes` database tables, theme-related backend routes, and frontend theme creation/management UI. Focus shifted to political gradient system for topic cards.
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 

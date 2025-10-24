@@ -7,7 +7,6 @@ import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sid
 import AppSidebar from "@/components/AppSidebar";
 import SearchBar from "@/components/SearchBar";
 import { useAuth } from "@/hooks/useAuth";
-import { ThemeProvider } from "@/contexts/ThemeContext";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
 import Profile from "@/pages/Profile";
@@ -25,7 +24,6 @@ import LiveStreamPage from "@/pages/LiveStreamPage";
 import DebateRoomPage from "@/pages/DebateRoomPage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Onboarding from "@/pages/Onboarding";
-import ThemeGallery from "@/pages/ThemeGallery";
 import RecentOpinions from "@/pages/RecentOpinions";
 import NotFound from "@/pages/not-found";
 
@@ -60,7 +58,6 @@ function Router() {
       <Route path="/live-stream/:id" component={LiveStreamPage} />
       <Route path="/debate-room/:id" component={DebateRoomPage} />
       <Route path="/admin" component={AdminDashboard} />
-      <Route path="/themes" component={ThemeGallery} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -197,11 +194,9 @@ function AppContent() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <AppContent />
-        </TooltipProvider>
-      </ThemeProvider>
+      <TooltipProvider>
+        <AppContent />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
