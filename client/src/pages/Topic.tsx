@@ -117,7 +117,7 @@ export default function Topic() {
   });
 
   // Fetch similar topics
-  const { data: similarTopics } = useQuery<TopicType[]>({
+  const { data: similarTopicsRaw } = useQuery<TopicType[]>({
     queryKey: ["/api/topics/search-similar", topic?.title],
     queryFn: async () => {
       if (!topic?.title) return [];
@@ -127,6 +127,9 @@ export default function Topic() {
     },
     enabled: !!topic?.title,
   });
+
+  // Filter out the current topic from similar topics
+  const similarTopics = similarTopicsRaw?.filter(t => t.id !== id) || [];
 
   // Get user's opinion on this topic to determine stance
   const userOpinion = opinions?.find(o => o.userId === user?.id);
