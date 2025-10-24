@@ -5,6 +5,8 @@ import {
   cumulativeOpinions,
   debateRooms,
   debateMessages,
+  debateVotes,
+  userDebateStats,
   liveStreams,
   streamInvitations,
   streamParticipants,
@@ -33,6 +35,10 @@ import {
   type DebateRoom,
   type InsertDebateRoom,
   type DebateMessage,
+  type DebateVote,
+  type InsertDebateVote,
+  type UserDebateStats,
+  type InsertUserDebateStats,
   type LiveStream,
   type InsertLiveStream,
   type StreamInvitation,
@@ -152,6 +158,15 @@ export interface IStorage {
   // Debate messages
   addDebateMessage(roomId: string, userId: string, content: string, status?: string): Promise<DebateMessage>;
   getDebateMessages(roomId: string, viewerId?: string): Promise<DebateMessage[]>;
+  updateDebateRoomTurn(roomId: string, userId: string): Promise<DebateRoom>;
+  
+  // Debate voting and stats
+  submitDebateVote(vote: InsertDebateVote): Promise<DebateVote>;
+  getDebateVotes(roomId: string): Promise<DebateVote[]>;
+  updateUserDebateStats(userId: string): Promise<UserDebateStats>;
+  getUserDebateStats(userId: string): Promise<UserDebateStats | undefined>;
+  updateDebatePhase(roomId: string, phase: 'structured' | 'voting' | 'free-form'): Promise<void>;
+  submitVoteToContinue(roomId: string, userId: string, voteToContinue: boolean): Promise<DebateRoom>;
   
   // Live streams
   createLiveStream(stream: InsertLiveStream): Promise<LiveStream>;
@@ -1251,6 +1266,183 @@ export class DatabaseStorage implements IStorage {
         fallacyCounts: fallacyMap[message.id] || {}
       };
     });
+  }
+
+  async updateDebateRoomTurn(roomId: string, userId: string): Promise<DebateRoom> {
+    const room = await this.getDebateRoom(roomId);
+    if (!room) throw new Error("Debate room not found");
+
+    const isParticipant1 = userId === room.participant1Id;
+    const isParticipant2 = userId === room.participant2Id;
+
+    if (!isParticipant1 && !isParticipant2) {
+      throw new Error("User is not a participant in this debate");
+    }
+
+    // Increment turn count for the user who just sent a message
+    const updates: Partial<DebateRoom> = {
+      turnCount1: isParticipant1 ? (room.turnCount1 || 0) + 1 : room.turnCount1,
+      turnCount2: isParticipant2 ? (room.turnCount2 || 0) + 1 : room.turnCount2,
+      currentTurn: isParticipant1 ? room.participant2Id : room.participant1Id, // Switch turn
+    };
+
+    // Check if both participants have reached 3 turns (transition to voting phase)
+    const newTurnCount1 = updates.turnCount1 || room.turnCount1 || 0;
+    const newTurnCount2 = updates.turnCount2 || room.turnCount2 || 0;
+
+    if (newTurnCount1 >= 3 && newTurnCount2 >= 3 && room.phase === 'structured') {
+      updates.phase = 'voting';
+      updates.currentTurn = null; // No more turns in voting phase
+    }
+
+    await db
+      .update(debateRooms)
+      .set(updates)
+      .where(eq(debateRooms.id, roomId));
+
+    return { ...room, ...updates } as DebateRoom;
+  }
+
+  async submitDebateVote(vote: InsertDebateVote): Promise<DebateVote> {
+    const [created] = await db
+      .insert(debateVotes)
+      .values(vote)
+      .onConflictDoUpdate({
+        target: [debateVotes.roomId, debateVotes.voterId],
+        set: {
+          logicalReasoning: vote.logicalReasoning,
+          politeness: vote.politeness,
+          opennessToChange: vote.opennessToChange,
+        }
+      })
+      .returning();
+    
+    // Update aggregate stats for the user being voted on
+    await this.updateUserDebateStats(vote.votedForUserId);
+    
+    return created;
+  }
+
+  async getDebateVotes(roomId: string): Promise<DebateVote[]> {
+    return await db
+      .select()
+      .from(debateVotes)
+      .where(eq(debateVotes.roomId, roomId));
+  }
+
+  async updateUserDebateStats(userId: string): Promise<UserDebateStats> {
+    // Calculate averages from all votes received
+    const votes = await db
+      .select()
+      .from(debateVotes)
+      .where(eq(debateVotes.votedForUserId, userId));
+
+    if (votes.length === 0) {
+      // Create or return empty stats
+      const [stats] = await db
+        .insert(userDebateStats)
+        .values({
+          userId,
+          totalDebates: 0,
+          avgLogicalReasoning: 0,
+          avgPoliteness: 0,
+          avgOpennessToChange: 0,
+          totalVotesReceived: 0,
+        })
+        .onConflictDoNothing()
+        .returning();
+      
+      return stats || { userId, totalDebates: 0, avgLogicalReasoning: 0, avgPoliteness: 0, avgOpennessToChange: 0, totalVotesReceived: 0, updatedAt: new Date() } as UserDebateStats;
+    }
+
+    // Calculate averages (multiply by 100 to store as integers)
+    const avgLogical = Math.round((votes.reduce((sum, v) => sum + v.logicalReasoning, 0) / votes.length) * 100);
+    const avgPolite = Math.round((votes.reduce((sum, v) => sum + v.politeness, 0) / votes.length) * 100);
+    const avgOpenness = Math.round((votes.reduce((sum, v) => sum + v.opennessToChange, 0) / votes.length) * 100);
+
+    // Count unique debates this user participated in
+    const uniqueRoomIds = new Set(votes.map(v => v.roomId));
+
+    const [updated] = await db
+      .insert(userDebateStats)
+      .values({
+        userId,
+        totalDebates: uniqueRoomIds.size,
+        avgLogicalReasoning: avgLogical,
+        avgPoliteness: avgPolite,
+        avgOpennessToChange: avgOpenness,
+        totalVotesReceived: votes.length,
+      })
+      .onConflictDoUpdate({
+        target: userDebateStats.userId,
+        set: {
+          totalDebates: uniqueRoomIds.size,
+          avgLogicalReasoning: avgLogical,
+          avgPoliteness: avgPolite,
+          avgOpennessToChange: avgOpenness,
+          totalVotesReceived: votes.length,
+          updatedAt: new Date(),
+        }
+      })
+      .returning();
+
+    return updated;
+  }
+
+  async getUserDebateStats(userId: string): Promise<UserDebateStats | undefined> {
+    const [stats] = await db
+      .select()
+      .from(userDebateStats)
+      .where(eq(userDebateStats.userId, userId))
+      .limit(1);
+    
+    return stats;
+  }
+
+  async updateDebatePhase(roomId: string, phase: 'structured' | 'voting' | 'free-form'): Promise<void> {
+    await db
+      .update(debateRooms)
+      .set({ phase })
+      .where(eq(debateRooms.id, roomId));
+  }
+
+  async submitVoteToContinue(roomId: string, userId: string, voteToContinue: boolean): Promise<DebateRoom> {
+    const room = await this.getDebateRoom(roomId);
+    if (!room) throw new Error("Debate room not found");
+
+    const isParticipant1 = userId === room.participant1Id;
+    const isParticipant2 = userId === room.participant2Id;
+
+    if (!isParticipant1 && !isParticipant2) {
+      throw new Error("User is not a participant in this debate");
+    }
+
+    const updates: Partial<DebateRoom> = {
+      votesToContinue1: isParticipant1 ? voteToContinue : room.votesToContinue1,
+      votesToContinue2: isParticipant2 ? voteToContinue : room.votesToContinue2,
+    };
+
+    // Check if both have voted
+    const newVote1 = updates.votesToContinue1 ?? room.votesToContinue1;
+    const newVote2 = updates.votesToContinue2 ?? room.votesToContinue2;
+
+    // If both have voted and both want to continue, transition to free-form
+    if (newVote1 !== null && newVote2 !== null) {
+      if (newVote1 === true && newVote2 === true) {
+        updates.phase = 'free-form';
+      } else {
+        // At least one person voted to end - end the debate
+        updates.status = 'ended';
+        updates.endedAt = new Date();
+      }
+    }
+
+    await db
+      .update(debateRooms)
+      .set(updates)
+      .where(eq(debateRooms.id, roomId));
+
+    return { ...room, ...updates } as DebateRoom;
   }
 
   // Live streams

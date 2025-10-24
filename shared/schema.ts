@@ -17,6 +17,7 @@ import { z } from "zod";
 
 // Enums
 export const debateStatusEnum = pgEnum('debate_status', ['open', 'closed', 'private']);
+export const debatePhaseEnum = pgEnum('debate_phase', ['structured', 'voting', 'free-form']);
 
 // Session storage table for Replit Auth
 export const sessions = pgTable(
@@ -127,6 +128,13 @@ export const debateRooms = pgTable("debate_rooms", {
   participant1Privacy: varchar("participant1_privacy", { length: 20 }).default("public"), // 'public', 'private'
   participant2Privacy: varchar("participant2_privacy", { length: 20 }).default("public"), // 'public', 'private'
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'ended', 'abandoned'
+  // Turn-based debate fields
+  phase: debatePhaseEnum("phase").default("structured").notNull(),
+  currentTurn: varchar("current_turn"), // userId of whose turn it is
+  turnCount1: integer("turn_count1").default(0), // participant1's turn count
+  turnCount2: integer("turn_count2").default(0), // participant2's turn count
+  votesToContinue1: boolean("votes_to_continue1"), // null = not voted, true = continue, false = end
+  votesToContinue2: boolean("votes_to_continue2"), // null = not voted, true = continue, false = end
   startedAt: timestamp("started_at").defaultNow(),
   endedAt: timestamp("ended_at"),
 });
@@ -139,6 +147,31 @@ export const debateMessages = pgTable("debate_messages", {
   content: text("content").notNull(),
   status: varchar("status", { length: 20 }).default("approved"), // 'approved', 'flagged', 'hidden'
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Debate performance votes (structured phase ratings)
+export const debateVotes = pgTable("debate_votes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: uuid("room_id").notNull().references(() => debateRooms.id, { onDelete: "cascade" }),
+  voterId: varchar("voter_id").notNull().references(() => users.id), // Who submitted the vote
+  votedForUserId: varchar("voted_for_user_id").notNull().references(() => users.id), // Who they're rating
+  logicalReasoning: integer("logical_reasoning").notNull(), // 1-5 rating
+  politeness: integer("politeness").notNull(), // 1-5 rating
+  opennessToChange: integer("openness_to_change").notNull(), // 1-5 rating
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_debate_vote").on(table.roomId, table.voterId)
+]);
+
+// Aggregate debate performance stats (for fast reads)
+export const userDebateStats = pgTable("user_debate_stats", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  totalDebates: integer("total_debates").default(0),
+  avgLogicalReasoning: integer("avg_logical_reasoning").default(0), // Average * 100 (e.g., 3.5 = 350)
+  avgPoliteness: integer("avg_politeness").default(0), // Average * 100
+  avgOpennessToChange: integer("avg_openness_to_change").default(0), // Average * 100
+  totalVotesReceived: integer("total_votes_received").default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Live streaming debates
@@ -326,8 +359,22 @@ export const insertOpinionSchema = createInsertSchema(opinions).omit({
 export const insertDebateRoomSchema = createInsertSchema(debateRooms).omit({
   id: true,
   status: true,
+  phase: true,
+  turnCount1: true,
+  turnCount2: true,
+  votesToContinue1: true,
+  votesToContinue2: true,
   startedAt: true,
   endedAt: true,
+});
+
+export const insertDebateVoteSchema = createInsertSchema(debateVotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserDebateStatsSchema = createInsertSchema(userDebateStats).omit({
+  updatedAt: true,
 });
 
 export const insertLiveStreamSchema = createInsertSchema(liveStreams).omit({
@@ -388,6 +435,10 @@ export type InsertDebateRoom = z.infer<typeof insertDebateRoomSchema>;
 export type DebateMessage = typeof debateMessages.$inferSelect & {
   fallacyCounts?: { [key: string]: number };
 };
+export type DebateVote = typeof debateVotes.$inferSelect;
+export type InsertDebateVote = z.infer<typeof insertDebateVoteSchema>;
+export type UserDebateStats = typeof userDebateStats.$inferSelect;
+export type InsertUserDebateStats = z.infer<typeof insertUserDebateStatsSchema>;
 export type LiveStream = typeof liveStreams.$inferSelect;
 export type InsertLiveStream = z.infer<typeof insertLiveStreamSchema>;
 export type StreamInvitation = typeof streamInvitations.$inferSelect;
