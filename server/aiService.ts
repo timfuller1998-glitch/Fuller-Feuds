@@ -548,6 +548,7 @@ Return only valid JSON with economicScore and authoritarianScore fields.`;
 
     try {
       console.log(`[Opinion Analysis] Analyzing opinion using model: ${model}`);
+      // GPT-5 only supports temperature=1 (default), other models support 0.3
       const completion = await openai.chat.completions.create({
         model,
         messages: [
@@ -562,7 +563,7 @@ Return only valid JSON with economicScore and authoritarianScore fields.`;
         ],
         response_format: { type: "json_object" },
         max_completion_tokens: 200,
-        temperature: 0.3
+        ...(model !== "gpt-5" ? { temperature: 0.3 } : {})
       });
 
       const responseContent = completion.choices[0]?.message?.content;
