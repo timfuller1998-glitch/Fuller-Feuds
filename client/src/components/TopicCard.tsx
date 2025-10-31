@@ -2,7 +2,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MessageCircle, Users, Sparkles, Activity } from "lucide-react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import { getTopicCornerGradient } from "@/lib/politicalColors";
 
 interface TopicCardProps {
@@ -18,6 +17,12 @@ interface TopicCardProps {
   previewAuthor?: string;
   previewIsAI?: boolean;
   diversityScore?: number;
+  politicalDistribution?: {
+    authoritarianCapitalist: number;
+    authoritarianSocialist: number;
+    libertarianCapitalist: number;
+    libertarianSocialist: number;
+  };
 }
 
 export default function TopicCard({
@@ -33,23 +38,13 @@ export default function TopicCard({
   previewAuthor,
   previewIsAI,
   diversityScore,
+  politicalDistribution,
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
 
-  // Fetch political distribution for this topic
-  const { data: distribution } = useQuery<{
-    authoritarianCapitalist: number;
-    authoritarianSocialist: number;
-    libertarianCapitalist: number;
-    libertarianSocialist: number;
-  }>({
-    queryKey: ['/api/topics', id, 'political-distribution'],
-    enabled: opinionsCount > 0, // Only fetch if there are opinions
-  });
-
   // Get gradient style based on political distribution
-  const gradientStyle = distribution && opinionsCount > 0
-    ? getTopicCornerGradient(distribution)
+  const gradientStyle = politicalDistribution && opinionsCount > 0
+    ? getTopicCornerGradient(politicalDistribution)
     : { background: 'linear-gradient(135deg, hsl(var(--muted)) 0%, hsl(var(--muted) / 0.5) 100%)' };
 
   // Truncate preview content to fit card with ellipsis

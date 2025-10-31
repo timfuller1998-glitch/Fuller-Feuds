@@ -316,6 +316,7 @@ export default function Home() {
                               previewAuthor={topic.previewAuthor}
                               previewIsAI={topic.previewIsAI}
                               diversityScore={topic.diversityScore}
+                              politicalDistribution={topic.politicalDistribution}
                             />
                           </CardContainer>
                         ))}

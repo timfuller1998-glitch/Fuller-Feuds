@@ -143,6 +143,7 @@ export default function HotDebates() {
                       previewAuthor={topic.previewAuthor}
                       previewIsAI={topic.previewIsAI}
                       diversityScore={topic.diversityScore}
+                      politicalDistribution={topic.politicalDistribution}
                     />
                   </div>
                   {/* Political Diversity Indicator */}

@@ -177,6 +177,7 @@ export default function Search() {
                   previewAuthor={topic.previewAuthor}
                   previewIsAI={topic.previewIsAI}
                   diversityScore={topic.diversityScore}
+                  politicalDistribution={topic.politicalDistribution}
                 />
               ))}
             </div>

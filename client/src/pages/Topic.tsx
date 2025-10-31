@@ -805,6 +805,7 @@ export default function Topic() {
                     previewAuthor={similarTopic.previewAuthor}
                     previewIsAI={similarTopic.previewIsAI}
                     diversityScore={similarTopic.diversityScore}
+                    politicalDistribution={similarTopic.politicalDistribution}
                   />
                 </CardContainer>
               ))}

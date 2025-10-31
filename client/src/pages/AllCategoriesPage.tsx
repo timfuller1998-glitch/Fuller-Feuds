@@ -245,6 +245,7 @@ export default function AllCategoriesPage() {
                             previewAuthor={topic.previewAuthor}
                             previewIsAI={topic.previewIsAI}
                             diversityScore={topic.diversityScore}
+                            politicalDistribution={topic.politicalDistribution}
                           />
                         </CardContainer>
                       ))}
