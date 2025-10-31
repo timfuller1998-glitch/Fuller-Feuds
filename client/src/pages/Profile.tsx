@@ -508,7 +508,7 @@ export default function Profile() {
         )}
       </div>
 
-      {/* From People You Follow Section - Horizontal Scrolling */}
+      {/* From People You Follow Section - Horizontal Scrolling (Mixed Topics & Opinions) */}
       {isOwnProfile && (
         <div className="space-y-4" data-testid="section-following">
           <div className="flex items-center justify-between">
@@ -519,23 +519,45 @@ export default function Profile() {
           </div>
           {followingTopics.length > 0 ? (
             <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-              {followingTopics.map((topic) => (
-                <CardContainer key={topic.id}>
-                  <TopicCard
-                    id={topic.id}
-                    title={topic.title}
-                    description={topic.description}
-                    imageUrl={topic.imageUrl}
-                    categories={topic.categories}
-                    participantCount={topic.participantCount || 0}
-                    opinionsCount={topic.opinionCount || 0}
-                    isActive={topic.isActive || false}
-                    previewContent={topic.previewContent}
-                    previewAuthor={topic.previewAuthor}
-                    previewIsAI={topic.previewIsAI}
-                    diversityScore={topic.diversityScore}
-                    politicalDistribution={topic.politicalDistribution}
-                  />
+              {followingTopics.map((item: any) => (
+                <CardContainer key={`${item.type}-${item.id}`}>
+                  {item.type === 'topic' ? (
+                    <TopicCard
+                      id={item.id}
+                      title={item.title}
+                      description={item.description}
+                      imageUrl={item.imageUrl}
+                      categories={item.categories}
+                      participantCount={item.participantCount || 0}
+                      opinionsCount={item.opinionCount || 0}
+                      isActive={item.isActive || false}
+                      previewContent={item.previewContent}
+                      previewAuthor={item.previewAuthor}
+                      previewIsAI={item.previewIsAI}
+                      diversityScore={item.diversityScore}
+                      politicalDistribution={item.politicalDistribution}
+                    />
+                  ) : (
+                    <OpinionCard
+                      id={item.id}
+                      topicId={item.topicId}
+                      userId={item.userId}
+                      userName={`${item.user?.firstName || ''} ${item.user?.lastName || ''}`}
+                      userAvatar={item.user?.profileImageUrl}
+                      economicScore={item.user?.economicScore}
+                      authoritarianScore={item.user?.authoritarianScore}
+                      topicEconomicScore={item.topic?.economicScore}
+                      topicAuthoritarianScore={item.topic?.authoritarianScore}
+                      content={item.content}
+                      stance={item.stance}
+                      debateStatus={item.debateStatus}
+                      timestamp={item.createdAt}
+                      likesCount={item.likesCount || 0}
+                      dislikesCount={item.dislikesCount || 0}
+                      references={item.references}
+                      fallacyCounts={item.fallacyCounts}
+                    />
+                  )}
                 </CardContainer>
               ))}
             </div>
@@ -543,7 +565,7 @@ export default function Profile() {
             <Card className="p-8 text-center">
               <UserPlus className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p className="text-muted-foreground">
-                Follow users to see their topics here
+                Follow users to see their topics and opinions here
               </p>
             </Card>
           )}

@@ -2456,7 +2456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get topics from users that this user follows
+  // Get topics and opinions from users that this user follows (mixed feed)
   app.get('/api/users/:userId/following-topics', async (req, res) => {
     try {
       const { userId } = req.params;
@@ -2476,17 +2476,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter topics created by followed users (topics already enriched with preview)
       const followingTopics = allTopics
         .filter(topic => followingIds.includes(topic.createdById))
+        .map(topic => ({
+          type: 'topic' as const,
+          data: topic,
+          timestamp: topic.createdAt || new Date()
+        }));
+      
+      // Get recent opinions from all topics
+      const allOpinions = await storage.getRecentOpinions(50);
+      
+      // Filter opinions posted by followed users
+      const followingOpinions = allOpinions
+        .filter((opinion: any) => followingIds.includes(opinion.userId))
+        .map((opinion: any) => ({
+          type: 'opinion' as const,
+          data: opinion,
+          timestamp: opinion.createdAt || new Date()
+        }));
+      
+      // Combine and sort by timestamp (most recent first)
+      const mixedFeed = [...followingTopics, ...followingOpinions]
         .sort((a, b) => {
-          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          const dateA = new Date(a.timestamp).getTime();
+          const dateB = new Date(b.timestamp).getTime();
           return dateB - dateA;
         })
-        .slice(0, limit);
+        .slice(0, limit)
+        .map(item => ({
+          type: item.type,
+          ...item.data
+        }));
       
-      res.json(followingTopics);
+      res.json(mixedFeed);
     } catch (error) {
-      console.error("Error fetching following topics:", error);
-      res.status(500).json({ message: "Failed to fetch following topics" });
+      console.error("Error fetching following content:", error);
+      res.status(500).json({ message: "Failed to fetch following content" });
     }
   });
 
