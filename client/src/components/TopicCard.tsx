@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Users, TrendingUp, Sparkles } from "lucide-react";
+import { MessageCircle, Users, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getTopicCornerGradient } from "@/lib/politicalColors";
@@ -88,14 +88,6 @@ export default function TopicCard({
             </Badge>
           )}
         </div>
-        {isActive && (
-          <div className="absolute top-2 right-2">
-            <Badge className="bg-chart-1 text-white">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              Active
-            </Badge>
-          </div>
-        )}
 
         {previewContent && (
           <div className="mt-8 space-y-2">
