@@ -502,7 +502,7 @@ export default function Topic() {
                   style={getOpinionGradientStyle(userOpinion.topicEconomicScore, userOpinion.topicAuthoritarianScore)}
                   data-testid="card-user-opinion"
                 >
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-3 flex-shrink-0">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">Your Opinion</CardTitle>
                       <Badge variant={userOpinion.stance === 'for' ? 'default' : userOpinion.stance === 'against' ? 'destructive' : 'secondary'}>
@@ -510,9 +510,9 @@ export default function Topic() {
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-sm leading-relaxed whitespace-normal break-words">{userOpinion.content}</p>
-                    <div className="flex gap-2">
+                  <CardContent className="pt-0 flex-1 flex flex-col">
+                    <p className="text-sm leading-relaxed mb-3 whitespace-normal break-words">{userOpinion.content}</p>
+                    <div className="flex gap-2 mt-auto pt-2 border-t">
                       <Button 
                         variant="outline" 
                         size="sm"
