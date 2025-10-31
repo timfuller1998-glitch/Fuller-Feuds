@@ -430,9 +430,10 @@ export type Opinion = typeof opinions.$inferSelect & {
     firstName: string | null;
     lastName: string | null;
     profileImageUrl: string | null;
-    economicScore: number | null;
-    authoritarianScore: number | null;
-  };
+    politicalLeaningScore?: number;
+    economicScore?: number;
+    authoritarianScore?: number;
+  } | null;
 };
 export type CumulativeOpinion = typeof cumulativeOpinions.$inferSelect;
 export type DebateRoom = typeof debateRooms.$inferSelect;
