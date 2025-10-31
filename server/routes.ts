@@ -2352,6 +2352,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get recommended topics for a user (based on their categories and political leaning)
+  app.get('/api/users/:userId/recommended-topics', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      // Get user's profile to find their interests
+      const profile = await storage.getUserProfile(userId);
+      
+      // Get user's opinions to find categories they engage with
+      const userOpinions = await storage.getProfileOpinions(userId, 'recent', 50);
+      
+      // Get topics the user has already participated in
+      const participatedTopicIds = new Set(userOpinions.map((o: any) => o.topicId));
+      
+      // Get all topics
+      const allTopics = await storage.getTopics();
+      
+      // Filter out topics the user has already participated in
+      const candidateTopics = allTopics.filter(t => !participatedTopicIds.has(t.id));
+      
+      // Find categories the user engages with most
+      const topicCategories = new Map<string, number>();
+      for (const opinion of userOpinions) {
+        const topic = await storage.getTopic(opinion.topicId);
+        if (topic?.categories) {
+          for (const category of topic.categories) {
+            topicCategories.set(category, (topicCategories.get(category) || 0) + 1);
+          }
+        }
+      }
+      
+      // Score topics based on category match
+      const scoredTopics = candidateTopics.map(topic => {
+        let score = 0;
+        
+        // Score based on matching categories
+        if (topic.categories) {
+          for (const category of topic.categories) {
+            score += topicCategories.get(category) || 0;
+          }
+        }
+        
+        // Boost newer topics slightly
+        const createdAt = topic.createdAt || new Date();
+        const ageInDays = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24);
+        if (ageInDays < 7) score += 2;
+        else if (ageInDays < 30) score += 1;
+        
+        return { topic, score };
+      });
+      
+      // Sort by score and return top recommendations (topics already enriched)
+      const recommended = scoredTopics
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(({ topic }) => topic);
+      
+      res.json(recommended);
+    } catch (error) {
+      console.error("Error fetching recommended topics:", error);
+      res.status(500).json({ message: "Failed to fetch recommended topics" });
+    }
+  });
+
+  // Get topics from users that this user follows
+  app.get('/api/users/:userId/following-topics', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      // Get list of users this user follows
+      const following = await storage.getUserFollowing(userId);
+      const followingIds = following.map((f: any) => f.id);
+      
+      if (followingIds.length === 0) {
+        return res.json([]);
+      }
+      
+      // Get all topics
+      const allTopics = await storage.getTopics();
+      
+      // Filter topics created by followed users (topics already enriched with preview)
+      const followingTopics = allTopics
+        .filter(topic => followingIds.includes(topic.createdById))
+        .sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        })
+        .slice(0, limit);
+      
+      res.json(followingTopics);
+    } catch (error) {
+      console.error("Error fetching following topics:", error);
+      res.status(500).json({ message: "Failed to fetch following topics" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time features following blueprint pattern

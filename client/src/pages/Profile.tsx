@@ -1,27 +1,19 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AvatarWithBadge } from "@/components/AvatarWithBadge";
 import { PoliticalCompassChart } from "@/components/PoliticalCompassChart";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { insertUserProfileSchema, insertLiveStreamSchema } from "@shared/schema";
-import { z } from "zod";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Progress } from "@/components/ui/progress";
+import OpinionCard from "@/components/OpinionCard";
+import TopicCard from "@/components/TopicCard";
+import { CardContainer } from "@/components/CardContainer";
+import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import * as LucideIcons from "lucide-react";
 import {
@@ -29,30 +21,16 @@ import {
   User,
   UserPlus,
   UserMinus,
-  TrendingUp,
-  TrendingDown,
   BarChart3,
   Calendar,
-  ThumbsUp,
-  ThumbsDown,
-  MessageSquare,
-  Brain,
-  Settings,
-  Edit,
-  Save,
-  X,
-  Filter,
-  ArrowUpDown,
-  Swords,
-  Video,
-  Clock,
-  Plus,
   Trophy,
-  Award,
-  Medal,
-  Star,
   Lock,
-  Check
+  Check,
+  ChevronRight,
+  Star,
+  MessageSquare,
+  Swords,
+  Lightbulb
 } from "lucide-react";
 
 interface ProfileData {
@@ -82,45 +60,19 @@ interface ProfileData {
     followingCount: number;
     totalTopics: number;
     lastAnalyzedAt?: string;
-    opinionSortPreference?: string;
-    categorySortPreference?: string;
   };
   followerCount: number;
   followingCount: number;
 }
 
-interface Opinion {
-  id: string;
-  topicId: string;
-  content: string;
-  stance: string;
-  likesCount: number;
-  dislikesCount: number;
-  createdAt: string;
-}
-
-const streamFormSchema = z.object({
-  topicId: z.string().min(1, "Please select a topic"),
-  title: z.string().min(1, "Title is required").max(200),
-  description: z.string().max(500).optional().or(z.literal("")),
-  participantSelectionMethod: z.enum(["open", "invite"]).default("open"),
-  scheduledAt: z.string().optional().or(z.literal("")),
-});
-
-const debateFormSchema = z.object({
-  topicId: z.string().min(1, "Please select a topic"),
-  participant2Id: z.string().min(1, "Opponent ID is required"),
-  participant1Stance: z.enum(["supporting", "opposing", "neutral"]),
-  participant2Stance: z.enum(["supporting", "opposing", "neutral"]),
-});
-
 export default function Profile() {
   const { userId } = useParams();
   const [, navigate] = useLocation();
   const { user: currentUser } = useAuth();
-  const [showCreateDebateDialog, setShowCreateDebateDialog] = useState(false);
-  const [showScheduleStreamDialog, setShowScheduleStreamDialog] = useState(false);
-  const [activeSection, setActiveSection] = useState<'opinions' | 'debates' | 'topics' | 'followers' | 'following' | 'badges' | 'leaderboards'>('opinions');
+  const [showBadgesModal, setShowBadgesModal] = useState(false);
+  const [showLeaderboardsModal, setShowLeaderboardsModal] = useState(false);
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [showFollowingModal, setShowFollowingModal] = useState(false);
 
   const isOwnProfile = currentUser?.id === userId;
 
@@ -131,35 +83,39 @@ export default function Profile() {
     enabled: !!userId,
   });
 
-  // Map opinion sort preference from settings to API parameter
-  const mapSortPreference = (pref?: string): 'recent' | 'oldest' | 'popular' | 'controversial' => {
-    switch (pref) {
-      case 'oldest':
-        return 'oldest';
-      case 'most_liked':
-        return 'popular';
-      case 'most_controversial':
-        return 'controversial';
-      case 'newest':
-      default:
-        return 'recent';
-    }
-  };
-
-  const opinionSortBy = mapSortPreference(profileData?.profile?.opinionSortPreference);
-
-  // Fetch user opinions
-  const { data: opinions = [], isLoading: opinionsLoading } = useQuery<Opinion[]>({
-    queryKey: ['/api/profile', userId, 'opinions', opinionSortBy],
-    queryFn: () => fetch(`/api/profile/${userId}/opinions?sortBy=${opinionSortBy}&limit=50`, { credentials: 'include' }).then(res => res.json()),
+  // Fetch user opinions (enriched with full data for OpinionCard)
+  const { data: opinions = [], isLoading: opinionsLoading } = useQuery<any[]>({
+    queryKey: ['/api/profile', userId, 'opinions-enriched'],
+    queryFn: () => fetch(`/api/profile/${userId}/opinions?limit=5`, { credentials: 'include' }).then(res => res.json()),
     enabled: !!userId,
   });
 
   // Fetch user's created topics
   const { data: userTopics = [], isLoading: topicsLoading } = useQuery<any[]>({
     queryKey: ['/api/users', userId, 'topics'],
-    queryFn: () => fetch(`/api/topics?createdBy=${userId}`, { credentials: 'include' }).then(res => res.json()),
-    enabled: !!userId && activeSection === 'topics',
+    queryFn: () => fetch(`/api/topics?createdBy=${userId}&limit=5`, { credentials: 'include' }).then(res => res.json()),
+    enabled: !!userId,
+  });
+
+  // Fetch debate rooms
+  const { data: debateRooms = [] } = useQuery<any[]>({
+    queryKey: ['/api/profile', userId, 'debate-rooms'],
+    queryFn: () => fetch(`/api/profile/${userId}/debate-rooms`, { credentials: 'include' }).then(res => res.json()),
+    enabled: !!userId,
+  });
+
+  // Fetch recommended topics (new endpoint)
+  const { data: recommendedTopics = [] } = useQuery<any[]>({
+    queryKey: ['/api/users', userId, 'recommended-topics'],
+    queryFn: () => fetch(`/api/users/${userId}/recommended-topics?limit=5`, { credentials: 'include' }).then(res => res.json()),
+    enabled: !!userId && isOwnProfile,
+  });
+
+  // Fetch topics from following (new endpoint)
+  const { data: followingTopics = [] } = useQuery<any[]>({
+    queryKey: ['/api/users', userId, 'following-topics'],
+    queryFn: () => fetch(`/api/users/${userId}/following-topics?limit=5`, { credentials: 'include' }).then(res => res.json()),
+    enabled: !!userId && isOwnProfile,
   });
 
   // Fetch follow status (only if viewing another user's profile)
@@ -183,19 +139,6 @@ export default function Profile() {
     enabled: !!userId,
   });
 
-  // Fetch debate rooms count
-  const { data: debateRooms = [] } = useQuery<any[]>({
-    queryKey: ['/api/profile', userId, 'debate-rooms'],
-    queryFn: () => fetch(`/api/profile/${userId}/debate-rooms`, { credentials: 'include' }).then(res => res.json()),
-    enabled: !!userId,
-  });
-
-  // Fetch topics for stream creation
-  const { data: topics = [] } = useQuery<any[]>({
-    queryKey: ['/api/topics'],
-    enabled: isOwnProfile && showScheduleStreamDialog,
-  });
-
   // Fetch user badges
   const { data: userBadges = [] } = useQuery<any[]>({
     queryKey: ['/api/users', userId, 'badges'],
@@ -207,7 +150,7 @@ export default function Profile() {
   const { data: leaderboards } = useQuery<any>({
     queryKey: ['/api/leaderboards'],
     queryFn: () => fetch('/api/leaderboards', { credentials: 'include' }).then(res => res.json()),
-    enabled: activeSection === 'leaderboards',
+    enabled: showLeaderboardsModal,
   });
 
   // Follow/unfollow mutation
@@ -220,121 +163,22 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ['/api/follow', userId, 'status'] });
       queryClient.invalidateQueries({ queryKey: ['/api/profile', userId] });
     },
-    onError: (error) => {
-      console.error("Failed to update follow status:", error);
-    }
-  });
-
-  // Political analysis mutation
-  const analyzeMutation = useMutation({
-    mutationFn: () => fetch(`/api/profile/${userId}/analyze`, { method: 'POST', credentials: 'include' }).then(res => res.json()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/profile', userId] });
-    },
-    onError: (error) => {
-      console.error("Political analysis failed:", error);
-    }
   });
 
   // Badge selection mutation
   const selectBadgeMutation = useMutation({
     mutationFn: (badgeId: string | null) => 
-      apiRequest('POST', '/api/users/me/selected-badge', { badgeId }),
+      fetch('/api/users/me/selected-badge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ badgeId }),
+      }).then(res => res.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'badges'] });
       queryClient.invalidateQueries({ queryKey: ['/api/profile', userId] });
     },
-    onError: (error) => {
-      console.error("Failed to select badge:", error);
-    }
   });
-
-  // Delete topic mutation
-  const deleteTopicMutation = useMutation({
-    mutationFn: (topicId: string) => 
-      apiRequest('DELETE', `/api/topics/${topicId}`, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/users', userId, 'topics'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/profile', userId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/topics'] });
-    },
-    onError: (error) => {
-      console.error("Failed to delete topic:", error);
-    }
-  });
-
-  // Stream schedule form
-  const streamForm = useForm<z.infer<typeof streamFormSchema>>({
-    resolver: zodResolver(streamFormSchema),
-    defaultValues: {
-      topicId: "",
-      title: "",
-      description: "",
-      participantSelectionMethod: "open",
-      scheduledAt: "",
-    },
-  });
-
-  // Debate room form
-  const debateForm = useForm<z.infer<typeof debateFormSchema>>({
-    resolver: zodResolver(debateFormSchema),
-    defaultValues: {
-      topicId: "",
-      participant2Id: "",
-      participant1Stance: "supporting",
-      participant2Stance: "opposing",
-    },
-  });
-
-  // Debate room creation mutation
-  const createDebateMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof debateFormSchema>) => {
-      const response = await apiRequest('POST', '/api/debate-rooms', data);
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms'] });
-      setShowCreateDebateDialog(false);
-      debateForm.reset();
-      navigate(`/debate-room/${data.id}`);
-    },
-    onError: (error) => {
-      console.error("Failed to create debate room:", error);
-    }
-  });
-
-  const onDebateSubmit = (data: z.infer<typeof debateFormSchema>) => {
-    createDebateMutation.mutate(data);
-  };
-
-  // Stream creation mutation
-  const createStreamMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof streamFormSchema>) => {
-      const payload = {
-        ...data,
-        description: data.description || undefined,
-        moderatorId: currentUser!.id,
-        scheduledAt: data.scheduledAt ? new Date(data.scheduledAt).toISOString() : undefined,
-      };
-      const response = await apiRequest('POST', '/api/streams', payload);
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/live-streams'] });
-      setShowScheduleStreamDialog(false);
-      streamForm.reset();
-      navigate(`/live-stream/${data.id}`);
-    },
-    onError: (error) => {
-      console.error("Failed to create stream:", error);
-    }
-  });
-
-  const onStreamSubmit = (data: z.infer<typeof streamFormSchema>) => {
-    console.log('Stream form submitted with data:', data);
-    console.log('Form errors:', streamForm.formState.errors);
-    createStreamMutation.mutate(data);
-  };
 
   // Helper functions
   const formatJoinDate = (dateString: string) => {
@@ -342,41 +186,6 @@ export default function Profile() {
       year: 'numeric',
       month: 'long'
     });
-  };
-
-  const getPoliticalLeaningColor = (leaning?: string) => {
-    switch (leaning?.toLowerCase()) {
-      case 'progressive':
-      case 'moderate-progressive':
-        return '#3b82f6'; // blue-500
-      case 'conservative':
-      case 'moderate-conservative':
-        return '#ef4444'; // red-500
-      case 'moderate':
-        return '#a855f7'; // purple-500
-      case 'libertarian':
-        return '#eab308'; // yellow-500
-      case 'populist':
-        return '#f97316'; // orange-500
-      default:
-        return '#6b7280'; // gray-500
-    }
-  };
-
-  const getPoliticalLeaningColorFromScore = (score: number) => {
-    if (score < -50) return '#3b82f6'; // Very Progressive - blue
-    if (score < -20) return '#3b82f6'; // Progressive - blue
-    if (score <= 20) return '#a855f7'; // Moderate - purple
-    if (score <= 50) return '#ef4444'; // Conservative - red
-    return '#ef4444'; // Very Conservative - red
-  };
-
-  const getLeaningDescription = (score: number) => {
-    if (score < -50) return "Very Progressive";
-    if (score < -20) return "Progressive";
-    if (score <= 20) return "Moderate";
-    if (score <= 50) return "Conservative";
-    return "Very Conservative";
   };
 
   // 2D Political Compass Description
@@ -429,9 +238,9 @@ export default function Profile() {
       <div className="container mx-auto py-8">
         <div className="animate-pulse">
           <div className="h-32 bg-muted rounded-lg mb-6"></div>
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="space-y-6">
             <div className="h-96 bg-muted rounded-lg"></div>
-            <div className="md:col-span-2 h-96 bg-muted rounded-lg"></div>
+            <div className="h-96 bg-muted rounded-lg"></div>
           </div>
         </div>
       </div>
@@ -462,7 +271,7 @@ export default function Profile() {
 
   return (
     <div className="container mx-auto py-8 space-y-6">
-      {/* Profile Header */}
+      {/* Profile Header - Cleaner Design */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -511,13 +320,6 @@ export default function Profile() {
                       </PopoverContent>
                     </Popover>
                   )}
-                  <p className="text-sm text-muted-foreground truncate" data-testid="profile-email">
-                    {user.email}
-                  </p>
-                  <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
-                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                    Joined {formatJoinDate(user.createdAt)}
-                  </p>
                 </div>
                 
                 {profile?.bio && (
@@ -525,6 +327,59 @@ export default function Profile() {
                     {profile.bio}
                   </p>
                 )}
+
+                {/* Inline Stats - Only 4 Clickable Stats */}
+                <div className="flex flex-wrap gap-2 sm:gap-3 pt-2">
+                  <button 
+                    className="text-center hover-elevate active-elevate-2 rounded-md px-3 py-2 transition-colors border"
+                    onClick={() => setShowBadgesModal(true)}
+                    data-testid="stat-badges"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-4 h-4" />
+                      <div>
+                        <div className="text-sm font-bold">{userBadges.filter((b: any) => b.unlockedAt).length}/{userBadges.length}</div>
+                        <div className="text-xs text-muted-foreground">Badges</div>
+                      </div>
+                    </div>
+                  </button>
+                  <button 
+                    className="text-center hover-elevate active-elevate-2 rounded-md px-3 py-2 transition-colors border"
+                    onClick={() => setShowLeaderboardsModal(true)}
+                    data-testid="stat-leaderboards"
+                  >
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4" />
+                      <div className="text-xs text-muted-foreground">Rankings</div>
+                    </div>
+                  </button>
+                  <button 
+                    className="text-center hover-elevate active-elevate-2 rounded-md px-3 py-2 transition-colors border"
+                    onClick={() => setShowFollowersModal(true)}
+                    data-testid="stat-followers"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <div>
+                        <div className="text-sm font-bold">{profile?.followerCount || 0}</div>
+                        <div className="text-xs text-muted-foreground">Followers</div>
+                      </div>
+                    </div>
+                  </button>
+                  <button 
+                    className="text-center hover-elevate active-elevate-2 rounded-md px-3 py-2 transition-colors border"
+                    onClick={() => setShowFollowingModal(true)}
+                    data-testid="stat-following"
+                  >
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="w-4 h-4" />
+                      <div>
+                        <div className="text-sm font-bold">{profile?.followingCount || 0}</div>
+                        <div className="text-xs text-muted-foreground">Following</div>
+                      </div>
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
             
@@ -551,1000 +406,563 @@ export default function Profile() {
               )}
             </div>
           </div>
-          
-          {/* Stats - Now Clickable */}
-          <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2 sm:gap-3 mt-6 pt-6 border-t">
-            <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'opinions' ? 'bg-primary/10' : ''}`}
-              onClick={() => setActiveSection('opinions')}
-              data-testid="stat-opinions"
-            >
-              <div className="text-lg sm:text-2xl font-bold">{profile?.totalOpinions || 0}</div>
-              <div className="text-xs text-muted-foreground">Opinions</div>
-            </button>
-            <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'debates' ? 'bg-primary/10' : ''}`}
-              onClick={() => setActiveSection('debates')}
-              data-testid="stat-debates"
-            >
-              <div className="text-lg sm:text-2xl font-bold">{debateRooms?.length || 0}</div>
-              <div className="text-xs text-muted-foreground">Debates</div>
-            </button>
-            <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'topics' ? 'bg-primary/10' : ''}`}
-              onClick={() => setActiveSection('topics')}
-              data-testid="stat-topics"
-            >
-              <div className="text-lg sm:text-2xl font-bold">{profile?.totalTopics || 0}</div>
-              <div className="text-xs text-muted-foreground">Topics</div>
-            </button>
-            <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'badges' ? 'bg-primary/10' : ''}`}
-              onClick={() => setActiveSection('badges')}
-              data-testid="stat-badges"
-            >
-              <div className="text-lg sm:text-2xl font-bold">{userBadges.filter((b: any) => b.unlockedAt).length}/{userBadges.length}</div>
-              <div className="text-xs text-muted-foreground">Badges</div>
-            </button>
-            <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'leaderboards' ? 'bg-primary/10' : ''}`}
-              onClick={() => setActiveSection('leaderboards')}
-              data-testid="stat-leaderboards"
-            >
-              <div className="text-lg sm:text-2xl font-bold">
-                <BarChart3 className="w-5 h-5 mx-auto" />
-              </div>
-              <div className="text-xs text-muted-foreground">Rankings</div>
-            </button>
-            <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'followers' ? 'bg-primary/10' : ''}`}
-              onClick={() => setActiveSection('followers')}
-              data-testid="stat-followers"
-            >
-              <div className="text-lg sm:text-2xl font-bold">{profile?.followerCount || 0}</div>
-              <div className="text-xs text-muted-foreground">Followers</div>
-            </button>
-            <button 
-              className={`text-center hover-elevate active-elevate-2 rounded-md px-2 sm:px-3 py-2 transition-colors ${activeSection === 'following' ? 'bg-primary/10' : ''}`}
-              onClick={() => setActiveSection('following')}
-              data-testid="stat-following"
-            >
-              <div className="text-lg sm:text-2xl font-bold">{profile?.followingCount || 0}</div>
-              <div className="text-xs text-muted-foreground">Following</div>
-            </button>
-          </div>
         </CardContent>
       </Card>
 
-      {/* Main Content - No Tabs, controlled by stat clicks */}
-      <div className="space-y-6">
-        {/* Opinions Section */}
-        {activeSection === 'opinions' && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Opinions</CardTitle>
-                  <CardDescription>
-                    All opinions shared by {isOwnProfile ? 'you' : `${user.firstName}`}
-                  </CardDescription>
-                </div>
-                <Link href="/settings">
-                  <Button variant="outline" size="sm" data-testid="button-sort-settings">
-                    <Filter className="w-4 h-4 mr-2" />
-                    Sort: {profileData?.profile?.opinionSortPreference === 'most_liked' ? 'Most Liked' : profileData?.profile?.opinionSortPreference === 'most_controversial' ? 'Most Controversial' : profileData?.profile?.opinionSortPreference === 'oldest' ? 'Oldest First' : 'Newest First'}
-                  </Button>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {opinionsLoading ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                      <div className="h-3 bg-muted rounded w-1/2"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : opinions.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No opinions shared yet</p>
-                  {isOwnProfile && (
-                    <p className="text-sm mt-2">
-                      Share your first opinion on a debate topic!
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {opinions.map((opinion) => (
-                    <div 
-                      key={opinion.id} 
-                      className="border rounded-lg p-4 hover:bg-muted/30 transition-colors cursor-pointer active-elevate-2" 
-                      onClick={() => navigate(`/topic/${opinion.topicId}`)}
-                      data-testid={`opinion-${opinion.id}`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <Badge variant={
-                          opinion.stance === 'for' ? 'default' : 
-                          opinion.stance === 'against' ? 'destructive' : 
-                          'secondary'
-                        }>
-                          {opinion.stance}
-                        </Badge>
-                        <div className="text-sm text-muted-foreground">
-                          {new Date(opinion.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <p className="text-sm mb-3">{opinion.content}</p>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <ThumbsUp className="w-3 h-3" />
-                          {opinion.likesCount}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <ThumbsDown className="w-3 h-3" />
-                          {opinion.dislikesCount}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Debates Section */}
-        {activeSection === 'debates' && (
-          <div className="space-y-6">
-            {isOwnProfile && (
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Create Debate Room Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Swords className="w-5 h-5" />
-                      Start a Debate
-                    </CardTitle>
-                    <CardDescription>
-                      Challenge someone to a one-on-one debate
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Dialog open={showCreateDebateDialog} onOpenChange={setShowCreateDebateDialog}>
-                      <DialogTrigger asChild>
-                        <Button className="w-full" data-testid="button-create-debate">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Create Debate Room
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>Create Debate Room</DialogTitle>
-                          <DialogDescription>
-                            Set up a one-on-one debate with another user
-                          </DialogDescription>
-                        </DialogHeader>
-                        <Form {...debateForm}>
-                          <form onSubmit={debateForm.handleSubmit(onDebateSubmit)} className="space-y-4">
-                            <FormField
-                              control={debateForm.control}
-                              name="topicId"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Topic</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-debate-topic">
-                                        <SelectValue placeholder="Select a debate topic" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {topics.map((topic: any) => (
-                                        <SelectItem key={topic.id} value={topic.id}>
-                                          {topic.title}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={debateForm.control}
-                              name="participant2Id"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Opponent User ID</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      placeholder="Enter opponent's user ID" 
-                                      {...field}
-                                      data-testid="input-opponent-id"
-                                    />
-                                  </FormControl>
-                                  <FormDescription>
-                                    Enter the user ID of the person you want to debate with
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={debateForm.control}
-                              name="participant1Stance"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Your Stance</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-my-stance">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="supporting">Supporting</SelectItem>
-                                      <SelectItem value="opposing">Opposing</SelectItem>
-                                      <SelectItem value="neutral">Neutral</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={debateForm.control}
-                              name="participant2Stance"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Opponent's Stance</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-opponent-stance">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="supporting">Supporting</SelectItem>
-                                      <SelectItem value="opposing">Opposing</SelectItem>
-                                      <SelectItem value="neutral">Neutral</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <DialogFooter>
-                              <Button 
-                                type="button" 
-                                variant="outline" 
-                                onClick={() => setShowCreateDebateDialog(false)}
-                                data-testid="button-cancel-debate"
-                              >
-                                Cancel
-                              </Button>
-                              <Button 
-                                type="submit" 
-                                disabled={createDebateMutation.isPending}
-                                data-testid="button-submit-debate"
-                              >
-                                {createDebateMutation.isPending ? "Creating..." : "Create Debate"}
-                              </Button>
-                            </DialogFooter>
-                          </form>
-                        </Form>
-                      </DialogContent>
-                    </Dialog>
-                  </CardContent>
-                </Card>
-
-                {/* Schedule Live Stream Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Video className="w-5 h-5" />
-                      Schedule Live Stream
-                    </CardTitle>
-                    <CardDescription>
-                      Host a live debate with multiple participants
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Dialog open={showScheduleStreamDialog} onOpenChange={setShowScheduleStreamDialog}>
-                      <DialogTrigger asChild>
-                        <Button className="w-full" data-testid="button-schedule-stream">
-                          <Clock className="w-4 h-4 mr-2" />
-                          Schedule Stream
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>Schedule Live Stream</DialogTitle>
-                          <DialogDescription>
-                            Set up a live debate stream with moderation controls
-                          </DialogDescription>
-                        </DialogHeader>
-                        <Form {...streamForm}>
-                          <form onSubmit={streamForm.handleSubmit(onStreamSubmit)} className="space-y-4">
-                            <FormField
-                              control={streamForm.control}
-                              name="topicId"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Topic</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-stream-topic">
-                                        <SelectValue placeholder="Select a debate topic" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {topics.map((topic: any) => (
-                                        <SelectItem key={topic.id} value={topic.id}>
-                                          {topic.title}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <FormField
-                              control={streamForm.control}
-                              name="title"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Stream Title</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="e.g., Live Debate: Climate Change Solutions"
-                                      {...field}
-                                      data-testid="input-stream-title"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <FormField
-                              control={streamForm.control}
-                              name="description"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Description (Optional)</FormLabel>
-                                  <FormControl>
-                                    <Textarea
-                                      placeholder="Describe what this debate will cover..."
-                                      className="resize-none"
-                                      maxLength={500}
-                                      {...field}
-                                      value={field.value || ""}
-                                      data-testid="input-stream-description"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <FormField
-                              control={streamForm.control}
-                              name="scheduledAt"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Scheduled Time (Optional)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="datetime-local"
-                                      {...field}
-                                      data-testid="input-stream-scheduled-time"
-                                    />
-                                  </FormControl>
-                                  <FormDescription>
-                                    Leave empty to start immediately
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <FormField
-                              control={streamForm.control}
-                              name="participantSelectionMethod"
-                              render={({ field }) => (
-                                <FormItem className="space-y-3">
-                                  <FormLabel>Participant Selection</FormLabel>
-                                  <FormControl>
-                                    <RadioGroup
-                                      onValueChange={field.onChange}
-                                      value={field.value}
-                                      className="flex flex-col space-y-1"
-                                    >
-                                      <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="open" id="open" data-testid="radio-open-voting" />
-                                        <Label htmlFor="open" className="font-normal cursor-pointer">
-                                          <div className="font-medium">Open Voting</div>
-                                          <div className="text-sm text-muted-foreground">
-                                            Viewers can vote on who should speak
-                                          </div>
-                                        </Label>
-                                      </div>
-                                      <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="invite" id="invite" data-testid="radio-invite-only" />
-                                        <Label htmlFor="invite" className="font-normal cursor-pointer">
-                                          <div className="font-medium">Invite Only</div>
-                                          <div className="text-sm text-muted-foreground">
-                                            Only invited users can participate
-                                          </div>
-                                        </Label>
-                                      </div>
-                                    </RadioGroup>
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <DialogFooter>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setShowScheduleStreamDialog(false)}
-                                disabled={createStreamMutation.isPending}
-                              >
-                                Cancel
-                              </Button>
-                              <Button 
-                                type="submit" 
-                                disabled={createStreamMutation.isPending}
-                                data-testid="button-submit-stream"
-                              >
-                                {createStreamMutation.isPending ? (
-                                  <>
-                                    <Clock className="w-4 h-4 mr-2 animate-spin" />
-                                    Creating...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Video className="w-4 h-4 mr-2" />
-                                    Schedule Stream
-                                  </>
-                                )}
-                              </Button>
-                            </DialogFooter>
-                          </form>
-                        </Form>
-                      </DialogContent>
-                    </Dialog>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* My Debates and Streams */}
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {isOwnProfile ? 'My Debates & Streams' : `${user.firstName}'s Debates & Streams`}
-                </CardTitle>
-                <CardDescription>
-                  Active debates and scheduled live streams
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Swords className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No debates or streams yet</p>
-                  {isOwnProfile && (
-                    <p className="text-sm mt-2">
-                      Create your first debate or schedule a live stream!
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+      {/* My Opinions Section - Horizontal Scrolling */}
+      {opinions.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">My Opinions</h2>
+            <Link href={`/profile/${userId}`}>
+              <Button variant="ghost" size="sm" data-testid="link-view-all-opinions">
+                View All
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
           </div>
-        )}
+          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+            {opinions.map((opinion) => (
+              <CardContainer key={opinion.id}>
+                <OpinionCard
+                  id={opinion.id}
+                  topicId={opinion.topicId}
+                  userId={opinion.userId}
+                  userName={`${opinion.user?.firstName || ''} ${opinion.user?.lastName || ''}`}
+                  userAvatar={opinion.user?.profileImageUrl}
+                  economicScore={opinion.user?.economicScore}
+                  authoritarianScore={opinion.user?.authoritarianScore}
+                  topicEconomicScore={opinion.topic?.economicScore}
+                  topicAuthoritarianScore={opinion.topic?.authoritarianScore}
+                  content={opinion.content}
+                  stance={opinion.stance}
+                  debateStatus={opinion.debateStatus}
+                  timestamp={opinion.createdAt}
+                  likesCount={opinion.likesCount || 0}
+                  dislikesCount={opinion.dislikesCount || 0}
+                  references={opinion.references}
+                  fallacyCounts={opinion.fallacyCounts}
+                />
+              </CardContainer>
+            ))}
+          </div>
+        </div>
+      )}
 
-        {/* Topics Section */}
-        {activeSection === 'topics' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Topics</CardTitle>
-              <CardDescription>
-                Topics created by {isOwnProfile ? 'you' : `${user.firstName}`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {topicsLoading ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                      <div className="h-3 bg-muted rounded w-1/2"></div>
+      {/* My Topics Section - Horizontal Scrolling */}
+      {userTopics.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">My Topics</h2>
+            <Link href={`/profile/${userId}`}>
+              <Button variant="ghost" size="sm" data-testid="link-view-all-topics">
+                View All
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+            {userTopics.map((topic) => (
+              <CardContainer key={topic.id}>
+                <TopicCard
+                  id={topic.id}
+                  title={topic.title}
+                  description={topic.description}
+                  imageUrl={topic.imageUrl}
+                  categories={topic.categories}
+                  participantCount={topic.participantCount || 0}
+                  opinionsCount={topic.opinionCount || 0}
+                  isActive={topic.isActive || false}
+                  previewContent={topic.previewContent}
+                  previewAuthor={topic.previewAuthor}
+                  previewIsAI={topic.previewIsAI}
+                  diversityScore={topic.diversityScore}
+                  politicalDistribution={topic.politicalDistribution}
+                />
+              </CardContainer>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Active Debates Section - Horizontal Scrolling */}
+      {debateRooms.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">Active Debates</h2>
+            <Link href="/my-active-debates">
+              <Button variant="ghost" size="sm" data-testid="link-view-all-debates">
+                View All
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+            {debateRooms.slice(0, 5).map((room) => (
+              <CardContainer key={room.id}>
+                <Card 
+                  className="hover-elevate active-elevate-2 cursor-pointer" 
+                  onClick={() => navigate(`/debate-room/${room.id}`)}
+                  data-testid={`card-debate-${room.id}`}
+                >
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Swords className="w-5 h-5" />
+                      <CardTitle className="text-base">{room.topic?.title || 'Debate Room'}</CardTitle>
                     </div>
-                  ))}
-                </div>
-              ) : userTopics.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No topics created yet</p>
-                  {isOwnProfile && (
-                    <p className="text-sm mt-2">
-                      Create your first topic to start a debate!
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {userTopics.map((topic: any) => (
-                    <div 
-                      key={topic.id} 
-                      className="border rounded-lg p-4 hover:bg-muted/30 transition-colors"
-                      data-testid={`topic-${topic.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div 
-                          className="flex-1 cursor-pointer"
-                          onClick={() => navigate(`/topic/${topic.id}`)}
-                        >
-                          <h3 className="font-semibold mb-1">{topic.title}</h3>
-                          <p className="text-sm text-muted-foreground mb-2">{topic.description}</p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {topic.categories?.map((cat: string) => (
-                              <Badge 
-                                key={cat} 
-                                variant="secondary" 
-                                className="text-xs cursor-pointer hover-elevate"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/category/${encodeURIComponent(cat)}`);
-                                }}
-                                data-testid={`badge-category-${cat.toLowerCase()}`}
-                              >
-                                {cat}
-                              </Badge>
-                            ))}
-                          </div>
-                          <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <MessageSquare className="w-3 h-3" />
-                              {topic.opinionCount || 0} opinions
-                            </span>
-                            <span>{new Date(topic.createdAt).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                        {isOwnProfile && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => {
-                              if (window.confirm('Are you sure you want to delete this topic? This will also delete all associated opinions and debates.')) {
-                                deleteTopicMutation.mutate(topic.id);
-                              }
-                            }}
-                            disabled={deleteTopicMutation.isPending}
-                            data-testid={`button-delete-topic-${topic.id}`}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
+                    <CardDescription className="line-clamp-2">
+                      {room.topic?.description || 'Active debate room'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="w-4 h-4" />
+                      <span>{room.participant1?.firstName} vs {room.participant2?.firstName}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </CardContainer>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recommended for You Section - Horizontal Scrolling */}
+      {isOwnProfile && recommendedTopics.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Lightbulb className="w-5 h-5" />
+              Recommended for You
+            </h2>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+            {recommendedTopics.map((topic) => (
+              <CardContainer key={topic.id}>
+                <TopicCard
+                  id={topic.id}
+                  title={topic.title}
+                  description={topic.description}
+                  imageUrl={topic.imageUrl}
+                  categories={topic.categories}
+                  participantCount={topic.participantCount || 0}
+                  opinionsCount={topic.opinionCount || 0}
+                  isActive={topic.isActive || false}
+                  previewContent={topic.previewContent}
+                  previewAuthor={topic.previewAuthor}
+                  previewIsAI={topic.previewIsAI}
+                  diversityScore={topic.diversityScore}
+                  politicalDistribution={topic.politicalDistribution}
+                />
+              </CardContainer>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* From People You Follow Section - Horizontal Scrolling */}
+      {isOwnProfile && followingTopics.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              From People You Follow
+            </h2>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+            {followingTopics.map((topic) => (
+              <CardContainer key={topic.id}>
+                <TopicCard
+                  id={topic.id}
+                  title={topic.title}
+                  description={topic.description}
+                  imageUrl={topic.imageUrl}
+                  categories={topic.categories}
+                  participantCount={topic.participantCount || 0}
+                  opinionsCount={topic.opinionCount || 0}
+                  isActive={topic.isActive || false}
+                  previewContent={topic.previewContent}
+                  previewAuthor={topic.previewAuthor}
+                  previewIsAI={topic.previewIsAI}
+                  diversityScore={topic.diversityScore}
+                  politicalDistribution={topic.politicalDistribution}
+                />
+              </CardContainer>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Badges Modal */}
+      <Dialog open={showBadgesModal} onOpenChange={setShowBadgesModal}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5" />
+              Badges
+            </DialogTitle>
+            <DialogDescription>
+              {isOwnProfile 
+                ? `You've unlocked ${userBadges.filter((b: any) => b.unlockedAt).length} of ${userBadges.length} badges`
+                : `${user.firstName} has unlocked ${userBadges.filter((b: any) => b.unlockedAt).length} of ${userBadges.length} badges`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-4">
+            {userBadges.map((userBadge: any) => {
+              const isUnlocked = !!userBadge.unlockedAt;
+              const isSelected = userBadge.isSelected;
+              const IconComponent = (LucideIcons as any)[userBadge.icon] || Trophy;
+              
+              return (
+                <div
+                  key={userBadge.badgeId}
+                  className={`relative p-4 border rounded-lg transition-all ${
+                    isUnlocked 
+                      ? 'bg-card hover-elevate active-elevate-2' 
+                      : 'bg-muted/30 opacity-60'
+                  } ${isSelected ? 'ring-2 ring-primary' : ''}`}
+                  data-testid={`badge-${userBadge.badgeId}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                      isUnlocked ? 'bg-primary/10' : 'bg-muted'
+                    }`}>
+                      {isUnlocked ? (
+                        <IconComponent className="w-6 h-6 text-primary" />
+                      ) : (
+                        <Lock className="w-6 h-6 text-muted-foreground" />
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-sm">{userBadge.name}</h3>
+                        {isSelected && (
+                          <Badge variant="default" className="text-xs">
+                            <Check className="w-3 h-3 mr-1" />
+                            Selected
+                          </Badge>
                         )}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {userBadge.description}
+                      </p>
+                      
+                      {isUnlocked ? (
+                        <div className="mt-2 flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            Unlocked {new Date(userBadge.unlockedAt).toLocaleDateString()}
+                          </p>
+                          {isOwnProfile && (
+                            <Button
+                              size="sm"
+                              variant={isSelected ? "outline" : "default"}
+                              onClick={() => selectBadgeMutation.mutate(isSelected ? null : userBadge.badgeId)}
+                              disabled={selectBadgeMutation.isPending}
+                              data-testid={`button-select-badge-${userBadge.badgeId}`}
+                            >
+                              {isSelected ? 'Deselect' : 'Display'}
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          🔒 Locked
+                        </p>
+                      )}
                     </div>
-                  ))}
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
 
-        {/* Followers Section */}
-        {activeSection === 'followers' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Followers ({followers.length})</CardTitle>
-              <CardDescription>
-                People following {isOwnProfile ? 'you' : `${user.firstName}`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {followers.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No followers yet</p>
-                </div>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {followers.map((follower) => (
-                    <div key={follower.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors" data-testid={`follower-${follower.id}`}>
-                      <Avatar>
-                        <AvatarImage src={follower.profileImageUrl} />
-                        <AvatarFallback>
-                          {follower.firstName?.charAt(0)}{follower.lastName?.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="font-medium">{follower.firstName} {follower.lastName}</p>
-                        <p className="text-sm text-muted-foreground">{follower.email}</p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/profile/${follower.id}`)}
-                        data-testid={`button-view-follower-${follower.id}`}
-                      >
-                        View Profile
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Following Section */}
-        {activeSection === 'following' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Following ({following.length})</CardTitle>
-              <CardDescription>
-                People {isOwnProfile ? 'you follow' : `${user.firstName} follows`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {following.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <UserPlus className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Not following anyone yet</p>
-                </div>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {following.map((followedUser) => (
-                    <div key={followedUser.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors" data-testid={`following-${followedUser.id}`}>
-                      <Avatar>
-                        <AvatarImage src={followedUser.profileImageUrl} />
-                        <AvatarFallback>
-                          {followedUser.firstName?.charAt(0)}{followedUser.lastName?.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="font-medium">{followedUser.firstName} {followedUser.lastName}</p>
-                        <p className="text-sm text-muted-foreground">{followedUser.email}</p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/profile/${followedUser.id}`)}
-                        data-testid={`button-view-following-${followedUser.id}`}
-                      >
-                        View Profile
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Leaderboards Section */}
-        {activeSection === 'leaderboards' && (
-          <div className="space-y-6">
+      {/* Leaderboards Modal */}
+      <Dialog open={showLeaderboardsModal} onOpenChange={setShowLeaderboardsModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" />
+              Leaderboards
+            </DialogTitle>
+            <DialogDescription>
+              See how you rank among other users
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 mt-4">
             {leaderboards ? (
               <>
                 {/* Most Opinionated Users */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MessageSquare className="w-5 h-5" />
-                      Most Opinionated Users
-                    </CardTitle>
-                    <CardDescription>
-                      Top users by total opinions posted
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {(leaderboards.mostOpinionated || []).map((entry: any, index: number) => (
-                        <div
-                          key={entry.userId}
-                          className={`flex items-center gap-3 p-3 rounded-lg border ${
-                            entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
-                          }`}
-                          data-testid={`leaderboard-opinions-${index}`}
-                        >
-                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                            index === 0 ? 'bg-yellow-500 text-yellow-50' :
-                            index === 1 ? 'bg-gray-400 text-gray-50' :
-                            index === 2 ? 'bg-orange-600 text-orange-50' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src={entry.profileImageUrl} />
-                            <AvatarFallback className="text-xs">
-                              {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">
-                              {entry.firstName} {entry.lastName}
-                              {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
-                            </p>
-                          </div>
-                          <Badge variant="secondary">{entry.count} opinions</Badge>
+                <div>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4" />
+                    Most Opinionated Users
+                  </h3>
+                  <div className="space-y-2">
+                    {(leaderboards.mostOpinionated || []).map((entry: any, index: number) => (
+                      <div
+                        key={entry.userId}
+                        className={`flex items-center gap-3 p-3 rounded-lg border ${
+                          entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
+                        }`}
+                      >
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                          index === 0 ? 'bg-yellow-500 text-yellow-50' :
+                          index === 1 ? 'bg-gray-400 text-gray-50' :
+                          index === 2 ? 'bg-orange-600 text-orange-50' :
+                          'bg-muted text-muted-foreground'
+                        }`}>
+                          {index + 1}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={entry.profileImageUrl} />
+                          <AvatarFallback className="text-xs">
+                            {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {entry.firstName} {entry.lastName}
+                            {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">{entry.count} opinions</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 {/* Most Active Debaters */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Swords className="w-5 h-5" />
-                      Most Active Debaters
-                    </CardTitle>
-                    <CardDescription>
-                      Top users by debate participation
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {(leaderboards.mostDebates || []).map((entry: any, index: number) => (
-                        <div
-                          key={entry.userId}
-                          className={`flex items-center gap-3 p-3 rounded-lg border ${
-                            entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
-                          }`}
-                          data-testid={`leaderboard-debates-${index}`}
-                        >
-                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                            index === 0 ? 'bg-yellow-500 text-yellow-50' :
-                            index === 1 ? 'bg-gray-400 text-gray-50' :
-                            index === 2 ? 'bg-orange-600 text-orange-50' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src={entry.profileImageUrl} />
-                            <AvatarFallback className="text-xs">
-                              {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">
-                              {entry.firstName} {entry.lastName}
-                              {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
-                            </p>
-                          </div>
-                          <Badge variant="secondary">{entry.count} debates</Badge>
+                <div>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Swords className="w-4 h-4" />
+                    Most Active Debaters
+                  </h3>
+                  <div className="space-y-2">
+                    {(leaderboards.mostDebates || []).map((entry: any, index: number) => (
+                      <div
+                        key={entry.userId}
+                        className={`flex items-center gap-3 p-3 rounded-lg border ${
+                          entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
+                        }`}
+                      >
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                          index === 0 ? 'bg-yellow-500 text-yellow-50' :
+                          index === 1 ? 'bg-gray-400 text-gray-50' :
+                          index === 2 ? 'bg-orange-600 text-orange-50' :
+                          'bg-muted text-muted-foreground'
+                        }`}>
+                          {index + 1}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={entry.profileImageUrl} />
+                          <AvatarFallback className="text-xs">
+                            {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {entry.firstName} {entry.lastName}
+                            {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">{entry.count} debates</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 {/* Top Topic Creators */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Brain className="w-5 h-5" />
-                      Top Topic Creators
-                    </CardTitle>
-                    <CardDescription>
-                      Top users by topics created
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {(leaderboards.mostTopics || []).map((entry: any, index: number) => (
-                        <div
-                          key={entry.userId}
-                          className={`flex items-center gap-3 p-3 rounded-lg border ${
-                            entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
-                          }`}
-                          data-testid={`leaderboard-topics-${index}`}
-                        >
-                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                            index === 0 ? 'bg-yellow-500 text-yellow-50' :
-                            index === 1 ? 'bg-gray-400 text-gray-50' :
-                            index === 2 ? 'bg-orange-600 text-orange-50' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src={entry.profileImageUrl} />
-                            <AvatarFallback className="text-xs">
-                              {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">
-                              {entry.firstName} {entry.lastName}
-                              {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
-                            </p>
-                          </div>
-                          <Badge variant="secondary">{entry.count} topics</Badge>
+                <div>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Lightbulb className="w-4 h-4" />
+                    Top Topic Creators
+                  </h3>
+                  <div className="space-y-2">
+                    {(leaderboards.mostTopics || []).map((entry: any, index: number) => (
+                      <div
+                        key={entry.userId}
+                        className={`flex items-center gap-3 p-3 rounded-lg border ${
+                          entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
+                        }`}
+                      >
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                          index === 0 ? 'bg-yellow-500 text-yellow-50' :
+                          index === 1 ? 'bg-gray-400 text-gray-50' :
+                          index === 2 ? 'bg-orange-600 text-orange-50' :
+                          'bg-muted text-muted-foreground'
+                        }`}>
+                          {index + 1}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={entry.profileImageUrl} />
+                          <AvatarFallback className="text-xs">
+                            {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {entry.firstName} {entry.lastName}
+                            {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">{entry.count} topics</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 {/* Logical Reasoning Champions */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Star className="w-5 h-5" />
-                      Logical Reasoning Champions
-                    </CardTitle>
-                    <CardDescription>
-                      Users with the best logical reasoning (lowest fallacy rate)
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {(leaderboards.logicalReasoning || []).map((entry: any, index: number) => (
-                        <div
-                          key={entry.userId}
-                          className={`flex items-center gap-3 p-3 rounded-lg border ${
-                            entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
-                          }`}
-                          data-testid={`leaderboard-reasoning-${index}`}
-                        >
-                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                            index === 0 ? 'bg-yellow-500 text-yellow-50' :
-                            index === 1 ? 'bg-gray-400 text-gray-50' :
-                            index === 2 ? 'bg-orange-600 text-orange-50' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src={entry.profileImageUrl} />
-                            <AvatarFallback className="text-xs">
-                              {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">
-                              {entry.firstName} {entry.lastName}
-                              {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
-                            </p>
-                          </div>
-                          <Badge variant="secondary">{entry.fallacyRate.toFixed(1)}% fallacy rate</Badge>
+                <div>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Star className="w-4 h-4" />
+                    Logical Reasoning Champions
+                  </h3>
+                  <div className="space-y-2">
+                    {(leaderboards.logicalReasoning || []).map((entry: any, index: number) => (
+                      <div
+                        key={entry.userId}
+                        className={`flex items-center gap-3 p-3 rounded-lg border ${
+                          entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
+                        }`}
+                      >
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                          index === 0 ? 'bg-yellow-500 text-yellow-50' :
+                          index === 1 ? 'bg-gray-400 text-gray-50' :
+                          index === 2 ? 'bg-orange-600 text-orange-50' :
+                          'bg-muted text-muted-foreground'
+                        }`}>
+                          {index + 1}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={entry.profileImageUrl} />
+                          <AvatarFallback className="text-xs">
+                            {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {entry.firstName} {entry.lastName}
+                            {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">{entry.fallacyRate.toFixed(1)}% fallacy rate</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </>
             ) : (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-8 text-muted-foreground">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Loading leaderboards...</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="text-center py-8 text-muted-foreground">
+                <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Loading leaderboards...</p>
+              </div>
             )}
           </div>
-        )}
+        </DialogContent>
+      </Dialog>
 
-        {/* Badges Section */}
-        {activeSection === 'badges' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="w-5 h-5" />
-                Badges
-              </CardTitle>
-              <CardDescription>
-                {isOwnProfile 
-                  ? `You've unlocked ${userBadges.filter((b: any) => b.unlockedAt).length} of ${userBadges.length} badges`
-                  : `${user.firstName} has unlocked ${userBadges.filter((b: any) => b.unlockedAt).length} of ${userBadges.length} badges`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {userBadges.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No badges available yet</p>
-                </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {userBadges.map((userBadge: any) => {
-                    const isUnlocked = !!userBadge.unlockedAt;
-                    const isSelected = userBadge.isSelected;
-                    // Dynamically resolve icon from lucide-react
-                    const IconComponent = (LucideIcons as any)[userBadge.icon] || Trophy;
-                    
-                    return (
-                      <div
-                        key={userBadge.badgeId}
-                        className={`relative p-4 border rounded-lg transition-all ${
-                          isUnlocked 
-                            ? 'bg-card hover-elevate active-elevate-2' 
-                            : 'bg-muted/30 opacity-60'
-                        } ${isSelected ? 'ring-2 ring-primary' : ''}`}
-                        data-testid={`badge-${userBadge.badgeId}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                            isUnlocked ? 'bg-primary/10' : 'bg-muted'
-                          }`}>
-                            {isUnlocked ? (
-                              <IconComponent className="w-6 h-6 text-primary" />
-                            ) : (
-                              <Lock className="w-6 h-6 text-muted-foreground" />
-                            )}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <h3 className="font-semibold text-sm">{userBadge.name}</h3>
-                              {isSelected && (
-                                <Badge variant="default" className="text-xs">
-                                  <Check className="w-3 h-3 mr-1" />
-                                  Selected
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {userBadge.description}
-                            </p>
-                            
-                            {isUnlocked ? (
-                              <div className="mt-2 flex items-center justify-between">
-                                <p className="text-xs text-muted-foreground">
-                                  Unlocked {new Date(userBadge.unlockedAt).toLocaleDateString()}
-                                </p>
-                                {isOwnProfile && (
-                                  <Button
-                                    size="sm"
-                                    variant={isSelected ? "outline" : "default"}
-                                    onClick={() => selectBadgeMutation.mutate(isSelected ? null : userBadge.badgeId)}
-                                    disabled={selectBadgeMutation.isPending}
-                                    data-testid={`button-select-badge-${userBadge.badgeId}`}
-                                  >
-                                    {isSelected ? 'Deselect' : 'Display'}
-                                  </Button>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-muted-foreground mt-2">
-                                🔒 Locked
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      {/* Followers Modal */}
+      <Dialog open={showFollowersModal} onOpenChange={setShowFollowersModal}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Followers ({followers.length})
+            </DialogTitle>
+            <DialogDescription>
+              People following {isOwnProfile ? 'you' : `${user.firstName}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {followers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No followers yet</p>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {followers.map((follower) => (
+                  <div key={follower.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                    <Avatar>
+                      <AvatarImage src={follower.profileImageUrl} />
+                      <AvatarFallback>
+                        {follower.firstName?.charAt(0)}{follower.lastName?.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <p className="font-medium">{follower.firstName} {follower.lastName}</p>
+                      <p className="text-sm text-muted-foreground">{follower.email}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowFollowersModal(false);
+                        navigate(`/profile/${follower.id}`);
+                      }}
+                    >
+                      View Profile
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Following Modal */}
+      <Dialog open={showFollowingModal} onOpenChange={setShowFollowingModal}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5" />
+              Following ({following.length})
+            </DialogTitle>
+            <DialogDescription>
+              People {isOwnProfile ? 'you follow' : `${user.firstName} follows`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {following.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <UserPlus className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Not following anyone yet</p>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {following.map((followedUser) => (
+                  <div key={followedUser.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                    <Avatar>
+                      <AvatarImage src={followedUser.profileImageUrl} />
+                      <AvatarFallback>
+                        {followedUser.firstName?.charAt(0)}{followedUser.lastName?.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <p className="font-medium">{followedUser.firstName} {followedUser.lastName}</p>
+                      <p className="text-sm text-muted-foreground">{followedUser.email}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowFollowingModal(false);
+                        navigate(`/profile/${followedUser.id}`);
+                      }}
+                    >
+                      View Profile
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -531,6 +531,16 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  /* Hide scrollbar utility for horizontal scrolling sections */
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Respect reduced motion preferences */
