@@ -142,13 +142,16 @@ export function getTopicCornerGradient(distribution: {
   const bottomRight = `rgba(255, 220, 100, ${toOpacity(distribution.libertarianCapitalist)})`;    // Soft Yellow
 
   // Create a radial gradient for each corner and blend them
+  // Gradient uses bright off-white wash slightly above card lightness
+  // - Brighter than card (98%) and much brighter than original 90% muted
+  // - Stays comfortably below 100% pure white for distinction
   return {
     background: `
       radial-gradient(circle at 0% 0%, ${topLeft} 0%, transparent 85%),
       radial-gradient(circle at 100% 0%, ${topRight} 0%, transparent 85%),
       radial-gradient(circle at 0% 100%, ${bottomLeft} 0%, transparent 85%),
       radial-gradient(circle at 100% 100%, ${bottomRight} 0%, transparent 85%),
-      linear-gradient(135deg, hsl(0, 0%, 98%) 0%, hsl(0, 0%, 96%) 100%)
+      linear-gradient(135deg, hsl(from hsl(var(--card)) h s calc(l + 0.5) / alpha) 0%, hsl(var(--card)) 100%)
     `
   };
 }
