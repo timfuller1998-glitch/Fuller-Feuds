@@ -608,6 +608,8 @@ export default function Topic() {
                     userAvatar={opinion.author?.profileImageUrl}
                     economicScore={opinion.author?.economicScore}
                     authoritarianScore={opinion.author?.authoritarianScore}
+                    topicEconomicScore={opinion.topicEconomicScore}
+                    topicAuthoritarianScore={opinion.topicAuthoritarianScore}
                     content={opinion.content}
                     stance={opinion.stance}
                     debateStatus={opinion.debateStatus}
@@ -669,6 +671,8 @@ export default function Topic() {
                     userAvatar={opinion.author?.profileImageUrl}
                     economicScore={opinion.author?.economicScore}
                     authoritarianScore={opinion.author?.authoritarianScore}
+                    topicEconomicScore={opinion.topicEconomicScore}
+                    topicAuthoritarianScore={opinion.topicAuthoritarianScore}
                     content={opinion.content}
                     stance={opinion.stance}
                     debateStatus={opinion.debateStatus}
@@ -730,6 +734,8 @@ export default function Topic() {
                     userAvatar={opinion.author?.profileImageUrl}
                     economicScore={opinion.author?.economicScore}
                     authoritarianScore={opinion.author?.authoritarianScore}
+                    topicEconomicScore={opinion.topicEconomicScore}
+                    topicAuthoritarianScore={opinion.topicAuthoritarianScore}
                     content={opinion.content}
                     stance={opinion.stance}
                     debateStatus={opinion.debateStatus}
