@@ -35,8 +35,8 @@ export function get2DPoliticalCompassColor(economicScore: number, authoritarianS
   // Base colors for each quadrant (Hue, Saturation, Lightness)
   // Red (authoritarian capitalist): H=0, x > 0, y > 0
   // Blue (authoritarian socialist): H=220, x < 0, y > 0
-  // Green (libertarian capitalist): H=140, x > 0, y < 0
-  // Yellow (libertarian socialist): H=50, x < 0, y < 0
+  // Yellow (libertarian capitalist): H=50, x > 0, y < 0
+  // Green (libertarian socialist): H=140, x < 0, y < 0
   
   let hue: number;
   let saturation: number;
@@ -56,13 +56,13 @@ export function get2DPoliticalCompassColor(economicScore: number, authoritarianS
     saturation = 35 + (intensity * 15); // 35-50% - softer saturation
     lightness = 75; // Higher lightness for softer colors
   } else if (x >= 0 && y < 0) {
-    // Libertarian Capitalist (Green) - bottom right
-    hue = 140;
+    // Libertarian Capitalist (Yellow) - bottom right
+    hue = 50;
     saturation = 35 + (intensity * 15); // 35-50% - softer saturation
     lightness = 75; // Higher lightness for softer colors
   } else {
-    // Libertarian Socialist (Yellow) - bottom left
-    hue = 50;
+    // Libertarian Socialist (Green) - bottom left
+    hue = 140;
     saturation = 35 + (intensity * 15); // 35-50% - softer saturation
     lightness = 75; // Higher lightness for softer colors
   }
@@ -128,8 +128,8 @@ export function getOpinionGradientStyle(
 export function getTopicCornerGradient(distribution: {
   authoritarianCapitalist: number;  // % of opinions (Red) - top-right corner
   authoritarianSocialist: number;   // % of opinions (Blue) - top-left corner
-  libertarianCapitalist: number;    // % of opinions (Green) - bottom-right corner
-  libertarianSocialist: number;     // % of opinions (Yellow) - bottom-left corner
+  libertarianCapitalist: number;    // % of opinions (Yellow) - bottom-right corner
+  libertarianSocialist: number;     // % of opinions (Green) - bottom-left corner
 }): React.CSSProperties {
   // Quadrant colors - softer, more pastel versions for text legibility
   // Convert percentages (0-100) to reduced opacity (max 0.4 instead of 1.0)
@@ -138,8 +138,8 @@ export function getTopicCornerGradient(distribution: {
   // Softer color variants with higher lightness
   const topLeft = `rgba(100, 150, 255, ${toOpacity(distribution.authoritarianSocialist)})`;      // Soft Blue
   const topRight = `rgba(255, 120, 130, ${toOpacity(distribution.authoritarianCapitalist)})`;     // Soft Red
-  const bottomLeft = `rgba(255, 220, 100, ${toOpacity(distribution.libertarianSocialist)})`;      // Soft Yellow
-  const bottomRight = `rgba(100, 200, 150, ${toOpacity(distribution.libertarianCapitalist)})`;    // Soft Green
+  const bottomLeft = `rgba(100, 200, 150, ${toOpacity(distribution.libertarianSocialist)})`;      // Soft Green
+  const bottomRight = `rgba(255, 220, 100, ${toOpacity(distribution.libertarianCapitalist)})`;    // Soft Yellow
 
   // Create a radial gradient for each corner and blend them
   return {
