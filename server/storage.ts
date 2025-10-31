@@ -371,11 +371,18 @@ export class DatabaseStorage implements IStorage {
       .where(eq(topics.id, topicId));
   }
 
-  // Helper method to enrich a topic with preview content
+  // Helper method to enrich a topic with preview content and political diversity
   private async enrichTopicWithPreview(topic: Topic): Promise<{
     previewContent?: string;
     previewAuthor?: string;
     previewIsAI: boolean;
+    diversityScore: number;
+    politicalDistribution: {
+      authoritarianCapitalist: number;
+      authoritarianSocialist: number;
+      libertarianCapitalist: number;
+      libertarianSocialist: number;
+    };
   }> {
     let previewContent: string | undefined;
     let previewAuthor: string | undefined;
@@ -415,8 +422,18 @@ export class DatabaseStorage implements IStorage {
         previewIsAI = false;
       }
     }
+
+    // Get political distribution and diversity score
+    const politicalDistribution = await this.getTopicPoliticalDistribution(topic.id);
+    const diversityScore = this.calculatePoliticalDiversityScore(politicalDistribution);
     
-    return { previewContent, previewAuthor, previewIsAI };
+    return { 
+      previewContent, 
+      previewAuthor, 
+      previewIsAI,
+      diversityScore,
+      politicalDistribution
+    };
   }
 
   async getTopics(options?: { limit?: number; category?: string; search?: string; createdBy?: string }): Promise<TopicWithCounts[]> {
@@ -601,6 +618,34 @@ export class DatabaseStorage implements IStorage {
     }
 
     return rounded;
+  }
+
+  calculatePoliticalDiversityScore(distribution: {
+    authoritarianCapitalist: number;
+    authoritarianSocialist: number;
+    libertarianCapitalist: number;
+    libertarianSocialist: number;
+  }): number {
+    // Convert percentages to proportions (0-1)
+    const proportions = [
+      distribution.authoritarianCapitalist / 100,
+      distribution.authoritarianSocialist / 100,
+      distribution.libertarianCapitalist / 100,
+      distribution.libertarianSocialist / 100
+    ].filter(p => p > 0);
+
+    // If no opinions, return 0
+    if (proportions.length === 0) return 0;
+
+    // Calculate Shannon entropy
+    const entropy = -proportions.reduce((sum, p) => sum + p * Math.log2(p), 0);
+
+    // Normalize by max entropy (log2(4) = 2) and convert to percentage
+    // Max entropy is when all 4 quadrants are equal (25% each)
+    const maxEntropy = Math.log2(4);
+    const diversityScore = (entropy / maxEntropy) * 100;
+
+    return Math.round(diversityScore);
   }
 
   async getTopicsWithEmbeddings(): Promise<TopicWithCounts[]> {
