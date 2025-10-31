@@ -116,8 +116,9 @@ export function getOpinionGradientStyle(
   const baseColor = get2DPoliticalCompassColor(economicScore, authoritarianScore);
   
   // Create a very subtle gradient from the political color to transparent
+  // Opacity values increased by ~4% for better visibility: 25→2F (14.5%→18.4%), 10→1A (6.3%→10.2%)
   return {
-    background: `linear-gradient(135deg, ${baseColor}25 0%, ${baseColor}10 100%)`
+    background: `linear-gradient(135deg, ${baseColor}2F 0%, ${baseColor}1A 100%)`
   };
 }
 

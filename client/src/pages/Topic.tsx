@@ -29,6 +29,7 @@ import FallacyBadges from "@/components/FallacyBadges";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import { formatDistanceToNow } from "date-fns";
 import type { FallacyType } from "@shared/fallacies";
+import { getOpinionGradientStyle } from "@/lib/politicalColors";
 
 const opinionFormSchema = insertOpinionSchema.omit({
   topicId: true,
@@ -496,7 +497,11 @@ export default function Topic() {
             {/* User's Opinion Card or Share Opinion Button */}
             <CardContainer>
               {userOpinion && !showOpinionForm ? (
-                <Card>
+                <Card 
+                  className="h-full flex flex-col" 
+                  style={getOpinionGradientStyle(userOpinion.topicEconomicScore, userOpinion.topicAuthoritarianScore)}
+                  data-testid="card-user-opinion"
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">Your Opinion</CardTitle>
