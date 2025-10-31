@@ -420,6 +420,13 @@ export type TopicWithCounts = Topic & {
   previewContent?: string;
   previewAuthor?: string;
   previewIsAI?: boolean;
+  diversityScore?: number;
+  politicalDistribution?: {
+    authoritarianCapitalist: number;
+    authoritarianSocialist: number;
+    libertarianCapitalist: number;
+    libertarianSocialist: number;
+  };
 };
 export type InsertOpinion = z.infer<typeof insertOpinionSchema>;
 export type Opinion = typeof opinions.$inferSelect & {
