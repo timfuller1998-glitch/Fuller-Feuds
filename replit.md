@@ -4,6 +4,7 @@
 Opinion Feud is a modern platform designed to facilitate meaningful discussions on important topics. It combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats. The platform features topic-based debate matching that automatically connects users with opposing viewpoints, privacy controls for debate participants, AI-generated cumulative opinions that summarize community perspectives and track debate sentiment, and support for attaching reference links to opinions to cite sources.
 
 ## Recent Changes
+- **October 31, 2025**: Swapped yellow and green positions on political compass for cleaner color blending. Yellow now represents Libertarian Capitalist (bottom-right), Green represents Libertarian Socialist (bottom-left). This prevents muddy brown colors from red-green mixing and creates cleaner transitions (red↔yellow=orange, blue↔green=cyan).
 - **October 24, 2025**: Removed user-created theme personalization system. Platform now uses uniform design with basic light/dark/medium theme preferences. Removed `themes` and `themeLikes` database tables, theme-related backend routes, and frontend theme creation/management UI. Focus shifted to political gradient system for topic cards.
 
 ## User Preferences
@@ -49,9 +50,9 @@ Preferred communication style: Simple, everyday language.
 - **Color Scheme**:
   - **Red** (H=0): Authoritarian Capitalist (economic < 0, authoritarian > 0)
   - **Blue** (H=220): Authoritarian Socialist (economic > 0, authoritarian > 0)
-  - **Green** (H=140): Libertarian Capitalist (economic < 0, authoritarian < 0)
-  - **Yellow** (H=50): Libertarian Socialist (economic > 0, authoritarian < 0)
-  - **Blending**: Colors blend smoothly with minimal white only at center (±15% radius)
+  - **Yellow** (H=50): Libertarian Capitalist (economic < 0, authoritarian < 0)
+  - **Green** (H=140): Libertarian Socialist (economic > 0, authoritarian < 0)
+  - **Blending**: Colors blend smoothly with minimal white only at center (±15% radius). Clean edge blending: red↔blue (purple), yellow↔green (lime), red↔yellow (orange), blue↔green (cyan)
   - **Extremist Fade**: At ±85 on either axis, colors fade to black (up to 70% darker) to indicate extreme positions
 - **Data Flow**: Backend analysis → user_profiles.economicScore/authoritarianScore → API responses → Frontend avatar rings and charts
 - **Opinion Count Tracking**: 
