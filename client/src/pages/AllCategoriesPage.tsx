@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import TopicCard from "@/components/TopicCard";
+import { CardContainer } from "@/components/CardContainer";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { 
@@ -227,9 +228,8 @@ export default function AllCategoriesPage() {
                       data-testid={`scroll-topics-${category.name.toLowerCase()}`}
                     >
                       {topics.map((topic) => (
-                        <div 
-                          key={topic.id} 
-                          className="flex-none w-[280px] sm:w-[300px]"
+                        <CardContainer 
+                          key={topic.id}
                           style={{ scrollSnapAlign: 'start' }}
                         >
                           <TopicCard
@@ -245,13 +245,10 @@ export default function AllCategoriesPage() {
                             previewAuthor={topic.previewAuthor}
                             previewIsAI={topic.previewIsAI}
                           />
-                        </div>
+                        </CardContainer>
                       ))}
                       {category.totalCount > 5 && (
-                        <div 
-                          className="flex-none w-[280px] sm:w-[300px]"
-                          style={{ scrollSnapAlign: 'start' }}
-                        >
+                        <CardContainer style={{ scrollSnapAlign: 'start' }}>
                           <Card className="h-full hover-elevate active-elevate-2 transition-all">
                             <CardContent className="flex flex-col items-center justify-center h-full min-h-[160px] sm:min-h-[200px] p-4 sm:p-6">
                               <CategoryIcon className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground mb-2 sm:mb-4" />
@@ -271,7 +268,7 @@ export default function AllCategoriesPage() {
                               </Button>
                             </CardContent>
                           </Card>
-                        </div>
+                        </CardContainer>
                       )}
                     </div>
                   </div>

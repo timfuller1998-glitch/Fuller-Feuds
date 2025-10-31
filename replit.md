@@ -4,7 +4,11 @@
 Opinion Feud is a modern platform designed to facilitate meaningful discussions on important topics. It combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats. The platform features topic-based debate matching that automatically connects users with opposing viewpoints, privacy controls for debate participants, AI-generated cumulative opinions that summarize community perspectives and track debate sentiment, and support for attaching reference links to opinions to cite sources.
 
 ## Recent Changes
-- **October 31, 2025**: Swapped yellow and green positions on political compass for cleaner color blending. Yellow now represents Libertarian Capitalist (bottom-right), Green represents Libertarian Socialist (bottom-left). This prevents muddy brown colors from red-green mixing and creates cleaner transitions (red↔yellow=orange, blue↔green=cyan).
+- **October 31, 2025**: 
+  - Created CardContainer wrapper component for unified card sizing (280px mobile, 300px desktop) across entire site
+  - Replaced all manual card wrappers with CardContainer in Home, Topic, AllCategoriesPage, and RecentOpinions pages
+  - Updated backend storage layer with enrichTopicWithPreview helper for consistent preview data
+  - Swapped yellow and green positions on political compass for cleaner color blending. Yellow now represents Libertarian Capitalist (bottom-right), Green represents Libertarian Socialist (bottom-left). This prevents muddy brown colors from red-green mixing and creates cleaner transitions (red↔yellow=orange, blue↔green=cyan).
 - **October 24, 2025**: Removed user-created theme personalization system. Platform now uses uniform design with basic light/dark/medium theme preferences. Removed `themes` and `themeLikes` database tables, theme-related backend routes, and frontend theme creation/management UI. Focus shifted to political gradient system for topic cards.
 
 ## User Preferences
@@ -21,6 +25,7 @@ Preferred communication style: Simple, everyday language.
 - **Form Handling**: React Hook Form with Zod validation
 - **Design System**: Material Design 3 principles with Discord-inspired patterns, supporting light, dark, and time-based themes. Inter font family, HSL-based color tokens, and Tailwind spacing units.
 - **Component Architecture**: Atomic Design principles, with feature-specific and layout components.
+- **Card Sizing Standard**: CardContainer component (`client/src/components/CardContainer.tsx`) ensures consistent card dimensions (280px mobile, 300px desktop) across all horizontal scrolling sections site-wide.
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js

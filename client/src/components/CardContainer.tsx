@@ -7,11 +7,12 @@
 interface CardContainerProps {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export function CardContainer({ children, className = "" }: CardContainerProps) {
+export function CardContainer({ children, className = "", style }: CardContainerProps) {
   return (
-    <div className={`flex-none w-[280px] sm:w-[300px] ${className}`}>
+    <div className={`flex-none w-[280px] sm:w-[300px] ${className}`} style={style}>
       {children}
     </div>
   );

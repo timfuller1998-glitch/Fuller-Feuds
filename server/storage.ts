@@ -371,6 +371,54 @@ export class DatabaseStorage implements IStorage {
       .where(eq(topics.id, topicId));
   }
 
+  // Helper method to enrich a topic with preview content
+  private async enrichTopicWithPreview(topic: Topic): Promise<{
+    previewContent?: string;
+    previewAuthor?: string;
+    previewIsAI: boolean;
+  }> {
+    let previewContent: string | undefined;
+    let previewAuthor: string | undefined;
+    let previewIsAI = false;
+    
+    // Try to get AI summary first
+    const [cumulative] = await db
+      .select()
+      .from(cumulativeOpinions)
+      .where(eq(cumulativeOpinions.topicId, topic.id))
+      .orderBy(desc(cumulativeOpinions.updatedAt))
+      .limit(1);
+    
+    if (cumulative) {
+      previewContent = cumulative.summary;
+      previewAuthor = 'AI Summary';
+      previewIsAI = true;
+    } else {
+      // Get first opinion as fallback
+      const [firstOpinion] = await db
+        .select()
+        .from(opinions)
+        .innerJoin(users, eq(opinions.userId, users.id))
+        .where(and(
+          eq(opinions.topicId, topic.id),
+          eq(opinions.status, 'approved')
+        ))
+        .orderBy(desc(opinions.createdAt))
+        .limit(1);
+      
+      if (firstOpinion) {
+        previewContent = firstOpinion.opinions.content;
+        const user = firstOpinion.users;
+        previewAuthor = user.firstName && user.lastName 
+          ? `${user.firstName} ${user.lastName}` 
+          : user.email || 'Anonymous';
+        previewIsAI = false;
+      }
+    }
+    
+    return { previewContent, previewAuthor, previewIsAI };
+  }
+
   async getTopics(options?: { limit?: number; category?: string; search?: string; createdBy?: string }): Promise<TopicWithCounts[]> {
     const { limit = 50, category, search, createdBy } = options || {};
     let conditions = [eq(topics.isActive, true)];
@@ -432,53 +480,14 @@ export class DatabaseStorage implements IStorage {
         
         const participantCount = Number(participantsResult.rows[0]?.count || 0);
         
-        // Get preview content: AI summary if exists, otherwise first opinion
-        let previewContent: string | undefined;
-        let previewAuthor: string | undefined;
-        let previewIsAI = false;
-        
-        // Try to get AI summary first
-        const [cumulative] = await db
-          .select()
-          .from(cumulativeOpinions)
-          .where(eq(cumulativeOpinions.topicId, topic.id))
-          .orderBy(desc(cumulativeOpinions.updatedAt))
-          .limit(1);
-        
-        if (cumulative) {
-          previewContent = cumulative.summary;
-          previewAuthor = 'AI Summary';
-          previewIsAI = true;
-        } else {
-          // Get first opinion as fallback
-          const [firstOpinion] = await db
-            .select()
-            .from(opinions)
-            .innerJoin(users, eq(opinions.userId, users.id))
-            .where(and(
-              eq(opinions.topicId, topic.id),
-              eq(opinions.status, 'approved')
-            ))
-            .orderBy(desc(opinions.createdAt))
-            .limit(1);
-          
-          if (firstOpinion) {
-            previewContent = firstOpinion.opinions.content;
-            const user = firstOpinion.users;
-            previewAuthor = user.firstName && user.lastName 
-              ? `${user.firstName} ${user.lastName}` 
-              : user.email || 'Anonymous';
-            previewIsAI = false;
-          }
-        }
+        // Get preview content using helper method
+        const previewData = await this.enrichTopicWithPreview(topic);
         
         return {
           ...topic,
           opinionsCount,
           participantCount,
-          previewContent,
-          previewAuthor,
-          previewIsAI
+          ...previewData
         };
       })
     );
@@ -594,14 +603,53 @@ export class DatabaseStorage implements IStorage {
     return rounded;
   }
 
-  async getTopicsWithEmbeddings(): Promise<Topic[]> {
-    return await db
+  async getTopicsWithEmbeddings(): Promise<TopicWithCounts[]> {
+    const topicsFromDb = await db
       .select()
       .from(topics)
       .where(and(
         eq(topics.isActive, true),
         sql`${topics.embedding} IS NOT NULL`
       ));
+    
+    // Enrich each topic with preview data, opinions count, and participant count
+    const enrichedTopics = await Promise.all(
+      topicsFromDb.map(async (topic) => {
+        // Get opinions count
+        const opinionsResult = await db.execute<{ count: number }>(sql`
+          SELECT COUNT(*)::int as count
+          FROM opinions
+          WHERE topic_id = ${topic.id} AND status = 'approved'
+        `);
+        const opinionsCount = Number(opinionsResult.rows[0]?.count || 0);
+        
+        // Get participant count
+        const participantsResult = await db.execute<{ count: number }>(sql`
+          SELECT COUNT(DISTINCT user_id)::int as count
+          FROM (
+            SELECT user_id FROM opinions WHERE topic_id = ${topic.id} AND status = 'approved'
+            UNION
+            SELECT user_id FROM opinion_flags WHERE opinion_id IN (
+              SELECT id FROM opinions WHERE topic_id = ${topic.id} AND status = 'approved'
+            )
+          ) AS all_participants
+          WHERE user_id IS NOT NULL
+        `);
+        const participantCount = Number(participantsResult.rows[0]?.count || 0);
+        
+        // Get preview content using helper method
+        const previewData = await this.enrichTopicWithPreview(topic);
+        
+        return {
+          ...topic,
+          opinionsCount,
+          participantCount,
+          ...previewData
+        };
+      })
+    );
+    
+    return enrichedTopics;
   }
 
   async deleteTopic(id: string): Promise<void> {

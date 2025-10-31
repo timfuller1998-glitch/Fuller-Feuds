@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import OpinionCard from "@/components/OpinionCard";
+import { CardContainer } from "@/components/CardContainer";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { 
@@ -292,10 +293,7 @@ export default function RecentOpinionsPage() {
                 </div>
               ))}
               {group.opinions.length > 5 && (
-                <div 
-                  className="flex-none w-[280px] sm:w-[300px]"
-                  style={{ scrollSnapAlign: 'start' }}
-                >
+                <CardContainer style={{ scrollSnapAlign: 'start' }}>
                   <Card className="h-full flex items-center justify-center hover-elevate active-elevate-2 cursor-pointer" onClick={() => setLocation(`/topic/${group.topic.id}`)}>
                     <CardContent className="text-center py-12">
                       <MessageCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
@@ -303,7 +301,7 @@ export default function RecentOpinionsPage() {
                       <p className="text-sm text-muted-foreground">Explore all opinions</p>
                     </CardContent>
                   </Card>
-                </div>
+                </CardContainer>
               )}
             </div>
           </div>

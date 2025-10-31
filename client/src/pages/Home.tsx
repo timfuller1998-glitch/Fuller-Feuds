@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import TopicCard from "@/components/TopicCard";
 import OpinionCard from "@/components/OpinionCard";
+import { CardContainer } from "@/components/CardContainer";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { 
@@ -244,9 +245,8 @@ export default function Home() {
                       // Render Opinion Cards
                       <>
                         {section.opinions.map((opinion) => (
-                          <div 
-                            key={opinion.id} 
-                            className="flex-none w-[280px] sm:w-[300px]"
+                          <CardContainer 
+                            key={opinion.id}
                             style={{ scrollSnapAlign: 'start' }}
                           >
                             <OpinionCard
@@ -269,13 +269,10 @@ export default function Home() {
                               isLiked={opinion.userVote?.voteType === 'like'}
                               isDisliked={opinion.userVote?.voteType === 'dislike'}
                             />
-                          </div>
+                          </CardContainer>
                         ))}
                         {section.totalCount > 5 && (
-                          <div 
-                            className="flex-none w-[280px] sm:w-[300px]"
-                            style={{ scrollSnapAlign: 'start' }}
-                          >
+                          <CardContainer style={{ scrollSnapAlign: 'start' }}>
                             <Card className="h-full hover-elevate active-elevate-2 transition-all">
                               <CardContent className="flex flex-col items-center justify-center h-full min-h-[160px] sm:min-h-[200px] p-4 sm:p-6">
                                 <SectionIcon className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground mb-2 sm:mb-4" />
@@ -295,16 +292,15 @@ export default function Home() {
                                 </Button>
                               </CardContent>
                             </Card>
-                          </div>
+                          </CardContainer>
                         )}
                       </>
                     ) : (
                       // Render Topic Cards
                       <>
                         {section.topics.map((topic) => (
-                          <div 
-                            key={topic.id} 
-                            className="flex-none w-[280px] sm:w-[300px]"
+                          <CardContainer 
+                            key={topic.id}
                             style={{ scrollSnapAlign: 'start' }}
                           >
                             <TopicCard
@@ -320,13 +316,10 @@ export default function Home() {
                               previewAuthor={topic.previewAuthor}
                               previewIsAI={topic.previewIsAI}
                             />
-                          </div>
+                          </CardContainer>
                         ))}
                         {section.totalCount > 5 && (
-                          <div 
-                            className="flex-none w-[280px] sm:w-[300px]"
-                            style={{ scrollSnapAlign: 'start' }}
-                          >
+                          <CardContainer style={{ scrollSnapAlign: 'start' }}>
                             <Card className="h-full hover-elevate active-elevate-2 transition-all">
                               <CardContent className="flex flex-col items-center justify-center h-full min-h-[160px] sm:min-h-[200px] p-4 sm:p-6">
                                 <SectionIcon className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground mb-2 sm:mb-4" />
@@ -346,7 +339,7 @@ export default function Home() {
                                 </Button>
                               </CardContent>
                             </Card>
-                          </div>
+                          </CardContainer>
                         )}
                       </>
                     )}
