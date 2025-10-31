@@ -548,7 +548,7 @@ Return only valid JSON with economicScore and authoritarianScore fields.`;
 
     try {
       console.log(`[Opinion Analysis] Analyzing opinion using model: ${model}`);
-      // GPT-5 only supports temperature=1 (default), other models support 0.3
+      // GPT-5 limitations: only supports temperature=1 (default) and no response_format parameter
       const completion = await openai.chat.completions.create({
         model,
         messages: [
@@ -561,7 +561,7 @@ Return only valid JSON with economicScore and authoritarianScore fields.`;
             content: prompt
           }
         ],
-        response_format: { type: "json_object" },
+        ...(model !== "gpt-5" ? { response_format: { type: "json_object" } } : {}),
         max_completion_tokens: 200,
         ...(model !== "gpt-5" ? { temperature: 0.3 } : {})
       });
@@ -573,7 +573,20 @@ Return only valid JSON with economicScore and authoritarianScore fields.`;
         return { economicScore: 0, authoritarianScore: 0 };
       }
 
-      const aiAnalysis = JSON.parse(responseContent);
+      // Extract JSON from response (GPT-5 might wrap it in markdown code blocks)
+      let jsonText = responseContent.trim();
+      const jsonMatch = jsonText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[1];
+      } else if (!jsonText.startsWith('{')) {
+        // Try to find JSON object in the response
+        const objectMatch = jsonText.match(/\{[\s\S]*?\}/);
+        if (objectMatch) {
+          jsonText = objectMatch[0];
+        }
+      }
+
+      const aiAnalysis = JSON.parse(jsonText);
       const economicScore = Math.max(-100, Math.min(100, aiAnalysis.economicScore || 0));
       const authoritarianScore = Math.max(-100, Math.min(100, aiAnalysis.authoritarianScore || 0));
 

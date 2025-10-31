@@ -9,7 +9,7 @@ Opinion Feud is a modern platform designed to facilitate meaningful discussions 
   - **Diversity Badges**: Added purple diversity score badges to top-right corner of all topic cards site-wide (Home, Categories, Hot Debates, Search, Topic pages). Shows percentage even for 0% diversity (all opinions in one quadrant).
   - **Hot Debates Redesign**: Replaced for/against/neutral metrics with 4-quadrant political distribution bars (Red=Auth. Cap., Blue=Auth. Soc., Yellow=Lib. Cap., Green=Lib. Soc.) matching political compass colors.
   - **Performance Optimization**: Eliminated N+1 query problem by passing `politicalDistribution` as prop to TopicCard instead of individual API fetches. Backend `enrichTopicWithPreview()` includes distribution data in all topic responses.
-  - **GPT-5 Temperature Fix**: Fixed admin backfill tool GPT-5 analysis failure. GPT-5 only supports default temperature (1), while GPT-4 supports custom values (0.3). Backend now conditionally omits temperature parameter for GPT-5 requests.
+  - **GPT-5 Analysis Fix**: Fixed admin backfill tool GPT-5 analysis failure. GPT-5 has two API limitations: (1) only supports default temperature (1) unlike GPT-4 which supports custom values (0.3), and (2) doesn't support `response_format` parameter for JSON output. Backend now conditionally omits both parameters for GPT-5 requests and includes robust JSON extraction to handle GPT-5's freeform responses.
   - Created CardContainer wrapper component for unified card sizing (280px mobile, 300px desktop) across entire site
   - Replaced all manual card wrappers with CardContainer in Home, Topic, AllCategoriesPage, and RecentOpinions pages
   - Updated backend storage layer with enrichTopicWithPreview helper for consistent preview data
