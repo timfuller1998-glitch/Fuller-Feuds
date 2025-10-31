@@ -2370,7 +2370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all topics
       const allTopics = await storage.getTopics();
       
-      // Filter out topics the user has already participated in
+      // Filter out topics the user has already participated in (for category matching)
       const candidateTopics = allTopics.filter(t => !participatedTopicIds.has(t.id));
       
       // Find categories the user engages with most
@@ -2404,11 +2404,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return { topic, score };
       });
       
-      // Sort by score and return top recommendations (topics already enriched)
-      const recommended = scoredTopics
+      // Sort by score
+      let recommended = scoredTopics
         .sort((a, b) => b.score - a.score)
         .slice(0, limit)
         .map(({ topic }) => topic);
+      
+      // Fallback to trending topics if we don't have enough category-based recommendations
+      // This allows users to re-engage with topics and see updated summaries
+      if (recommended.length < 5) {
+        const trendingTopics = allTopics
+          .map(topic => ({
+            topic,
+            trendingScore: (topic.opinionCount || 0) * 10 + 
+                          (topic.participantCount || 0) * 5 +
+                          (topic.createdAt && (Date.now() - new Date(topic.createdAt).getTime()) / (1000 * 60 * 60 * 24) < 7 ? 20 : 0)
+          }))
+          .sort((a, b) => b.trendingScore - a.trendingScore)
+          .map(({ topic }) => topic);
+        
+        // Add trending topics to fill the gap, avoiding duplicates
+        const recommendedIds = new Set(recommended.map(t => t.id));
+        for (const topic of trendingTopics) {
+          if (recommended.length >= limit) break;
+          if (!recommendedIds.has(topic.id)) {
+            recommended.push(topic);
+            recommendedIds.add(topic.id);
+          }
+        }
+      }
       
       res.json(recommended);
     } catch (error) {
