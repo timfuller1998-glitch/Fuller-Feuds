@@ -409,61 +409,52 @@ export default function Profile() {
         </CardContent>
       </Card>
 
-      {/* My Opinions Section - Horizontal Scrolling */}
-      <div className="space-y-4" data-testid="section-my-opinions">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">My Opinions</h2>
-          {opinions.length > 0 && (
-            <Link href={`/profile/${userId}`}>
-              <Button variant="ghost" size="sm" data-testid="link-view-all-opinions">
-                View All
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-          )}
-        </div>
-        {opinions.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-            {opinions.map((opinion) => (
-              <CardContainer key={opinion.id}>
-                <OpinionCard
-                  id={opinion.id}
-                  topicId={opinion.topicId}
-                  userId={opinion.userId}
-                  userName={`${opinion.user?.firstName || ''} ${opinion.user?.lastName || ''}`}
-                  userAvatar={opinion.user?.profileImageUrl}
-                  economicScore={opinion.user?.economicScore}
-                  authoritarianScore={opinion.user?.authoritarianScore}
-                  topicEconomicScore={opinion.topic?.economicScore}
-                  topicAuthoritarianScore={opinion.topic?.authoritarianScore}
-                  content={opinion.content}
-                  stance={opinion.stance}
-                  debateStatus={opinion.debateStatus}
-                  timestamp={opinion.createdAt}
-                  likesCount={opinion.likesCount || 0}
-                  dislikesCount={opinion.dislikesCount || 0}
-                  references={opinion.references}
-                  fallacyCounts={opinion.fallacyCounts}
-                />
-              </CardContainer>
-            ))}
+      {/* Recommended for You Section - Horizontal Scrolling */}
+      {isOwnProfile && (
+        <div className="space-y-4" data-testid="section-recommended">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Lightbulb className="w-5 h-5" />
+              Recommended for You
+            </h2>
           </div>
-        ) : (
-          <Card className="p-8 text-center">
-            <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p className="text-muted-foreground">
-              {isOwnProfile ? "You haven't shared any opinions yet" : "No opinions shared yet"}
-            </p>
-            {isOwnProfile && (
+          {recommendedTopics.length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+              {recommendedTopics.map((topic) => (
+                <CardContainer key={topic.id}>
+                  <TopicCard
+                    id={topic.id}
+                    title={topic.title}
+                    description={topic.description}
+                    imageUrl={topic.imageUrl}
+                    categories={topic.categories}
+                    participantCount={topic.participantCount || 0}
+                    opinionsCount={topic.opinionCount || 0}
+                    isActive={topic.isActive || false}
+                    previewContent={topic.previewContent}
+                    previewAuthor={topic.previewAuthor}
+                    previewIsAI={topic.previewIsAI}
+                    diversityScore={topic.diversityScore}
+                    politicalDistribution={topic.politicalDistribution}
+                  />
+                </CardContainer>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-8 text-center">
+              <Star className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-muted-foreground">
+                Share opinions to get personalized recommendations
+              </p>
               <Link href="/">
-                <Button variant="default" className="mt-4" data-testid="button-browse-topics">
+                <Button variant="default" className="mt-4" data-testid="button-browse-topics-recommended">
                   Browse Topics
                 </Button>
               </Link>
-            )}
-          </Card>
-        )}
-      </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* My Topics Section - Horizontal Scrolling */}
       <div className="space-y-4" data-testid="section-my-topics">
@@ -516,6 +507,48 @@ export default function Profile() {
           </Card>
         )}
       </div>
+
+      {/* From People You Follow Section - Horizontal Scrolling */}
+      {isOwnProfile && (
+        <div className="space-y-4" data-testid="section-following">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              From People You Follow
+            </h2>
+          </div>
+          {followingTopics.length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+              {followingTopics.map((topic) => (
+                <CardContainer key={topic.id}>
+                  <TopicCard
+                    id={topic.id}
+                    title={topic.title}
+                    description={topic.description}
+                    imageUrl={topic.imageUrl}
+                    categories={topic.categories}
+                    participantCount={topic.participantCount || 0}
+                    opinionsCount={topic.opinionCount || 0}
+                    isActive={topic.isActive || false}
+                    previewContent={topic.previewContent}
+                    previewAuthor={topic.previewAuthor}
+                    previewIsAI={topic.previewIsAI}
+                    diversityScore={topic.diversityScore}
+                    politicalDistribution={topic.politicalDistribution}
+                  />
+                </CardContainer>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-8 text-center">
+              <UserPlus className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-muted-foreground">
+                Follow users to see their topics here
+              </p>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Active Debates Section - Horizontal Scrolling */}
       <div className="space-y-4" data-testid="section-active-debates">
@@ -575,94 +608,61 @@ export default function Profile() {
         )}
       </div>
 
-      {/* Recommended for You Section - Horizontal Scrolling */}
-      {isOwnProfile && (
-        <div className="space-y-4" data-testid="section-recommended">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Lightbulb className="w-5 h-5" />
-              Recommended for You
-            </h2>
+      {/* My Opinions Section - Horizontal Scrolling */}
+      <div className="space-y-4" data-testid="section-my-opinions">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold">My Opinions</h2>
+          {opinions.length > 0 && (
+            <Link href={`/profile/${userId}`}>
+              <Button variant="ghost" size="sm" data-testid="link-view-all-opinions">
+                View All
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          )}
+        </div>
+        {opinions.length > 0 ? (
+          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+            {opinions.map((opinion) => (
+              <CardContainer key={opinion.id}>
+                <OpinionCard
+                  id={opinion.id}
+                  topicId={opinion.topicId}
+                  userId={opinion.userId}
+                  userName={`${opinion.user?.firstName || ''} ${opinion.user?.lastName || ''}`}
+                  userAvatar={opinion.user?.profileImageUrl}
+                  economicScore={opinion.user?.economicScore}
+                  authoritarianScore={opinion.user?.authoritarianScore}
+                  topicEconomicScore={opinion.topic?.economicScore}
+                  topicAuthoritarianScore={opinion.topic?.authoritarianScore}
+                  content={opinion.content}
+                  stance={opinion.stance}
+                  debateStatus={opinion.debateStatus}
+                  timestamp={opinion.createdAt}
+                  likesCount={opinion.likesCount || 0}
+                  dislikesCount={opinion.dislikesCount || 0}
+                  references={opinion.references}
+                  fallacyCounts={opinion.fallacyCounts}
+                />
+              </CardContainer>
+            ))}
           </div>
-          {recommendedTopics.length > 0 ? (
-            <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-              {recommendedTopics.map((topic) => (
-                <CardContainer key={topic.id}>
-                  <TopicCard
-                    id={topic.id}
-                    title={topic.title}
-                    description={topic.description}
-                    imageUrl={topic.imageUrl}
-                    categories={topic.categories}
-                    participantCount={topic.participantCount || 0}
-                    opinionsCount={topic.opinionCount || 0}
-                    isActive={topic.isActive || false}
-                    previewContent={topic.previewContent}
-                    previewAuthor={topic.previewAuthor}
-                    previewIsAI={topic.previewIsAI}
-                    diversityScore={topic.diversityScore}
-                    politicalDistribution={topic.politicalDistribution}
-                  />
-                </CardContainer>
-              ))}
-            </div>
-          ) : (
-            <Card className="p-8 text-center">
-              <Star className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p className="text-muted-foreground">
-                Share opinions to get personalized recommendations
-              </p>
+        ) : (
+          <Card className="p-8 text-center">
+            <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p className="text-muted-foreground">
+              {isOwnProfile ? "You haven't shared any opinions yet" : "No opinions shared yet"}
+            </p>
+            {isOwnProfile && (
               <Link href="/">
-                <Button variant="default" className="mt-4" data-testid="button-browse-topics-recommended">
+                <Button variant="default" className="mt-4" data-testid="button-browse-topics">
                   Browse Topics
                 </Button>
               </Link>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* From People You Follow Section - Horizontal Scrolling */}
-      {isOwnProfile && (
-        <div className="space-y-4" data-testid="section-following">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              From People You Follow
-            </h2>
-          </div>
-          {followingTopics.length > 0 ? (
-            <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-              {followingTopics.map((topic) => (
-                <CardContainer key={topic.id}>
-                  <TopicCard
-                    id={topic.id}
-                    title={topic.title}
-                    description={topic.description}
-                    imageUrl={topic.imageUrl}
-                    categories={topic.categories}
-                    participantCount={topic.participantCount || 0}
-                    opinionsCount={topic.opinionCount || 0}
-                    isActive={topic.isActive || false}
-                    previewContent={topic.previewContent}
-                    previewAuthor={topic.previewAuthor}
-                    previewIsAI={topic.previewIsAI}
-                    diversityScore={topic.diversityScore}
-                    politicalDistribution={topic.politicalDistribution}
-                  />
-                </CardContainer>
-              ))}
-            </div>
-          ) : (
-            <Card className="p-8 text-center">
-              <UserPlus className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p className="text-muted-foreground">
-                Follow users to see their topics here
-              </p>
-            </Card>
-          )}
-        </div>
-      )}
+            )}
+          </Card>
+        )}
+      </div>
 
       {/* Badges Modal */}
       <Dialog open={showBadgesModal} onOpenChange={setShowBadgesModal}>
