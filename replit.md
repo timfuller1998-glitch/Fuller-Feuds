@@ -5,6 +5,10 @@ Opinion Feud is a modern platform designed to facilitate meaningful discussions 
 
 ## Recent Changes
 - **October 31, 2025**: 
+  - **Political Diversity Score System**: Implemented Shannon entropy-based diversity scoring (0-100%) across 4 political quadrants for all topics. Backend `getPoliticalDiversityScore()` and `calculatePoliticalDiversityScore()` methods calculate diversity from opinion political distributions.
+  - **Diversity Badges**: Added purple diversity score badges to top-right corner of all topic cards site-wide (Home, Categories, Hot Debates, Search, Topic pages). Shows percentage even for 0% diversity (all opinions in one quadrant).
+  - **Hot Debates Redesign**: Replaced for/against/neutral metrics with 4-quadrant political distribution bars (Red=Auth. Cap., Blue=Auth. Soc., Yellow=Lib. Cap., Green=Lib. Soc.) matching political compass colors.
+  - **Performance Optimization**: Eliminated N+1 query problem by passing `politicalDistribution` as prop to TopicCard instead of individual API fetches. Backend `enrichTopicWithPreview()` includes distribution data in all topic responses.
   - Created CardContainer wrapper component for unified card sizing (280px mobile, 300px desktop) across entire site
   - Replaced all manual card wrappers with CardContainer in Home, Topic, AllCategoriesPage, and RecentOpinions pages
   - Updated backend storage layer with enrichTopicWithPreview helper for consistent preview data
