@@ -20,7 +20,6 @@ import { useState } from "react";
 
 interface OpinionWithTopic extends Opinion {
   topic?: Topic;
-  userVote?: { voteType: 'like' | 'dislike' } | null;
 }
 
 interface TopicGroup {
@@ -271,10 +270,10 @@ export default function RecentOpinionsPage() {
                     topicId={opinion.topicId}
                     userId={opinion.userId}
                     userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                    userAvatar={opinion.author?.profileImageUrl}
-                    politicalLeaningScore={opinion.author?.politicalLeaningScore}
-                    economicScore={(opinion.author as any)?.economicScore}
-                    authoritarianScore={(opinion.author as any)?.authoritarianScore}
+                    userAvatar={opinion.author?.profileImageUrl ?? undefined}
+                    politicalLeaningScore={undefined}
+                    economicScore={opinion.author?.economicScore ?? undefined}
+                    authoritarianScore={opinion.author?.authoritarianScore ?? undefined}
                     content={opinion.content}
                     stance={opinion.stance as "for" | "against" | "neutral"}
                     debateStatus={opinion.debateStatus}
