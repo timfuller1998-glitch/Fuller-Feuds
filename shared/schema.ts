@@ -424,12 +424,14 @@ export type TopicWithCounts = Topic & {
 export type InsertOpinion = z.infer<typeof insertOpinionSchema>;
 export type Opinion = typeof opinions.$inferSelect & {
   fallacyCounts?: { [key: string]: number };
-  userVote?: 'like' | 'dislike' | null;
+  userVote?: { voteType: 'like' | 'dislike' } | null;
   author?: {
     id: string;
     firstName: string | null;
     lastName: string | null;
     profileImageUrl: string | null;
+    economicScore: number | null;
+    authoritarianScore: number | null;
   };
 };
 export type CumulativeOpinion = typeof cumulativeOpinions.$inferSelect;
