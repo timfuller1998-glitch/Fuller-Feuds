@@ -144,11 +144,11 @@ export function getTopicCornerGradient(distribution: {
   // Create a radial gradient for each corner and blend them
   return {
     background: `
-      radial-gradient(circle at 0% 0%, ${topLeft} 0%, transparent 70%),
-      radial-gradient(circle at 100% 0%, ${topRight} 0%, transparent 70%),
-      radial-gradient(circle at 0% 100%, ${bottomLeft} 0%, transparent 70%),
-      radial-gradient(circle at 100% 100%, ${bottomRight} 0%, transparent 70%),
-      linear-gradient(135deg, hsl(var(--muted)) 0%, hsl(var(--muted) / 0.8) 100%)
+      radial-gradient(circle at 0% 0%, ${topLeft} 0%, transparent 85%),
+      radial-gradient(circle at 100% 0%, ${topRight} 0%, transparent 85%),
+      radial-gradient(circle at 0% 100%, ${bottomLeft} 0%, transparent 85%),
+      radial-gradient(circle at 100% 100%, ${bottomRight} 0%, transparent 85%),
+      linear-gradient(135deg, hsl(0, 0%, 98%) 0%, hsl(0, 0%, 96%) 100%)
     `
   };
 }
