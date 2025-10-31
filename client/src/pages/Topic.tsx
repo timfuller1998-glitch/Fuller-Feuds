@@ -493,7 +493,7 @@ export default function Topic() {
         <ScrollArea className="w-full whitespace-nowrap">
           <div className="flex gap-4 pb-4">
             {/* User's Opinion Card or Share Opinion Button */}
-            <div className="min-w-[320px] max-w-[400px]">
+            <div className="flex-none w-[280px] sm:w-[300px]">
               {userOpinion && !showOpinionForm ? (
                 <Card>
                   <CardHeader className="pb-3">
@@ -557,7 +557,7 @@ export default function Topic() {
               const opponent = room.participants?.find((p: any) => p.userId !== user?.id);
               return (
                 <Link key={room.id} href={`/debate-room/${room.id}`}>
-                  <Card className="min-w-[320px] max-w-[400px] hover-elevate active-elevate-2 cursor-pointer h-full">
+                  <Card className="flex-none w-[280px] sm:w-[300px] hover-elevate active-elevate-2 cursor-pointer h-full">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">Debate</CardTitle>
                     </CardHeader>
@@ -599,7 +599,7 @@ export default function Topic() {
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
               {supportingOpinions.map((opinion: any) => (
-                <div key={opinion.id} className="min-w-[320px] max-w-[400px]">
+                <div key={opinion.id} className="flex-none w-[280px] sm:w-[300px]">
                   <OpinionCard
                     id={opinion.id}
                     topicId={id!}
@@ -660,7 +660,7 @@ export default function Topic() {
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
               {neutralOpinions.map((opinion: any) => (
-                <div key={opinion.id} className="min-w-[320px] max-w-[400px]">
+                <div key={opinion.id} className="flex-none w-[280px] sm:w-[300px]">
                   <OpinionCard
                     id={opinion.id}
                     topicId={id!}
@@ -721,7 +721,7 @@ export default function Topic() {
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
               {opposingOpinions.map((opinion: any) => (
-                <div key={opinion.id} className="min-w-[320px] max-w-[400px]">
+                <div key={opinion.id} className="flex-none w-[280px] sm:w-[300px]">
                   <OpinionCard
                     id={opinion.id}
                     topicId={id!}
@@ -782,7 +782,7 @@ export default function Topic() {
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
               {similarTopics.slice(0, 10).map((similarTopic: any) => (
-                <div key={similarTopic.id} className="min-w-[320px] max-w-[400px]">
+                <div key={similarTopic.id} className="flex-none w-[280px] sm:w-[300px]">
                   <TopicCard
                     id={similarTopic.id}
                     title={similarTopic.title}
