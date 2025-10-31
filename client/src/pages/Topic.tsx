@@ -506,7 +506,7 @@ export default function Topic() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <p className="text-sm leading-relaxed">{userOpinion.content}</p>
+                    <p className="text-sm leading-relaxed whitespace-normal break-words">{userOpinion.content}</p>
                     <div className="flex gap-2">
                       <Button 
                         variant="outline" 
@@ -554,6 +554,32 @@ export default function Topic() {
             </CardContainer>
 
             {/* User's Active Debate Cards */}
+            {topicDebateRooms.length === 0 && userOpinion && (
+              <CardContainer>
+                <Card className="h-full flex items-center justify-center min-h-[200px]">
+                  <CardContent className="text-center space-y-3">
+                    <div className="text-muted-foreground text-sm">
+                      <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p>No active debates yet</p>
+                    </div>
+                    {oppositeOpinions.length > 0 ? (
+                      <Button 
+                        variant="default" 
+                        size="sm"
+                        onClick={() => startDebateMutation.mutate()}
+                        disabled={startDebateMutation.isPending}
+                        data-testid="button-start-new-debate"
+                      >
+                        <MessageCircle className="w-3 h-3 mr-1" />
+                        {startDebateMutation.isPending ? "Matching..." : "Start Debate"}
+                      </Button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Share your opinion and wait for others to join the discussion</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </CardContainer>
+            )}
             {topicDebateRooms.map((room) => {
               const opponent = room.participants?.find((p: any) => p.userId !== user?.id);
               return (
