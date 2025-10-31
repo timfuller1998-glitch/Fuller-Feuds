@@ -2362,7 +2362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profile = await storage.getUserProfile(userId);
       
       // Get user's opinions to find categories they engage with
-      const userOpinions = await storage.getProfileOpinions(userId, 'recent', 50);
+      const userOpinions = await storage.getUserOpinions(userId, 'recent', 50, userId);
       
       // Get topics the user has already participated in
       const participatedTopicIds = new Set(userOpinions.map((o: any) => o.topicId));
