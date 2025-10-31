@@ -315,6 +315,7 @@ export default function Home() {
                               previewContent={topic.previewContent}
                               previewAuthor={topic.previewAuthor}
                               previewIsAI={topic.previewIsAI}
+                              diversityScore={topic.diversityScore}
                             />
                           </CardContainer>
                         ))}

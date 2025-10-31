@@ -1,65 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
 import TopicCard from "@/components/TopicCard";
 import { Card, CardContent } from "@/components/ui/card";
-import { Flame, Users, TrendingUp, Activity } from "lucide-react";
-import { type Topic } from "@shared/schema";
-
-// Extended topic type with diversity metrics
-type TopicWithDiversity = Topic & {
-  opinionsCount?: number;
-  participantCount?: number;
-  forCount?: number;
-  againstCount?: number;
-  neutralCount?: number;
-  diversityScore?: number;
-  recentActivity?: number;
-  previewContent?: string;
-  previewAuthor?: string;
-  previewIsAI?: boolean;
-};
+import { Flame, Users, Activity } from "lucide-react";
+import { type TopicWithCounts } from "@shared/schema";
 
 export default function HotDebates() {
-  // Fetch topics with diversity metrics
-  const { data: topics, isLoading } = useQuery<TopicWithDiversity[]>({
-    queryKey: ["/api/topics", { sort: "hot" }],
-    queryFn: async () => {
-      const response = await fetch("/api/topics?sort=hot");
-      if (!response.ok) throw new Error("Failed to fetch topics");
-      return response.json();
-    },
+  // Fetch topics sorted by political diversity
+  const { data: topics, isLoading } = useQuery<TopicWithCounts[]>({
+    queryKey: ["/api/topics"],
   });
 
-  // Calculate diversity metrics for display
-  const calculateDiversityScore = (topic: TopicWithDiversity) => {
-    const total = (topic.forCount || 0) + (topic.againstCount || 0) + (topic.neutralCount || 0);
-    if (total === 0) return 0;
-
-    // Calculate how evenly distributed opinions are
-    const forPct = (topic.forCount || 0) / total;
-    const againstPct = (topic.againstCount || 0) / total;
-    const neutralPct = (topic.neutralCount || 0) / total;
-
-    // Shannon entropy for diversity (higher = more diverse)
-    const entropy = -[forPct, againstPct, neutralPct]
-      .filter(p => p > 0)
-      .reduce((sum, p) => sum + p * Math.log2(p), 0);
-
-    // Normalize by max entropy (log2(3) ≈ 1.585) and convert to percentage
-    return Math.round((entropy / Math.log2(3)) * 100);
-  };
-
-  // Sort by diversity score and recent activity (copy array to avoid cache mutation)
-  const sortedTopics = topics ? [...topics].sort((a, b) => {
-    const aScore = (a.diversityScore || calculateDiversityScore(a)) + (a.recentActivity || 0) * 0.1;
-    const bScore = (b.diversityScore || calculateDiversityScore(b)) + (b.recentActivity || 0) * 0.1;
-    return bScore - aScore;
-  }) : [];
+  // Sort by diversity score (copy array to avoid cache mutation)
+  const sortedTopics = topics ? [...topics]
+    .filter(t => t.diversityScore !== undefined && t.diversityScore > 0)
+    .sort((a, b) => (b.diversityScore || 0) - (a.diversityScore || 0)) : [];
 
   // Calculate aggregate stats
   const totalOpinions = sortedTopics.reduce((sum, t) => sum + (t.opinionsCount || 0), 0);
   const totalParticipants = sortedTopics.reduce((sum, t) => sum + (t.participantCount || 0), 0);
   const avgDiversity = sortedTopics.length > 0
-    ? Math.round(sortedTopics.reduce((sum, t) => sum + (t.diversityScore || calculateDiversityScore(t)), 0) / sortedTopics.length)
+    ? Math.round(sortedTopics.reduce((sum, t) => sum + (t.diversityScore || 0), 0) / sortedTopics.length)
     : 0;
 
   return (
@@ -151,8 +111,13 @@ export default function HotDebates() {
       ) : (
         <div className="grid grid-cols-1 gap-4" data-testid="list-hot-debates">
           {sortedTopics.map((topic, index) => {
-            const diversityScore = topic.diversityScore || calculateDiversityScore(topic);
-            const total = (topic.forCount || 0) + (topic.againstCount || 0) + (topic.neutralCount || 0);
+            const distribution = topic.politicalDistribution;
+            const diversityScore = topic.diversityScore || 0;
+            const hasDistribution = distribution && 
+              (distribution.authoritarianCapitalist > 0 || 
+               distribution.authoritarianSocialist > 0 || 
+               distribution.libertarianCapitalist > 0 || 
+               distribution.libertarianSocialist > 0);
 
             return (
               <div key={topic.id} className="relative">
@@ -177,51 +142,66 @@ export default function HotDebates() {
                       previewContent={topic.previewContent}
                       previewAuthor={topic.previewAuthor}
                       previewIsAI={topic.previewIsAI}
+                      diversityScore={topic.diversityScore}
                     />
                   </div>
-                  {/* Diversity Indicator */}
+                  {/* Political Diversity Indicator */}
                   <div className="border-t bg-muted/30 p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Activity className="w-4 h-4 text-purple-500" />
-                        <span className="text-sm font-medium">Opinion Diversity</span>
+                        <span className="text-sm font-medium">Political Diversity</span>
                       </div>
                       <span className="text-sm font-bold text-purple-500">{diversityScore}%</span>
                     </div>
-                    {total > 0 && (
+                    {hasDistribution && distribution && (
                       <div className="space-y-2">
                         <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-background">
-                          {topic.forCount! > 0 && (
-                            <div
-                              className="bg-green-500"
-                              style={{ width: `${(topic.forCount! / total) * 100}%` }}
-                            />
-                          )}
-                          {topic.againstCount! > 0 && (
+                          {distribution.authoritarianCapitalist > 0 && (
                             <div
                               className="bg-red-500"
-                              style={{ width: `${(topic.againstCount! / total) * 100}%` }}
+                              style={{ width: `${distribution.authoritarianCapitalist}%` }}
+                              title={`Authoritarian Capitalist: ${distribution.authoritarianCapitalist}%`}
                             />
                           )}
-                          {topic.neutralCount! > 0 && (
+                          {distribution.authoritarianSocialist > 0 && (
                             <div
-                              className="bg-gray-500"
-                              style={{ width: `${(topic.neutralCount! / total) * 100}%` }}
+                              className="bg-blue-500"
+                              style={{ width: `${distribution.authoritarianSocialist}%` }}
+                              title={`Authoritarian Socialist: ${distribution.authoritarianSocialist}%`}
+                            />
+                          )}
+                          {distribution.libertarianCapitalist > 0 && (
+                            <div
+                              className="bg-yellow-500"
+                              style={{ width: `${distribution.libertarianCapitalist}%` }}
+                              title={`Libertarian Capitalist: ${distribution.libertarianCapitalist}%`}
+                            />
+                          )}
+                          {distribution.libertarianSocialist > 0 && (
+                            <div
+                              className="bg-green-500"
+                              style={{ width: `${distribution.libertarianSocialist}%` }}
+                              title={`Libertarian Socialist: ${distribution.libertarianSocialist}%`}
                             />
                           )}
                         </div>
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-green-500" />
-                            <span>For: {topic.forCount}</span>
-                          </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <div className="w-2 h-2 rounded-full bg-red-500" />
-                            <span>Against: {topic.againstCount}</span>
+                            <span>Auth. Cap.: {distribution.authoritarianCapitalist}%</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-gray-500" />
-                            <span>Neutral: {topic.neutralCount}</span>
+                            <div className="w-2 h-2 rounded-full bg-blue-500" />
+                            <span>Auth. Soc.: {distribution.authoritarianSocialist}%</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                            <span>Lib. Cap.: {distribution.libertarianCapitalist}%</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                            <span>Lib. Soc.: {distribution.libertarianSocialist}%</span>
                           </div>
                         </div>
                       </div>
