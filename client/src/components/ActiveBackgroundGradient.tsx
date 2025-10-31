@@ -13,8 +13,8 @@ interface PoliticalDistribution {
  * based on active user political distribution
  */
 function getActiveBackgroundGradient(distribution: PoliticalDistribution): React.CSSProperties {
-  // Convert percentages (0-100) to very low opacity for subtle background (max 0.08 instead of 0.4)
-  const toOpacity = (percent: number) => ((percent / 100) * 0.08).toFixed(3);
+  // Convert percentages (0-100) to subtle opacity for background (max 0.20 for visibility)
+  const toOpacity = (percent: number) => ((percent / 100) * 0.20).toFixed(3);
 
   // Softer color variants with higher lightness - same as topic cards
   const topLeft = `rgba(100, 150, 255, ${toOpacity(distribution.authoritarianSocialist)})`;      // Soft Blue
