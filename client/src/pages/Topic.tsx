@@ -510,8 +510,8 @@ export default function Topic() {
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-0 flex-1 flex flex-col">
-                    <p className="text-sm leading-relaxed mb-3 whitespace-normal break-words">{userOpinion.content}</p>
+                  <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
+                    <p className="text-sm leading-relaxed line-clamp-3 mb-3">{userOpinion.content}</p>
                     <div className="flex gap-2 mt-auto pt-2 border-t">
                       <Button 
                         variant="outline" 
