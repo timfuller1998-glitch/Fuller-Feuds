@@ -201,6 +201,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/users/active-distribution', async (req, res) => {
+    try {
+      const distribution = await storage.getActiveUserPoliticalDistribution();
+      res.json(distribution);
+    } catch (error) {
+      console.error("Error fetching active user political distribution:", error);
+      res.status(500).json({ message: "Failed to fetch active user distribution" });
+    }
+  });
+
   app.get('/api/users/:id', async (req, res) => {
     try {
       const user = await storage.getUser(req.params.id);

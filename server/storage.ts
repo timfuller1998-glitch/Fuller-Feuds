@@ -128,6 +128,12 @@ export interface IStorage {
     libertarianCapitalist: number;
     libertarianSocialist: number;
   }>;
+  getActiveUserPoliticalDistribution(): Promise<{
+    authoritarianCapitalist: number;
+    authoritarianSocialist: number;
+    libertarianCapitalist: number;
+    libertarianSocialist: number;
+  }>;
   
   // Opinion operations
   createOpinion(opinion: InsertOpinion): Promise<Opinion>;
@@ -583,6 +589,114 @@ export class DatabaseStorage implements IStorage {
     }
 
     const total = topicOpinions.length;
+
+    // Calculate percentages with proper rounding to ensure sum = 100
+    const percentages = {
+      authoritarianCapitalist: (authoritarianCapitalist / total) * 100,
+      authoritarianSocialist: (authoritarianSocialist / total) * 100,
+      libertarianCapitalist: (libertarianCapitalist / total) * 100,
+      libertarianSocialist: (libertarianSocialist / total) * 100
+    };
+
+    // Round each value
+    const rounded = {
+      authoritarianCapitalist: Math.round(percentages.authoritarianCapitalist),
+      authoritarianSocialist: Math.round(percentages.authoritarianSocialist),
+      libertarianCapitalist: Math.round(percentages.libertarianCapitalist),
+      libertarianSocialist: Math.round(percentages.libertarianSocialist)
+    };
+
+    // Adjust to ensure sum = 100 (distribute rounding error)
+    const sum = rounded.authoritarianCapitalist + rounded.authoritarianSocialist + 
+                rounded.libertarianCapitalist + rounded.libertarianSocialist;
+    const diff = 100 - sum;
+
+    if (diff !== 0) {
+      // Find the quadrant with the largest fractional part and adjust it
+      const fractionals = [
+        { key: 'authoritarianCapitalist' as const, frac: percentages.authoritarianCapitalist - rounded.authoritarianCapitalist },
+        { key: 'authoritarianSocialist' as const, frac: percentages.authoritarianSocialist - rounded.authoritarianSocialist },
+        { key: 'libertarianCapitalist' as const, frac: percentages.libertarianCapitalist - rounded.libertarianCapitalist },
+        { key: 'libertarianSocialist' as const, frac: percentages.libertarianSocialist - rounded.libertarianSocialist }
+      ].sort((a, b) => Math.abs(b.frac) - Math.abs(a.frac));
+
+      rounded[fractionals[0].key] += diff;
+    }
+
+    return rounded;
+  }
+
+  async getActiveUserPoliticalDistribution(): Promise<{
+    authoritarianCapitalist: number;
+    authoritarianSocialist: number;
+    libertarianCapitalist: number;
+    libertarianSocialist: number;
+  }> {
+    // Get all opinions created in the last 12 hours
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    
+    const recentOpinions = await db
+      .select()
+      .from(opinions)
+      .where(sql`${opinions.createdAt} >= ${twelveHoursAgo}`);
+
+    if (recentOpinions.length === 0) {
+      // No recent activity
+      return {
+        authoritarianCapitalist: 0,
+        authoritarianSocialist: 0,
+        libertarianCapitalist: 0,
+        libertarianSocialist: 0
+      };
+    }
+
+    // Get unique user IDs
+    const uniqueUserIds = [...new Set(recentOpinions.map(o => o.userId))];
+
+    // Get user profiles with political scores
+    const activeUserProfiles = await db
+      .select()
+      .from(userProfiles)
+      .where(and(
+        inArray(userProfiles.userId, uniqueUserIds),
+        sql`${userProfiles.economicScore} IS NOT NULL`,
+        sql`${userProfiles.authoritarianScore} IS NOT NULL`
+      ));
+
+    if (activeUserProfiles.length === 0) {
+      // No users with political scores yet
+      return {
+        authoritarianCapitalist: 0,
+        authoritarianSocialist: 0,
+        libertarianCapitalist: 0,
+        libertarianSocialist: 0
+      };
+    }
+
+    // Count users in each quadrant
+    // Schema: economicScore -100 (socialist) to +100 (capitalist)
+    // authoritarianScore -100 (libertarian) to +100 (authoritarian)
+    let authoritarianCapitalist = 0;  // economic >= 0, authoritarian >= 0
+    let authoritarianSocialist = 0;   // economic < 0, authoritarian >= 0
+    let libertarianCapitalist = 0;    // economic >= 0, authoritarian < 0
+    let libertarianSocialist = 0;     // economic < 0, authoritarian < 0
+
+    for (const profile of activeUserProfiles) {
+      const economic = profile.economicScore || 0;
+      const authoritarian = profile.authoritarianScore || 0;
+
+      if (economic >= 0 && authoritarian >= 0) {
+        authoritarianCapitalist++;
+      } else if (economic < 0 && authoritarian >= 0) {
+        authoritarianSocialist++;
+      } else if (economic >= 0 && authoritarian < 0) {
+        libertarianCapitalist++;
+      } else {
+        libertarianSocialist++;
+      }
+    }
+
+    const total = activeUserProfiles.length;
 
     // Calculate percentages with proper rounding to ensure sum = 100
     const percentages = {

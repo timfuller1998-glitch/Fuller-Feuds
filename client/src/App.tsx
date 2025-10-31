@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
 import SearchBar from "@/components/SearchBar";
+import { ActiveBackgroundGradient } from "@/components/ActiveBackgroundGradient";
 import { useAuth } from "@/hooks/useAuth";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
@@ -195,7 +196,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AppContent />
+        <ActiveBackgroundGradient>
+          <AppContent />
+        </ActiveBackgroundGradient>
       </TooltipProvider>
     </QueryClientProvider>
   );
