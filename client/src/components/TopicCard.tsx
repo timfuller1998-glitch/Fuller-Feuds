@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Users, Sparkles } from "lucide-react";
+import { MessageCircle, Users, Sparkles, Activity } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getTopicCornerGradient } from "@/lib/politicalColors";
@@ -17,6 +17,7 @@ interface TopicCardProps {
   previewContent?: string;
   previewAuthor?: string;
   previewIsAI?: boolean;
+  diversityScore?: number;
 }
 
 export default function TopicCard({
@@ -31,6 +32,7 @@ export default function TopicCard({
   previewContent,
   previewAuthor,
   previewIsAI,
+  diversityScore,
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
 
@@ -88,6 +90,15 @@ export default function TopicCard({
             </Badge>
           )}
         </div>
+
+        {diversityScore !== undefined && diversityScore > 0 && (
+          <div className="absolute top-2 right-2">
+            <Badge className="bg-purple-500/90 text-white backdrop-blur-sm" data-testid={`badge-diversity-${id}`}>
+              <Activity className="w-3 h-3 mr-1" />
+              {diversityScore}%
+            </Badge>
+          </div>
+        )}
 
         {previewContent && (
           <div className="mt-8 space-y-2">
