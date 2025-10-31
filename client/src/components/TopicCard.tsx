@@ -91,7 +91,7 @@ export default function TopicCard({
           )}
         </div>
 
-        {diversityScore !== undefined && diversityScore > 0 && (
+        {diversityScore !== undefined && (
           <div className="absolute top-2 right-2">
             <Badge className="bg-purple-500/90 text-white backdrop-blur-sm" data-testid={`badge-diversity-${id}`}>
               <Activity className="w-3 h-3 mr-1" />
