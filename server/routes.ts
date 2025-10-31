@@ -2413,14 +2413,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fallback to trending topics if we don't have enough category-based recommendations
       // This allows users to re-engage with topics and see updated summaries
       if (recommended.length < 5) {
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        
         const trendingTopics = allTopics
+          // Filter to topics active in the last 30 days
+          .filter(topic => {
+            const topicDate = topic.createdAt ? new Date(topic.createdAt).getTime() : 0;
+            return topicDate >= thirtyDaysAgo;
+          })
           .map(topic => ({
             topic,
             trendingScore: (topic.opinionCount || 0) * 10 + 
                           (topic.participantCount || 0) * 5 +
                           (topic.createdAt && (Date.now() - new Date(topic.createdAt).getTime()) / (1000 * 60 * 60 * 24) < 7 ? 20 : 0)
           }))
-          .sort((a, b) => b.trendingScore - a.trendingScore)
+          // Sort by trending score, then by most recent activity
+          .sort((a, b) => {
+            if (b.trendingScore !== a.trendingScore) {
+              return b.trendingScore - a.trendingScore;
+            }
+            const dateA = a.topic.createdAt ? new Date(a.topic.createdAt).getTime() : 0;
+            const dateB = b.topic.createdAt ? new Date(b.topic.createdAt).getTime() : 0;
+            return dateB - dateA;
+          })
           .map(({ topic }) => topic);
         
         // Add trending topics to fill the gap, avoiding duplicates
