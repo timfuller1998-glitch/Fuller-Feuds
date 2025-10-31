@@ -271,7 +271,7 @@ export default function RecentOpinionsPage() {
                     userId={opinion.userId}
                     userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
                     userAvatar={opinion.author?.profileImageUrl ?? undefined}
-                    politicalLeaningScore={undefined}
+                    politicalLeaningScore={opinion.author?.politicalLeaningScore ?? undefined}
                     economicScore={opinion.author?.economicScore ?? undefined}
                     authoritarianScore={opinion.author?.authoritarianScore ?? undefined}
                     content={opinion.content}
