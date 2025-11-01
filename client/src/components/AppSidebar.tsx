@@ -75,14 +75,6 @@ export default function AppSidebar({
     queryKey: ["/api/topics"],
   });
 
-  // Fetch user's active debate rooms to show count badge
-  const { data: activeDebateRooms } = useQuery<any[]>({
-    queryKey: ["/api/users/me/debate-rooms"],
-    refetchInterval: 10000, // Refetch every 10 seconds to catch new matches
-  });
-
-  const activeDebatesCount = activeDebateRooms?.length || 0;
-
   // Fetch user's saved (followed) categories
   const { data: userData } = useQuery<{ followedCategories: string[] }>({
     queryKey: ["/api/users/me"],
@@ -122,8 +114,6 @@ export default function AppSidebar({
     { title: "Trending", icon: TrendingUp, path: "/trending" },
     { title: "Live Debates", icon: Radio, path: "/live" },
     { title: "Hot Debates", icon: Flame, path: "/hot-debates" },
-    { title: "My Topics", icon: MessageCircle, path: "/debates" },
-    { title: "My Current Debates", icon: MessageCircle, path: "/my-active-debates", badge: activeDebatesCount },
     { title: "Recent Opinions", icon: Clock, path: "/recent-opinions" },
   ];
 

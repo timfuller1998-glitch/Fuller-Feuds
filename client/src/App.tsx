@@ -23,13 +23,10 @@ import Topic from "@/pages/Topic";
 import Trending from "@/pages/Trending";
 import LiveDebates from "@/pages/LiveDebates";
 import HotDebates from "@/pages/HotDebates";
-import MyDebates from "@/pages/MyDebates";
-import MyActiveDebates from "@/pages/MyActiveDebates";
 import Search from "@/pages/Search";
 import AllCategoriesPage from "@/pages/AllCategoriesPage";
 import CategoryPage from "@/pages/CategoryPage";
 import LiveStreamPage from "@/pages/LiveStreamPage";
-import DebateRoomPage from "@/pages/DebateRoomPage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Onboarding from "@/pages/Onboarding";
 import RecentOpinions from "@/pages/RecentOpinions";
@@ -55,8 +52,6 @@ function Router() {
       <Route path="/trending" component={Trending} />
       <Route path="/live" component={LiveDebates} />
       <Route path="/hot-debates" component={HotDebates} />
-      <Route path="/debates" component={MyDebates} />
-      <Route path="/my-active-debates" component={MyActiveDebates} />
       <Route path="/categories" component={AllCategoriesPage} />
       <Route path="/category/:category" component={CategoryPage} />
       <Route path="/recent-opinions" component={RecentOpinions} />
@@ -64,7 +59,6 @@ function Router() {
       <Route path="/profile/:userId" component={Profile} />
       <Route path="/settings" component={Settings} />
       <Route path="/live-stream/:id" component={LiveStreamPage} />
-      <Route path="/debate-room/:id" component={DebateRoomPage} />
       <Route path="/admin" component={AdminDashboard} />
       <Route component={NotFound} />
     </Switch>

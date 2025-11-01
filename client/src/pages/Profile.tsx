@@ -97,12 +97,6 @@ export default function Profile() {
     enabled: !!userId,
   });
 
-  // Fetch debate rooms
-  const { data: debateRooms = [] } = useQuery<any[]>({
-    queryKey: ['/api/profile', userId, 'debate-rooms'],
-    queryFn: () => fetch(`/api/profile/${userId}/debate-rooms`, { credentials: 'include' }).then(res => res.json()),
-    enabled: !!userId,
-  });
 
   // Fetch recommended topics (new endpoint)
   const { data: recommendedTopics = [] } = useQuery<any[]>({
@@ -571,64 +565,6 @@ export default function Profile() {
           )}
         </div>
       )}
-
-      {/* Active Debates Section - Horizontal Scrolling */}
-      <div className="space-y-4" data-testid="section-active-debates">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">Active Debates</h2>
-          {debateRooms.length > 0 && (
-            <Link href="/my-active-debates">
-              <Button variant="ghost" size="sm" data-testid="link-view-all-debates">
-                View All
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-          )}
-        </div>
-        {debateRooms.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-            {debateRooms.slice(0, 5).map((room) => (
-              <CardContainer key={room.id}>
-                <Card 
-                  className="hover-elevate active-elevate-2 cursor-pointer" 
-                  onClick={() => navigate(`/debate-room/${room.id}`)}
-                  data-testid={`card-debate-${room.id}`}
-                >
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Swords className="w-5 h-5" />
-                      <CardTitle className="text-base">{room.topic?.title || 'Debate Room'}</CardTitle>
-                    </div>
-                    <CardDescription className="line-clamp-2">
-                      {room.topic?.description || 'Active debate room'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Users className="w-4 h-4" />
-                      <span>{room.participant1?.firstName} vs {room.participant2?.firstName}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </CardContainer>
-            ))}
-          </div>
-        ) : (
-          <Card className="p-8 text-center">
-            <Swords className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p className="text-muted-foreground">
-              {isOwnProfile ? "You have no active debates" : "No active debates"}
-            </p>
-            {isOwnProfile && (
-              <Link href="/">
-                <Button variant="default" className="mt-4" data-testid="button-find-debates">
-                  Find Debates
-                </Button>
-              </Link>
-            )}
-          </Card>
-        )}
-      </div>
 
       {/* My Opinions Section - Horizontal Scrolling */}
       <div className="space-y-4" data-testid="section-my-opinions">
