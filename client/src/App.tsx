@@ -8,6 +8,9 @@ import AppSidebar from "@/components/AppSidebar";
 import SearchBar from "@/components/SearchBar";
 import { ActiveBackgroundGradient } from "@/components/ActiveBackgroundGradient";
 import { useAuth } from "@/hooks/useAuth";
+import { DebateProvider } from "@/contexts/DebateContext";
+import { DebateFooter } from "@/components/debates/DebateFooter";
+import { useDebateWebSocket } from "@/hooks/useDebateWebSocket";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
 import Profile from "@/pages/Profile";
@@ -100,14 +103,21 @@ function AppWithSidebar({
             />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 pb-20">
           <div className="max-w-7xl mx-auto w-full">
             <Router />
           </div>
         </main>
+        <DebateFooter />
       </div>
     </div>
   );
+}
+
+function WebSocketManager() {
+  const { user } = useAuth();
+  useDebateWebSocket(user?.id);
+  return null;
 }
 
 function AuthenticatedApp() {
@@ -160,14 +170,17 @@ function AuthenticatedApp() {
   }
 
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <AppWithSidebar 
-        user={user}
-        displayName={displayName}
-        searchQuery={searchQuery}
-        handleSearch={handleSearch}
-      />
-    </SidebarProvider>
+    <DebateProvider>
+      <SidebarProvider style={style as React.CSSProperties}>
+        <WebSocketManager />
+        <AppWithSidebar 
+          user={user}
+          displayName={displayName}
+          searchQuery={searchQuery}
+          handleSearch={handleSearch}
+        />
+      </SidebarProvider>
+    </DebateProvider>
   );
 }
 

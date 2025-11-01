@@ -541,6 +541,22 @@
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  /* Subtle pulse animation for debate footer avatars with new messages */
+  @keyframes pulse-subtle {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 0.9;
+    }
+  }
+
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
 }
 
 /* Respect reduced motion preferences */
