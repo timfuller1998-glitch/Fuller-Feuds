@@ -133,6 +133,64 @@ export default function Topic() {
 
   // Get user's opinion on this topic to determine stance
   const userOpinion = opinions?.find(o => o.userId === user?.id);
+  
+  // Add SEO metadata
+  useEffect(() => {
+    if (topic) {
+      // Set page title
+      document.title = `${topic.title} - Opinion Feud`;
+      
+      // Create or update meta description
+      const description = `Join the debate on "${topic.title}". ${opinions?.length || 0} opinions shared. Explore different perspectives and share your thoughts on Opinion Feud.`;
+      let metaDescription = document.querySelector('meta[name="description"]');
+      if (!metaDescription) {
+        metaDescription = document.createElement('meta');
+        metaDescription.setAttribute('name', 'description');
+        document.head.appendChild(metaDescription);
+      }
+      metaDescription.setAttribute('content', description);
+      
+      // Open Graph tags for social sharing
+      const ogTags = [
+        { property: 'og:title', content: topic.title },
+        { property: 'og:description', content: description },
+        { property: 'og:type', content: 'article' },
+        { property: 'og:url', content: window.location.href },
+      ];
+      
+      ogTags.forEach(({ property, content }) => {
+        let tag = document.querySelector(`meta[property="${property}"]`);
+        if (!tag) {
+          tag = document.createElement('meta');
+          tag.setAttribute('property', property);
+          document.head.appendChild(tag);
+        }
+        tag.setAttribute('content', content);
+      });
+      
+      // Twitter Card tags
+      const twitterTags = [
+        { name: 'twitter:card', content: 'summary' },
+        { name: 'twitter:title', content: topic.title },
+        { name: 'twitter:description', content: description },
+      ];
+      
+      twitterTags.forEach(({ name, content }) => {
+        let tag = document.querySelector(`meta[name="${name}"]`);
+        if (!tag) {
+          tag = document.createElement('meta');
+          tag.setAttribute('name', name);
+          document.head.appendChild(tag);
+        }
+        tag.setAttribute('content', content);
+      });
+    }
+    
+    // Cleanup function to reset to default title when component unmounts
+    return () => {
+      document.title = 'Opinion Feud';
+    };
+  }, [topic, opinions?.length]);
 
   // Sort opinions based on user preference
   const sortOpinions = (opinionList: Opinion[]) => {
