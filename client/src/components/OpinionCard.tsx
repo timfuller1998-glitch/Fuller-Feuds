@@ -6,12 +6,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AvatarWithBadge } from "./AvatarWithBadge";
 import FallacyBadges from "./FallacyBadges";
 import FallacyFlagDialog from "./FallacyFlagDialog";
+import { LoginPromptDialog } from "./LoginPromptDialog";
 import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag, Link as LinkIcon, ExternalLink, MessageCircle, Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
 import type { FallacyType } from "@shared/fallacies";
 
@@ -89,7 +91,10 @@ export default function OpinionCard({
   const [, setLocation] = useLocation();
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showFlagDialog, setShowFlagDialog] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginAction, setLoginAction] = useState<"like" | "opinion" | "debate" | "interact">("interact");
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
 
   // Get political gradient style for this opinion
   const gradientStyle = getOpinionGradientStyle(topicEconomicScore, topicAuthoritarianScore);
@@ -131,15 +136,60 @@ export default function OpinionCard({
   const currentDislikes = dislikesCount;
 
   const handleLike = () => {
+    if (!isAuthenticated) {
+      setLoginAction("like");
+      setShowLoginPrompt(true);
+      return;
+    }
     onLike?.(id);
   };
 
   const handleDislike = () => {
+    if (!isAuthenticated) {
+      setLoginAction("like");
+      setShowLoginPrompt(true);
+      return;
+    }
     onDislike?.(id);
   };
 
   const handleFlag = () => {
+    if (!isAuthenticated) {
+      setLoginAction("interact");
+      setShowLoginPrompt(true);
+      return;
+    }
     setShowFlagDialog(true);
+  };
+  
+  const handleDebate = () => {
+    if (!isAuthenticated) {
+      setLoginAction("debate");
+      setShowLoginPrompt(true);
+      return;
+    }
+    onDebate?.(id);
+    setShowDetailsDialog(false);
+  };
+  
+  const handleRandomMatch = () => {
+    if (!isAuthenticated) {
+      setLoginAction("debate");
+      setShowLoginPrompt(true);
+      return;
+    }
+    onRandomMatch?.();
+    setShowDetailsDialog(false);
+  };
+  
+  const handleAdopt = () => {
+    if (!isAuthenticated) {
+      setLoginAction("opinion");
+      setShowLoginPrompt(true);
+      return;
+    }
+    onAdopt?.(id);
+    setShowDetailsDialog(false);
   };
 
   // Truncate content for card preview
@@ -421,8 +471,7 @@ export default function OpinionCard({
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onAdopt?.(id);
-                      setShowDetailsDialog(false);
+                      handleAdopt();
                     }}
                     data-testid={`button-adopt-dialog-${id}`}
                   >
@@ -436,8 +485,7 @@ export default function OpinionCard({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDebate(id);
-                        setShowDetailsDialog(false);
+                        handleDebate();
                       }}
                       data-testid={`button-debate-dialog-${id}`}
                     >
@@ -452,8 +500,7 @@ export default function OpinionCard({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onRandomMatch();
-                        setShowDetailsDialog(false);
+                        handleRandomMatch();
                       }}
                       disabled={isRandomMatchPending}
                       data-testid={`button-random-match-dialog-${id}`}
@@ -489,6 +536,13 @@ export default function OpinionCard({
         onSubmit={(fallacyType) => flagMutation.mutate(fallacyType)}
         isPending={flagMutation.isPending}
         entityType="opinion"
+      />
+      
+      {/* Login Prompt Dialog */}
+      <LoginPromptDialog
+        open={showLoginPrompt}
+        onOpenChange={setShowLoginPrompt}
+        action={loginAction}
       />
     </>
   );
