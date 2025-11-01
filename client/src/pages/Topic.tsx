@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -31,6 +31,7 @@ import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import { formatDistanceToNow } from "date-fns";
 import type { FallacyType } from "@shared/fallacies";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
+import useEmblaCarousel from "embla-carousel-react";
 
 const opinionFormSchema = insertOpinionSchema.omit({
   topicId: true,
@@ -57,6 +58,25 @@ export default function Topic() {
   const [isRandomMatch, setIsRandomMatch] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [loginAction, setLoginAction] = useState<"like" | "opinion" | "debate" | "interact">("interact");
+  
+  // Carousel state for opinion/summary swipe
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "start" });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Update carousel selected index
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setSelectedIndex(emblaApi.selectedScrollSnap());
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    onSelect();
+    emblaApi.on("select", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi, onSelect]);
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -493,173 +513,193 @@ export default function Topic() {
         </Button>
       </Link>
 
-      {/* Header Section with Title and AI Summary Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          {/* Categories and Active Badge */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {topic.categories.map((cat) => (
-              <Badge 
-                key={cat} 
-                variant="secondary"
-                className="cursor-pointer hover-elevate"
-                onClick={() => navigate(`/category/${encodeURIComponent(cat)}`)}
-                data-testid={`badge-category-${cat.toLowerCase()}`}
-              >
-                {cat}
-              </Badge>
-            ))}
-            {topic.isActive && (
-              <Badge className="bg-chart-1 text-white">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                Active
-              </Badge>
-            )}
-          </div>
-
-          {/* Title and Flag Button */}
-          <div className="flex items-start justify-between gap-4">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight" data-testid="text-topic-title">
-              {topic.title}
-            </h1>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleFlagTopicClick}
-              data-testid="button-flag-topic"
-              className="flex-shrink-0"
+      {/* Header Section */}
+      <div className="space-y-4">
+        {/* Categories and Active Badge */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {topic.categories.map((cat) => (
+            <Badge 
+              key={cat} 
+              variant="secondary"
+              className="cursor-pointer hover-elevate"
+              onClick={() => navigate(`/category/${encodeURIComponent(cat)}`)}
+              data-testid={`badge-category-${cat.toLowerCase()}`}
             >
-              <Flag className="w-4 h-4 mr-2" />
-              Flag
-            </Button>
-          </div>
-          
-          {/* Display fallacy badges if any */}
-          {topic.fallacyCounts && Object.keys(topic.fallacyCounts).some(key => (topic.fallacyCounts?.[key] || 0) > 0) && (
-            <div>
-              <FallacyBadges fallacyCounts={topic.fallacyCounts} />
-            </div>
+              {cat}
+            </Badge>
+          ))}
+          {topic.isActive && (
+            <Badge className="bg-chart-1 text-white">
+              <TrendingUp className="w-3 h-3 mr-1" />
+              Active
+            </Badge>
           )}
-
-          {/* Stats */}
-          <div className="flex items-center gap-6 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="w-4 h-4" />
-              <span data-testid="text-opinions-count">{opinions?.length || 0} opinions</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              <span data-testid="text-participants-count">
-                {opinions ? new Set(opinions.map(o => o.userId)).size : 0} participants
-              </span>
-            </div>
-          </div>
         </div>
 
-        {/* AI Summary Card */}
-        {cumulativeData && (
-          <Card className="lg:col-span-1">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Brain className="w-4 h-4 text-primary" />
-                AI Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm leading-relaxed">{cumulativeData.summary}</p>
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-primary">{cumulativeData.supportingPercentage || 0}%</div>
-                  <div className="text-xs text-muted-foreground">For</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-muted-foreground">{cumulativeData.neutralPercentage || 0}%</div>
-                  <div className="text-xs text-muted-foreground">Neutral</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-destructive">{cumulativeData.opposingPercentage || 0}%</div>
-                  <div className="text-xs text-muted-foreground">Against</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* "You" Section */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold">You</h2>
-          <Badge variant="outline">{userOpinion ? 1 : 0}</Badge>
+        {/* Title and Flag Button - Full Width */}
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex-1" data-testid="text-topic-title">
+            {topic.title}
+          </h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleFlagTopicClick}
+            data-testid="button-flag-topic"
+            className="flex-shrink-0"
+          >
+            <Flag className="w-4 h-4 mr-2" />
+            Flag
+          </Button>
         </div>
         
-        <ScrollArea className="w-full whitespace-nowrap">
-          <div className="flex gap-4 pb-4">
-            {/* User's Opinion Card or Share Opinion Button */}
-            <CardContainer>
-              {userOpinion && !showOpinionForm ? (
-                <Card 
-                  className="h-full flex flex-col" 
-                  style={getOpinionGradientStyle(userOpinion.topicEconomicScore, userOpinion.topicAuthoritarianScore)}
-                  data-testid="card-user-opinion"
-                >
-                  <CardHeader className="pb-3 flex-shrink-0">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">Your Opinion</CardTitle>
-                      <Badge variant={userOpinion.stance === 'for' ? 'default' : userOpinion.stance === 'against' ? 'destructive' : 'secondary'}>
-                        {userOpinion.stance}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
-                    <p className="text-sm leading-relaxed line-clamp-3 mb-3">{userOpinion.content}</p>
-                    <div className="flex gap-2 mt-auto pt-2 border-t">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
-                          opinionForm.setValue('content', userOpinion.content);
-                          opinionForm.setValue('debateStatus', (userOpinion.debateStatus || "open") as "open" | "closed" | "private");
-                          opinionForm.setValue('references', userOpinion.references || []);
-                          setShowOpinionForm(true);
-                        }}
-                        data-testid="button-change-opinion"
-                      >
-                        Update
-                      </Button>
-                      {oppositeOpinions.length > 0 && (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={handleFindDebateClick}
-                          data-testid="button-find-random-debate"
-                        >
-                          <MessageCircle className="w-3 h-3 mr-1" />
-                          Find Debate
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card className="h-full flex items-center justify-center min-h-[200px]">
-                  <CardContent className="text-center">
-                    <Button 
-                      variant="default" 
-                      onClick={handleShareOpinionClick}
-                      data-testid="button-share-opinion"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Share Your Opinion
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-            </CardContainer>
+        {/* Display fallacy badges if any */}
+        {topic.fallacyCounts && Object.keys(topic.fallacyCounts).some(key => (topic.fallacyCounts?.[key] || 0) > 0) && (
+          <div>
+            <FallacyBadges fallacyCounts={topic.fallacyCounts} />
           </div>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
+        )}
+
+        {/* Stats */}
+        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-4 h-4" />
+            <span data-testid="text-opinions-count">{opinions?.length || 0} opinions</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            <span data-testid="text-participants-count">
+              {opinions ? new Set(opinions.map(o => o.userId)).size : 0} participants
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Swipeable Carousel: Your Opinion & AI Summary */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-semibold">Overview</h2>
+        </div>
+        
+        <div className="overflow-hidden" ref={emblaRef} data-testid="carousel-overview">
+          <div className="flex gap-4">
+            {/* Slide 1: User's Opinion */}
+            <div className="flex-[0_0_100%] min-w-0 pl-[calc((100%-280px)/2)] pr-[calc((100%-280px)/2)] md:pl-[calc((100%-300px)/2)] md:pr-[calc((100%-300px)/2)]">
+              <div className="w-[280px] md:w-[300px] mx-auto">
+                {userOpinion && !showOpinionForm ? (
+                  <Card 
+                    className="h-full flex flex-col" 
+                    style={getOpinionGradientStyle(userOpinion.topicEconomicScore, userOpinion.topicAuthoritarianScore)}
+                    data-testid="card-user-opinion"
+                  >
+                    <CardHeader className="pb-3 flex-shrink-0">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">Your Opinion</CardTitle>
+                        <Badge variant={userOpinion.stance === 'for' ? 'default' : userOpinion.stance === 'against' ? 'destructive' : 'secondary'}>
+                          {userOpinion.stance}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
+                      <p className="text-sm leading-relaxed line-clamp-3 mb-3">{userOpinion.content}</p>
+                      <div className="flex gap-2 mt-auto pt-2 border-t">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
+                            opinionForm.setValue('content', userOpinion.content);
+                            opinionForm.setValue('debateStatus', (userOpinion.debateStatus || "open") as "open" | "closed" | "private");
+                            opinionForm.setValue('references', userOpinion.references || []);
+                            setShowOpinionForm(true);
+                          }}
+                          data-testid="button-change-opinion"
+                        >
+                          Update
+                        </Button>
+                        {oppositeOpinions.length > 0 && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={handleFindDebateClick}
+                            data-testid="button-find-random-debate"
+                          >
+                            <MessageCircle className="w-3 h-3 mr-1" />
+                            Find Debate
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="h-full flex items-center justify-center min-h-[200px]">
+                    <CardContent className="text-center">
+                      <Button 
+                        variant="default" 
+                        onClick={handleShareOpinionClick}
+                        data-testid="button-share-opinion"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Share Your Opinion
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+
+            {/* Slide 2: AI Summary */}
+            {cumulativeData && (
+              <div className="flex-[0_0_100%] min-w-0 pl-[calc((100%-280px)/2)] pr-[calc((100%-280px)/2)] md:pl-[calc((100%-300px)/2)] md:pr-[calc((100%-300px)/2)]">
+                <div className="w-[280px] md:w-[300px] mx-auto">
+                  <Card className="h-full" data-testid="card-ai-summary">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-primary" />
+                        AI Summary
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-sm leading-relaxed">{cumulativeData.summary}</p>
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-primary">{cumulativeData.supportingPercentage || 0}%</div>
+                          <div className="text-xs text-muted-foreground">For</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-muted-foreground">{cumulativeData.neutralPercentage || 0}%</div>
+                          <div className="text-xs text-muted-foreground">Neutral</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-destructive">{cumulativeData.opposingPercentage || 0}%</div>
+                          <div className="text-xs text-muted-foreground">Against</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Carousel Indicators */}
+        {cumulativeData && (
+          <div className="flex justify-center gap-2 pt-2">
+            <button
+              onClick={() => emblaApi?.scrollTo(0)}
+              className={`w-2 h-2 rounded-full transition-all ${selectedIndex === 0 ? 'bg-primary w-6' : 'bg-muted-foreground/30'}`}
+              aria-label="View your opinion"
+              data-testid="carousel-dot-0"
+            />
+            <button
+              onClick={() => emblaApi?.scrollTo(1)}
+              className={`w-2 h-2 rounded-full transition-all ${selectedIndex === 1 ? 'bg-primary w-6' : 'bg-muted-foreground/30'}`}
+              aria-label="View AI summary"
+              data-testid="carousel-dot-1"
+            />
+          </div>
+        )}
       </div>
 
       {/* "For" Section */}
