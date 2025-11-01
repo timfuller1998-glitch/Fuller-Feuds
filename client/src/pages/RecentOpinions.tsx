@@ -8,6 +8,7 @@ import OpinionCard from "@/components/OpinionCard";
 import { CardContainer } from "@/components/CardContainer";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { 
   MessageCircle,
   Clock,
@@ -31,6 +32,7 @@ interface TopicGroup {
 export default function RecentOpinionsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [flaggingOpinionId, setFlaggingOpinionId] = useState<string | null>(null);
   const [flagReason, setFlagReason] = useState("");
 
@@ -163,10 +165,18 @@ export default function RecentOpinionsPage() {
     mutate: async (opinionId: string) => {
       const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, {});
       const room = await response.json();
-      window.location.href = `/debate-room/${room.id}`;
+      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
+      toast({
+        title: "Debate started!",
+        description: "Check the footer to see your new debate. Click your opponent's avatar to start chatting!",
+      });
     },
     onError: (error: any) => {
-      alert(error.message || "Failed to start debate");
+      toast({
+        title: "Cannot start debate",
+        description: error.message || "Failed to start debate",
+        variant: "destructive",
+      });
     },
   };
 

@@ -149,8 +149,7 @@ export default function Home() {
         title: "My Current Debates",
         icon: MessageCircle,
         topics: debateTopics,
-        totalCount: debateTopicIds.size,
-        linkPath: "/my-active-debates"
+        totalCount: debateTopicIds.size
       });
     }
   }
