@@ -660,53 +660,58 @@ export default function Topic() {
           
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
-              {supportingOpinions.map((opinion: any) => (
-                <CardContainer key={opinion.id}>
-                  <OpinionCard
-                    id={opinion.id}
-                    topicId={id!}
-                    userId={opinion.userId}
-                    userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                    userAvatar={opinion.author?.profileImageUrl}
-                    economicScore={opinion.author?.economicScore}
-                    authoritarianScore={opinion.author?.authoritarianScore}
-                    topicEconomicScore={opinion.topicEconomicScore}
-                    topicAuthoritarianScore={opinion.topicAuthoritarianScore}
-                    content={opinion.content}
-                    stance={opinion.stance}
-                    debateStatus={opinion.debateStatus}
-                    timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
-                    likesCount={opinion.likesCount || 0}
-                    dislikesCount={opinion.dislikesCount || 0}
-                    references={opinion.references}
-                    fallacyCounts={opinion.fallacyCounts}
-                    isLiked={opinion.userVote === 'like'}
-                    isDisliked={opinion.userVote === 'dislike'}
-                    onLike={(opinionId) => voteMutation.mutate({ 
-                      opinionId, 
-                      voteType: 'like', 
-                      currentVote: opinion.userVote 
-                    })}
-                    onDislike={(opinionId) => voteMutation.mutate({ 
-                      opinionId, 
-                      voteType: 'dislike', 
-                      currentVote: opinion.userVote 
-                    })}
-                    onAdopt={(opinionId) => {
-                      const opinionData = opinions?.find(o => o.id === opinionId);
-                      setOpinionToAdopt(opinionData);
-                      setShowAdoptDialog(true);
-                    }}
-                    onDebate={(opinionId) => {
-                      const opinionData = opinions?.find(o => o.id === opinionId);
-                      handleStartDebate(
+              {supportingOpinions.map((opinion: any) => {
+                // Allow debating if: user has no opinion, OR user has different stance
+                const canDebate = !userOpinion || userOpinion.stance !== opinion.stance;
+                
+                return (
+                  <CardContainer key={opinion.id}>
+                    <OpinionCard
+                      id={opinion.id}
+                      topicId={id!}
+                      userId={opinion.userId}
+                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                      userAvatar={opinion.author?.profileImageUrl}
+                      economicScore={opinion.author?.economicScore}
+                      authoritarianScore={opinion.author?.authoritarianScore}
+                      topicEconomicScore={opinion.topicEconomicScore}
+                      topicAuthoritarianScore={opinion.topicAuthoritarianScore}
+                      content={opinion.content}
+                      stance={opinion.stance}
+                      debateStatus={opinion.debateStatus}
+                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
+                      likesCount={opinion.likesCount || 0}
+                      dislikesCount={opinion.dislikesCount || 0}
+                      references={opinion.references}
+                      fallacyCounts={opinion.fallacyCounts}
+                      isLiked={opinion.userVote === 'like'}
+                      isDisliked={opinion.userVote === 'dislike'}
+                      onLike={(opinionId) => voteMutation.mutate({ 
                         opinionId, 
-                        opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
-                      );
-                    }}
-                  />
-                </CardContainer>
-              ))}
+                        voteType: 'like', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onDislike={(opinionId) => voteMutation.mutate({ 
+                        opinionId, 
+                        voteType: 'dislike', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onAdopt={(opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        setOpinionToAdopt(opinionData);
+                        setShowAdoptDialog(true);
+                      }}
+                      onDebate={canDebate ? (opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        handleStartDebate(
+                          opinionId, 
+                          opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+                        );
+                      } : undefined}
+                    />
+                  </CardContainer>
+                );
+              })}
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -723,53 +728,58 @@ export default function Topic() {
           
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
-              {neutralOpinions.map((opinion: any) => (
-                <CardContainer key={opinion.id}>
-                  <OpinionCard
-                    id={opinion.id}
-                    topicId={id!}
-                    userId={opinion.userId}
-                    userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                    userAvatar={opinion.author?.profileImageUrl}
-                    economicScore={opinion.author?.economicScore}
-                    authoritarianScore={opinion.author?.authoritarianScore}
-                    topicEconomicScore={opinion.topicEconomicScore}
-                    topicAuthoritarianScore={opinion.topicAuthoritarianScore}
-                    content={opinion.content}
-                    stance={opinion.stance}
-                    debateStatus={opinion.debateStatus}
-                    timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
-                    likesCount={opinion.likesCount || 0}
-                    dislikesCount={opinion.dislikesCount || 0}
-                    references={opinion.references}
-                    fallacyCounts={opinion.fallacyCounts}
-                    isLiked={opinion.userVote === 'like'}
-                    isDisliked={opinion.userVote === 'dislike'}
-                    onLike={(opinionId) => voteMutation.mutate({ 
-                      opinionId, 
-                      voteType: 'like', 
-                      currentVote: opinion.userVote 
-                    })}
-                    onDislike={(opinionId) => voteMutation.mutate({ 
-                      opinionId, 
-                      voteType: 'dislike', 
-                      currentVote: opinion.userVote 
-                    })}
-                    onAdopt={(opinionId) => {
-                      const opinionData = opinions?.find(o => o.id === opinionId);
-                      setOpinionToAdopt(opinionData);
-                      setShowAdoptDialog(true);
-                    }}
-                    onDebate={(opinionId) => {
-                      const opinionData = opinions?.find(o => o.id === opinionId);
-                      handleStartDebate(
+              {neutralOpinions.map((opinion: any) => {
+                // Allow debating if: user has no opinion, OR user has different stance
+                const canDebate = !userOpinion || userOpinion.stance !== opinion.stance;
+                
+                return (
+                  <CardContainer key={opinion.id}>
+                    <OpinionCard
+                      id={opinion.id}
+                      topicId={id!}
+                      userId={opinion.userId}
+                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                      userAvatar={opinion.author?.profileImageUrl}
+                      economicScore={opinion.author?.economicScore}
+                      authoritarianScore={opinion.author?.authoritarianScore}
+                      topicEconomicScore={opinion.topicEconomicScore}
+                      topicAuthoritarianScore={opinion.topicAuthoritarianScore}
+                      content={opinion.content}
+                      stance={opinion.stance}
+                      debateStatus={opinion.debateStatus}
+                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
+                      likesCount={opinion.likesCount || 0}
+                      dislikesCount={opinion.dislikesCount || 0}
+                      references={opinion.references}
+                      fallacyCounts={opinion.fallacyCounts}
+                      isLiked={opinion.userVote === 'like'}
+                      isDisliked={opinion.userVote === 'dislike'}
+                      onLike={(opinionId) => voteMutation.mutate({ 
                         opinionId, 
-                        opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
-                      );
-                    }}
-                  />
-                </CardContainer>
-              ))}
+                        voteType: 'like', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onDislike={(opinionId) => voteMutation.mutate({ 
+                        opinionId, 
+                        voteType: 'dislike', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onAdopt={(opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        setOpinionToAdopt(opinionData);
+                        setShowAdoptDialog(true);
+                      }}
+                      onDebate={canDebate ? (opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        handleStartDebate(
+                          opinionId, 
+                          opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+                        );
+                      } : undefined}
+                    />
+                  </CardContainer>
+                );
+              })}
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -786,53 +796,58 @@ export default function Topic() {
           
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
-              {opposingOpinions.map((opinion: any) => (
-                <CardContainer key={opinion.id}>
-                  <OpinionCard
-                    id={opinion.id}
-                    topicId={id!}
-                    userId={opinion.userId}
-                    userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                    userAvatar={opinion.author?.profileImageUrl}
-                    economicScore={opinion.author?.economicScore}
-                    authoritarianScore={opinion.author?.authoritarianScore}
-                    topicEconomicScore={opinion.topicEconomicScore}
-                    topicAuthoritarianScore={opinion.topicAuthoritarianScore}
-                    content={opinion.content}
-                    stance={opinion.stance}
-                    debateStatus={opinion.debateStatus}
-                    timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
-                    likesCount={opinion.likesCount || 0}
-                    dislikesCount={opinion.dislikesCount || 0}
-                    references={opinion.references}
-                    fallacyCounts={opinion.fallacyCounts}
-                    isLiked={opinion.userVote === 'like'}
-                    isDisliked={opinion.userVote === 'dislike'}
-                    onLike={(opinionId) => voteMutation.mutate({ 
-                      opinionId, 
-                      voteType: 'like', 
-                      currentVote: opinion.userVote 
-                    })}
-                    onDislike={(opinionId) => voteMutation.mutate({ 
-                      opinionId, 
-                      voteType: 'dislike', 
-                      currentVote: opinion.userVote 
-                    })}
-                    onAdopt={(opinionId) => {
-                      const opinionData = opinions?.find(o => o.id === opinionId);
-                      setOpinionToAdopt(opinionData);
-                      setShowAdoptDialog(true);
-                    }}
-                    onDebate={(opinionId) => {
-                      const opinionData = opinions?.find(o => o.id === opinionId);
-                      handleStartDebate(
+              {opposingOpinions.map((opinion: any) => {
+                // Allow debating if: user has no opinion, OR user has different stance
+                const canDebate = !userOpinion || userOpinion.stance !== opinion.stance;
+                
+                return (
+                  <CardContainer key={opinion.id}>
+                    <OpinionCard
+                      id={opinion.id}
+                      topicId={id!}
+                      userId={opinion.userId}
+                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                      userAvatar={opinion.author?.profileImageUrl}
+                      economicScore={opinion.author?.economicScore}
+                      authoritarianScore={opinion.author?.authoritarianScore}
+                      topicEconomicScore={opinion.topicEconomicScore}
+                      topicAuthoritarianScore={opinion.topicAuthoritarianScore}
+                      content={opinion.content}
+                      stance={opinion.stance}
+                      debateStatus={opinion.debateStatus}
+                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
+                      likesCount={opinion.likesCount || 0}
+                      dislikesCount={opinion.dislikesCount || 0}
+                      references={opinion.references}
+                      fallacyCounts={opinion.fallacyCounts}
+                      isLiked={opinion.userVote === 'like'}
+                      isDisliked={opinion.userVote === 'dislike'}
+                      onLike={(opinionId) => voteMutation.mutate({ 
                         opinionId, 
-                        opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
-                      );
-                    }}
-                  />
-                </CardContainer>
-              ))}
+                        voteType: 'like', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onDislike={(opinionId) => voteMutation.mutate({ 
+                        opinionId, 
+                        voteType: 'dislike', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onAdopt={(opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        setOpinionToAdopt(opinionData);
+                        setShowAdoptDialog(true);
+                      }}
+                      onDebate={canDebate ? (opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        handleStartDebate(
+                          opinionId, 
+                          opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+                        );
+                      } : undefined}
+                    />
+                  </CardContainer>
+                );
+              })}
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
