@@ -91,6 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.body.objectId,
         userId,
         {
+          owner: userId,
           visibility: "public", // Profile pictures are public
         },
       );
@@ -101,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({
         objectPath: objectPath,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error setting profile picture:", error);
       if (error instanceof ObjectNotFoundError) {
         return res.status(404).json({ error: "Object not found" });
@@ -164,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If user doesn't exist, create them automatically
       if (!user) {
         const claims = req.user.claims;
-        await storage.createUser({
+        await storage.upsertUser({
           id: userId,
           email: claims.email,
           firstName: claims.first_name || null,
@@ -782,9 +783,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate content BEFORE creating the room
       if (openingMessage && openingMessage.trim()) {
         const filterResult = await validateContent(openingMessage.trim());
-        if (!filterResult.allowed) {
+        if (!filterResult.isAllowed) {
           return res.status(400).json({ 
-            message: filterResult.reason || "Your opening message contains inappropriate content" 
+            message: "Your opening message contains inappropriate content" 
           });
         }
       }
@@ -1941,6 +1942,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sender = await storage.getUser(userId);
       const topic = await storage.getTopic(room.topicId);
       
+      // Create sender display name from first/last name
+      const senderName = sender?.firstName && sender?.lastName 
+        ? `${sender.firstName} ${sender.lastName}`.trim()
+        : sender?.firstName || sender?.lastName || 'Someone';
+      
       // Broadcast message to room via WebSocket for real-time delivery
       broadcastToRoom(req.params.roomId, {
         type: 'chat_message',
@@ -1958,7 +1964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notification: {
             type: 'debate_message',
             debateRoomId: req.params.roomId,
-            senderName: sender?.displayName || sender?.username || 'Someone',
+            senderName,
             topicTitle: topic?.title || 'Debate',
             messagePreview: content.substring(0, 100)
           },
@@ -1971,7 +1977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (wsHelpers && !wsHelpers.isUserOnline(opponentId)) {
         await sendDebateMessageNotification(
           opponentId,
-          sender?.displayName || sender?.username || 'Someone',
+          senderName,
           req.params.roomId,
           topic?.title || 'Debate',
           content
@@ -2113,9 +2119,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Convert averages back to decimal (they're stored as integers * 100)
       res.json({
         ...stats,
-        avgLogicalReasoning: stats.avgLogicalReasoning / 100,
-        avgPoliteness: stats.avgPoliteness / 100,
-        avgOpennessToChange: stats.avgOpennessToChange / 100,
+        avgLogicalReasoning: (stats.avgLogicalReasoning || 0) / 100,
+        avgPoliteness: (stats.avgPoliteness || 0) / 100,
+        avgOpennessToChange: (stats.avgOpennessToChange || 0) / 100,
       });
     } catch (error) {
       console.error("Error fetching user debate stats:", error);
@@ -2310,10 +2316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         participant2Id: opponent.id,
         participant1Stance: userOpinion.stance,
         participant2Stance: opponentStance,
-        phase: 'structured',
         currentTurn: userId, // Initiator goes first
-        turnCount1: 0,
-        turnCount2: 0,
       });
 
       // Check and award badges asynchronously for both participants
@@ -2422,10 +2425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         participant2Id: newOpponentId,
         participant1Stance: userStance,
         participant2Stance: newOpponentStance,
-        phase: 'structured',
         currentTurn: userId, // Initiator goes first
-        turnCount1: 0,
-        turnCount2: 0,
       });
 
       res.status(201).json(newRoom);
@@ -2635,7 +2635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
           .map(topic => ({
             topic,
-            trendingScore: (topic.opinionCount || 0) * 10 + 
+            trendingScore: (topic.opinionsCount || 0) * 10 + 
                           (topic.participantCount || 0) * 5 +
                           (topic.createdAt && (Date.now() - new Date(topic.createdAt).getTime()) / (1000 * 60 * 60 * 24) < 7 ? 20 : 0)
           }))
@@ -2950,7 +2950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!room) return;
     
     let userInRoom = false;
-    for (const [userId, socket] of room.entries()) {
+    for (const [userId, socket] of Array.from(room.entries())) {
       if (socket === ws) {
         userInRoom = true;
         break;
@@ -2979,7 +2979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!room) return;
     
     let userInRoom = false;
-    for (const [userId, socket] of room.entries()) {
+    for (const [userId, socket] of Array.from(room.entries())) {
       if (socket === ws) {
         userInRoom = true;
         break;
@@ -3008,7 +3008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!room) return;
     
     let userInRoom = false;
-    for (const [userId, socket] of room.entries()) {
+    for (const [userId, socket] of Array.from(room.entries())) {
       if (socket === ws) {
         userInRoom = true;
         break;
@@ -3055,7 +3055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!room) return;
     
     let userInRoom = false;
-    for (const [userId, socket] of room.entries()) {
+    for (const [userId, socket] of Array.from(room.entries())) {
       if (socket === ws) {
         userInRoom = true;
         break;

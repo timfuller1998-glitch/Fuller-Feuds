@@ -74,7 +74,7 @@ app.use((req, res, next) => {
     try {
       await storage.initializeBadges();
       log("Badges initialized successfully");
-    } catch (error) {
+    } catch (error: any) {
       log("Error initializing badges:", error);
     }
     
