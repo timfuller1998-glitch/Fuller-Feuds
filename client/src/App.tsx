@@ -33,20 +33,16 @@ import RecentOpinions from "@/pages/RecentOpinions";
 import NotFound from "@/pages/not-found";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading || !isAuthenticated) {
-    return (
-      <Switch>
-        <Route path="/" component={Landing} />
-        <Route component={Landing} />
-      </Switch>
-    );
-  }
+  const { isAuthenticated } = useAuth();
 
   return (
     <Switch>
-      <Route path="/onboarding" component={Onboarding} />
+      {/* Authenticated-only routes */}
+      {isAuthenticated && <Route path="/onboarding" component={Onboarding} />}
+      {isAuthenticated && <Route path="/settings" component={Settings} />}
+      {isAuthenticated && <Route path="/admin" component={AdminDashboard} />}
+      
+      {/* Public routes - visible to everyone */}
       <Route path="/" component={Home} />
       <Route path="/search" component={Search} />
       <Route path="/trending" component={Trending} />
@@ -57,9 +53,7 @@ function Router() {
       <Route path="/recent-opinions" component={RecentOpinions} />
       <Route path="/topic/:id" component={Topic} />
       <Route path="/profile/:userId" component={Profile} />
-      <Route path="/settings" component={Settings} />
       <Route path="/live-stream/:id" component={LiveStreamPage} />
-      <Route path="/admin" component={AdminDashboard} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -69,12 +63,14 @@ function AppWithSidebar({
   user, 
   displayName, 
   searchQuery, 
-  handleSearch 
+  handleSearch,
+  isAuthenticated
 }: {
   user: any;
   displayName: string;
   searchQuery: string;
   handleSearch: (query: string) => void;
+  isAuthenticated: boolean;
 }) {
   return (
     <div className="flex h-screen w-full overflow-x-hidden">
@@ -100,17 +96,29 @@ function AppWithSidebar({
               className="w-full"
             />
           </div>
+          {!isAuthenticated && (
+            <a href="/api/login" className="flex-shrink-0">
+              <button className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 font-medium" data-testid="button-sign-in">
+                Sign In
+              </button>
+            </a>
+          )}
         </header>
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 pb-20">
           <div className="max-w-7xl mx-auto w-full">
             <Router />
           </div>
         </main>
-        <DebateFooter />
-        <AllActiveDebatesPanel />
-        <ArchivedDebatesPanel />
-        <OpponentDebateList />
-        <DebateWindowManager />
+        {/* Only show debate messenger UI for authenticated users */}
+        {isAuthenticated && (
+          <>
+            <DebateFooter />
+            <AllActiveDebatesPanel />
+            <ArchivedDebatesPanel />
+            <OpponentDebateList />
+            <DebateWindowManager />
+          </>
+        )}
       </div>
     </div>
   );
@@ -122,13 +130,13 @@ function WebSocketManager() {
   return null;
 }
 
-function AuthenticatedApp() {
-  const { user } = useAuth();
+function MainApp() {
+  const { user, isAuthenticated } = useAuth();
   const [location, setLocation] = useLocation();
   const searchParams = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   
-  // Redirect to onboarding if not completed
+  // Redirect to onboarding if authenticated but not completed
   useEffect(() => {
     if (user && !user.onboardingComplete && location !== "/onboarding") {
       setLocation("/onboarding");
@@ -167,19 +175,20 @@ function AuthenticatedApp() {
   };
 
   // Onboarding page doesn't need sidebar
-  if (location === "/onboarding") {
+  if (isAuthenticated && location === "/onboarding") {
     return <Router />;
   }
 
   return (
     <DebateProvider>
       <SidebarProvider style={style as React.CSSProperties}>
-        <WebSocketManager />
+        {isAuthenticated && <WebSocketManager />}
         <AppWithSidebar 
           user={user}
           displayName={displayName}
           searchQuery={searchQuery}
           handleSearch={handleSearch}
+          isAuthenticated={isAuthenticated}
         />
       </SidebarProvider>
     </DebateProvider>
@@ -187,7 +196,7 @@ function AuthenticatedApp() {
 }
 
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -200,11 +209,7 @@ function AppContent() {
     );
   }
 
-  if (isAuthenticated) {
-    return <AuthenticatedApp />;
-  }
-
-  return <Router />;
+  return <MainApp />;
 }
 
 export default function App() {
