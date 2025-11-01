@@ -2746,11 +2746,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (req.headers.cookie) {
       const cookies = cookie.parse(req.headers.cookie);
       const sessionCookie = cookies['connect.sid'];
+      console.log('[WebSocket] Session cookie present:', !!sessionCookie);
       
       // Store the session cookie for this connection
       // The client will send an 'authenticate' message, and we'll verify
       // that the userId they send matches their session
       (ws as any)._sessionCookie = sessionCookie;
+    } else {
+      console.log('[WebSocket] No cookies in request headers');
     }
     
     userConnections.set(ws, {});
