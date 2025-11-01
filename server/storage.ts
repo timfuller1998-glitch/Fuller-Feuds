@@ -22,6 +22,8 @@ import {
   topicViews,
   badges,
   userBadges,
+  notifications,
+  pushSubscriptions,
   type User,
   type UpsertUser,
   type Topic,
@@ -53,6 +55,10 @@ import {
   type InsertBadge,
   type UserBadge,
   type InsertUserBadge,
+  type Notification,
+  type InsertNotification,
+  type PushSubscription,
+  type InsertPushSubscription,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, sql, count, ilike, or, inArray, ne } from "drizzle-orm";
@@ -174,6 +180,28 @@ export interface IStorage {
   getUserDebateStats(userId: string): Promise<UserDebateStats | undefined>;
   updateDebatePhase(roomId: string, phase: 'structured' | 'voting' | 'free-form'): Promise<void>;
   submitVoteToContinue(roomId: string, userId: string, voteToContinue: boolean): Promise<DebateRoom>;
+  
+  // Debate management
+  getGroupedDebateRooms(userId: string): Promise<{
+    opponent: User;
+    debates: DebateRoom[];
+    totalUnread: number;
+    isRecent: boolean;
+  }[]>;
+  getArchivedDebateRooms(userId: string): Promise<DebateRoom[]>;
+  markDebateRoomAsRead(roomId: string, userId: string): Promise<void>;
+  archiveDebateRoom(roomId: string): Promise<void>;
+  getEndedDebatesForArchiving(daysInactive: number): Promise<DebateRoom[]>;
+  
+  // Notifications
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getUserNotifications(userId: string, limit?: number): Promise<Notification[]>;
+  markNotificationAsRead(notificationId: string): Promise<void>;
+  
+  // Push subscriptions
+  subscribeToPush(subscription: InsertPushSubscription): Promise<PushSubscription>;
+  unsubscribeFromPush(userId: string, endpoint: string): Promise<void>;
+  getUserPushSubscriptions(userId: string): Promise<PushSubscription[]>;
   
   // Live streams
   createLiveStream(stream: InsertLiveStream): Promise<LiveStream>;
@@ -1778,6 +1806,223 @@ export class DatabaseStorage implements IStorage {
       .where(eq(debateRooms.id, roomId));
 
     return { ...room, ...updates } as DebateRoom;
+  }
+
+  // Debate management
+  async getGroupedDebateRooms(userId: string): Promise<{
+    opponent: User;
+    debates: DebateRoom[];
+    totalUnread: number;
+    isRecent: boolean;
+  }[]> {
+    const activeDebates = await db
+      .select()
+      .from(debateRooms)
+      .where(
+        and(
+          or(
+            eq(debateRooms.participant1Id, userId),
+            eq(debateRooms.participant2Id, userId)
+          ),
+          eq(debateRooms.status, 'active')
+        )
+      );
+
+    if (activeDebates.length === 0) {
+      return [];
+    }
+
+    const grouped = new Map<string, {
+      opponent: User;
+      debates: DebateRoom[];
+      totalUnread: number;
+      isRecent: boolean;
+    }>();
+
+    for (const debate of activeDebates) {
+      const opponentId = debate.participant1Id === userId 
+        ? debate.participant2Id 
+        : debate.participant1Id;
+      
+      const isParticipant1 = debate.participant1Id === userId;
+      const lastReadAt = isParticipant1 
+        ? debate.participant1LastReadAt 
+        : debate.participant2LastReadAt;
+
+      const unreadCount = await db
+        .select({ count: count() })
+        .from(debateMessages)
+        .where(
+          and(
+            eq(debateMessages.roomId, debate.id),
+            lastReadAt 
+              ? sql`${debateMessages.createdAt} > ${lastReadAt}`
+              : sql`true`
+          )
+        );
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const isRecent = debate.lastMessageAt 
+        ? debate.lastMessageAt > thirtyDaysAgo 
+        : true;
+
+      if (!grouped.has(opponentId)) {
+        const [opponent] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, opponentId));
+
+        if (opponent) {
+          grouped.set(opponentId, {
+            opponent,
+            debates: [],
+            totalUnread: 0,
+            isRecent
+          });
+        }
+      }
+
+      const group = grouped.get(opponentId);
+      if (group) {
+        group.debates.push(debate);
+        group.totalUnread += Number(unreadCount[0]?.count || 0);
+        if (isRecent) {
+          group.isRecent = true;
+        }
+      }
+    }
+
+    return Array.from(grouped.values());
+  }
+
+  async getArchivedDebateRooms(userId: string): Promise<DebateRoom[]> {
+    return await db
+      .select()
+      .from(debateRooms)
+      .where(
+        and(
+          or(
+            eq(debateRooms.participant1Id, userId),
+            eq(debateRooms.participant2Id, userId)
+          ),
+          eq(debateRooms.status, 'archived')
+        )
+      )
+      .orderBy(desc(debateRooms.endedAt));
+  }
+
+  async markDebateRoomAsRead(roomId: string, userId: string): Promise<void> {
+    const [room] = await db
+      .select()
+      .from(debateRooms)
+      .where(eq(debateRooms.id, roomId));
+
+    if (!room) {
+      throw new Error('Debate room not found');
+    }
+
+    const isParticipant1 = room.participant1Id === userId;
+    const isParticipant2 = room.participant2Id === userId;
+
+    if (!isParticipant1 && !isParticipant2) {
+      throw new Error('User is not a participant in this debate room');
+    }
+
+    const updates: Partial<DebateRoom> = {};
+    if (isParticipant1) {
+      updates.participant1LastReadAt = new Date();
+    }
+    if (isParticipant2) {
+      updates.participant2LastReadAt = new Date();
+    }
+
+    await db
+      .update(debateRooms)
+      .set(updates)
+      .where(eq(debateRooms.id, roomId));
+  }
+
+  async archiveDebateRoom(roomId: string): Promise<void> {
+    await db
+      .update(debateRooms)
+      .set({ status: 'archived' })
+      .where(eq(debateRooms.id, roomId));
+  }
+
+  async getEndedDebatesForArchiving(daysInactive: number): Promise<DebateRoom[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysInactive);
+    
+    return await db
+      .select()
+      .from(debateRooms)
+      .where(
+        and(
+          eq(debateRooms.status, 'ended'),
+          sql`${debateRooms.lastMessageAt} < ${cutoffDate}`
+        )
+      )
+      .orderBy(asc(debateRooms.lastMessageAt));
+  }
+
+  // Notifications
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [created] = await db
+      .insert(notifications)
+      .values(notification)
+      .returning();
+    return created;
+  }
+
+  async getUserNotifications(userId: string, limit = 50): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit);
+  }
+
+  async markNotificationAsRead(notificationId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, notificationId));
+  }
+
+  // Push subscriptions
+  async subscribeToPush(subscription: InsertPushSubscription): Promise<PushSubscription> {
+    const [created] = await db
+      .insert(pushSubscriptions)
+      .values(subscription)
+      .onConflictDoUpdate({
+        target: [pushSubscriptions.userId, pushSubscriptions.endpoint],
+        set: {
+          p256dh: subscription.p256dh,
+          auth: subscription.auth,
+        },
+      })
+      .returning();
+    return created;
+  }
+
+  async unsubscribeFromPush(userId: string, endpoint: string): Promise<void> {
+    await db
+      .delete(pushSubscriptions)
+      .where(
+        and(
+          eq(pushSubscriptions.userId, userId),
+          eq(pushSubscriptions.endpoint, endpoint)
+        )
+      );
+  }
+
+  async getUserPushSubscriptions(userId: string): Promise<PushSubscription[]> {
+    return await db
+      .select()
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.userId, userId));
   }
 
   // Live streams

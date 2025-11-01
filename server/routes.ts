@@ -2089,6 +2089,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // New debate management endpoints
+  app.get('/api/debates/grouped', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const groupedDebates = await storage.getGroupedDebateRooms(userId);
+      res.json(groupedDebates);
+    } catch (error) {
+      console.error("Error fetching grouped debates:", error);
+      res.status(500).json({ message: "Failed to fetch debates" });
+    }
+  });
+
+  app.get('/api/debates/archived', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const archivedDebates = await storage.getArchivedDebateRooms(userId);
+      res.json(archivedDebates);
+    } catch (error) {
+      console.error("Error fetching archived debates:", error);
+      res.status(500).json({ message: "Failed to fetch archived debates" });
+    }
+  });
+
+  app.patch('/api/debate-rooms/:id/mark-read', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      // Verify user is a participant
+      const room = await storage.getDebateRoom(id);
+      if (!room) {
+        return res.status(404).json({ message: "Debate room not found" });
+      }
+      
+      const isParticipant = userId === room.participant1Id || userId === room.participant2Id;
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant in this debate" });
+      }
+      
+      await storage.markDebateRoomAsRead(id, userId);
+      res.json({ message: "Debate marked as read" });
+    } catch (error) {
+      console.error("Error marking debate as read:", error);
+      res.status(500).json({ message: "Failed to mark debate as read" });
+    }
+  });
+
+  app.patch('/api/debate-rooms/:id/archive', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      // Verify user is a participant
+      const room = await storage.getDebateRoom(id);
+      if (!room) {
+        return res.status(404).json({ message: "Debate room not found" });
+      }
+      
+      const isParticipant = userId === room.participant1Id || userId === room.participant2Id;
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant in this debate" });
+      }
+      
+      await storage.archiveDebateRoom(id);
+      res.json({ message: "Debate archived" });
+    } catch (error) {
+      console.error("Error archiving debate:", error);
+      res.status(500).json({ message: "Failed to archive debate" });
+    }
+  });
+
+  // Notification endpoints
+  app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const notifications = await storage.getUserNotifications(userId, limit);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.patch('/api/notifications/:id/read', isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.markNotificationAsRead(req.params.id);
+      res.json({ message: "Notification marked as read" });
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  // Push notification subscription endpoints
+  app.post('/api/push/subscribe', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { endpoint, keys } = req.body;
+      
+      if (!endpoint || !keys?.p256dh || !keys?.auth) {
+        return res.status(400).json({ message: "Invalid subscription data" });
+      }
+      
+      const subscription = await storage.subscribeToPush({
+        userId,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+      });
+      
+      res.status(201).json(subscription);
+    } catch (error) {
+      console.error("Error subscribing to push notifications:", error);
+      res.status(500).json({ message: "Failed to subscribe to push notifications" });
+    }
+  });
+
+  app.post('/api/push/unsubscribe', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { endpoint } = req.body;
+      
+      if (!endpoint) {
+        return res.status(400).json({ message: "Endpoint is required" });
+      }
+      
+      await storage.unsubscribeFromPush(userId, endpoint);
+      res.json({ message: "Unsubscribed from push notifications" });
+    } catch (error) {
+      console.error("Error unsubscribing from push notifications:", error);
+      res.status(500).json({ message: "Failed to unsubscribe from push notifications" });
+    }
+  });
+
   // Auto-match debate endpoint
   app.post('/api/topics/:topicId/match-debate', isAuthenticated, async (req: any, res) => {
     try {

@@ -45,4 +45,33 @@ export function startScheduledJobs() {
   });
 
   log('[CRON] Scheduled daily AI summary update at 2:00 AM ' + (process.env.CRON_TZ || 'UTC'));
+
+  // Auto-archive ended debates with no activity for 7 days
+  cron.schedule('0 3 * * *', async () => {
+    log('[CRON] Starting auto-archive of inactive ended debates at 3:00 AM');
+    
+    try {
+      // Get all ended debates that haven't had messages in 7 days
+      const endedRooms = await storage.getEndedDebatesForArchiving(7);
+      
+      let archived = 0;
+      for (const room of endedRooms) {
+        try {
+          await storage.archiveDebateRoom(room.id);
+          archived++;
+          log(`[CRON] Archived debate room: ${room.id}`);
+        } catch (error) {
+          log(`[CRON] Error archiving debate room ${room.id}: ${error}`);
+        }
+      }
+      
+      log(`[CRON] Auto-archive completed - Archived: ${archived} debates`);
+    } catch (error) {
+      log(`[CRON] Error in auto-archive job: ${error}`);
+    }
+  }, {
+    timezone: process.env.CRON_TZ || 'UTC'
+  });
+
+  log('[CRON] Scheduled auto-archive of inactive debates at 3:00 AM ' + (process.env.CRON_TZ || 'UTC'));
 }

@@ -130,7 +130,7 @@ export const debateRooms = pgTable("debate_rooms", {
   participant2Stance: varchar("participant2_stance", { length: 20 }).notNull(),
   participant1Privacy: varchar("participant1_privacy", { length: 20 }).default("public"), // 'public', 'private'
   participant2Privacy: varchar("participant2_privacy", { length: 20 }).default("public"), // 'public', 'private'
-  status: varchar("status", { length: 20 }).default("active"), // 'active', 'ended', 'abandoned'
+  status: varchar("status", { length: 20 }).default("active"), // 'active', 'ended', 'archived'
   // Turn-based debate fields
   phase: debatePhaseEnum("phase").default("structured").notNull(),
   currentTurn: varchar("current_turn"), // userId of whose turn it is
@@ -138,6 +138,10 @@ export const debateRooms = pgTable("debate_rooms", {
   turnCount2: integer("turn_count2").default(0), // participant2's turn count
   votesToContinue1: boolean("votes_to_continue1"), // null = not voted, true = continue, false = end
   votesToContinue2: boolean("votes_to_continue2"), // null = not voted, true = continue, false = end
+  // Read receipts and activity tracking
+  participant1LastReadAt: timestamp("participant1_last_read_at"),
+  participant2LastReadAt: timestamp("participant2_last_read_at"),
+  lastMessageAt: timestamp("last_message_at"), // For auto-archiving inactive debates
   startedAt: timestamp("started_at").defaultNow(),
   endedAt: timestamp("ended_at"),
 });
@@ -151,6 +155,31 @@ export const debateMessages = pgTable("debate_messages", {
   status: varchar("status", { length: 20 }).default("approved"), // 'approved', 'flagged', 'hidden'
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Notifications for new debates and messages
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(), // 'new_debate', 'new_message', 'debate_ended'
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  debateRoomId: uuid("debate_room_id").references(() => debateRooms.id, { onDelete: "cascade" }),
+  messageId: uuid("message_id").references(() => debateMessages.id, { onDelete: "cascade" }),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Push notification subscriptions for browser notifications
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(), // Public key
+  auth: text("auth").notNull(), // Auth secret
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_push_subscription").on(table.userId, table.endpoint)
+]);
 
 // Debate performance votes (structured phase ratings)
 export const debateVotes = pgTable("debate_votes", {
@@ -376,6 +405,17 @@ export const insertDebateVoteSchema = createInsertSchema(debateVotes).omit({
   createdAt: true,
 });
 
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  isRead: true,
+  createdAt: true,
+});
+
+export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertUserDebateStatsSchema = createInsertSchema(userDebateStats).omit({
   updatedAt: true,
 });
@@ -448,6 +488,10 @@ export type InsertDebateRoom = z.infer<typeof insertDebateRoomSchema>;
 export type DebateMessage = typeof debateMessages.$inferSelect & {
   fallacyCounts?: { [key: string]: number };
 };
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type DebateVote = typeof debateVotes.$inferSelect;
 export type InsertDebateVote = z.infer<typeof insertDebateVoteSchema>;
 export type UserDebateStats = typeof userDebateStats.$inferSelect;
