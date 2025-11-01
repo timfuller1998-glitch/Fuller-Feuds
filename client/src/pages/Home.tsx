@@ -25,7 +25,7 @@ interface SectionData {
   icon: any;
   topics: TopicWithCounts[];
   totalCount: number;
-  linkPath: string;
+  linkPath?: string;
   type?: 'topics'; // default type
 }
 
@@ -34,7 +34,7 @@ interface OpinionSectionData {
   icon: any;
   opinions: any[];
   totalCount: number;
-  linkPath: string;
+  linkPath?: string;
   type: 'opinions';
 }
 
@@ -270,7 +270,7 @@ export default function Home() {
                             />
                           </CardContainer>
                         ))}
-                        {section.totalCount > 5 && (
+                        {section.totalCount > 5 && section.linkPath && (
                           <CardContainer style={{ scrollSnapAlign: 'start' }}>
                             <Card className="h-full hover-elevate active-elevate-2 transition-all">
                               <CardContent className="flex flex-col items-center justify-center h-full min-h-[160px] sm:min-h-[200px] p-4 sm:p-6">
@@ -319,7 +319,7 @@ export default function Home() {
                             />
                           </CardContainer>
                         ))}
-                        {section.totalCount > 5 && (
+                        {section.totalCount > 5 && section.linkPath && (
                           <CardContainer style={{ scrollSnapAlign: 'start' }}>
                             <Card className="h-full hover-elevate active-elevate-2 transition-all">
                               <CardContent className="flex flex-col items-center justify-center h-full min-h-[160px] sm:min-h-[200px] p-4 sm:p-6">
