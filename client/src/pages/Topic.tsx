@@ -112,11 +112,6 @@ export default function Topic() {
     enabled: !!user?.id,
   });
 
-  // Fetch user's debate rooms
-  const { data: debateRooms } = useQuery<any[]>({
-    queryKey: ["/api/users/me/debate-rooms"],
-    enabled: !!user?.id,
-  });
 
   // Fetch similar topics
   const { data: similarTopicsRaw } = useQuery<TopicType[]>({
@@ -170,9 +165,6 @@ export default function Topic() {
   const supportingOpinions = sortOpinions(opinions?.filter(o => o.stance === 'for' && o.userId !== user?.id) || []);
   const neutralOpinions = sortOpinions(opinions?.filter(o => o.stance === 'neutral' && o.userId !== user?.id) || []);
   const opposingOpinions = sortOpinions(opinions?.filter(o => o.stance === 'against' && o.userId !== user?.id) || []);
-
-  // Filter debate rooms for this topic
-  const topicDebateRooms = debateRooms?.filter(room => room.topicId === id) || [];
 
   // Create opinion mutation
   const createOpinionMutation = useMutation({
@@ -259,12 +251,12 @@ export default function Topic() {
       return response.json();
     },
     onSuccess: (room) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
       toast({
         title: "Debate started!",
-        description: "Navigating to debate room...",
+        description: "Your new debate will appear in the footer. Click their avatar to start chatting!",
       });
       setShowDebateOnboarding(false);
-      navigate(`/debate-room/${room.id}`);
     },
     onError: (error: any) => {
       toast({
@@ -326,8 +318,11 @@ export default function Topic() {
       return response.json();
     },
     onSuccess: (room) => {
-      // Navigate to the newly created debate room
-      navigate(`/debate-room/${room.id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
+      toast({
+        title: "Debate matched!",
+        description: "Check the footer to see your new debate. Click your opponent's avatar to start chatting!",
+      });
     },
     onError: (error: any) => {
       console.error("Failed to start debate:", error);
@@ -489,7 +484,7 @@ export default function Topic() {
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <h2 className="text-xl font-semibold">You</h2>
-          <Badge variant="outline">{(userOpinion ? 1 : 0) + topicDebateRooms.length}</Badge>
+          <Badge variant="outline">{userOpinion ? 1 : 0}</Badge>
         </div>
         
         <ScrollArea className="w-full whitespace-nowrap">
@@ -557,66 +552,6 @@ export default function Topic() {
                 </Card>
               )}
             </CardContainer>
-
-            {/* User's Active Debate Cards */}
-            {topicDebateRooms.length === 0 && userOpinion && (
-              <CardContainer>
-                <Card className="h-full flex items-center justify-center min-h-[200px]">
-                  <CardContent className="text-center space-y-3">
-                    <div className="text-muted-foreground text-sm">
-                      <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                      <p>No active debates yet</p>
-                    </div>
-                    {oppositeOpinions.length > 0 ? (
-                      <Button 
-                        variant="default" 
-                        size="sm"
-                        onClick={() => startDebateMutation.mutate()}
-                        disabled={startDebateMutation.isPending}
-                        data-testid="button-start-new-debate"
-                      >
-                        <MessageCircle className="w-3 h-3 mr-1" />
-                        {startDebateMutation.isPending ? "Matching..." : "Start Debate"}
-                      </Button>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Share your opinion and wait for others to join the discussion</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </CardContainer>
-            )}
-            {topicDebateRooms.map((room) => {
-              const opponent = room.participants?.find((p: any) => p.userId !== user?.id);
-              return (
-                <CardContainer key={room.id}>
-                  <Link href={`/debate-room/${room.id}`}>
-                    <Card className="hover-elevate active-elevate-2 cursor-pointer h-full">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Debate</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={opponent?.user?.profileImageUrl} />
-                          <AvatarFallback>
-                            {opponent?.user?.firstName?.[0]}{opponent?.user?.lastName?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-sm font-medium">
-                            vs {opponent?.user?.firstName} {opponent?.user?.lastName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {room.phase} • {room.turnCount || 0} turns
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                    </Card>
-                  </Link>
-                </CardContainer>
-              );
-            })}
           </div>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
