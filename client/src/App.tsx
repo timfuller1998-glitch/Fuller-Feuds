@@ -13,6 +13,7 @@ import { DebateFooter } from "@/components/debates/DebateFooter";
 import { AllActiveDebatesPanel } from "@/components/debates/AllActiveDebatesPanel";
 import { ArchivedDebatesPanel } from "@/components/debates/ArchivedDebatesPanel";
 import { OpponentDebateList } from "@/components/debates/OpponentDebateList";
+import { DebateWindowManager } from "@/components/debates/DebateWindowManager";
 import { useDebateWebSocket } from "@/hooks/useDebateWebSocket";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
@@ -115,6 +116,7 @@ function AppWithSidebar({
         <AllActiveDebatesPanel />
         <ArchivedDebatesPanel />
         <OpponentDebateList />
+        <DebateWindowManager />
       </div>
     </div>
   );
