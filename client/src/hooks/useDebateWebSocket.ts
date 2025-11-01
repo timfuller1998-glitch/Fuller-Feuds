@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useDebateContext } from '@/contexts/DebateContext';
 import { useToast } from '@/hooks/use-toast';
+import { queryClient } from '@/lib/queryClient';
 
 // Define discriminated union for type safety
 type WebSocketMessage =
@@ -9,7 +10,8 @@ type WebSocketMessage =
   | { type: 'new_debate_message'; debateRoomId: string; message: any }
   | { type: 'user_notification'; notification: { title: string; body: string } }
   | { type: 'debate_ended'; debateRoomId: string }
-  | { type: 'opponent_typing'; debateRoomId: string; isTyping: boolean; userId: string };
+  | { type: 'opponent_typing'; debateRoomId: string; isTyping: boolean; userId: string }
+  | { type: 'new_debate_created'; debateRoomId: string; opponentName: string };
 
 export function useDebateWebSocket(userId?: string) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -74,6 +76,20 @@ export function useDebateWebSocket(userId?: string) {
     });
   }, []);
 
+  const handleNewDebateCreated = useCallback((data: Extract<WebSocketMessage, { type: 'new_debate_created' }>) => {
+    const { toast } = handlersRef.current;
+    
+    // Invalidate debates query to fetch the new debate and update the footer
+    queryClient.invalidateQueries({ queryKey: ['/api/debates/grouped'] });
+    
+    // Show toast notification
+    toast({
+      title: 'New Debate Started!',
+      description: `Your debate with ${data.opponentName} is ready. Check the footer to start chatting!`,
+      duration: 4000,
+    });
+  }, []);
+
   const connect = useCallback(() => {
     if (!userId) return;
 
@@ -109,6 +125,9 @@ export function useDebateWebSocket(userId?: string) {
             break;
           case 'debate_ended':
             handleDebateEnded(data);
+            break;
+          case 'new_debate_created':
+            handleNewDebateCreated(data);
             break;
           case 'opponent_typing':
             // Handle typing indicator in chat components
@@ -149,7 +168,7 @@ export function useDebateWebSocket(userId?: string) {
         connect();
       }, 3000);
     };
-  }, [userId, handleNewMessage, handleNotification, handleDebateEnded]);
+  }, [userId, handleNewMessage, handleNotification, handleDebateEnded, handleNewDebateCreated]);
 
   const sendMessage = useCallback((message: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

@@ -91,7 +91,7 @@ export function DebateFooter() {
                     <button
                       key={group.opponentId}
                       onClick={() => openOpponentPanel(group.opponentId, group.opponentName)}
-                      className="relative shrink-0 group"
+                      className="relative shrink-0 group animate-slide-in-up"
                       data-testid={`avatar-opponent-${group.opponentId}`}
                     >
                       {/* Avatar with pulse animation on unread */}

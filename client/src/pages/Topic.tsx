@@ -54,6 +54,7 @@ export default function Topic() {
   const [showDebateOnboarding, setShowDebateOnboarding] = useState(false);
   const [debateOpinionId, setDebateOpinionId] = useState<string | null>(null);
   const [debateOpponentName, setDebateOpponentName] = useState<string>("");
+  const [isRandomMatch, setIsRandomMatch] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [loginAction, setLoginAction] = useState<"like" | "opinion" | "debate" | "interact">("interact");
 
@@ -330,6 +331,7 @@ export default function Topic() {
 
   // Handler to open debate onboarding modal
   const handleStartDebate = (opinionId: string, opponentName: string) => {
+    setIsRandomMatch(false);
     setDebateOpinionId(opinionId);
     setDebateOpponentName(opponentName);
     setShowDebateOnboarding(true);
@@ -337,7 +339,11 @@ export default function Topic() {
 
   // Handler to submit debate with opening message
   const handleSubmitDebate = (openingMessage: string) => {
-    if (debateOpinionId) {
+    if (isRandomMatch) {
+      // Random match flow
+      startRandomDebateMutation.mutate({ openingMessage });
+    } else if (debateOpinionId) {
+      // Specific opponent flow
       startDebateWithOpinionMutation.mutate({ opinionId: debateOpinionId, openingMessage });
     }
   };
@@ -372,10 +378,10 @@ export default function Topic() {
     },
   });
 
-  // Start debate mutation
-  const startDebateMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/topics/${id}/match-debate`, {});
+  // Start random debate match mutation
+  const startRandomDebateMutation = useMutation({
+    mutationFn: async ({ openingMessage }: { openingMessage: string }) => {
+      const response = await apiRequest('POST', `/api/topics/${id}/match-debate`, { openingMessage });
       return response.json();
     },
     onSuccess: (room) => {
@@ -384,10 +390,15 @@ export default function Topic() {
         title: "Debate matched!",
         description: "Check the footer to see your new debate. Click your opponent's avatar to start chatting!",
       });
+      setShowDebateOnboarding(false);
     },
     onError: (error: any) => {
       console.error("Failed to start debate:", error);
-      alert(error.message || "Failed to start debate. Please try again.");
+      toast({
+        title: "Cannot start debate",
+        description: error.message || "Failed to start debate",
+        variant: "destructive",
+      });
     },
   });
 
@@ -424,7 +435,9 @@ export default function Topic() {
       setShowLoginPrompt(true);
       return;
     }
-    startDebateMutation.mutate();
+    setIsRandomMatch(true);
+    setDebateOpponentName("a random opponent");
+    setShowDebateOnboarding(true);
   };
   
   const handleFlagTopicClick = () => {
@@ -620,11 +633,10 @@ export default function Topic() {
                           variant="default"
                           size="sm"
                           onClick={handleFindDebateClick}
-                          disabled={startDebateMutation.isPending}
                           data-testid="button-find-random-debate"
                         >
                           <MessageCircle className="w-3 h-3 mr-1" />
-                          {startDebateMutation.isPending ? "Matching..." : "Find Debate"}
+                          Find Debate
                         </Button>
                       )}
                     </div>
@@ -1030,7 +1042,7 @@ export default function Topic() {
         open={showDebateOnboarding}
         onOpenChange={setShowDebateOnboarding}
         onSubmit={handleSubmitDebate}
-        isPending={startDebateWithOpinionMutation.isPending}
+        isPending={isRandomMatch ? startRandomDebateMutation.isPending : startDebateWithOpinionMutation.isPending}
         opponentName={debateOpponentName}
       />
       

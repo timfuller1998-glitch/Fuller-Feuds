@@ -794,6 +794,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Debate] Successfully created debate room ${room.id} between ${room.participant1Id} and ${room.participant2Id}`);
 
+      // Get participant names for notifications
+      const participant1 = await storage.getUser(room.participant1Id);
+      const participant2 = await storage.getUser(room.participant2Id);
+      const participant1Name = participant1 ? `${participant1.firstName || ''} ${participant1.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous';
+      const participant2Name = participant2 ? `${participant2.firstName || ''} ${participant2.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous';
+
+      // Broadcast new debate creation to both participants
+      broadcastToUser(room.participant1Id, {
+        type: 'new_debate_created',
+        debateRoomId: room.id,
+        opponentName: participant2Name
+      });
+      broadcastToUser(room.participant2Id, {
+        type: 'new_debate_created',
+        debateRoomId: room.id,
+        opponentName: participant1Name
+      });
+
       // If opening message provided, send it as first message
       if (openingMessage && openingMessage.trim()) {
         try {
@@ -2269,6 +2287,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { topicId } = req.params;
+      const { openingMessage } = req.body;
+
+      // Validate opening message if provided
+      if (openingMessage && typeof openingMessage !== 'string') {
+        return res.status(400).json({ message: "Opening message must be a string" });
+      }
+
+      if (openingMessage && openingMessage.trim().length === 0) {
+        return res.status(400).json({ message: "Opening message cannot be empty" });
+      }
+
+      // Validate content BEFORE creating the room
+      if (openingMessage && openingMessage.trim()) {
+        const filterResult = await validateContent(openingMessage.trim());
+        if (!filterResult.isAllowed) {
+          return res.status(400).json({ 
+            message: "Your opening message contains inappropriate content" 
+          });
+        }
+      }
 
       // Get user's opinion on this topic to determine their stance
       const userOpinions = await storage.getOpinionsByTopic(topicId);
@@ -2318,6 +2356,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         participant2Stance: opponentStance,
         currentTurn: userId, // Initiator goes first
       });
+
+      // Get participant names for notifications
+      const participant1 = await storage.getUser(userId);
+      const participant2 = await storage.getUser(opponent.id);
+      const participant1Name = participant1 ? `${participant1.firstName || ''} ${participant1.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous';
+      const participant2Name = participant2 ? `${participant2.firstName || ''} ${participant2.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous';
+
+      // Broadcast new debate creation to both participants
+      broadcastToUser(userId, {
+        type: 'new_debate_created',
+        debateRoomId: room.id,
+        opponentName: participant2Name
+      });
+      broadcastToUser(opponent.id, {
+        type: 'new_debate_created',
+        debateRoomId: room.id,
+        opponentName: participant1Name
+      });
+
+      // If opening message provided, send it as first message
+      if (openingMessage && openingMessage.trim()) {
+        try {
+          const message = await storage.addDebateMessage(room.id, userId, openingMessage.trim());
+
+          // Update turn count and switch turn to opponent
+          const updatedRoom = await storage.updateDebateRoomTurn(room.id, userId);
+
+          // Broadcast via WebSocket
+          broadcastToRoom(room.id, {
+            type: 'new_message',
+            message,
+            roomId: room.id,
+          });
+
+          broadcastToRoom(room.id, {
+            type: 'turn_update',
+            roomId: room.id,
+            currentTurn: updatedRoom.currentTurn,
+            turnCount1: updatedRoom.turnCount1,
+            turnCount2: updatedRoom.turnCount2,
+          });
+
+          console.log(`[Debate] Sent opening message for matched room ${room.id}`);
+        } catch (msgError: any) {
+          console.error(`[Debate] Failed to send opening message for room ${room.id}:`, msgError);
+          // Still continue - user can send message manually in debate room
+        }
+      }
 
       // Check and award badges asynchronously for both participants
       storage.checkAndAwardBadges(userId).catch(err => {
