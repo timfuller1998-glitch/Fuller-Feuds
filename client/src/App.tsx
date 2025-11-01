@@ -10,6 +10,9 @@ import { ActiveBackgroundGradient } from "@/components/ActiveBackgroundGradient"
 import { useAuth } from "@/hooks/useAuth";
 import { DebateProvider } from "@/contexts/DebateContext";
 import { DebateFooter } from "@/components/debates/DebateFooter";
+import { AllActiveDebatesPanel } from "@/components/debates/AllActiveDebatesPanel";
+import { ArchivedDebatesPanel } from "@/components/debates/ArchivedDebatesPanel";
+import { OpponentDebateList } from "@/components/debates/OpponentDebateList";
 import { useDebateWebSocket } from "@/hooks/useDebateWebSocket";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
@@ -109,6 +112,9 @@ function AppWithSidebar({
           </div>
         </main>
         <DebateFooter />
+        <AllActiveDebatesPanel />
+        <ArchivedDebatesPanel />
+        <OpponentDebateList />
       </div>
     </div>
   );
