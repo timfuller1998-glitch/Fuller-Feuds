@@ -1,7 +1,7 @@
 # Opinion Feud Platform
 
 ## Overview
-Opinion Feud is a modern platform for facilitating meaningful discussions through text-based debates, live streaming, and AI-powered insights. It enables users to create and participate in debates, share opinions, and engage in real-time discussions. Key features include topic-based debate matching, privacy controls, AI-generated cumulative opinions summarizing community perspectives and tracking sentiment, and the ability to attach reference links to opinions.
+Opinion Feud is a modern platform for facilitating meaningful discussions through text-based debates, live streaming, and AI-powered insights. It enables users to create and participate in debates, share opinions, and engage in real-time discussions. Key features include X-style (Twitter-like) public content browsing for SEO, topic-based debate matching, privacy controls, AI-generated cumulative opinions summarizing community perspectives and tracking sentiment, and the ability to attach reference links to opinions.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -26,6 +26,13 @@ Preferred communication style: Simple, everyday language.
 - **API Design**: RESTful endpoints with structured error handling
 - **Core Data Models**: Users, Topics, Opinions, Debate Rooms, Live Streams, Cumulative Opinions.
 - **Admin & Moderation**: Role-Based Access Control (user, moderator, admin), content status management, flagging system, and admin dashboard.
+
+### X-Style Public Browsing & SEO
+- **Public Content Access**: All pages (Home, Topics, Profiles, Recent Opinions) are viewable without authentication for maximum SEO exposure.
+- **Login-Gated Interactions**: Interactive features (like, share opinion, debate, flag) require authentication with context-aware login prompts.
+- **SEO Metadata**: Dynamic page titles, meta descriptions, Open Graph tags, and Twitter Cards for better search engine indexing and social sharing.
+- **Guest Experience**: Unauthenticated users see a "Sign In" button in the header and are prompted to login when attempting any interaction.
+- **Hidden Messenger UI**: DebateFooter and all messenger components are hidden for unauthenticated users.
 
 ### Debate Matching & Privacy System
 - **Topic-Based Matching**: Automatically connects users with opposing viewpoints on specific topics.
