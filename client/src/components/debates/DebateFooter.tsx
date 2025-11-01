@@ -31,7 +31,8 @@ export function DebateFooter() {
 
   // Filter to only show debates with activity in last 30 days
   const recentDebates = groupedDebates.filter(group => {
-    if (!group.mostRecentActivity) return false;
+    // If no activity date, it's a brand new debate - show it
+    if (!group.mostRecentActivity) return true;
     const activityDate = new Date(group.mostRecentActivity).getTime();
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
     return activityDate >= thirtyDaysAgo;

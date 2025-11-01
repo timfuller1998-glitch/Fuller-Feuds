@@ -2154,7 +2154,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const groupedDebates = await storage.getGroupedDebateRooms(userId);
-      res.json(groupedDebates);
+      
+      // Transform data to match frontend interface
+      const transformed = await Promise.all(groupedDebates.map(async (group) => {
+        // Get opponent's profile for political scores
+        const opponentProfile = await storage.getUserProfile(group.opponent.id);
+        
+        // Find the most recent activity across all debates with this opponent
+        const mostRecentActivity = group.debates.reduce((latest, debate) => {
+          if (!debate.lastMessageAt) return latest;
+          if (!latest || new Date(debate.lastMessageAt) > new Date(latest)) {
+            return debate.lastMessageAt;
+          }
+          return latest;
+        }, null as Date | null);
+        
+        return {
+          opponentId: group.opponent.id,
+          opponentName: `${group.opponent.firstName || ''} ${group.opponent.lastName || ''}`.trim() || group.opponent.email || 'Anonymous',
+          opponentAvatar: group.opponent.profileImageUrl,
+          opponentEconomicScore: opponentProfile?.economicScore || 0,
+          opponentAuthoritarianScore: opponentProfile?.authoritarianScore || 0,
+          debates: group.debates.map(debate => ({
+            id: debate.id,
+            topicTitle: debate.topicId || 'Unknown Topic', // Will be enriched by frontend if needed
+            lastMessageAt: debate.lastMessageAt,
+            unreadCount: 0 // Will be calculated on frontend
+          })),
+          totalUnread: group.totalUnread,
+          mostRecentActivity
+        };
+      }));
+      
+      res.json(transformed);
     } catch (error) {
       console.error("Error fetching grouped debates:", error);
       res.status(500).json({ message: "Failed to fetch debates" });
