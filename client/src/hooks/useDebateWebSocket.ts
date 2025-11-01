@@ -77,12 +77,15 @@ export function useDebateWebSocket(userId?: string) {
   }, []);
 
   const handleNewDebateCreated = useCallback((data: Extract<WebSocketMessage, { type: 'new_debate_created' }>) => {
+    console.log('[WebSocket] Received new_debate_created event:', data);
     const { toast } = handlersRef.current;
     
     // Invalidate debates query to fetch the new debate and update the footer
+    console.log('[WebSocket] Invalidating debates query');
     queryClient.invalidateQueries({ queryKey: ['/api/debates/grouped'] });
     
     // Show toast notification
+    console.log('[WebSocket] Showing toast notification');
     toast({
       title: 'New Debate Started!',
       description: `Your debate with ${data.opponentName} is ready. Check the footer to start chatting!`,

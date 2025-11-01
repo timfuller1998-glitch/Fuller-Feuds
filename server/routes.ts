@@ -801,11 +801,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const participant2Name = participant2 ? `${participant2.firstName || ''} ${participant2.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous';
 
       // Broadcast new debate creation to both participants
+      console.log(`[WebSocket] Broadcasting new_debate_created to participant1 ${room.participant1Id}`);
       broadcastToUser(room.participant1Id, {
         type: 'new_debate_created',
         debateRoomId: room.id,
         opponentName: participant2Name
       });
+      console.log(`[WebSocket] Broadcasting new_debate_created to participant2 ${room.participant2Id}`);
       broadcastToUser(room.participant2Id, {
         type: 'new_debate_created',
         debateRoomId: room.id,
@@ -3200,13 +3202,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Broadcast notification to a specific user (all their connections)
   function broadcastToUser(userId: string, message: any) {
     const userSockets = onlineUsers.get(userId);
-    if (!userSockets || userSockets.length === 0) return;
+    if (!userSockets || userSockets.length === 0) {
+      console.log(`[WebSocket] User ${userId} not found in onlineUsers map or has no sockets`);
+      return;
+    }
     
     const messageStr = JSON.stringify(message);
+    console.log(`[WebSocket] Sending to ${userSockets.length} socket(s) for user ${userId}:`, message.type);
     
     for (const socket of userSockets) {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(messageStr);
+      } else {
+        console.log(`[WebSocket] Socket for user ${userId} is not OPEN (state: ${socket.readyState})`);
       }
     }
   }
