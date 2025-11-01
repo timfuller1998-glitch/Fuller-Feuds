@@ -634,6 +634,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/opinions/:opinionId', async (req, res) => {
+    try {
+      const opinion = await storage.getOpinion(req.params.opinionId);
+      
+      if (!opinion) {
+        return res.status(404).json({ message: "Opinion not found" });
+      }
+      
+      res.json(opinion);
+    } catch (error) {
+      console.error("Error fetching opinion:", error);
+      res.status(500).json({ message: "Failed to fetch opinion" });
+    }
+  });
+
   app.patch('/api/opinions/:opinionId', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -649,6 +664,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validatedData = insertOpinionSchema.omit({ topicId: true, userId: true }).parse(req.body);
       const updatedOpinion = await storage.updateOpinion(req.params.opinionId, validatedData);
+      
+      // If content was updated, re-analyze political stance
+      if (validatedData.content) {
+        const topic = await storage.getTopic(opinion.topicId);
+        if (topic) {
+          AIService.analyzeOpinionPoliticalStance(validatedData.content, topic.title)
+            .then(async (scores) => {
+              await storage.updateOpinion(req.params.opinionId, {
+                topicEconomicScore: scores.economicScore,
+                topicAuthoritarianScore: scores.authoritarianScore
+              });
+            })
+            .catch(err => {
+              console.error("Error re-analyzing opinion political stance:", err);
+            });
+        }
+      }
+      
+      // Auto-update political leaning analysis after updating opinion
+      storage.analyzeUserPoliticalLeaning(userId).catch(err => {
+        console.error("Error auto-analyzing political leaning:", err);
+      });
+      
+      // Auto-generate/update AI summary for the topic asynchronously
+      storage.refreshCumulativeOpinion(opinion.topicId).catch(err => {
+        console.error("Error auto-updating cumulative opinion:", err);
+      });
+      
       res.json(updatedOpinion);
     } catch (error) {
       if (error instanceof z.ZodError) {
