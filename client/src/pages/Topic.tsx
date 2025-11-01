@@ -25,6 +25,7 @@ import TopicCard from "@/components/TopicCard";
 import { CardContainer } from "@/components/CardContainer";
 import { AdoptOpinionDialog } from "@/components/AdoptOpinionDialog";
 import { DebateOnboardingModal } from "@/components/DebateOnboardingModal";
+import { LoginPromptDialog } from "@/components/LoginPromptDialog";
 import FallacyBadges from "@/components/FallacyBadges";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import { formatDistanceToNow } from "date-fns";
@@ -44,7 +45,7 @@ const opinionFormSchema = insertOpinionSchema.omit({
 export default function Topic() {
   const { id } = useParams();
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [showOpinionForm, setShowOpinionForm] = useState(false);
   const [showTopicFlagDialog, setShowTopicFlagDialog] = useState(false);
@@ -53,6 +54,8 @@ export default function Topic() {
   const [showDebateOnboarding, setShowDebateOnboarding] = useState(false);
   const [debateOpinionId, setDebateOpinionId] = useState<string | null>(null);
   const [debateOpponentName, setDebateOpponentName] = useState<string>("");
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginAction, setLoginAction] = useState<"like" | "opinion" | "debate" | "interact">("interact");
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -340,7 +343,39 @@ export default function Topic() {
   });
 
   const onSubmitOpinion = (data: z.infer<typeof opinionFormSchema>) => {
+    if (!isAuthenticated) {
+      setLoginAction("opinion");
+      setShowLoginPrompt(true);
+      return;
+    }
     createOpinionMutation.mutate(data);
+  };
+  
+  const handleShareOpinionClick = () => {
+    if (!isAuthenticated) {
+      setLoginAction("opinion");
+      setShowLoginPrompt(true);
+      return;
+    }
+    setShowOpinionForm(true);
+  };
+  
+  const handleFindDebateClick = () => {
+    if (!isAuthenticated) {
+      setLoginAction("debate");
+      setShowLoginPrompt(true);
+      return;
+    }
+    startDebateMutation.mutate();
+  };
+  
+  const handleFlagTopicClick = () => {
+    if (!isAuthenticated) {
+      setLoginAction("interact");
+      setShowLoginPrompt(true);
+      return;
+    }
+    setShowTopicFlagDialog(true);
   };
 
   if (topicLoading) {
@@ -419,7 +454,7 @@ export default function Topic() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowTopicFlagDialog(true)}
+              onClick={handleFlagTopicClick}
               data-testid="button-flag-topic"
               className="flex-shrink-0"
             >
@@ -526,7 +561,7 @@ export default function Topic() {
                         <Button
                           variant="default"
                           size="sm"
-                          onClick={() => startDebateMutation.mutate()}
+                          onClick={handleFindDebateClick}
                           disabled={startDebateMutation.isPending}
                           data-testid="button-find-random-debate"
                         >
@@ -542,7 +577,7 @@ export default function Topic() {
                   <CardContent className="text-center">
                     <Button 
                       variant="default" 
-                      onClick={() => setShowOpinionForm(true)}
+                      onClick={handleShareOpinionClick}
                       data-testid="button-share-opinion"
                     >
                       <Plus className="w-4 h-4 mr-2" />
@@ -924,6 +959,13 @@ export default function Topic() {
         onSubmit={handleSubmitDebate}
         isPending={startDebateWithOpinionMutation.isPending}
         opponentName={debateOpponentName}
+      />
+      
+      {/* Login Prompt Dialog */}
+      <LoginPromptDialog
+        open={showLoginPrompt}
+        onOpenChange={setShowLoginPrompt}
+        action={loginAction}
       />
     </div>
   );
