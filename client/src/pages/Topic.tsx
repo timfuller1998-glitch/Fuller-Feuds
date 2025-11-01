@@ -536,22 +536,10 @@ export default function Topic() {
           )}
         </div>
 
-        {/* Title and Flag Button - Full Width */}
-        <div className="flex items-start justify-between gap-4">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex-1" data-testid="text-topic-title">
-            {topic.title}
-          </h1>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleFlagTopicClick}
-            data-testid="button-flag-topic"
-            className="flex-shrink-0"
-          >
-            <Flag className="w-4 h-4 mr-2" />
-            Flag
-          </Button>
-        </div>
+        {/* Title - Full Width */}
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight" data-testid="text-topic-title">
+          {topic.title}
+        </h1>
         
         {/* Display fallacy badges if any */}
         {topic.fallacyCounts && Object.keys(topic.fallacyCounts).some(key => (topic.fallacyCounts?.[key] || 0) > 0) && (
@@ -560,7 +548,7 @@ export default function Topic() {
           </div>
         )}
 
-        {/* Stats */}
+        {/* Stats and Flag Button */}
         <div className="flex items-center gap-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <MessageCircle className="w-4 h-4" />
@@ -572,6 +560,16 @@ export default function Topic() {
               {opinions ? new Set(opinions.map(o => o.userId)).size : 0} participants
             </span>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleFlagTopicClick}
+            data-testid="button-flag-topic"
+            className="flex-shrink-0 ml-auto"
+          >
+            <Flag className="w-4 h-4 mr-2" />
+            Flag
+          </Button>
         </div>
       </div>
 
