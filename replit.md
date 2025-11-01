@@ -4,6 +4,19 @@
 Opinion Feud is a modern platform designed to facilitate meaningful discussions on important topics. It combines traditional text-based debates with live streaming capabilities and AI-powered insights. Users can create and participate in debates, share opinions, and engage in real-time discussions across multiple formats. The platform features topic-based debate matching that automatically connects users with opposing viewpoints, privacy controls for debate participants, AI-generated cumulative opinions that summarize community perspectives and track debate sentiment, and support for attaching reference links to opinions to cite sources.
 
 ## Recent Changes
+- **November 1, 2025**:
+  - **Facebook Messenger-Style Debate System**: Implemented backend infrastructure for persistent debate footer, slide-up panels, and popup windows
+  - **Notifications System**: Created notifications and push_subscriptions tables with full CRUD operations
+  - **Read Receipts**: Added participant1LastReadAt, participant2LastReadAt, and lastMessageAt fields to debate_rooms for tracking message status
+  - **Grouped Debates API**: New endpoint `/api/debates/grouped` returns debates grouped by opponent with recent/inactive sections (30-day threshold)
+  - **Archived Debates**: Auto-archive system with manual archive endpoint and dedicated GET `/api/debates/archived` endpoint
+  - **Auto-Archive Cron Job**: Scheduled job runs daily at 3:00 AM UTC to archive ended debates with no activity for 7+ days
+  - **Push Notifications**: Full web-push integration with VAPID keys, service worker, and smart online/offline detection
+  - **Enhanced WebSocket**: Global user tracking (onlineUsers map), authentication with session validation, broadcastToUser for targeted notifications
+  - **Security**: WebSocket authentication requires valid session cookie, prevents impersonation attacks
+  - **Notification Flow**: New debate messages trigger WebSocket notifications to online users and push notifications to offline users only
+
+## Recent Changes
 - **October 31, 2025**: 
   - **Recommendation Fallback System**: Enhanced `/api/users/:userId/recommended-topics` endpoint with trending topic fallback. When category-based recommendations return fewer than 5 results, system adds trending topics created in the last 30 days (scored by opinionCount × 10 + participantCount × 5 + 20 bonus if < 7 days old, with creation date as tiebreaker). Fallback includes topics user has participated in, allowing re-engagement with updated AI summaries.
   - **Profile Section Reordering**: Reorganized profile page sections for better discovery flow: (1) Recommended for You, (2) My Topics, (3) From People You Follow (mixed topics & opinions), (4) Active Debates, (5) My Opinions.

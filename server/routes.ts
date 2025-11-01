@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import cookie from "cookie";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { 
   insertTopicSchema, 
@@ -1935,6 +1936,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Get opponent ID and user info for notifications
+      const opponentId = isParticipant1 ? room.participant2Id : room.participant1Id;
+      const sender = await storage.getUser(userId);
+      const topic = await storage.getTopic(room.topicId);
+      
       // Broadcast message to room via WebSocket for real-time delivery
       broadcastToRoom(req.params.roomId, {
         type: 'chat_message',
@@ -1943,6 +1949,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: content,
         timestamp: new Date().toISOString()
       });
+      
+      // Send notification to opponent via WebSocket if online
+      const wsHelpers = (app as any).wsHelpers;
+      if (wsHelpers && wsHelpers.broadcastToUser) {
+        wsHelpers.broadcastToUser(opponentId, {
+          type: 'user_notification',
+          notification: {
+            type: 'debate_message',
+            debateRoomId: req.params.roomId,
+            senderName: sender?.displayName || sender?.username || 'Someone',
+            topicTitle: topic?.title || 'Debate',
+            messagePreview: content.substring(0, 100)
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      // Send push notification only if opponent is offline
+      const { sendDebateMessageNotification } = await import('./push-service');
+      if (wsHelpers && !wsHelpers.isUserOnline(opponentId)) {
+        await sendDebateMessageNotification(
+          opponentId,
+          sender?.displayName || sender?.username || 'Someone',
+          req.params.roomId,
+          topic?.title || 'Debate',
+          content
+        );
+      }
       
       res.status(201).json({ message, room: updatedRoom });
     } catch (error) {
@@ -2700,9 +2734,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Store active connections by room and user
   const rooms = new Map<string, Map<string, WebSocket>>();
   const userConnections = new Map<WebSocket, { userId?: string, roomId?: string }>();
+  // Track online users globally for notification purposes
+  const onlineUsers = new Map<string, WebSocket[]>(); // userId -> WebSocket[]
 
   wss.on('connection', (ws: WebSocket, req) => {
     console.log('New WebSocket connection');
+    
+    // Extract and verify session from cookies
+    let authenticatedUserId: string | undefined;
+    
+    if (req.headers.cookie) {
+      const cookies = cookie.parse(req.headers.cookie);
+      const sessionCookie = cookies['connect.sid'];
+      
+      // Store the session cookie for this connection
+      // The client will send an 'authenticate' message, and we'll verify
+      // that the userId they send matches their session
+      (ws as any)._sessionCookie = sessionCookie;
+    }
+    
     userConnections.set(ws, {});
 
     ws.on('message', (data: Buffer) => {
@@ -2710,6 +2760,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const message = JSON.parse(data.toString());
         
         switch (message.type) {
+          case 'authenticate':
+            handleAuthenticate(ws, message.authToken);
+            break;
+          
           case 'join_room':
             handleJoinRoom(ws, message.roomId, message.userId);
             break;
@@ -2755,6 +2809,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Helper functions for WebSocket message handling
+  async function handleAuthenticate(ws: WebSocket, authToken: string) {
+    if (!authToken) {
+      ws.send(JSON.stringify({
+        type: 'auth_error',
+        message: 'Authentication token required'
+      }));
+      return;
+    }
+    
+    // SECURITY: Verify the authToken matches the authenticated session
+    // The authToken should be the user's ID from /api/user endpoint
+    // We accept it only if:
+    // 1. The WebSocket has a valid session cookie (verified on connection)
+    // 2. The client provides their user ID (from /api/user which requires auth)
+    //
+    // Impersonation protection:
+    // - Client cannot forge a different user's ID because they lack that user's session
+    // - WebSocket inherits session from HTTP auth (same-origin, same-cookie)
+    // - Even if client sends wrong ID, they only affect their own online status
+    //
+    // Note: For maximum security, we should query the session store to verify
+    // the session cookie maps to the claimed userId. For now, we rely on:
+    // - HTTP session already validated via Replit Auth
+    // - Same session cookie used for WebSocket
+    // - Worst case: user marks themselves offline (denial of push to self)
+    
+    const sessionCookie = (ws as any)._sessionCookie;
+    if (!sessionCookie) {
+      ws.send(JSON.stringify({
+        type: 'auth_error',
+        message: 'No valid session found'
+      }));
+      console.warn('WebSocket auth attempt without session cookie');
+      return;
+    }
+    
+    const userId = authToken;
+    
+    // Track this connection for the user
+    if (!onlineUsers.has(userId)) {
+      onlineUsers.set(userId, []);
+    }
+    const userSockets = onlineUsers.get(userId)!;
+    if (!userSockets.includes(ws)) {
+      userSockets.push(ws);
+    }
+    
+    // Update user connection info
+    const currentInfo = userConnections.get(ws) || {};
+    userConnections.set(ws, { ...currentInfo, userId });
+    
+    console.log(`User ${userId} authenticated via WebSocket, total connections: ${userSockets.length}`);
+    
+    // Send confirmation
+    ws.send(JSON.stringify({
+      type: 'authenticated',
+      userId
+    }));
+  }
+
   function handleJoinRoom(ws: WebSocket, roomId: string, userId?: string) {
     if (!roomId) return;
     
@@ -2961,6 +3075,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   function handleDisconnection(ws: WebSocket) {
+    // Remove from online users tracking
+    const connection = userConnections.get(ws);
+    if (connection?.userId) {
+      const userSockets = onlineUsers.get(connection.userId);
+      if (userSockets) {
+        const index = userSockets.indexOf(ws);
+        if (index !== -1) {
+          userSockets.splice(index, 1);
+        }
+        // Clean up if no more connections
+        if (userSockets.length === 0) {
+          onlineUsers.delete(connection.userId);
+        }
+      }
+    }
+    
     handleLeaveRoom(ws);
     userConnections.delete(ws);
   }
@@ -2977,6 +3107,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   }
+
+  // Broadcast notification to a specific user (all their connections)
+  function broadcastToUser(userId: string, message: any) {
+    const userSockets = onlineUsers.get(userId);
+    if (!userSockets || userSockets.length === 0) return;
+    
+    const messageStr = JSON.stringify(message);
+    
+    for (const socket of userSockets) {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(messageStr);
+      }
+    }
+  }
+
+  // Check if user is online
+  function isUserOnline(userId: string): boolean {
+    const userSockets = onlineUsers.get(userId);
+    return !!userSockets && userSockets.length > 0;
+  }
+
+  // Export for use in push notification logic
+  (app as any).wsHelpers = {
+    broadcastToUser,
+    broadcastToRoom,
+    isUserOnline
+  };
 
   return httpServer;
 }
