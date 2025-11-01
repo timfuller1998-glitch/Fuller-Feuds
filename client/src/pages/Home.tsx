@@ -131,8 +131,7 @@ export default function Home() {
         title: "My Topics",
         icon: MessageCircle,
         topics: myTopics,
-        totalCount: myTopicIds.size,
-        linkPath: "/debates"
+        totalCount: myTopicIds.size
       });
     }
   }
