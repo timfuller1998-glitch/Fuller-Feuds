@@ -15,6 +15,9 @@ import { ArchivedDebatesPanel } from "@/components/debates/ArchivedDebatesPanel"
 import { OpponentDebateList } from "@/components/debates/OpponentDebateList";
 import { DebateWindowManager } from "@/components/debates/DebateWindowManager";
 import { useDebateWebSocket } from "@/hooks/useDebateWebSocket";
+import { InstallPrompt } from "@/components/InstallPrompt";
+import { UpdateNotification } from "@/components/UpdateNotification";
+import { registerServiceWorker } from "@/utils/registerSW";
 import Home from "@/pages/Home";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
@@ -212,11 +215,28 @@ function AppContent() {
 }
 
 export default function App() {
+  // Register service worker on mount
+  useEffect(() => {
+    registerServiceWorker({
+      onSuccess: (registration) => {
+        console.log('[PWA] Service Worker registered successfully');
+      },
+      onUpdate: (registration) => {
+        console.log('[PWA] New version available');
+      },
+      onError: (error) => {
+        console.error('[PWA] Service Worker registration failed:', error);
+      }
+    });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ActiveBackgroundGradient>
           <AppContent />
+          <InstallPrompt />
+          <UpdateNotification />
         </ActiveBackgroundGradient>
       </TooltipProvider>
     </QueryClientProvider>
