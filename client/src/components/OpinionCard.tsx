@@ -29,7 +29,6 @@ interface OpinionCardProps {
   topicEconomicScore?: number;
   topicAuthoritarianScore?: number;
   content: string;
-  stance: "for" | "against" | "neutral";
   debateStatus?: "open" | "closed" | "private";
   timestamp: string;
   likesCount: number;
@@ -47,18 +46,6 @@ interface OpinionCardProps {
   isRandomMatchPending?: boolean;
 }
 
-const stanceBadgeVariant = {
-  for: "default",
-  against: "destructive", 
-  neutral: "secondary"
-} as const;
-
-const stanceText = {
-  for: "Supporting",
-  against: "Opposing",
-  neutral: "Neutral"
-} as const;
-
 export default function OpinionCard({
   id,
   topicId,
@@ -71,7 +58,6 @@ export default function OpinionCard({
   topicEconomicScore,
   topicAuthoritarianScore,
   content,
-  stance,
   debateStatus = "open",
   timestamp,
   likesCount,
@@ -259,9 +245,6 @@ export default function OpinionCard({
                 </div>
               </div>
             )}
-            <Badge variant={stanceBadgeVariant[stance]} className="flex-shrink-0 text-xs">
-              {stanceText[stance]}
-            </Badge>
           </div>
         </CardHeader>
         
@@ -373,9 +356,6 @@ export default function OpinionCard({
                 </div>
               )}
               <div className="flex flex-col gap-1 items-end flex-shrink-0">
-                <Badge variant={stanceBadgeVariant[stance]}>
-                  {stanceText[stance]}
-                </Badge>
                 {debateStatus === "closed" && (
                   <Badge variant="secondary" className="text-xs">
                     Not Debatable

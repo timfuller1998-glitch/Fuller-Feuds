@@ -285,7 +285,6 @@ export default function RecentOpinionsPage() {
                     economicScore={opinion.author?.economicScore ?? undefined}
                     authoritarianScore={opinion.author?.authoritarianScore ?? undefined}
                     content={opinion.content}
-                    stance={opinion.stance as "for" | "against" | "neutral"}
                     debateStatus={opinion.debateStatus}
                     timestamp={formatDistanceToNow(new Date(opinion.createdAt!), { addSuffix: true })}
                     likesCount={opinion.likesCount || 0}

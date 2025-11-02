@@ -749,7 +749,6 @@ export default function Topic() {
                       topicEconomicScore={opinion.topicEconomicScore}
                       topicAuthoritarianScore={opinion.topicAuthoritarianScore}
                       content={opinion.content}
-                      stance={opinion.stance}
                       debateStatus={opinion.debateStatus}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
                       likesCount={opinion.likesCount || 0}
@@ -817,7 +816,6 @@ export default function Topic() {
                       topicEconomicScore={opinion.topicEconomicScore}
                       topicAuthoritarianScore={opinion.topicAuthoritarianScore}
                       content={opinion.content}
-                      stance={opinion.stance}
                       debateStatus={opinion.debateStatus}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
                       likesCount={opinion.likesCount || 0}
@@ -885,7 +883,6 @@ export default function Topic() {
                       topicEconomicScore={opinion.topicEconomicScore}
                       topicAuthoritarianScore={opinion.topicAuthoritarianScore}
                       content={opinion.content}
-                      stance={opinion.stance}
                       debateStatus={opinion.debateStatus}
                       timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
                       likesCount={opinion.likesCount || 0}
