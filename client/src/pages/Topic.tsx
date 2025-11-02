@@ -159,10 +159,10 @@ export default function Topic() {
   useEffect(() => {
     if (topic) {
       // Set page title
-      document.title = `${topic.title} - Opinion Feud`;
+      document.title = `${topic.title} - Fuller Feuds`;
       
       // Create or update meta description
-      const description = `Join the debate on "${topic.title}". ${opinions?.length || 0} opinions shared. Explore different perspectives and share your thoughts on Opinion Feud.`;
+      const description = `Join the debate on "${topic.title}". ${opinions?.length || 0} opinions shared. Explore different perspectives and share your thoughts on Fuller Feuds.`;
       let metaDescription = document.querySelector('meta[name="description"]');
       if (!metaDescription) {
         metaDescription = document.createElement('meta');
@@ -209,7 +209,7 @@ export default function Topic() {
     
     // Cleanup function to reset to default title when component unmounts
     return () => {
-      document.title = 'Opinion Feud';
+      document.title = 'Fuller Feuds';
     };
   }, [topic, opinions?.length]);
 
@@ -581,7 +581,40 @@ export default function Topic() {
         
         <div className="overflow-hidden" ref={emblaRef} data-testid="carousel-overview">
           <div className="flex gap-4">
-            {/* Slide 1: User's Opinion */}
+            {/* Slide 1: AI Summary */}
+            {cumulativeData && (
+              <div className="flex-[0_0_100%] min-w-0 pl-[calc((100%-280px)/2)] pr-[calc((100%-280px)/2)] md:pl-[calc((100%-300px)/2)] md:pr-[calc((100%-300px)/2)]">
+                <div className="w-[280px] md:w-[300px] mx-auto">
+                  <Card className="h-full" data-testid="card-ai-summary">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-primary" />
+                        AI Summary
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-sm leading-relaxed">{cumulativeData.summary}</p>
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-primary">{cumulativeData.supportingPercentage || 0}%</div>
+                          <div className="text-xs text-muted-foreground">For</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-muted-foreground">{cumulativeData.neutralPercentage || 0}%</div>
+                          <div className="text-xs text-muted-foreground">Neutral</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-destructive">{cumulativeData.opposingPercentage || 0}%</div>
+                          <div className="text-xs text-muted-foreground">Against</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {/* Slide 2: User's Opinion */}
             <div className="flex-[0_0_100%] min-w-0 pl-[calc((100%-280px)/2)] pr-[calc((100%-280px)/2)] md:pl-[calc((100%-300px)/2)] md:pr-[calc((100%-300px)/2)]">
               <div className="w-[280px] md:w-[300px] mx-auto">
                 {userOpinion && !showOpinionForm ? (
@@ -645,39 +678,6 @@ export default function Topic() {
                 )}
               </div>
             </div>
-
-            {/* Slide 2: AI Summary */}
-            {cumulativeData && (
-              <div className="flex-[0_0_100%] min-w-0 pl-[calc((100%-280px)/2)] pr-[calc((100%-280px)/2)] md:pl-[calc((100%-300px)/2)] md:pr-[calc((100%-300px)/2)]">
-                <div className="w-[280px] md:w-[300px] mx-auto">
-                  <Card className="h-full" data-testid="card-ai-summary">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Brain className="w-4 h-4 text-primary" />
-                        AI Summary
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <p className="text-sm leading-relaxed">{cumulativeData.summary}</p>
-                      <div className="grid grid-cols-3 gap-2 pt-2 border-t">
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-primary">{cumulativeData.supportingPercentage || 0}%</div>
-                          <div className="text-xs text-muted-foreground">For</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-muted-foreground">{cumulativeData.neutralPercentage || 0}%</div>
-                          <div className="text-xs text-muted-foreground">Neutral</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-destructive">{cumulativeData.opposingPercentage || 0}%</div>
-                          <div className="text-xs text-muted-foreground">Against</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -687,13 +687,13 @@ export default function Topic() {
             <button
               onClick={() => emblaApi?.scrollTo(0)}
               className={`w-2 h-2 rounded-full transition-all ${selectedIndex === 0 ? 'bg-primary w-6' : 'bg-muted-foreground/30'}`}
-              aria-label="View your opinion"
+              aria-label="View AI summary"
               data-testid="carousel-dot-0"
             />
             <button
               onClick={() => emblaApi?.scrollTo(1)}
               className={`w-2 h-2 rounded-full transition-all ${selectedIndex === 1 ? 'bg-primary w-6' : 'bg-muted-foreground/30'}`}
-              aria-label="View AI summary"
+              aria-label="View your opinion"
               data-testid="carousel-dot-1"
             />
           </div>

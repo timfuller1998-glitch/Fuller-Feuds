@@ -29,7 +29,7 @@ export function LoginPromptDialog({ open, onOpenChange, action = "interact" }: L
     debate: {
       icon: MessageCircle,
       title: "Sign in to start debating",
-      description: "Join Opinion Feud to engage in meaningful debates with people who have different perspectives."
+      description: "Join Fuller Feuds to engage in meaningful debates with people who have different perspectives."
     },
     interact: {
       icon: MessageCircle,
@@ -61,7 +61,7 @@ export function LoginPromptDialog({ open, onOpenChange, action = "interact" }: L
             </Button>
           </a>
           <p className="text-xs text-center text-muted-foreground">
-            New to Opinion Feud? Signing in will create your account.
+            New to Fuller Feuds? Signing in will create your account.
           </p>
         </div>
       </DialogContent>

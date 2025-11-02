@@ -1,7 +1,7 @@
-# Opinion Feud Platform
+# Fuller Feuds Platform
 
 ## Overview
-Opinion Feud is a modern platform for facilitating meaningful discussions through text-based debates, live streaming, and AI-powered insights. It enables users to create and participate in debates, share opinions, and engage in real-time discussions. Key features include X-style (Twitter-like) public content browsing for SEO, topic-based debate matching, privacy controls, AI-generated cumulative opinions summarizing community perspectives and tracking sentiment, and the ability to attach reference links to opinions.
+Fuller Feuds is a modern platform for facilitating meaningful 1v1 debates with no comments, no noise, and no crowd. Users submit opinions that change the summary, engage in structured debates, and see both sides or step in to change some minds. The platform features X-style (Twitter-like) public content browsing for SEO, topic-based debate matching, privacy controls, AI-generated cumulative opinions summarizing community perspectives, and clean 1v1 debate experiences that break echo chambers one fair fight at a time.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.

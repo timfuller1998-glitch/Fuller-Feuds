@@ -1,4 +1,4 @@
-# Design Guidelines: Opinion Feud Platform
+# Design Guidelines: Fuller Feuds Platform
 
 ## Design Approach: Reference-Based (Linear/Vercel Aesthetic)
 **Selected References**: Linear, Vercel, Arc Browser

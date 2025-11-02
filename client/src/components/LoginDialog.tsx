@@ -22,7 +22,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
               <MessageCircle className="w-8 h-8 text-primary" />
             </div>
           </div>
-          <DialogTitle className="text-center text-2xl">Welcome to Opinion Feud</DialogTitle>
+          <DialogTitle className="text-center text-2xl">Welcome to Fuller Feuds</DialogTitle>
           <DialogDescription className="text-center pt-2">
             Sign in to join the conversation and share your perspectives
           </DialogDescription>

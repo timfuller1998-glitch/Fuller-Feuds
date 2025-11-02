@@ -305,7 +305,7 @@ export default function Settings() {
       <Card>
         <CardHeader>
           <CardTitle>Preferences</CardTitle>
-          <CardDescription>Customize your Opinion Feud experience</CardDescription>
+          <CardDescription>Customize your Fuller Feuds experience</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Theme Preference */}
@@ -313,7 +313,7 @@ export default function Settings() {
             <div>
               <h3 className="text-sm font-medium mb-1">Theme</h3>
               <p className="text-sm text-muted-foreground">
-                Choose how Opinion Feud looks to you
+                Choose how Fuller Feuds looks to you
               </p>
             </div>
             <Select value={themePreference} onValueChange={handleThemeChange}>

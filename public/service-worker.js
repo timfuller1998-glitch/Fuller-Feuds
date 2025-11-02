@@ -1,4 +1,4 @@
-// Service Worker for Opinion Feud push notifications
+// Service Worker for Fuller Feuds push notifications
 // This handles push events and notification clicks
 
 self.addEventListener('install', (event) => {
@@ -47,7 +47,7 @@ self.addEventListener('push', (event) => {
     };
 
     event.waitUntil(
-      self.registration.showNotification(title || 'Opinion Feud', options)
+      self.registration.showNotification(title || 'Fuller Feuds', options)
     );
   } catch (error) {
     console.error('[Service Worker] Error parsing push data:', error);

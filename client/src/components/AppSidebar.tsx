@@ -196,8 +196,8 @@ export default function AppSidebar({
               <MessageCircle className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-lg">Opinion Feud</h2>
-              <p className="text-xs text-muted-foreground">Where Ideas Collide</p>
+              <h2 className="font-bold text-lg">Fuller Feuds</h2>
+              <p className="text-xs text-muted-foreground">Every opinion. One fair fight.</p>
             </div>
           </div>
         </Link>

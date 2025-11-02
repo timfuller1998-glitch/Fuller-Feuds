@@ -1,5 +1,5 @@
 /**
- * Political gradient utilities for Opinion Feud
+ * Political gradient utilities for Fuller Feuds
  * Generates colors and gradients based on 2D political compass scores
  */
 

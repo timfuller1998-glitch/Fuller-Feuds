@@ -43,8 +43,8 @@ export default function Landing() {
               <MessageCircle className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="font-bold text-lg">Opinion Feud</h1>
-              <p className="text-xs text-muted-foreground">Where Ideas Collide</p>
+              <h1 className="font-bold text-lg">Fuller Feuds</h1>
+              <p className="text-xs text-muted-foreground">Every opinion. One fair fight.</p>
             </div>
           </div>
           
@@ -70,13 +70,15 @@ export default function Landing() {
           </Badge>
           
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-tight">
-            Where Ideas 
-            <span className="text-gradient"> Collide</span>
+            Every opinion. 
+            <span className="text-gradient"> One fair fight.</span>
           </h1>
           
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Join meaningful debates on topics that matter. Share your opinions, discover different perspectives, 
-            and engage in thoughtful discussions with AI-powered insights and live streaming debates.
+            Submit your opinion, change the summary. <br />
+            Debate 1v1 — no comments, no noise, no crowd. <br />
+            See both sides or step into change some minds.<br />
+            Break echo chambers, one fair fight at a time.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
