@@ -1320,7 +1320,7 @@ export class DatabaseStorage implements IStorage {
       throw new Error("You cannot debate your own opinion");
     }
 
-    // Get current user's opinion on the same topic to determine their stance
+    // Get current user's opinion on the same topic
     const userOpinions = await db
       .select()
       .from(opinions)
@@ -1338,9 +1338,28 @@ export class DatabaseStorage implements IStorage {
 
     const userOpinion = userOpinions[0];
 
-    // Check if they have the same stance
-    if (userOpinion.stance === opinion.stance) {
-      throw new Error("You cannot debate someone with the same stance as you");
+    // Get political scores for both users to check alignment difference
+    const [currentUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+    
+    const [opinionAuthor] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, opinionAuthorId));
+    
+    // Calculate political distance between users
+    if (currentUser?.economicScore !== null && currentUser?.authoritarianScore !== null &&
+        opinionAuthor?.economicScore !== null && opinionAuthor?.authoritarianScore !== null) {
+      const economicDiff = Math.abs((currentUser.economicScore || 0) - (opinionAuthor.economicScore || 0));
+      const authDiff = Math.abs((currentUser.authoritarianScore || 0) - (opinionAuthor.authoritarianScore || 0));
+      const distance = Math.sqrt(economicDiff * economicDiff + authDiff * authDiff);
+      
+      // Require at least 25 points difference for a meaningful debate
+      if (distance < 25) {
+        throw new Error("You and this user have very similar political alignments. Try debating someone with more opposing views!");
+      }
     }
 
     // Check if both opinions are open for debate
@@ -1365,8 +1384,6 @@ export class DatabaseStorage implements IStorage {
       topicId,
       participant1Id: userId,
       participant2Id: opinionAuthorId,
-      participant1Stance: userOpinion.stance,
-      participant2Stance: opinion.stance,
       participant1Privacy: "public",
       participant2Privacy: "public",
       phase: 'structured',
@@ -1403,22 +1420,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(debateRooms.id, id));
   }
 
-  async findOppositeOpinionUsers(topicId: string, userId: string, currentStance: string): Promise<User[]> {
-    // Find users with opposite or different stance on the topic
-    // - "for" can debate with "against" or "neutral"
-    // - "against" can debate with "for" or "neutral"
-    // - "neutral" can debate with "for" or "against"
-    let oppositeStances: string[];
-    if (currentStance === 'for') {
-      oppositeStances = ['against', 'neutral'];
-    } else if (currentStance === 'against') {
-      oppositeStances = ['for', 'neutral'];
-    } else { // neutral
-      oppositeStances = ['for', 'against'];
-    }
+  async findOppositeOpinionUsers(topicId: string, userId: string): Promise<User[]> {
+    // Find users with politically different views on the topic
+    // First get the current user's political scores
+    const [currentUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
     
+    // Get all users with opinions on this topic (excluding current user)
     const usersWithOpinions = await db
-      .select({
+      .selectDistinct({
         id: users.id,
         email: users.email,
         firstName: users.firstName,
@@ -1433,20 +1445,39 @@ export class DatabaseStorage implements IStorage {
         status: users.status,
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
+        economicScore: users.economicScore,
+        authoritarianScore: users.authoritarianScore,
       })
       .from(opinions)
       .innerJoin(users, eq(opinions.userId, users.id))
       .where(
         and(
           eq(opinions.topicId, topicId),
-          inArray(opinions.stance, oppositeStances),
           eq(opinions.debateStatus, 'open'),
           sql`${opinions.userId} != ${userId}`
         )
       )
       .groupBy(users.id);
     
-    return usersWithOpinions;
+    // If current user has no political scores, return all users with opinions
+    if (!currentUser || currentUser.economicScore === null || currentUser.authoritarianScore === null) {
+      return usersWithOpinions;
+    }
+    
+    // Filter users based on political distance (at least 25 points difference)
+    const politicallyDifferentUsers = usersWithOpinions.filter(user => {
+      if (user.economicScore === null || user.authoritarianScore === null) {
+        return false; // Skip users without political scores
+      }
+      
+      const economicDiff = Math.abs((currentUser.economicScore || 0) - (user.economicScore || 0));
+      const authDiff = Math.abs((currentUser.authoritarianScore || 0) - (user.authoritarianScore || 0));
+      const distance = Math.sqrt(economicDiff * economicDiff + authDiff * authDiff);
+      
+      return distance >= 25; // Return users with at least 25 points difference
+    });
+    
+    return politicallyDifferentUsers;
   }
 
   async updateDebateRoomPrivacy(roomId: string, userId: string, privacy: 'public' | 'private'): Promise<void> {
@@ -1517,23 +1548,12 @@ export class DatabaseStorage implements IStorage {
             .select({ count: sql<number>`count(*)::int` })
             .from(debateMessages)
             .where(eq(debateMessages.roomId, room.id));
-          
-          // Determine user's stance
-          const userStance = room.participant1Id === userId
-            ? room.participant1Stance
-            : room.participant2Stance;
-          
-          const opponentStance = room.participant1Id === userId
-            ? room.participant2Stance
-            : room.participant1Stance;
 
           return {
             ...room,
             topic,
             opponent,
             messageCount: messageCount[0]?.count || 0,
-            userStance,
-            opponentStance,
           };
         } catch (error) {
           // Skip rooms that error during enrichment (e.g., deleted topics/users)
