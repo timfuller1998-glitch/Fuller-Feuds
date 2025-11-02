@@ -1,14 +1,102 @@
-// Service Worker for Fuller Feuds push notifications
-// This handles push events and notification clicks
+// Service Worker for Fuller Feuds PWA
+// Handles push notifications, offline caching, and app updates
+
+const CACHE_NAME = 'fuller-feuds-v1';
+const RUNTIME_CACHE = 'fuller-feuds-runtime-v1';
+
+// Assets to cache on install
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json'
+];
 
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Installing...');
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {
   console.log('[Service Worker] Activating...');
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
+            console.log('[Service Worker] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => clients.claim())
+  );
+});
+
+// Fetch handler - Network First for API, Cache First for assets
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Skip non-GET requests
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  // API requests - Network First with fallback
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      caches.open(RUNTIME_CACHE).then(cache => {
+        return fetch(request)
+          .then(response => {
+            // Cache successful responses
+            if (response && response.status === 200) {
+              cache.put(request, response.clone());
+            }
+            return response;
+          })
+          .catch(() => {
+            // Fallback to cache if network fails
+            return cache.match(request).then(cached => {
+              if (cached) {
+                return cached;
+              }
+              // Return offline response for API calls
+              return new Response(
+                JSON.stringify({ error: 'Offline', offline: true }),
+                { 
+                  status: 503,
+                  headers: { 'Content-Type': 'application/json' }
+                }
+              );
+            });
+          });
+      })
+    );
+    return;
+  }
+
+  // Static assets - Cache First with network fallback
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) {
+        return cached;
+      }
+      return fetch(request).then(response => {
+        // Cache successful responses
+        if (response && response.status === 200) {
+          return caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, response.clone());
+            return response;
+          });
+        }
+        return response;
+      });
+    })
+  );
 });
 
 // Handle push notifications
