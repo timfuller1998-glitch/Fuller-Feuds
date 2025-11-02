@@ -20,6 +20,14 @@ self.addEventListener('install', (event) => {
   );
 });
 
+// Listen for SKIP_WAITING message from UpdateNotification
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[Service Worker] Received SKIP_WAITING message');
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('activate', (event) => {
   console.log('[Service Worker] Activating...');
   event.waitUntil(

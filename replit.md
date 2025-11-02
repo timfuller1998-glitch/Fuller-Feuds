@@ -18,6 +18,24 @@ Preferred communication style: Simple, everyday language.
 - **Component Architecture**: Atomic Design principles, utilizing a `CardContainer` component for consistent card sizing (280px mobile, 300px desktop).
 - **Debate UI**: Messenger-style interface with draggable, minimizable popup windows, real-time messaging via WebSockets, and push notifications for offline users.
 
+### Progressive Web App (PWA)
+- **Mobile-First Design**: Optimized for mobile devices with installable app experience
+- **Offline Support**: Service worker with offline caching for static assets and API responses
+- **App Icons**: Multiple sizes (64x64, 192x192, 512x512) including maskable icons for adaptive display
+- **Install Prompt**: Smart install prompt that appears when app is installable on supported browsers
+- **Update Notifications**: Automatic detection and notification of app updates with one-click update
+- **Push Notifications**: Web Push API integration for real-time debate notifications (preserved from original implementation)
+- **Service Worker Features**:
+  - Precaching of static assets (HTML, CSS, JS, fonts)
+  - Runtime caching with Network First strategy for API calls
+  - Cache First strategy for images and static assets
+  - Automatic cache cleanup and version management
+- **Installation Process**: 
+  - Desktop: Click install button in browser address bar or via in-app prompt
+  - Mobile: "Add to Home Screen" prompt appears automatically or via share menu
+  - PWA displays as standalone app without browser UI chrome
+- **Implementation**: Manual service worker setup (vite-plugin-pwa installed but not configured in vite.config.ts due to system restrictions)
+
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js
 - **Language**: TypeScript with ES modules
