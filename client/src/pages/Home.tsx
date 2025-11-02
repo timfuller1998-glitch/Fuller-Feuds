@@ -184,10 +184,10 @@ export default function Home() {
       {/* Hero Section */}
       <div className="text-center space-y-3 sm:space-y-4 py-4 sm:py-8">
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight px-4">
-          Where Ideas Collide
+          Every opinion. One fair fight.
         </h1>
         <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
-          Join meaningful debates on topics that matter. Share your opinions, discover different perspectives, and engage in thoughtful discussions.
+          Submit your opinion, change the summary. Debate 1v1 — no comments, no noise, no crowd.
         </p>
       </div>
 
