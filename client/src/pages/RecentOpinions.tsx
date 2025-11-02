@@ -163,20 +163,25 @@ export default function RecentOpinionsPage() {
   // Start debate mutation
   const startDebateWithOpinionMutation = {
     mutate: async (opinionId: string) => {
-      const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, {});
-      const room = await response.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
-      toast({
-        title: "Debate started!",
-        description: "Check the footer to see your new debate. Click your opponent's avatar to start chatting!",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Cannot start debate",
-        description: error.message || "Failed to start debate",
-        variant: "destructive",
-      });
+      try {
+        const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, {});
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to start debate");
+        }
+        const room = await response.json();
+        queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
+        toast({
+          title: "Debate started!",
+          description: "Check the footer to see your new debate. Click your opponent's avatar to start chatting!",
+        });
+      } catch (error: any) {
+        toast({
+          title: "Cannot start debate",
+          description: error.message || "Failed to start debate",
+          variant: "destructive",
+        });
+      }
     },
   };
 

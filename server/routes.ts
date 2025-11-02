@@ -845,7 +845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(room);
     } catch (error: any) {
       console.error(`[Debate] Error starting debate for user ${userId} with opinion ${opinionId}:`, error.message);
-      res.status(error.message?.includes('cannot debate') || error.message?.includes('same stance') || error.message?.includes('must have an opinion') ? 400 : 500)
+      res.status(error.message?.includes('cannot debate') || error.message?.includes('same stance') || error.message?.includes('must have an opinion') || error.message?.includes('political alignment') || error.statusCode === 400 ? 400 : 500)
         .json({ message: error.message || "Failed to start debate" });
     }
   });
@@ -2360,8 +2360,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Find users with opposite opinions
-      const oppositeUsers = await storage.findOppositeOpinionUsers(topicId, userId, userOpinion.stance);
+      // Find users with opposite opinions (based on political alignment)
+      const oppositeUsers = await storage.findOppositeOpinionUsers(topicId, userId);
 
       if (oppositeUsers.length === 0) {
         return res.status(404).json({ 
@@ -2465,8 +2465,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Find users with opposite opinions
-      const oppositeUsers = await storage.findOppositeOpinionUsers(topicId, userId, userOpinion.stance);
+      // Find users with opposite opinions (based on political alignment)
+      const oppositeUsers = await storage.findOppositeOpinionUsers(topicId, userId);
 
       res.json(oppositeUsers);
     } catch (error) {
@@ -2512,11 +2512,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const opponentOpinion = opponentOpinions.find(o => o.userId === opponentId);
         newOpponentStance = opponentOpinion?.stance || (userStance === 'for' ? 'against' : 'for');
       } else {
-        // Random match
+        // Random match (based on political alignment)
         const oppositeUsers = await storage.findOppositeOpinionUsers(
           currentRoom.topicId, 
-          userId, 
-          userStance
+          userId
         );
 
         if (oppositeUsers.length === 0) {

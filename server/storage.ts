@@ -165,7 +165,7 @@ export interface IStorage {
   getDebateRoom(id: string): Promise<DebateRoom | undefined>;
   getUserDebateRooms(userId: string): Promise<DebateRoom[]>;
   endDebateRoom(id: string): Promise<void>;
-  findOppositeOpinionUsers(topicId: string, userId: string, currentStance: string): Promise<User[]>;
+  findOppositeOpinionUsers(topicId: string, userId: string): Promise<User[]>;
   updateDebateRoomPrivacy(roomId: string, userId: string, privacy: 'public' | 'private'): Promise<void>;
   
   // Debate messages
@@ -1358,7 +1358,9 @@ export class DatabaseStorage implements IStorage {
       
       // Require at least 25 points difference for a meaningful debate
       if (distance < 25) {
-        throw new Error("You and this user have very similar political alignments. Try debating someone with more opposing views!");
+        const error = new Error("You and this user have very similar political alignments. Try debating someone with more opposing views!");
+        (error as any).statusCode = 400; // Mark as a validation error
+        throw error;
       }
     }
 
