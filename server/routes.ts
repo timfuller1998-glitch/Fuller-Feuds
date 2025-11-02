@@ -397,16 +397,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/topics', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { initialOpinion, stance, references, ...topicData } = req.body;
+      const { initialOpinion, references, ...topicData } = req.body;
       
       // Validate initial opinion is provided and not empty
       if (!initialOpinion || !initialOpinion.trim()) {
         return res.status(400).json({ message: "Initial opinion is required" });
       }
-
-      // Validate stance if provided (case-insensitive)
-      const normalizedStance = stance ? String(stance).toLowerCase() : 'neutral';
-      const validStance = ['for', 'against', 'neutral'].includes(normalizedStance) ? normalizedStance : 'neutral';
       
       // Validate the topic data
       const validatedData = insertTopicSchema.parse({
@@ -464,7 +460,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           topicId: topic.id,
           userId: userId,
           content: initialOpinion.trim(),
-          stance: validStance, // Use the stance provided by user
           status: opinionStatus,
           references: references || []
         });
@@ -735,8 +730,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/opinions/:opinionId/adopt', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { content, stance } = req.body;
-      const adoptedOpinion = await storage.adoptOpinion(req.params.opinionId, userId, content, stance);
+      const { content } = req.body;
+      const adoptedOpinion = await storage.adoptOpinion(req.params.opinionId, userId, content);
       res.json(adoptedOpinion);
     } catch (error) {
       console.error("Error adopting opinion:", error);

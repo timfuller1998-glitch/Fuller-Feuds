@@ -1134,8 +1134,8 @@ export class DatabaseStorage implements IStorage {
     return vote;
   }
 
-  // Adopt opinion - creates a new opinion for the user with same content and stance
-  async adoptOpinion(opinionId: string, userId: string, content?: string, stance?: "for" | "against" | "neutral"): Promise<Opinion> {
+  // Adopt opinion - creates a new opinion for the user with same content
+  async adoptOpinion(opinionId: string, userId: string, content?: string): Promise<Opinion> {
     // Get the original opinion
     const [original] = await db
       .select()
@@ -1146,9 +1146,8 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Opinion not found');
     }
 
-    // Use provided content/stance or fallback to original opinion's values
+    // Use provided content or fallback to original opinion's value
     const finalContent = content || original.content;
-    const finalStance = stance || original.stance;
 
     // Check if user already has an opinion on this topic
     const [existing] = await db
@@ -1160,26 +1159,24 @@ export class DatabaseStorage implements IStorage {
       ));
 
     if (existing) {
-      // Update existing opinion with the adopted/edited content and stance
+      // Update existing opinion with the adopted/edited content
       const [updated] = await db
         .update(opinions)
         .set({
           content: finalContent,
-          stance: finalStance,
           updatedAt: new Date()
         })
         .where(eq(opinions.id, existing.id))
         .returning();
       return updated;
     } else {
-      // Create new opinion with the adopted/edited content and stance
+      // Create new opinion with the adopted/edited content
       const [created] = await db
         .insert(opinions)
         .values({
           topicId: original.topicId,
           userId,
           content: finalContent,
-          stance: finalStance,
         })
         .returning();
       return created;
