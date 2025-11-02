@@ -92,7 +92,6 @@ export const opinions = pgTable("opinions", {
   topicId: uuid("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull().references(() => users.id),
   content: text("content").notNull(),
-  stance: varchar("stance", { length: 20 }).notNull(), // 'for', 'against', 'neutral'
   status: varchar("status", { length: 20 }).default("approved"), // 'pending', 'approved', 'flagged', 'hidden'
   debateStatus: debateStatusEnum("debate_status").default("open").notNull(),
   references: text("references").array().default(sql`ARRAY[]::text[]`), // Reference links/URLs
@@ -111,11 +110,11 @@ export const cumulativeOpinions = pgTable("cumulative_opinions", {
   topicId: uuid("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
   summary: text("summary").notNull(),
   keyPoints: text("key_points").array().default([]),
-  supportingPercentage: integer("supporting_percentage").default(0),
-  opposingPercentage: integer("opposing_percentage").default(0),
-  neutralPercentage: integer("neutral_percentage").default(0),
   totalOpinions: integer("total_opinions").default(0),
   confidence: varchar("confidence", { length: 20 }).default("medium"), // 'high', 'medium', 'low'
+  averageEconomicScore: integer("average_economic_score"), // Average economic position of all opinions
+  averageAuthoritarianScore: integer("average_authoritarian_score"), // Average authoritarian position of all opinions
+  diversityScore: integer("diversity_score"), // How politically diverse the opinions are (0-100)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -126,8 +125,6 @@ export const debateRooms = pgTable("debate_rooms", {
   topicId: uuid("topic_id").notNull().references(() => topics.id),
   participant1Id: varchar("participant1_id").notNull().references(() => users.id),
   participant2Id: varchar("participant2_id").notNull().references(() => users.id),
-  participant1Stance: varchar("participant1_stance", { length: 20 }).notNull(),
-  participant2Stance: varchar("participant2_stance", { length: 20 }).notNull(),
   participant1Privacy: varchar("participant1_privacy", { length: 20 }).default("public"), // 'public', 'private'
   participant2Privacy: varchar("participant2_privacy", { length: 20 }).default("public"), // 'public', 'private'
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'ended', 'archived'
