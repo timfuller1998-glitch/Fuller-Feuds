@@ -16,7 +16,6 @@ import { OpponentDebateList } from "@/components/debates/OpponentDebateList";
 import { DebateWindowManager } from "@/components/debates/DebateWindowManager";
 import { useDebateWebSocket } from "@/hooks/useDebateWebSocket";
 import Home from "@/pages/Home";
-import Landing from "@/pages/Landing";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
 import Topic from "@/pages/Topic";

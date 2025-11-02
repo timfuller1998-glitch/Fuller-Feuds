@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
 - **Admin & Moderation**: Role-Based Access Control (user, moderator, admin), content status management, flagging system, and admin dashboard.
 
 ### X-Style Public Browsing & SEO
-- **Public Content Access**: All pages (Home, Topics, Profiles, Recent Opinions) are viewable without authentication for maximum SEO exposure.
+- **Public Content Access**: All pages (Home, Topics, Profiles, Recent Opinions) are viewable without authentication for maximum SEO exposure. The Home page serves as the landing page for both authenticated and unauthenticated users.
 - **Login-Gated Interactions**: Interactive features (like, share opinion, debate, flag) require authentication with context-aware login prompts.
 - **SEO Metadata**: Dynamic page titles, meta descriptions, Open Graph tags, and Twitter Cards for better search engine indexing and social sharing.
 - **Guest Experience**: Unauthenticated users see a "Sign In" button in the header and are prompted to login when attempting any interaction.

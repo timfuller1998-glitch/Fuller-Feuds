@@ -186,8 +186,11 @@ export default function Home() {
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight px-4">
           Every opinion. One fair fight.
         </h1>
-        <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
-          Submit your opinion, change the summary. Debate 1v1 — no comments, no noise, no crowd.
+        <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4 leading-relaxed">
+          Submit your opinion. Get matched with the opposite.<br />
+          Debate 1v1 — no comments, no noise, no crowd.<br />
+          See both sides or step in to change minds.<br />
+          Break echo chambers, one fair fight at a time.
         </p>
       </div>
 
