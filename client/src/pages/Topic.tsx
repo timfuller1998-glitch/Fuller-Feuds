@@ -38,7 +38,6 @@ const opinionFormSchema = insertOpinionSchema.omit({
   userId: true,
 }).extend({
   content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
-  stance: z.enum(["for", "against", "neutral"], { required_error: "Please select a stance" }),
   debateStatus: z.enum(["open", "closed", "private"], { required_error: "Please select debate availability" }),
   references: z.array(z.string().url("Must be a valid URL")).optional().default([]),
 });
@@ -243,10 +242,39 @@ export default function Topic() {
     }
   };
 
-  // Filter opinions by stance
-  const supportingOpinions = sortOpinions(opinions?.filter(o => o.stance === 'for' && o.userId !== user?.id) || []);
-  const neutralOpinions = sortOpinions(opinions?.filter(o => o.stance === 'neutral' && o.userId !== user?.id) || []);
-  const opposingOpinions = sortOpinions(opinions?.filter(o => o.stance === 'against' && o.userId !== user?.id) || []);
+  // Calculate political distance between two opinions/users
+  const calculatePoliticalDistance = (opinion: any) => {
+    if (!userProfile?.economicScore || !userProfile?.authoritarianScore) return 0;
+    if (!opinion.author?.economicScore || !opinion.author?.authoritarianScore) return 0;
+    
+    const economicDiff = Math.abs((userProfile.economicScore || 0) - (opinion.author.economicScore || 0));
+    const authDiff = Math.abs((userProfile.authoritarianScore || 0) - (opinion.author.authoritarianScore || 0));
+    
+    // Calculate Euclidean distance
+    return Math.sqrt(economicDiff * economicDiff + authDiff * authDiff);
+  };
+  
+  // Threshold for opposing opinions (can be tuned between 15-30)
+  const OPPOSING_THRESHOLD = 25;
+  const SIMILAR_THRESHOLD = 15;
+  
+  // Filter opinions by political alignment
+  const otherOpinions = opinions?.filter(o => o.userId !== user?.id) || [];
+  
+  // Highest Rated - sorted by likes
+  const highestRatedOpinions = sortOpinions([...otherOpinions].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0)));
+  
+  // Opposing Opinions - politically different users
+  const opposingOpinions = sortOpinions(otherOpinions.filter(opinion => {
+    const distance = calculatePoliticalDistance(opinion);
+    return distance >= OPPOSING_THRESHOLD;
+  }));
+  
+  // Similar Opinions - politically similar users  
+  const similarOpinions = sortOpinions(otherOpinions.filter(opinion => {
+    const distance = calculatePoliticalDistance(opinion);
+    return distance > 0 && distance < SIMILAR_THRESHOLD;
+  }));
 
   // Create opinion mutation
   const createOpinionMutation = useMutation({
@@ -426,8 +454,8 @@ export default function Topic() {
     resolver: zodResolver(opinionFormSchema),
     defaultValues: {
       content: "",
-      stance: "neutral",
       debateStatus: "open",
+      references: [],
     },
   });
 
@@ -624,12 +652,7 @@ export default function Topic() {
                     data-testid="card-user-opinion"
                   >
                     <CardHeader className="pb-3 flex-shrink-0">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">Your Opinion</CardTitle>
-                        <Badge variant={userOpinion.stance === 'for' ? 'default' : userOpinion.stance === 'against' ? 'destructive' : 'secondary'}>
-                          {userOpinion.stance}
-                        </Badge>
-                      </div>
+                      <CardTitle className="text-base">Your Opinion</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
                       <p className="text-sm leading-relaxed line-clamp-3 mb-3">{userOpinion.content}</p>
@@ -638,7 +661,6 @@ export default function Topic() {
                           variant="outline" 
                           size="sm"
                           onClick={() => {
-                            opinionForm.setValue('stance', userOpinion.stance as "for" | "against" | "neutral");
                             opinionForm.setValue('content', userOpinion.content);
                             opinionForm.setValue('debateStatus', (userOpinion.debateStatus || "open") as "open" | "closed" | "private");
                             opinionForm.setValue('references', userOpinion.references || []);
@@ -700,19 +722,19 @@ export default function Topic() {
         )}
       </div>
 
-      {/* "For" Section */}
-      {supportingOpinions.length > 0 && (
+      {/* "Highest Rated" Section */}
+      {highestRatedOpinions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold">For</h2>
-            <Badge variant="default">{supportingOpinions.length}</Badge>
+            <h2 className="text-xl font-semibold">Highest Rated</h2>
+            <Badge variant="default">{highestRatedOpinions.length}</Badge>
           </div>
           
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
-              {supportingOpinions.map((opinion: any) => {
-                // Allow debating if: user has no opinion, OR user has different stance
-                const canDebate = !userOpinion || userOpinion.stance !== opinion.stance;
+              {highestRatedOpinions.slice(0, 10).map((opinion: any) => {
+                // Allow debating if users have different political alignment
+                const canDebate = calculatePoliticalDistance(opinion) >= OPPOSING_THRESHOLD;
                 
                 return (
                   <CardContainer key={opinion.id}>
@@ -768,19 +790,19 @@ export default function Topic() {
         </div>
       )}
 
-      {/* "Neutral" Section */}
-      {neutralOpinions.length > 0 && (
+      {/* "Similar Opinions" Section */}
+      {similarOpinions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold">Neutral</h2>
-            <Badge variant="secondary">{neutralOpinions.length}</Badge>
+            <h2 className="text-xl font-semibold">Similar Opinions</h2>
+            <Badge variant="secondary">{similarOpinions.length}</Badge>
           </div>
           
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
-              {neutralOpinions.map((opinion: any) => {
-                // Allow debating if: user has no opinion, OR user has different stance
-                const canDebate = !userOpinion || userOpinion.stance !== opinion.stance;
+              {similarOpinions.map((opinion: any) => {
+                // Similar opinions typically cannot debate each other
+                const canDebate = false;
                 
                 return (
                   <CardContainer key={opinion.id}>
@@ -836,19 +858,19 @@ export default function Topic() {
         </div>
       )}
 
-      {/* "Against" Section */}
+      {/* "Opposing Opinions" Section */}
       {opposingOpinions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold">Against</h2>
+            <h2 className="text-xl font-semibold">Opposing Opinions</h2>
             <Badge variant="destructive">{opposingOpinions.length}</Badge>
           </div>
           
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="flex gap-4 pb-4">
               {opposingOpinions.map((opinion: any) => {
-                // Allow debating if: user has no opinion, OR user has different stance
-                const canDebate = !userOpinion || userOpinion.stance !== opinion.stance;
+                // Can always debate opposing opinions
+                const canDebate = true;
                 
                 return (
                   <CardContainer key={opinion.id}>
@@ -950,28 +972,6 @@ export default function Topic() {
           </DialogHeader>
           <Form {...opinionForm}>
             <form onSubmit={opinionForm.handleSubmit(onSubmitOpinion)} className="space-y-4">
-              <FormField
-                control={opinionForm.control}
-                name="stance"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Stance</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-stance">
-                          <SelectValue placeholder="Select your stance" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="for" data-testid="option-stance-for">For</SelectItem>
-                        <SelectItem value="against" data-testid="option-stance-against">Against</SelectItem>
-                        <SelectItem value="neutral" data-testid="option-stance-neutral">Neutral</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={opinionForm.control}
                 name="debateStatus"
