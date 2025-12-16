@@ -27,7 +27,8 @@ import {
   MessageSquare,
   Trash2,
   BookOpen,
-  Sparkles
+  Sparkles,
+  Database
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -36,6 +37,7 @@ import { DashboardOverview } from "@/components/admin/DashboardOverview";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { ContentFilters } from "@/components/admin/ContentFilters";
 import { AuditLog } from "@/components/admin/AuditLog";
+import { DataSeeding } from "@/components/admin/DataSeeding";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -209,7 +211,7 @@ export default function AdminDashboard() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid lg:grid-cols-8" data-testid="tabs-admin-sections">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid lg:grid-cols-9" data-testid="tabs-admin-sections">
           <TabsTrigger value="overview" data-testid="tab-overview">
             <LayoutDashboard className="h-4 w-4 mr-2" />
             Overview
@@ -243,6 +245,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="filters" data-testid="tab-filters">
             <Filter className="h-4 w-4 mr-2" />
             Filters
+          </TabsTrigger>
+          <TabsTrigger value="seeding" data-testid="tab-seeding">
+            <Database className="h-4 w-4 mr-2" />
+            Data Seeding
           </TabsTrigger>
           <TabsTrigger value="audit" data-testid="tab-audit">
             <FileText className="h-4 w-4 mr-2" />
@@ -640,6 +646,11 @@ export default function AdminDashboard() {
         {/* Content Filters Tab */}
         <TabsContent value="filters">
           <ContentFilters />
+        </TabsContent>
+
+        {/* Data Seeding Tab */}
+        <TabsContent value="seeding">
+          <DataSeeding />
         </TabsContent>
 
         {/* Audit Log Tab */}

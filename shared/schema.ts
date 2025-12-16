@@ -34,6 +34,7 @@ export const sessions = pgTable(
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
+  passwordHash: varchar("password_hash"), // For local authentication
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
@@ -44,6 +45,7 @@ export const users = pgTable("users", {
   onboardingComplete: boolean("onboarding_complete").default(false),
   role: varchar("role", { length: 20 }).default("user"), // 'user', 'moderator', 'admin'
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'suspended', 'banned'
+  isSynthetic: boolean("is_synthetic").default(false), // True for users created by data seeding
   selectedBadgeId: varchar("selected_badge_id"), // Badge displayed on user avatar
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -366,6 +368,20 @@ export const topicViews = pgTable("topic_views", {
   index("topic_views_viewed_at_idx").on(table.viewedAt)
 ]);
 
+// Topic interactions - tracks user swipe preferences and opinions
+export const topicInteractions = pgTable("topic_interactions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  topicId: uuid("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
+  preference: varchar("preference", { length: 20 }), // 'liked', 'disliked', null (seen but not swiped)
+  hasOpinion: boolean("has_opinion").default(false),
+  seenAt: timestamp("seen_at").defaultNow(),
+  swipedAt: timestamp("swiped_at"),
+}, (table) => [
+  uniqueIndex("unique_topic_interaction").on(table.userId, table.topicId),
+  index("topic_interactions_user_preference").on(table.userId, table.preference)
+]);
+
 // Schema types and validation
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -374,6 +390,12 @@ export const insertTopicSchema = createInsertSchema(topics).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  createdById: true, // Comes from authenticated user, not request body
+}).extend({
+  description: z.string().optional(), // Optional - service generates if not provided
+  initialOpinion: z.string().optional(),
+  references: z.array(z.string()).optional(),
+  stance: z.string().optional(), // Accept but ignore - will be removed in future
 });
 
 export const insertOpinionSchema = createInsertSchema(opinions).omit({
@@ -448,6 +470,8 @@ export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({
 }).partial();
 
 export type InsertTopic = z.infer<typeof insertTopicSchema>;
+// Database insert type (includes createdById which is omitted from validation schema)
+export type TopicInsert = typeof topics.$inferInsert;
 export type Topic = typeof topics.$inferSelect & {
   fallacyCounts?: { [key: string]: number };
 };
@@ -557,3 +581,25 @@ export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({
 });
 export type UserBadge = typeof userBadges.$inferSelect;
 export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
+
+// Topic interactions types
+export type TopicInteraction = typeof topicInteractions.$inferSelect;
+export type InsertTopicInteraction = typeof topicInteractions.$inferInsert;
+
+// Seeding jobs - tracks data import jobs from external sources
+export const seedingJobs = pgTable("seeding_jobs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  source: varchar("source", { length: 50 }).notNull(),
+  sourceConfig: jsonb("source_config"),
+  status: varchar("status", { length: 20 }).default("completed"),
+  topicsCreated: integer("topics_created").default(0),
+  topicsReused: integer("topics_reused").default(0),
+  usersCreated: integer("users_created").default(0),
+  opinionsCreated: integer("opinions_created").default(0),
+  errorMessage: text("error_message"),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type SeedingJob = typeof seedingJobs.$inferSelect;
+export type InsertSeedingJob = typeof seedingJobs.$inferInsert;

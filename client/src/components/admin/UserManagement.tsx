@@ -201,6 +201,11 @@ export function UserManagement() {
                         <Badge variant={getStatusBadgeVariant(user.status)} data-testid={`badge-status-${user.id}`}>
                           {user.status}
                         </Badge>
+                        {user.isSynthetic && (
+                          <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300" data-testid={`badge-synthetic-${user.id}`}>
+                            Synthetic
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate" data-testid={`text-email-${user.id}`}>
                         {user.email}
