@@ -117,7 +117,7 @@ export class OpinionRepository {
               eq(opinionVotes.userId, currentUserId)
             ))
             .limit(1);
-          userVote = vote ? { voteType: vote.voteType } : null;
+          userVote = vote ? { voteType: vote.voteType as 'like' | 'dislike' } : null;
         }
 
         return {

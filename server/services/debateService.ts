@@ -16,7 +16,8 @@ export class DebateService {
   }
 
   async getDebateRoom(roomId: string): Promise<DebateRoom | null> {
-    return await this.debateRepository.getDebateRoom(roomId);
+    const room = await this.debateRepository.getDebateRoom(roomId);
+    return room ?? null;
   }
 
   async getUserDebateRooms(userId: string): Promise<DebateRoom[]> {
