@@ -7,9 +7,14 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
-import { storage } from "./storage";
+import { UserRepository } from "./repositories/userRepository";
 
-if (!process.env.REPLIT_DOMAINS) {
+const userRepository = new UserRepository();
+
+// For local development without Replit, allow missing REPLIT_DOMAINS
+if (!process.env.REPLIT_DOMAINS && process.env.NODE_ENV !== 'production') {
+  console.warn("REPLIT_DOMAINS not set - running in local development mode without Replit auth");
+} else if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
 }
 
@@ -58,7 +63,7 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  await storage.upsertUser({
+  await userRepository.upsertUser({
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
@@ -68,6 +73,55 @@ async function upsertUser(
 }
 
 export async function setupAuth(app: Express) {
+  // For local development without Replit, use simple session storage
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("Setting up local development authentication (no Replit)");
+    app.use(session({
+      secret: process.env.SESSION_SECRET || 'dev-secret-key',
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        secure: false, // Allow HTTP in development
+      },
+    }));
+
+    // Initialize passport for local development
+    app.use(passport.initialize());
+    app.use(passport.session());
+
+    // Mock authentication routes for development
+    app.get('/api/login', (req, res) => {
+      // Create a mock user for development
+      const mockUser = {
+        claims: {
+          sub: 'dev-user-123',
+          email: 'dev@example.com',
+          name: 'Development User'
+        }
+      };
+      (req as any).login(mockUser, (err: any) => {
+        if (err) {
+          console.error('Mock login error:', err);
+          return res.redirect('/?error=login_failed');
+        }
+        res.redirect('/');
+      });
+    });
+
+    app.post('/api/logout', (req, res) => {
+      (req as any).logout((err: any) => {
+        if (err) {
+          console.error('Logout error:', err);
+        }
+        res.redirect('/');
+      });
+    });
+
+    return;
+  }
+
+  // Production Replit setup (unchanged)
   app.set("trust proxy", 1);
   app.use(getSession());
   app.use(passport.initialize());

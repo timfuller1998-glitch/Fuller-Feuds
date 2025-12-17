@@ -1,9 +1,10 @@
 import OpenAI from 'openai';
 import type { Opinion, Topic, CumulativeOpinion } from '@shared/schema';
 
-const openai = new OpenAI({
+// Temporarily disable OpenAI for testing - remove this when you have API key
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-});
+}) : null;
 
 interface OpinionAnalysis {
   summary: string;
@@ -32,6 +33,12 @@ interface PoliticalCompass2DAnalysis {
 
 export class AIService {
   static async generateCategories(topicTitle: string): Promise<string[]> {
+    // Return fallback categories if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning fallback categories');
+      return ["Politics", "Society", "General"];
+    }
+
     try {
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -67,32 +74,47 @@ export class AIService {
     }
   }
 
-  static async generateTopicImage(topicTitle: string): Promise<string> {
-    try {
-      const response = await openai.images.generate({
-        model: "dall-e-3",
-        prompt: `Create a professional, abstract visual representation for a debate topic titled: "${topicTitle}". The image should be thought-provoking, balanced, and suitable for a serious discussion platform. Style: modern, clean, conceptual art with symbolic elements related to the topic.`,
-        size: "1024x1024",
-        quality: "standard",
-        n: 1,
-      });
-
-      const imageUrl = response.data?.[0]?.url;
-      if (!imageUrl) {
-        throw new Error("No image URL returned from DALL-E");
-      }
-
-      return imageUrl;
-    } catch (error) {
-      console.error("Error generating topic image:", error);
-      throw error;
-    }
-  }
+  //static async generateTopicImage(topicTitle: string): Promise<string> {
+  //  try {
+  //    const response = await openai.images.generate({
+  //      model: "dall-e-3",
+  //      prompt: `Create a professional, abstract visual representation for a debate topic titled: "${topicTitle}". The image should be thought-provoking, balanced, and suitable for a serious discussion platform. Style: modern, clean, conceptual art with symbolic elements related to the topic.`,
+  //      size: "1024x1024",
+  //      quality: "standard",
+  //      n: 1,
+  //    });
 
   static async generateCumulativeOpinion(
     topic: Topic,
     opinions: Opinion[]
   ): Promise<OpinionAnalysis> {
+    // Return mock data if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning mock cumulative opinion');
+      const totalOpinions = opinions.length;
+      // Calculate percentages based on likes/dislikes since opinions don't have stance property
+      const totalLikes = opinions.reduce((sum, o) => sum + (o.likesCount || 0), 0);
+      const totalDislikes = opinions.reduce((sum, o) => sum + (o.dislikesCount || 0), 0);
+      const totalVotes = totalLikes + totalDislikes;
+      const supportingPercentage = totalVotes > 0 ? Math.round((totalLikes / totalVotes) * 100) : 0;
+      const opposingPercentage = totalVotes > 0 ? Math.round((totalDislikes / totalVotes) * 100) : 0;
+      const neutralPercentage = totalVotes === 0 ? 100 : 0;
+
+      return {
+        summary: `Mock AI summary: ${totalOpinions} opinions on "${topic.title}" with ${supportingPercentage}% support, ${opposingPercentage}% opposition.`,
+        keyPoints: [
+          'Mock key point: Community has mixed opinions',
+          'Mock key point: Further discussion needed',
+          'Mock key point: Data shows divided viewpoints'
+        ],
+        supportingPercentage,
+        opposingPercentage,
+        neutralPercentage,
+        totalOpinions,
+        confidence: 'medium' as const
+      };
+    }
+
     if (opinions.length === 0) {
       return {
         summary: "No opinions available yet for this topic.",
@@ -105,16 +127,14 @@ export class AIService {
       };
     }
 
-    // Calculate stance percentages
-    const stanceCounts = opinions.reduce((acc, opinion) => {
-      acc[opinion.stance] = (acc[opinion.stance] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
+    // Calculate percentages based on likes/dislikes since opinions don't have stance property
+    const totalLikes = opinions.reduce((sum, o) => sum + (o.likesCount || 0), 0);
+    const totalDislikes = opinions.reduce((sum, o) => sum + (o.dislikesCount || 0), 0);
+    const totalVotes = totalLikes + totalDislikes;
     const totalOpinions = opinions.length;
-    const supportingPercentage = Math.round(((stanceCounts.for || 0) / totalOpinions) * 100);
-    const opposingPercentage = Math.round(((stanceCounts.against || 0) / totalOpinions) * 100);
-    const neutralPercentage = Math.round(((stanceCounts.neutral || 0) / totalOpinions) * 100);
+    const supportingPercentage = totalVotes > 0 ? Math.round((totalLikes / totalVotes) * 100) : 0;
+    const opposingPercentage = totalVotes > 0 ? Math.round((totalDislikes / totalVotes) * 100) : 0;
+    const neutralPercentage = totalVotes === 0 ? 100 : 0;
 
     // Determine confidence based on opinion count and diversity
     let confidence: 'high' | 'medium' | 'low' = 'low';
@@ -126,7 +146,7 @@ export class AIService {
 
     // Prepare opinions for AI analysis
     const opinionTexts = opinions.map(opinion => 
-      `Stance: ${opinion.stance}, Content: ${opinion.content}`
+      `Content: ${opinion.content}`
     ).join('\n\n');
 
     const prompt = `
@@ -197,11 +217,10 @@ Return only valid JSON.`;
       console.error("Error generating AI analysis:", error);
       
       // Fallback analysis without AI
-      const majorityStance = Object.entries(stanceCounts)
-        .sort(([,a], [,b]) => b - a)[0]?.[0] || 'neutral';
+      const majorityVote = totalLikes > totalDislikes ? 'supportive' : totalDislikes > totalLikes ? 'opposing' : 'neutral';
 
       return {
-        summary: `Based on ${totalOpinions} opinion(s), the discussion around "${topic.title}" shows ${supportingPercentage}% support, ${opposingPercentage}% opposition, and ${neutralPercentage}% neutral positions. The majority stance appears to be "${majorityStance}".`,
+        summary: `Based on ${totalOpinions} opinion(s), the discussion around "${topic.title}" shows ${supportingPercentage}% support, ${opposingPercentage}% opposition, and ${neutralPercentage}% neutral positions. The majority sentiment appears to be "${majorityVote}".`,
         keyPoints: [
           `${totalOpinions} total opinions collected`,
           `${supportingPercentage}% expressing support`,
@@ -237,7 +256,7 @@ Return only valid JSON.`;
 
     // Prepare opinions for AI analysis
     const opinionTexts = opinions.map((opinion, index) => 
-      `Opinion ${index + 1}: ${opinion.content} (Stance: ${opinion.stance})`
+      `Opinion ${index + 1}: ${opinion.content}`
     ).join('\n\n');
 
     const prompt = `
@@ -272,6 +291,17 @@ Consider:
 5. Law and order vs. criminal justice reform attitudes
 
 Return only valid JSON.`;
+
+    // Return mock data if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning fallback political leaning analysis');
+      return {
+        leaning: 'moderate',
+        score: 0,
+        confidence: 'low',
+        reasoning: 'OpenAI not configured - cannot perform analysis'
+      };
+    }
 
     try {
       const completion = await openai.chat.completions.create({
@@ -313,14 +343,17 @@ Return only valid JSON.`;
     } catch (error) {
       console.error("Error analyzing political leaning:", error);
       
-      // Fallback analysis without AI - simple heuristic based on stance patterns
-      const forCount = opinions.filter(op => op.stance === 'for').length;
-      const againstCount = opinions.filter(op => op.stance === 'against').length;
-      const neutralCount = opinions.filter(op => op.stance === 'neutral').length;
+      // Fallback analysis without AI - simple heuristic based on likes/dislikes
+      const totalLikes = opinions.reduce((sum, op) => sum + (op.likesCount || 0), 0);
+      const totalDislikes = opinions.reduce((sum, op) => sum + (op.dislikesCount || 0), 0);
       
-      // Simple heuristic: more "for" stances might indicate progressive leaning
-      const ratio = forCount - againstCount;
-      const score = Math.max(-100, Math.min(100, (ratio / opinions.length) * 50));
+      // Simple heuristic: use average of economic scores if available, otherwise neutral
+      const opinionsWithScores = opinions.filter(op => op.topicEconomicScore != null);
+      let score = 0;
+      if (opinionsWithScores.length > 0) {
+        const avgEconomicScore = opinionsWithScores.reduce((sum, op) => sum + (op.topicEconomicScore || 0), 0) / opinionsWithScores.length;
+        score = Math.max(-100, Math.min(100, avgEconomicScore));
+      }
       
       let leaning = 'moderate';
       if (score < -20) leaning = 'progressive';
@@ -330,7 +363,7 @@ Return only valid JSON.`;
         leaning,
         score: Math.round(score),
         confidence,
-        reasoning: `Analysis based on ${opinions.length} opinions with stance distribution: ${forCount} supportive, ${againstCount} opposing, ${neutralCount} neutral`
+        reasoning: `Fallback analysis based on ${opinions.length} opinions (${opinionsWithScores.length} with political scores)`
       };
     }
   }
@@ -357,7 +390,7 @@ Return only valid JSON.`;
     // Prepare opinions for AI analysis (last 50 opinions)
     const recentOpinions = opinions.slice(-50);
     const opinionTexts = recentOpinions.map((opinion, index) => 
-      `Opinion ${index + 1}: ${opinion.content} (Stance: ${opinion.stance})`
+      `Opinion ${index + 1}: ${opinion.content}`
     ).join('\n\n');
 
     const prompt = `
@@ -403,6 +436,31 @@ AUTHORITARIAN indicators:
 - Traditional values vs. progressive social policies
 
 Return only valid JSON.`;
+
+    // Return mock data if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning fallback 2D political compass analysis');
+      // Try to calculate from existing scores
+      const opinionsWithScores = opinions.filter(op => op.topicEconomicScore != null && op.topicAuthoritarianScore != null);
+      if (opinionsWithScores.length > 0) {
+        const avgEconomic = opinionsWithScores.reduce((sum, op) => sum + (op.topicEconomicScore || 0), 0) / opinionsWithScores.length;
+        const avgAuthoritarian = opinionsWithScores.reduce((sum, op) => sum + (op.topicAuthoritarianScore || 0), 0) / opinionsWithScores.length;
+        return {
+          economicScore: Math.round(Math.max(-100, Math.min(100, avgEconomic))),
+          authoritarianScore: Math.round(Math.max(-100, Math.min(100, avgAuthoritarian))),
+          confidence: 'low',
+          reasoning: `Fallback analysis based on ${opinionsWithScores.length} opinions with political scores`,
+          quadrant: 'centrist'
+        };
+      }
+      return {
+        economicScore: 0,
+        authoritarianScore: 0,
+        confidence: 'low',
+        reasoning: 'OpenAI not configured and no political scores available',
+        quadrant: 'centrist'
+      };
+    }
 
     try {
       console.log(`[AI Analysis] Starting 2D political compass analysis for ${recentOpinions.length} opinions`);
@@ -474,20 +532,26 @@ Return only valid JSON.`;
     } catch (error) {
       console.error("Error analyzing 2D political compass:", error);
       
-      // Fallback analysis without AI - simple heuristic
-      const forCount = opinions.filter(op => op.stance === 'for').length;
-      const againstCount = opinions.filter(op => op.stance === 'against').length;
-      
-      // Simple heuristic: estimate based on stance patterns
-      const ratio = forCount - againstCount;
-      const economicScore = Math.max(-100, Math.min(100, (ratio / opinions.length) * 30));
-      const authoritarianScore = 0; // Default to center on authority axis without content analysis
+      // Fallback analysis without AI - use existing scores if available
+      const opinionsWithScores = opinions.filter(op => op.topicEconomicScore != null && op.topicAuthoritarianScore != null);
+      if (opinionsWithScores.length > 0) {
+        const avgEconomic = opinionsWithScores.reduce((sum, op) => sum + (op.topicEconomicScore || 0), 0) / opinionsWithScores.length;
+        const avgAuthoritarian = opinionsWithScores.reduce((sum, op) => sum + (op.topicAuthoritarianScore || 0), 0) / opinionsWithScores.length;
+        return {
+          economicScore: Math.round(Math.max(-100, Math.min(100, avgEconomic))),
+          authoritarianScore: Math.round(Math.max(-100, Math.min(100, avgAuthoritarian))),
+          confidence,
+          reasoning: `Fallback analysis based on ${opinionsWithScores.length} opinions with political scores`,
+          quadrant: 'centrist'
+        };
+      }
 
+      // No scores available - return neutral
       return {
-        economicScore: Math.round(economicScore),
-        authoritarianScore: Math.round(authoritarianScore),
+        economicScore: 0,
+        authoritarianScore: 0,
         confidence,
-        reasoning: `Fallback analysis based on ${opinions.length} opinions with stance distribution: ${forCount} supportive, ${againstCount} opposing`,
+        reasoning: `Fallback analysis based on ${opinions.length} opinions (no political scores available)`,
         quadrant: 'centrist'
       };
     }
@@ -545,6 +609,12 @@ AUTHORITARIAN indicators:
 - Traditional values vs. progressive social policies
 
 Return only valid JSON with economicScore and authoritarianScore fields.`;
+
+    // Return neutral scores if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning neutral scores for opinion analysis');
+      return { economicScore: 0, authoritarianScore: 0 };
+    }
 
     try {
       console.log(`[Opinion Analysis] Analyzing opinion using model: ${model}`);
@@ -607,6 +677,10 @@ Return only valid JSON with economicScore and authoritarianScore fields.`;
    * Returns a 1536-dimension vector for semantic similarity search
    */
   static async generateEmbedding(text: string): Promise<number[]> {
+    if (!openai) {
+      throw new Error("OpenAI not configured - cannot generate embedding");
+    }
+
     try {
       const response = await openai.embeddings.create({
         model: "text-embedding-3-small",

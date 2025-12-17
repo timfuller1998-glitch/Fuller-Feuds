@@ -156,3 +156,63 @@ export function getTopicCornerGradient(distribution: {
     `
   };
 }
+
+/**
+ * Generate corner glow effects for a topic card using box-shadow
+ * Glow emanates from corners outward based on political distribution
+ */
+export function getTopicCornerGlow(distribution: {
+  authoritarianCapitalist: number;  // % of opinions (Red) - top-right corner
+  authoritarianSocialist: number;   // % of opinions (Blue) - top-left corner
+  libertarianCapitalist: number;    // % of opinions (Yellow) - bottom-right corner
+  libertarianSocialist: number;     // % of opinions (Green) - bottom-left corner
+}): React.CSSProperties {
+  // Convert percentages (0-100) to glow intensity (0-1)
+  const toIntensity = (percent: number) => Math.max(0, Math.min(1, percent / 100));
+  
+  // Base colors for each quadrant (RGB values)
+  const topLeftColor = { r: 100, g: 150, b: 255 };      // Soft Blue
+  const topRightColor = { r: 255, g: 120, b: 130 };     // Soft Red
+  const bottomLeftColor = { r: 100, g: 200, b: 150 };  // Soft Green
+  const bottomRightColor = { r: 255, g: 220, b: 100 };  // Soft Yellow
+
+  // Calculate glow values based on intensity
+  const getGlowShadow = (intensity: number, color: { r: number; g: number; b: number }, offsetX: number, offsetY: number) => {
+    if (intensity === 0) return '';
+    const blur = 20 + (intensity * 30);    // 20-50px blur
+    const spread = intensity * 15;        // 0-15px spread
+    const opacity = 0.4 + (intensity * 0.4); // 40-80% opacity
+    return `${offsetX}px ${offsetY}px ${blur}px ${spread}px rgba(${color.r}, ${color.g}, ${color.b}, ${opacity})`;
+  };
+
+  // Build box-shadow for each corner positioned outward
+  const shadows: string[] = [];
+  
+  // Top-left (Blue) - Authoritarian Socialist
+  const tlIntensity = toIntensity(distribution.authoritarianSocialist);
+  if (tlIntensity > 0) {
+    shadows.push(getGlowShadow(tlIntensity, topLeftColor, -20, -20));
+  }
+
+  // Top-right (Red) - Authoritarian Capitalist
+  const trIntensity = toIntensity(distribution.authoritarianCapitalist);
+  if (trIntensity > 0) {
+    shadows.push(getGlowShadow(trIntensity, topRightColor, 20, -20));
+  }
+
+  // Bottom-left (Green) - Libertarian Socialist
+  const blIntensity = toIntensity(distribution.libertarianSocialist);
+  if (blIntensity > 0) {
+    shadows.push(getGlowShadow(blIntensity, bottomLeftColor, -20, 20));
+  }
+
+  // Bottom-right (Yellow) - Libertarian Capitalist
+  const brIntensity = toIntensity(distribution.libertarianCapitalist);
+  if (brIntensity > 0) {
+    shadows.push(getGlowShadow(brIntensity, bottomRightColor, 20, 20));
+  }
+
+  return {
+    boxShadow: shadows.length > 0 ? shadows.join(', ') : 'none',
+  };
+}

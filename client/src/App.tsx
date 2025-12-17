@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation, useSearch } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +18,7 @@ import { useDebateWebSocket } from "@/hooks/useDebateWebSocket";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { UpdateNotification } from "@/components/UpdateNotification";
 import { registerServiceWorker } from "@/utils/registerSW";
+import { LoginDialog } from "@/components/LoginDialog";
 import Home from "@/pages/Home";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
@@ -74,6 +75,8 @@ function AppWithSidebar({
   handleSearch: (query: string) => void;
   isAuthenticated: boolean;
 }) {
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+
   return (
     <div className="flex h-screen w-full overflow-x-hidden">
       <AppSidebar
@@ -84,8 +87,17 @@ function AppWithSidebar({
           isOnline: true
         }}
         onNavigate={(path) => console.log('Navigate to:', path)}
-        onLogout={() => {
-          window.location.href = "/api/logout";
+        onLogout={async () => {
+          try {
+            await fetch("/api/logout", {
+              method: "POST",
+              credentials: "include",
+            });
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            window.location.href = "/";
+          } catch (error) {
+            console.error("Logout error:", error);
+          }
         }}
       />
       <div className="flex flex-col flex-1 min-w-0">
@@ -99,12 +111,15 @@ function AppWithSidebar({
             />
           </div>
           {!isAuthenticated && (
-            <a href="/api/login" className="flex-shrink-0">
-              <button className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 font-medium" data-testid="button-sign-in">
-                Sign In
-              </button>
-            </a>
+            <button 
+              onClick={() => setLoginDialogOpen(true)}
+              className="flex-shrink-0 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 font-medium" 
+              data-testid="button-sign-in"
+            >
+              Sign In
+            </button>
           )}
+          <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} />
         </header>
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 pb-20">
           <div className="max-w-7xl mx-auto w-full">
@@ -133,17 +148,76 @@ function WebSocketManager() {
 }
 
 function MainApp() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: isUserLoading } = useAuth();
   const [location, setLocation] = useLocation();
   const searchParams = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
+  const redirectLockRef = useRef(false); // Prevent redirect loops
+  const hasCheckedOnboardingRef = useRef(false); // Track if we've done initial onboarding check
   
-  // Redirect to onboarding if authenticated but not completed
+  // Redirect logic for onboarding - simplified to prevent loops
   useEffect(() => {
-    if (user && !user.onboardingComplete && location !== "/onboarding") {
-      setLocation("/onboarding");
+    // Don't do anything while user data is loading
+    if (isUserLoading) {
+      return;
     }
-  }, [user, location, setLocation]);
+
+    // Only handle redirect if user is authenticated and we have user data
+    if (!isAuthenticated || !user) {
+      redirectLockRef.current = false;
+      hasCheckedOnboardingRef.current = false;
+      return;
+    }
+
+    // Prevent redirect loops with a lock
+    if (redirectLockRef.current) {
+      return;
+    }
+
+    const isOnOnboardingPage = location === "/onboarding";
+    // Explicitly check for true - server always returns a boolean (true or false)
+    const hasCompletedOnboarding = user.onboardingComplete === true;
+
+    // Debug logging to help diagnose the issue
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Onboarding Redirect]', {
+        location,
+        onboardingComplete: user.onboardingComplete,
+        hasCompletedOnboarding,
+        isOnOnboardingPage,
+        hasChecked: hasCheckedOnboardingRef.current,
+        userId: user.id
+      });
+    }
+
+    // PRIORITY 1: If user has completed onboarding, handle redirect away from onboarding page
+    if (hasCompletedOnboarding) {
+      // If on onboarding page, redirect away
+      if (isOnOnboardingPage) {
+        redirectLockRef.current = true;
+        setLocation("/");
+        setTimeout(() => {
+          redirectLockRef.current = false;
+        }, 1000);
+      }
+      // Mark as checked so we don't redirect to onboarding
+      hasCheckedOnboardingRef.current = true;
+      return; // NEVER redirect to onboarding if completed
+    }
+
+    // PRIORITY 2: User hasn't completed onboarding - redirect to onboarding if not already there
+    // Only redirect once per session to prevent loops
+    // Double-check that onboarding is NOT completed before redirecting (defensive check)
+    if (!hasCompletedOnboarding && !isOnOnboardingPage && !hasCheckedOnboardingRef.current) {
+      hasCheckedOnboardingRef.current = true;
+      redirectLockRef.current = true;
+      setLocation("/onboarding");
+      setTimeout(() => {
+        redirectLockRef.current = false;
+      }, 1000);
+      return;
+    }
+  }, [user, isAuthenticated, isUserLoading, location, setLocation]);
   
   // Initialize search query from URL on mount and location change
   useEffect(() => {

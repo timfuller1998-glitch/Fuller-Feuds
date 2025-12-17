@@ -1,6 +1,8 @@
 import webPush from 'web-push';
-import { storage } from './storage';
+import { NotificationService } from './services/notificationService';
 import type { InsertNotification } from '../shared/schema';
+
+const notificationService = new NotificationService();
 
 // Configure web-push with VAPID keys
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
@@ -46,7 +48,7 @@ export async function sendPushNotification(
 
   try {
     // Get all push subscriptions for this user
-    const subscriptions = await storage.getUserPushSubscriptions(userId);
+    const subscriptions = await notificationService.getUserPushSubscriptions(userId);
 
     if (subscriptions.length === 0) {
       console.log(`No push subscriptions found for user ${userId}`);
@@ -74,7 +76,7 @@ export async function sendPushNotification(
         // If subscription is invalid (410 Gone), remove it
         if (error.statusCode === 410) {
           console.log(`Removing invalid subscription for user ${userId}`);
-          await storage.unsubscribeFromPush(userId, sub.endpoint);
+          await notificationService.unsubscribeFromPush(userId, sub.endpoint);
         } else {
           console.error(`Error sending push notification to user ${userId}:`, error);
         }
@@ -108,7 +110,7 @@ export async function sendDebateMessageNotification(
     debateRoomId,
   };
 
-  await storage.createNotification(notification);
+  await notificationService.createNotification(notification);
 
   // Send push notification (will only send if user is offline)
   await sendPushNotification(recipientId, {
@@ -151,7 +153,7 @@ export async function sendDebatePhaseChangeNotification(
     debateRoomId,
   };
 
-  await storage.createNotification(notification);
+  await notificationService.createNotification(notification);
 
   // Send push notification
   await sendPushNotification(recipientId, {

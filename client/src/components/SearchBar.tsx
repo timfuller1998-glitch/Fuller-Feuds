@@ -216,6 +216,8 @@ export default function SearchBar({
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/platform"] });
+      // Invalidate opinions for the new topic so the initial opinion appears
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", data.id, "opinions"] });
       setShowSuggestions(false);
       setShowCreateForm(false);
       setTopicTitle("");

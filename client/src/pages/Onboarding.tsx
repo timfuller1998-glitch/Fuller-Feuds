@@ -26,11 +26,28 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Topic, Opinion } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+
+interface User {
+  id: string;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  role?: string | null;
+  status?: string | null;
+  onboardingStep?: number | null;
+  onboardingComplete?: boolean | null;
+  bio?: string | null;
+  location?: string | null;
+  profileImageUrl?: string | null;
+  followedCategories?: string[] | null;
+}
 
 export default function Onboarding() {
   const [, navigate] = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
   const [canProceed, setCanProceed] = useState(false);
+  const stepRestoredRef = useRef(false); // Track if we've restored the step
 
   // Step 1: Profile data
   const [firstName, setFirstName] = useState("");
@@ -53,9 +70,8 @@ export default function Onboarding() {
   // Step 3: Opinion data
   const [createdOpinions, setCreatedOpinions] = useState<Set<string>>(new Set());
 
-  const { data: user } = useQuery({
-    queryKey: ['/api/auth/user'],
-  });
+  // Use useAuth hook to get user data consistently with the rest of the app
+  const { user, isLoading: isUserLoading } = useAuth();
 
   const { data: topics = [] } = useQuery<Topic[]>({
     queryKey: ['/api/topics'],
@@ -71,31 +87,47 @@ export default function Onboarding() {
   // Update profile mutation
   const updateProfileMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest('PUT', '/api/onboarding/profile', data);
+      return await apiRequest('PUT', '/api/users/onboarding/profile', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      // Use exact query key format to match useAuth
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"], exact: true });
     }
   });
 
   // Update categories mutation
   const updateCategoriesMutation = useMutation({
     mutationFn: async (categories: string[]) => {
-      return await apiRequest('PUT', '/api/onboarding/categories', { categories });
+      return await apiRequest('PUT', '/api/users/onboarding/categories', { categories });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      // Use exact query key format to match useAuth
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"], exact: true });
     }
   });
 
   // Update onboarding progress mutation
   const updateProgressMutation = useMutation({
     mutationFn: async ({ step, complete }: { step: number; complete: boolean }) => {
-      return await apiRequest('PUT', '/api/onboarding/progress', { step, complete });
+      const response = await apiRequest('PUT', '/api/users/onboarding/progress', { step, complete });
+      
+      // Check content type from headers (without reading body)
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        // Clone response to read the body for error message
+        const clonedResponse = response.clone();
+        const text = await clonedResponse.text();
+        console.error('Expected JSON but got:', contentType);
+        console.error('Response body:', text.substring(0, 500));
+        throw new Error(`Server returned ${contentType} instead of JSON. This usually means the API endpoint '/api/users/onboarding/progress' was not found. Response: ${text.substring(0, 200)}`);
+      }
+      
+      // Parse JSON response
+      const data = await response.json();
+      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-    }
+    // Don't invalidate here - we'll handle refetch in the completion handlers
+    // to ensure we wait for fresh data before navigating
   });
 
   // Create opinion mutation
@@ -107,8 +139,11 @@ export default function Onboarding() {
       });
     },
     onSuccess: (_, variables) => {
-      setCreatedOpinions(prev => new Set([...prev, variables.topicId]));
+      setCreatedOpinions(prev => new Set([...Array.from(prev), variables.topicId]));
       queryClient.invalidateQueries({ queryKey: ['/api/topics'] });
+      // Invalidate opinions for this specific topic
+      queryClient.invalidateQueries({ queryKey: ['/api/topics', variables.topicId, 'opinions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stats/platform'] });
     }
   });
 
@@ -133,12 +168,38 @@ export default function Onboarding() {
     }
   }, [currentStep, firstName, lastName, selectedCategories, createdOpinions]);
 
+  const redirectLockRef = useRef(false); // Prevent redirect loops
+  
   // Redirect users who have already completed onboarding
+  // Also redirect if user data hasn't loaded yet but we're loading (to prevent flash)
   useEffect(() => {
-    if (user && user.onboardingComplete) {
-      navigate("/");
+    // Wait for user data to load
+    if (isUserLoading) {
+      return;
     }
-  }, [user, navigate]);
+
+    // If user is not authenticated, let the app handle navigation
+    if (!user) {
+      redirectLockRef.current = false;
+      return;
+    }
+
+    // Prevent redirect loops
+    if (redirectLockRef.current) {
+      return;
+    }
+
+    // Explicitly check for === true to handle null/undefined cases properly
+    // Server always returns a boolean (never null/undefined), so this check is safe
+    if (user.onboardingComplete === true) {
+      redirectLockRef.current = true;
+      navigate("/");
+      // Release lock after navigation
+      setTimeout(() => {
+        redirectLockRef.current = false;
+      }, 1000);
+    }
+  }, [user, isUserLoading, navigate]);
 
   // Pre-fill user data if available
   useEffect(() => {
@@ -150,6 +211,12 @@ export default function Onboarding() {
       setProfileImageUrl(user.profileImageUrl || "");
       if (user.followedCategories && user.followedCategories.length > 0) {
         setSelectedCategories(user.followedCategories);
+      }
+      // Restore onboarding step progress (only once, only if not completed)
+      // Explicitly check for !== true to handle null/undefined cases properly
+      if (!stepRestoredRef.current && user.onboardingStep && user.onboardingStep > 0 && user.onboardingComplete !== true) {
+        setCurrentStep(user.onboardingStep);
+        stepRestoredRef.current = true; // Mark as restored
       }
     }
   }, [user]);
@@ -185,25 +252,104 @@ export default function Onboarding() {
   };
 
   const handleComplete = async () => {
-    await updateProgressMutation.mutateAsync({
-      step: 4,
-      complete: true
-    });
-    // Wait for user data to refresh before navigating
-    await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-    await queryClient.refetchQueries({ queryKey: ['/api/auth/user'] });
-    navigate("/");
+    try {
+      // First, update the onboarding progress in the database
+      const response = await updateProgressMutation.mutateAsync({
+        step: 4,
+        complete: true
+      });
+      
+      console.log("Onboarding completion response:", response);
+      
+      // Verify the response contains the updated values
+      if (response && typeof response === 'object') {
+        if ('onboardingComplete' in response && !response.onboardingComplete) {
+          console.error("Database update did not set onboardingComplete to true!", response);
+          alert("Failed to save onboarding completion. Please try again.");
+          return;
+        }
+        console.log("Response shows onboardingComplete:", response.onboardingComplete);
+      }
+      
+      // Wait a moment for the database to commit
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Invalidate the query cache to mark it as stale
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/auth/user"],
+        exact: true 
+      });
+      
+      // Force a refetch of the user query to get updated onboarding status
+      // This ensures we have the latest data from the server
+      const refetchResult = await queryClient.refetchQueries({ 
+        queryKey: ["/api/auth/user"],
+        exact: true
+      });
+      
+      console.log("Refetch result:", refetchResult);
+      
+      // Wait a bit more to ensure React state has updated
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Verify the user data is updated before navigating
+      const updatedUser = queryClient.getQueryData(["/api/auth/user"]) as any;
+      console.log("Updated user data after refetch:", updatedUser);
+      
+      // Double-check that onboarding is actually completed
+      if (updatedUser && updatedUser.onboardingComplete !== true) {
+        console.error("Onboarding completion not saved! User data:", updatedUser);
+        alert("Warning: Onboarding completion may not have been saved. Please refresh the page and check.");
+        // Still navigate, but log the error
+      }
+      
+      // Now navigate - the App component will handle redirect if still needed
+      navigate("/");
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+      alert("Failed to complete onboarding. Please try again.");
+      // Don't navigate on error - let user see the error
+    }
   };
 
   const handleSkip = async () => {
-    await updateProgressMutation.mutateAsync({
-      step: currentStep,
-      complete: true
-    });
-    // Wait for user data to refresh before navigating
-    await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-    await queryClient.refetchQueries({ queryKey: ['/api/auth/user'] });
-    navigate("/");
+    try {
+      // First, update the onboarding progress in the database
+      const response = await updateProgressMutation.mutateAsync({
+        step: currentStep,
+        complete: true
+      });
+      
+      console.log("Onboarding skip response:", response);
+      
+      // Invalidate the query cache to mark it as stale
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/auth/user"],
+        exact: true 
+      });
+      
+      // Force a refetch of the user query to get updated onboarding status
+      const refetchResult = await queryClient.refetchQueries({ 
+        queryKey: ["/api/auth/user"],
+        exact: true
+      });
+      
+      console.log("Refetch result:", refetchResult);
+      
+      // Wait a bit more to ensure React state has updated
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Verify the user data is updated before navigating
+      const updatedUser = queryClient.getQueryData(["/api/auth/user"]);
+      console.log("Updated user data after refetch:", updatedUser);
+      
+      // Now navigate - the App component will handle redirect if still needed
+      navigate("/");
+    } catch (error) {
+      console.error("Error skipping onboarding:", error);
+      alert("Failed to skip onboarding. Please try again.");
+      // Don't navigate on error - let user see the error
+    }
   };
 
   const toggleCategory = (category: string) => {
@@ -312,6 +458,24 @@ export default function Onboarding() {
   }, {} as Record<string, Topic[]>);
 
   const progressPercentage = (currentStep / 4) * 100;
+
+  // Show loading state while user data is loading to prevent flash
+  if (isUserLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render onboarding content if user is not authenticated
+  // (let the app handle redirect to login)
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -558,7 +722,7 @@ export default function Onboarding() {
                           topic={topic}
                           hasOpinion={createdOpinions.has(topic.id)}
                           onOpinionCreated={() => {
-                            setCreatedOpinions(prev => new Set([...prev, topic.id]));
+                            setCreatedOpinions(prev => new Set([...Array.from(prev), topic.id]));
                           }}
                           createOpinionMutation={createOpinionMutation}
                         />

@@ -23,24 +23,17 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
 // Middleware to fetch and attach user role
 export async function attachUserRole(req: Request, res: Response, next: NextFunction) {
-  if (!req.isAuthenticated()) {
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
     return next();
   }
 
   try {
-    const userId = (req.user as any)?.claims?.sub;
-    if (!userId) return next();
+    const user = req.user as Express.User;
+    if (!user || !user.id) return next();
 
-    const user = await db
-      .select({ role: users.role, status: users.status })
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
-
-    if (user.length > 0) {
-      req.userRole = user[0].role || 'user';
-      req.userStatus = user[0].status || 'active';
-    }
+    // User object already has role and status from passport deserialization
+    req.userRole = user.role || 'user';
+    req.userStatus = user.status || 'active';
   } catch (error) {
     console.error('Error fetching user role:', error);
   }

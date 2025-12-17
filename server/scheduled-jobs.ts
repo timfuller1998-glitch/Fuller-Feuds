@@ -1,30 +1,38 @@
 import cron from 'node-cron';
-import { storage } from './storage';
 import { log } from './vite';
+import { TopicService } from './services/topicService';
+import { OpinionService } from './services/opinionService';
+import { CumulativeOpinionService } from './services/cumulativeOpinionService';
+import { DebateService } from './services/debateService';
+
+const topicService = new TopicService();
+const opinionService = new OpinionService();
+const cumulativeOpinionService = new CumulativeOpinionService();
+const debateService = new DebateService();
 
 export function startScheduledJobs() {
   cron.schedule('0 2 * * *', async () => {
     log('[CRON] Starting daily AI summary update at 2:00 AM');
     
     try {
-      const topics = await storage.getTopics({ limit: 1000 });
+      const topics = await topicService.getTopics({ limit: 1000 });
       let generated = 0;
       let refreshed = 0;
       let skipped = 0;
       
       for (const topic of topics) {
         try {
-          const opinions = await storage.getOpinionsByTopic(topic.id);
+          const opinions = await opinionService.getOpinionsByTopic(topic.id);
           
           if (opinions.length > 0) {
-            const existingCumulative = await storage.getCumulativeOpinion(topic.id);
+            const existingCumulative = await cumulativeOpinionService.getCumulativeOpinion(topic.id);
             
             if (existingCumulative) {
-              await storage.refreshCumulativeOpinion(topic.id);
+              await cumulativeOpinionService.refreshCumulativeOpinion(topic.id);
               refreshed++;
               log(`[CRON] Refreshed AI summary for topic: ${topic.title}`);
             } else {
-              await storage.generateCumulativeOpinion(topic.id);
+              await cumulativeOpinionService.generateCumulativeOpinion(topic.id);
               generated++;
               log(`[CRON] Generated AI summary for topic: ${topic.title}`);
             }
@@ -52,12 +60,12 @@ export function startScheduledJobs() {
     
     try {
       // Get all ended debates that haven't had messages in 7 days
-      const endedRooms = await storage.getEndedDebatesForArchiving(7);
+      const endedRooms = await debateService.getEndedDebatesForArchiving(7);
       
       let archived = 0;
       for (const room of endedRooms) {
         try {
-          await storage.archiveDebateRoom(room.id);
+          await debateService.archiveDebateRoom(room.id);
           archived++;
           log(`[CRON] Archived debate room: ${room.id}`);
         } catch (error) {

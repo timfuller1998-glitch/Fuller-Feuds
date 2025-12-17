@@ -84,9 +84,20 @@ export default function AppSidebar({
   const savedCategories = userData?.followedCategories || [];
 
   // Fetch recently viewed categories
-  const { data: recentCategories } = useQuery<string[]>({
+  const { data: recentCategories } = useQuery({
     queryKey: ["/api/users/me/recent-categories"],
     enabled: !!user,
+    select: (data: any): string[] => {
+      // Handle both array response and object with categories property (backward compatibility)
+      if (!data) return [];
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (typeof data === 'object' && 'categories' in data && Array.isArray(data.categories)) {
+        return data.categories;
+      }
+      return [];
+    },
   });
 
   // Mutation to toggle category follow status

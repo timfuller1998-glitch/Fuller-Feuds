@@ -136,7 +136,18 @@ export default function Profile() {
   // Fetch user badges
   const { data: userBadges = [] } = useQuery<any[]>({
     queryKey: ['/api/users', userId, 'badges'],
-    queryFn: () => fetch(`/api/users/${userId}/badges`, { credentials: 'include' }).then(res => res.json()),
+    queryFn: async () => {
+      const res = await fetch(`/api/users/${userId}/badges`, { credentials: 'include' });
+      const data = await res.json();
+      // Handle both array response and object with badges property (backward compatibility)
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (data && typeof data === 'object' && 'badges' in data && Array.isArray(data.badges)) {
+        return data.badges;
+      }
+      return [];
+    },
     enabled: !!userId,
   });
 

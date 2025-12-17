@@ -1,8 +1,35 @@
+import { useState, useEffect, useRef } from "react";
+import { animate } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Users, Sparkles, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MessageCircle, Users, Sparkles, Activity, Flag, Plus, ArrowRight, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
-import { getTopicCornerGradient } from "@/lib/politicalColors";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { getTopicCornerGlow } from "@/lib/politicalColors";
+import { insertOpinionSchema } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import FallacyFlagDialog from "@/components/FallacyFlagDialog";
+import { LoginPromptDialog } from "@/components/LoginPromptDialog";
+import type { FallacyType } from "@shared/fallacies";
+
+const opinionFormSchema = insertOpinionSchema.omit({
+  topicId: true,
+  userId: true,
+}).extend({
+  content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
+  debateStatus: z.enum(["open", "closed", "private"], { required_error: "Please select debate availability" }),
+  references: z.array(z.string().url("Must be a valid URL")).optional().default([]),
+});
 
 interface TopicCardProps {
   id: string;
@@ -23,6 +50,11 @@ interface TopicCardProps {
     libertarianCapitalist: number;
     libertarianSocialist: number;
   };
+  onFlipChange?: (isFlipped: boolean) => void;
+  onBackTimeUpdate?: (timeMs: number) => void;
+  showSwipeOverlay?: 'like' | 'dislike' | 'opinion' | null;
+  overlayOpacity?: number;
+  triggerOpinionForm?: number; // Timestamp to trigger opinion form opening
 }
 
 export default function TopicCard({
@@ -39,96 +71,487 @@ export default function TopicCard({
   previewIsAI,
   diversityScore,
   politicalDistribution,
+  onFlipChange,
+  onBackTimeUpdate,
+  showSwipeOverlay,
+  overlayOpacity = 0,
+  triggerOpinionForm,
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
+  const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [showOpinionForm, setShowOpinionForm] = useState(false);
+  const [showFlagDialog, setShowFlagDialog] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginAction, setLoginAction] = useState<"like" | "opinion" | "debate" | "interact">("interact");
+  const [timeOnBack, setTimeOnBack] = useState(0);
+  const backSideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  // Get gradient style based on political distribution
-  const gradientStyle = politicalDistribution && opinionsCount > 0
-    ? getTopicCornerGradient(politicalDistribution)
-    : { background: 'linear-gradient(135deg, hsl(var(--muted)) 0%, hsl(var(--muted) / 0.5) 100%)' };
+  // Get glow style based on political distribution
+  const glowStyle = politicalDistribution && opinionsCount > 0
+    ? getTopicCornerGlow(politicalDistribution)
+    : {};
 
-  // Truncate preview content to fit card with ellipsis
-  const truncateContent = (content: string, maxLength: number = 180) => {
-    if (content.length <= maxLength) return content + '...';
-    return content.substring(0, maxLength).trim() + '...';
+  // Fetch AI summary when card is flipped
+  const { data: cumulativeData, isLoading: summaryLoading } = useQuery<{ summary: string }>({
+    queryKey: ["/api/topics", id, "cumulative"],
+    queryFn: async () => {
+      const response = await fetch(`/api/topics/${id}/cumulative`);
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error("Failed to fetch cumulative opinion");
+      }
+      return response.json();
+    },
+    enabled: isFlipped && !!id,
+  });
+
+  // Opinion form
+  const opinionForm = useForm<z.infer<typeof opinionFormSchema>>({
+    resolver: zodResolver(opinionFormSchema),
+    defaultValues: {
+      content: "",
+      debateStatus: "open",
+      references: [],
+    },
+  });
+
+  // Create opinion mutation
+  const createOpinionMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof opinionFormSchema>) => {
+      return apiRequest('POST', `/api/topics/${id}/opinions`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Opinion shared",
+        description: "Your opinion has been successfully posted.",
+      });
+      opinionForm.reset();
+      setShowOpinionForm(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to share opinion",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Flag mutation
+  const flagMutation = useMutation({
+    mutationFn: async (fallacyType: FallacyType) => {
+      return apiRequest('POST', `/api/topics/${id}/flag`, { fallacyType });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Flag submitted",
+        description: "Thank you for helping keep debates productive.",
+      });
+      setShowFlagDialog(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit flag",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFlip = (e: React.MouseEvent) => {
+    // Only flip if clicking on the main content area, not on interactive buttons
+    if ((e.target as HTMLElement).closest('button, [role="button"]')) {
+      return;
+    }
+    const newFlipped = !isFlipped;
+    setIsFlipped(newFlipped);
+    onFlipChange?.(newFlipped);
   };
 
-  return (
-    <Card 
-      className="hover-elevate active-elevate-2 overflow-hidden group cursor-pointer" 
-      onClick={() => setLocation(`/topic/${id}`)}
-      data-testid={`card-topic-${id}`}
-    >
-      {/* Political gradient section with preview content */}
-      <div 
-        className="relative p-4 sm:p-6 min-h-[180px] flex flex-col justify-between"
-        style={gradientStyle}
-      >
-        <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
-          {categories?.slice(0, 2).map((category) => (
-            <Badge 
-              key={category} 
-              variant="secondary" 
-              className="bg-background/80 backdrop-blur-sm cursor-pointer hover-elevate"
-              onClick={(e) => {
-                e.stopPropagation();
-                setLocation(`/category/${encodeURIComponent(category)}`);
-              }}
-              data-testid={`badge-category-${category.toLowerCase()}`}
-            >
-              {category}
-            </Badge>
-          ))}
-          {categories && categories.length > 2 && (
-            <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
-              +{categories.length - 2}
-            </Badge>
-          )}
+  // Timer to track time spent on back side
+  useEffect(() => {
+    if (isFlipped) {
+      const startTime = Date.now();
+      backSideTimerRef.current = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        setTimeOnBack(elapsed);
+        onBackTimeUpdate?.(elapsed);
+        
+        // Trigger "jump up" animation after 3 seconds
+        if (elapsed > 3000 && cardRef.current) {
+          animate(cardRef.current, { y: [0, -15, 0] }, { duration: 0.4, ease: "easeOut" });
+        }
+      }, 100);
+    } else {
+      if (backSideTimerRef.current) {
+        clearInterval(backSideTimerRef.current);
+        backSideTimerRef.current = null;
+      }
+      setTimeOnBack(0);
+    }
+
+    return () => {
+      if (backSideTimerRef.current) {
+        clearInterval(backSideTimerRef.current);
+      }
+    };
+  }, [isFlipped, onBackTimeUpdate]);
+
+  // Trigger opinion form when triggerOpinionForm prop changes
+  useEffect(() => {
+    if (triggerOpinionForm && triggerOpinionForm > 0) {
+      if (!isAuthenticated) {
+        setLoginAction("opinion");
+        setShowLoginPrompt(true);
+      } else {
+        setShowOpinionForm(true);
+      }
+    }
+  }, [triggerOpinionForm, isAuthenticated]);
+
+  const handleAddOpinion = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      setLoginAction("opinion");
+      setShowLoginPrompt(true);
+      return;
+    }
+    setShowOpinionForm(true);
+  };
+
+  const handleFlag = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      setLoginAction("interact");
+      setShowLoginPrompt(true);
+      return;
+    }
+    setShowFlagDialog(true);
+  };
+
+  const handleNavigate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLocation(`/topic/${id}`);
+  };
+
+  const onSubmitOpinion = (data: z.infer<typeof opinionFormSchema>) => {
+    createOpinionMutation.mutate(data);
+  };
+
+  const handleFlagSubmit = (fallacyType: FallacyType) => {
+    flagMutation.mutate(fallacyType);
+  };
+
+  // Interactive elements component (used on both sides)
+  const InteractiveElements = () => (
+    <div className="flex items-center justify-between gap-2 pt-3 border-t mt-auto">
+      <div className="flex items-center gap-3 text-xs sm:text-sm text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+          <span data-testid={`text-opinions-count-${id}`}>{opinionsCount}</span>
         </div>
-
-        {diversityScore !== undefined && (
-          <div className="absolute top-2 right-2">
-            <Badge className="bg-purple-500/90 text-white backdrop-blur-sm" data-testid={`badge-diversity-${id}`}>
-              <Activity className="w-3 h-3 mr-1" />
-              {diversityScore}%
-            </Badge>
-          </div>
-        )}
-
-        {previewContent && (
-          <div className="mt-8 space-y-2">
-            <p className="text-sm leading-relaxed line-clamp-4" data-testid={`text-preview-content-${id}`}>
-              {truncateContent(previewContent)}
-            </p>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              {previewIsAI && <Sparkles className="w-3 h-3" />}
-              <span data-testid={`text-preview-author-${id}`}>— {previewAuthor}</span>
-            </div>
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+          <span data-testid={`text-participants-count-${id}`}>{participantCount}</span>
+        </div>
       </div>
-      
-      <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
-        <h3 className="font-semibold text-base sm:text-lg leading-tight" data-testid={`text-topic-title-${id}`}>
-          {title}
-        </h3>
-        <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-          {description}
-        </p>
-      </CardHeader>
-      
-      <CardContent className="pt-0 p-3 sm:p-6 sm:pt-0">
-        <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span data-testid={`text-opinions-count-${id}`}>{opinionsCount}</span>
+      <div className="flex items-center gap-1">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleAddOpinion}
+          className="h-7 px-2"
+          data-testid={`button-add-opinion-${id}`}
+        >
+          <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleFlag}
+          className="h-7 px-2"
+          data-testid={`button-flag-${id}`}
+        >
+          <Flag className="w-3 h-3 sm:w-4 sm:h-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleNavigate}
+          className="h-7 px-2"
+          data-testid={`button-navigate-${id}`}
+        >
+          <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div
+        ref={cardRef}
+        className="relative w-full h-full"
+        style={{ perspective: "1000px", ...glowStyle }}
+        data-testid={`card-topic-${id}`}
+      >
+        {/* Swipe overlays */}
+        {showSwipeOverlay === 'like' && (
+          <div
+            className="absolute inset-0 bg-green-500/30 rounded-lg z-50 pointer-events-none"
+            style={{ opacity: overlayOpacity }}
+          />
+        )}
+        {showSwipeOverlay === 'dislike' && (
+          <div
+            className="absolute inset-0 bg-red-500/30 rounded-lg z-50 pointer-events-none"
+            style={{ opacity: overlayOpacity }}
+          />
+        )}
+        {showSwipeOverlay === 'opinion' && (
+          <div
+            className="absolute inset-0 bg-purple-500/30 rounded-lg z-50 pointer-events-none"
+            style={{ opacity: overlayOpacity }}
+          />
+        )}
+        
+        <Card
+          className="hover-elevate active-elevate-2 overflow-hidden cursor-pointer relative w-full h-full"
+          style={{ minHeight: "280px" }}
+          onClick={handleFlip}
+        >
+          <div
+            className="relative w-full h-full"
+            style={{
+              transformStyle: "preserve-3d",
+              transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+              transition: "transform 0.6s ease-in-out",
+            }}
+          >
+            {/* Front Side */}
+            <div 
+              className="absolute inset-0 p-4 sm:p-6 min-h-[280px] flex flex-col h-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
+            >
+            {/* Categories and Diversity Badge */}
+            <div className="absolute top-2 left-2 flex gap-1 flex-wrap z-20 pointer-events-auto">
+              {categories?.slice(0, 2).map((category) => (
+                <Badge
+                  key={category}
+                  variant="secondary"
+                  className="bg-background/80 backdrop-blur-sm cursor-pointer hover-elevate"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLocation(`/category/${encodeURIComponent(category)}`);
+                  }}
+                  data-testid={`badge-category-${category.toLowerCase()}`}
+                >
+                  {category}
+                </Badge>
+              ))}
+              {categories && categories.length > 2 && (
+                <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
+                  +{categories.length - 2}
+                </Badge>
+              )}
+            </div>
+
+            {diversityScore !== undefined && (
+              <div className="absolute top-2 right-2 z-20 pointer-events-auto">
+                <Badge className="bg-purple-500/90 text-white backdrop-blur-sm" data-testid={`badge-diversity-${id}`}>
+                  <Activity className="w-3 h-3 mr-1" />
+                  {diversityScore}%
+                </Badge>
+              </div>
+            )}
+
+            {/* Content Area - Centered in top 2/3rds */}
+            <div className="flex-1 flex items-center justify-center" style={{ minHeight: "66%" }}>
+              <div className="text-center px-4">
+                <h3 className="font-semibold text-lg sm:text-xl leading-tight" data-testid={`text-topic-title-${id}`}>
+                  {title}
+                </h3>
+              </div>
+            </div>
+
+            <InteractiveElements />
           </div>
-          <div className="flex items-center gap-1">
-            <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span data-testid={`text-participants-count-${id}`}>{participantCount}</span>
+
+          {/* Back Side */}
+          <div 
+            className="absolute inset-0 p-4 sm:p-6 min-h-[280px] flex flex-col h-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
+            style={{
+              transform: "rotateY(180deg)",
+            }}
+          >
+            {/* Categories and Diversity Badge */}
+            <div className="absolute top-2 left-2 flex gap-1 flex-wrap z-20 pointer-events-auto">
+              {categories?.slice(0, 2).map((category) => (
+                <Badge
+                  key={category}
+                  variant="secondary"
+                  className="bg-background/80 backdrop-blur-sm cursor-pointer hover-elevate"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLocation(`/category/${encodeURIComponent(category)}`);
+                  }}
+                  data-testid={`badge-category-back-${category.toLowerCase()}`}
+                >
+                  {category}
+                </Badge>
+              ))}
+              {categories && categories.length > 2 && (
+                <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
+                  +{categories.length - 2}
+                </Badge>
+              )}
+            </div>
+
+            {diversityScore !== undefined && (
+              <div className="absolute top-2 right-2 z-20 pointer-events-auto">
+                <Badge className="bg-purple-500/90 text-white backdrop-blur-sm" data-testid={`badge-diversity-back-${id}`}>
+                  <Activity className="w-3 h-3 mr-1" />
+                  {diversityScore}%
+                </Badge>
+              </div>
+            )}
+
+            {/* Content Area - Centered in top 2/3rds */}
+            <div className="flex-1 flex items-center justify-center" style={{ minHeight: "66%" }}>
+              <div className="text-center px-4 w-full">
+                {summaryLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : cumulativeData?.summary ? (
+                  <div>
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                      <h3 className="font-semibold text-sm">AI Summary</h3>
+                    </div>
+                    <p className="text-sm leading-relaxed" data-testid={`text-ai-summary-${id}`}>
+                      {cumulativeData.summary}
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <Sparkles className="w-4 h-4 text-muted-foreground" />
+                      <h3 className="font-semibold text-sm text-muted-foreground">Description</h3>
+                    </div>
+                    <p className="text-sm leading-relaxed text-muted-foreground" data-testid={`text-description-${id}`}>
+                      {description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <InteractiveElements />
           </div>
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+        </Card>
+      </div>
+
+      {/* Opinion Creation Dialog */}
+      <Dialog open={showOpinionForm} onOpenChange={setShowOpinionForm}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Share Your Opinion</DialogTitle>
+            <DialogDescription>
+              Share your thoughts on this topic.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...opinionForm}>
+            <form onSubmit={opinionForm.handleSubmit(onSubmitOpinion)} className="space-y-4">
+              <FormField
+                control={opinionForm.control}
+                name="debateStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Debate Availability</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-debate-status">
+                          <SelectValue placeholder="Select debate availability" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="open" data-testid="option-debate-open">
+                          Open for Debate - Others can challenge this opinion
+                        </SelectItem>
+                        <SelectItem value="closed" data-testid="option-debate-closed">
+                          Not Debatable - Opinion is public but read-only
+                        </SelectItem>
+                        <SelectItem value="private" data-testid="option-debate-private">
+                          Private - Only visible to you
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={opinionForm.control}
+                name="content"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Opinion</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Share your thoughts on this topic..."
+                        className="min-h-[200px]"
+                        {...field}
+                        data-testid="textarea-opinion-content"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowOpinionForm(false)}
+                  disabled={createOpinionMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createOpinionMutation.isPending}
+                  data-testid="button-submit-opinion"
+                >
+                  {createOpinionMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {createOpinionMutation.isPending ? 'Sharing...' : 'Share Opinion'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Flag Dialog */}
+      <FallacyFlagDialog
+        open={showFlagDialog}
+        onOpenChange={setShowFlagDialog}
+        onSubmit={handleFlagSubmit}
+        isPending={flagMutation.isPending}
+        entityType="topic"
+      />
+
+      {/* Login Prompt Dialog */}
+      <LoginPromptDialog
+        open={showLoginPrompt}
+        onOpenChange={setShowLoginPrompt}
+        action={loginAction}
+      />
+    </>
   );
 }

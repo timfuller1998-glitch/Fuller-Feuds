@@ -5,15 +5,15 @@ import { Users, FileText, Flag, Shield } from "lucide-react";
 export function DashboardOverview() {
   // Fetch platform stats
   const { data: users } = useQuery({
-    queryKey: ['/api/admin/users', { limit: 1000 }],
+    queryKey: ['/api/admin/users'],
   });
 
   const { data: topics } = useQuery({
-    queryKey: ['/api/admin/topics', { limit: 1000 }],
+    queryKey: ['/api/admin/topics'],
   });
 
   const { data: opinions } = useQuery({
-    queryKey: ['/api/admin/opinions', { limit: 1000 }],
+    queryKey: ['/api/admin/opinions'],
   });
 
   const { data: flaggedOpinions } = useQuery({

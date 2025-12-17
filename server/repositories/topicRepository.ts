@@ -103,6 +103,20 @@ export class TopicRepository {
       .where(eq(topics.id, topicId));
   }
 
+  async findWithoutEmbeddings(limit?: number): Promise<Topic[]> {
+    const topicsList = await db
+      .select()
+      .from(topics)
+      .where(and(
+        eq(topics.isActive, true),
+        sql`${topics.embedding} IS NULL`
+      ))
+      .orderBy(desc(topics.createdAt))
+      .limit(limit || 1000);
+    
+    return topicsList;
+  }
+
   async delete(id: string): Promise<void> {
     await db.update(topics)
       .set({ isActive: false })
@@ -272,8 +286,13 @@ export class TopicRepository {
         ? `${mostLiked.firstName} ${mostLiked.lastName}` 
         : undefined;
       
+      // Handle content preview safely - avoid "undefined" string coercion
+      const contentPreview = mostLiked.content 
+        ? mostLiked.content.slice(0, 200) + (mostLiked.content.length > 200 ? '...' : '')
+        : undefined;
+      
       result = {
-        content: mostLiked.content?.slice(0, 200) + (mostLiked.content && mostLiked.content.length > 200 ? '...' : ''),
+        content: contentPreview,
         author: authorName,
         isAI: false,
       };

@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, ThumbsUp, MessageSquarePlus } from "lucide-react";
+import { LoginDialog } from "@/components/LoginDialog";
+import { useState } from "react";
 
 interface LoginPromptDialogProps {
   open: boolean;
@@ -15,6 +17,8 @@ interface LoginPromptDialogProps {
 }
 
 export function LoginPromptDialog({ open, onOpenChange, action = "interact" }: LoginPromptDialogProps) {
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+
   const actionMessages = {
     like: {
       icon: ThumbsUp,
@@ -55,16 +59,23 @@ export function LoginPromptDialog({ open, onOpenChange, action = "interact" }: L
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3 mt-4">
-          <a href="/api/login" className="w-full">
-            <Button className="w-full" size="lg" data-testid="button-login-primary">
-              Sign in with Replit
-            </Button>
-          </a>
+          <Button 
+            onClick={() => {
+              onOpenChange(false);
+              setLoginDialogOpen(true);
+            }}
+            className="w-full" 
+            size="lg" 
+            data-testid="button-login-primary"
+          >
+            Sign In
+          </Button>
           <p className="text-xs text-center text-muted-foreground">
             New to Fuller Feuds? Signing in will create your account.
           </p>
         </div>
       </DialogContent>
+      <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} />
     </Dialog>
   );
 }
