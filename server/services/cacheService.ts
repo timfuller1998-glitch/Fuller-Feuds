@@ -18,7 +18,8 @@ try {
   // Check if redis is available in environment
   if (process.env.REDIS_URL || process.env.REDIS_HOST) {
     // Dynamic import to avoid errors if redis is not installed
-    import('redis').then((redis) => {
+    // @ts-ignore - redis is optional dependency
+    import('redis').then((redis: any) => {
       const client = redis.createClient({
         url: process.env.REDIS_URL,
         socket: {
@@ -27,7 +28,7 @@ try {
         },
       });
       
-      client.on('error', (err) => {
+      client.on('error', (err: Error) => {
         console.warn('[Cache] Redis connection error:', err);
         redisAvailable = false;
       });
@@ -36,7 +37,7 @@ try {
         redisClient = client;
         redisAvailable = true;
         console.log('[Cache] Redis connected successfully');
-      }).catch((err) => {
+      }).catch((err: Error) => {
         console.warn('[Cache] Redis connection failed, using in-memory cache only:', err);
         redisAvailable = false;
       });
@@ -44,7 +45,7 @@ try {
       console.log('[Cache] Redis not installed, using in-memory cache only');
     });
   }
-} catch (error) {
+} catch (error: unknown) {
   console.log('[Cache] Redis not available, using in-memory cache only');
 }
 

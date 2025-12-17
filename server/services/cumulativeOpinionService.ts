@@ -54,9 +54,6 @@ export class CumulativeOpinionService {
     return await this.cumulativeOpinionRepo.upsert(topicId, {
       summary: analysis.summary,
       keyPoints: analysis.keyPoints,
-      supportingPercentage: analysis.supportingPercentage,
-      opposingPercentage: analysis.opposingPercentage,
-      neutralPercentage: analysis.neutralPercentage,
       totalOpinions: analysis.totalOpinions,
       confidence: analysis.confidence,
     });
