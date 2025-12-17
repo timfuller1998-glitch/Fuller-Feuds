@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import path from "path";
+import fs from "fs";
 import routes from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startScheduledJobs } from "./scheduled-jobs";
@@ -57,6 +58,34 @@ app.use(attachUserRole);
 
 // Mount API routes
 app.use('/api', routes);
+
+// Diagnostic route to check static file setup (remove in production if needed)
+if (process.env.NODE_ENV === 'production') {
+  app.get('/api/debug/static', (req, res) => {
+    const distPath = path.resolve(process.cwd(), "dist", "public");
+    const altPath = path.resolve(import.meta.dirname, "..", "dist", "public");
+    
+    try {
+      const files = fs.existsSync(distPath) ? fs.readdirSync(distPath) : [];
+      const altFiles = fs.existsSync(altPath) ? fs.readdirSync(altPath) : [];
+      
+      res.json({
+        cwd: process.cwd(),
+        importMetaDirname: import.meta.dirname,
+        distPath,
+        distPathExists: fs.existsSync(distPath),
+        distPathFiles: files.slice(0, 10),
+        altPath,
+        altPathExists: fs.existsSync(altPath),
+        altPathFiles: altFiles.slice(0, 10),
+        indexHtmlExists: fs.existsSync(path.join(distPath, "index.html")),
+        env: process.env.NODE_ENV,
+      });
+    } catch (error: any) {
+      res.json({ error: error.message, stack: error.stack });
+    }
+  });
+}
 
 // Create HTTP server
 const server = createServer(app);
