@@ -16,7 +16,7 @@ const topicService = new TopicService();
 router.post('/users/:userId/suspend', requireModerator, async (req, res) => {
   try {
     const { reason } = req.body;
-    await moderationService.suspendUser(req.params.userId, req.user!.claims.sub, reason);
+    await moderationService.suspendUser(req.params.userId, req.user!.id, reason);
     res.json({ message: "User suspended successfully" });
   } catch (error) {
     console.error("Error suspending user:", error);
@@ -38,7 +38,7 @@ router.post('/users/:userId/ban', requireModerator, async (req, res) => {
 router.post('/users/:userId/reinstate', requireModerator, async (req, res) => {
   try {
     const { reason } = req.body;
-    await moderationService.reinstateUser(req.params.userId, req.user!.claims.sub, reason);
+    await moderationService.reinstateUser(req.params.userId, req.user!.id, reason);
     res.json({ message: "User reinstated successfully" });
   } catch (error) {
     console.error("Error reinstating user:", error);
@@ -61,7 +61,7 @@ router.post('/topics/:topicId/hide', requireModerator, async (req, res) => {
 router.post('/topics/:topicId/archive', requireModerator, async (req, res) => {
   try {
     const { reason } = req.body;
-    await moderationService.archiveTopic(req.params.topicId, req.user!.claims.sub, reason);
+    await moderationService.archiveTopic(req.params.topicId, req.user!.id, reason);
     res.json({ message: "Topic archived successfully" });
   } catch (error) {
     console.error("Error archiving topic:", error);
@@ -133,7 +133,7 @@ router.put('/users/:userId/role', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Valid role is required' });
     }
 
-    await moderationService.updateUserRole(req.params.userId, role, req.user!.claims.sub);
+    await moderationService.updateUserRole(req.params.userId, role, req.user!.id);
     res.json({ message: "User role updated successfully" });
   } catch (error) {
     console.error("Error updating user role:", error);
@@ -158,7 +158,7 @@ router.put('/users/:userId/status', requireAdmin, async (req, res) => {
 
 router.delete('/users/:userId', requireAdmin, async (req, res) => {
   try {
-    await moderationService.deleteUser(req.params.userId, req.user!.claims.sub);
+    await moderationService.deleteUser(req.params.userId, req.user!.id);
     res.json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("Error deleting user:", error);
@@ -202,7 +202,7 @@ router.post('/opinions/:opinionId/approve', requireModerator, async (req, res) =
   try {
     const { reason } = req.body;
     const user = req.user as Express.User;
-    const userId = user?.id || (req.user as any)?.claims?.sub;
+    const userId = user?.id;
     await moderationService.approveOpinion(req.params.opinionId, userId, reason);
     res.json({ message: "Opinion approved" });
   } catch (error) {
@@ -215,7 +215,7 @@ router.post('/opinions/:opinionId/hide', requireModerator, async (req, res) => {
   try {
     const { reason } = req.body;
     const user = req.user as Express.User;
-    const userId = user?.id || (req.user as any)?.claims?.sub;
+    const userId = user?.id;
     await moderationService.hideOpinion(req.params.opinionId, userId, reason);
     res.json({ message: "Opinion hidden" });
   } catch (error) {
@@ -227,7 +227,7 @@ router.post('/opinions/:opinionId/hide', requireModerator, async (req, res) => {
 router.delete('/opinions/:opinionId', requireAdmin, async (req, res) => {
   try {
     const user = req.user as Express.User;
-    const userId = user?.id || (req.user as any)?.claims?.sub;
+    const userId = user?.id;
     await moderationService.deleteOpinionAdmin(req.params.opinionId, userId);
     res.json({ message: "Opinion deleted successfully" });
   } catch (error) {
