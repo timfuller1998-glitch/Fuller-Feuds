@@ -37,7 +37,7 @@ router.get('/recent', async (req, res) => {
 // GET /api/topics/:topicId/opinions - Get opinions for a topic
 router.get('/topics/:topicId', async (req, res) => {
   try {
-    // Get current user ID - support both local auth (req.user.id) and Replit auth (req.user.claims.sub)
+    // Get current user ID
     const user = req.user as Express.User;
     const currentUserId = user?.id;
     const opinions = await opinionService.getOpinionsByTopic(req.params.topicId, {
