@@ -7,7 +7,8 @@ import {
   opinions,
   users,
   topics,
-  debateMessageFlags
+  debateMessageFlags,
+  userProfiles
 } from '@shared/schema';
 import { eq, and, or, desc, sql, inArray, lt } from 'drizzle-orm';
 import type {
@@ -60,16 +61,23 @@ export class DebateRepository {
     }
 
     // Get political scores for both users to check alignment difference
+    // Join with userProfiles to get economicScore and authoritarianScore
     const [currentUser] = await db
-      .select({ economicScore: users.economicScore, authoritarianScore: users.authoritarianScore })
-      .from(users)
-      .where(eq(users.id, userId))
+      .select({ 
+        economicScore: userProfiles.economicScore, 
+        authoritarianScore: userProfiles.authoritarianScore 
+      })
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, userId))
       .limit(1);
 
     const [opinionAuthor] = await db
-      .select({ economicScore: users.economicScore, authoritarianScore: users.authoritarianScore })
-      .from(users)
-      .where(eq(users.id, opinionAuthorId))
+      .select({ 
+        economicScore: userProfiles.economicScore, 
+        authoritarianScore: userProfiles.authoritarianScore 
+      })
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, opinionAuthorId))
       .limit(1);
 
     // Calculate political distance between users
@@ -84,18 +92,15 @@ export class DebateRepository {
     console.log(`[Debate Storage] Political distance: ${politicalDistance}`);
 
     // Create the debate room
+    // Note: status, phase, turnCount1, turnCount2, and startedAt are omitted from InsertDebateRoom
+    // They will use their default values from the schema
     const debateRoomData: InsertDebateRoom = {
       topicId,
       participant1Id: opinionAuthorId,
       participant2Id: userId,
       participant1Privacy: 'public',
       participant2Privacy: 'public',
-      status: 'active',
-      phase: 'structured',
       currentTurn: opinionAuthorId, // Opinion author goes first
-      turnCount1: 0,
-      turnCount2: 0,
-      startedAt: new Date(),
     };
 
     const [created] = await db.insert(debateRooms).values(debateRoomData).returning();

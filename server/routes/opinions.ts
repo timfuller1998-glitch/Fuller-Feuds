@@ -16,7 +16,7 @@ const moderationService = new ModerationService();
 router.get('/recent', async (req, res) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
-    const currentUserId = req.user?.claims?.sub;
+    const currentUserId = (req.user as Express.User)?.id;
 
     // TODO: Implement recent opinions in OpinionService
     // const opinions = await opinionService.getRecentOpinions(limit, req.userRole, currentUserId);
@@ -39,7 +39,7 @@ router.get('/topics/:topicId', async (req, res) => {
   try {
     // Get current user ID - support both local auth (req.user.id) and Replit auth (req.user.claims.sub)
     const user = req.user as Express.User;
-    const currentUserId = user?.id || (req.user as any)?.claims?.sub;
+    const currentUserId = user?.id;
     const opinions = await opinionService.getOpinionsByTopic(req.params.topicId, {
       userRole: req.userRole,
       currentUserId,
