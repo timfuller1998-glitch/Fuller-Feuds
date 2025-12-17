@@ -131,10 +131,10 @@ export class OpinionRepository {
             firstName: row.author.firstName,
             lastName: row.author.lastName,
             profileImageUrl: row.author.profileImageUrl,
-            politicalLeaningScore: row.profile?.economicScore && row.profile?.authoritarianScore ?
+            politicalLeaningScore: row.profile?.economicScore != null && row.profile?.authoritarianScore != null ?
               (row.profile.economicScore + row.profile.authoritarianScore) / 2 : undefined,
-            economicScore: row.profile?.economicScore,
-            authoritarianScore: row.profile?.authoritarianScore
+            economicScore: row.profile?.economicScore ?? undefined,
+            authoritarianScore: row.profile?.authoritarianScore ?? undefined
           } : null
         };
       })
