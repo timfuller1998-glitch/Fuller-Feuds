@@ -8,7 +8,7 @@ const debateService = new DebateService();
 // POST /api/debate-messages/:messageId/flag - Flag a debate message
 router.post('/messages/:messageId/flag', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user!.claims.sub;
+    const userId = req.user!.id;
     const { fallacyType } = req.body;
 
     if (!fallacyType || typeof fallacyType !== 'string') {

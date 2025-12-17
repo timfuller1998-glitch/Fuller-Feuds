@@ -111,7 +111,7 @@ router.patch('/:opinionId', isAuthenticated, async (req, res) => {
 // POST /api/opinions/:opinionId/vote - Vote on opinion
 router.post('/:opinionId/vote', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user!.claims.sub;
+    const userId = req.user!.id;
     const { voteType } = req.body;
 
     if (voteType !== null && !['like', 'dislike'].includes(voteType)) {
@@ -134,7 +134,7 @@ router.post('/:opinionId/vote', isAuthenticated, async (req, res) => {
 // GET /api/opinions/:opinionId/my-vote - Get user's vote on opinion
 router.get('/:opinionId/my-vote', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user!.claims.sub;
+    const userId = req.user!.id;
     // TODO: Implement getUserVote in OpinionService
     // const vote = await opinionService.getUserVote(req.params.opinionId, userId);
     res.json(null); // Placeholder
@@ -147,7 +147,7 @@ router.get('/:opinionId/my-vote', isAuthenticated, async (req, res) => {
 // POST /api/opinions/:opinionId/adopt - Adopt opinion
 router.post('/:opinionId/adopt', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user!.claims.sub;
+    const userId = req.user!.id;
     const { content } = req.body;
 
     // TODO: Implement adoptOpinion in OpinionService
@@ -162,7 +162,7 @@ router.post('/:opinionId/adopt', isAuthenticated, async (req, res) => {
 // POST /api/opinions/:opinionId/flag - Flag opinion
 router.post('/:opinionId/flag', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user!.claims.sub;
+    const userId = req.user!.id;
     const { fallacyType } = req.body;
 
     if (!fallacyType || typeof fallacyType !== 'string') {
@@ -180,7 +180,7 @@ router.post('/:opinionId/flag', isAuthenticated, async (req, res) => {
 // POST /api/opinions/:opinionId/start-debate - Start debate from opinion
 router.post('/:opinionId/start-debate', isAuthenticated, async (req, res) => {
   try {
-    const debateRoom = await debateService.createDebateRoom(req.params.opinionId, req.user!.claims.sub);
+    const debateRoom = await debateService.createDebateRoom(req.params.opinionId, req.user!.id);
     res.json(debateRoom);
   } catch (error) {
     console.error("Error starting debate:", error);
@@ -202,7 +202,7 @@ router.get('/admin/flagged-opinions', requireModerator, async (req, res) => {
 router.post('/admin/:opinionId/approve', requireModerator, async (req, res) => {
   try {
     const { reason } = req.body;
-    await moderationService.approveOpinion(req.params.opinionId, req.user!.claims.sub, reason);
+    await moderationService.approveOpinion(req.params.opinionId, req.user!.id, reason);
     res.json({ message: "Opinion approved" });
   } catch (error) {
     console.error("Error approving opinion:", error);
@@ -213,7 +213,7 @@ router.post('/admin/:opinionId/approve', requireModerator, async (req, res) => {
 router.post('/admin/:opinionId/hide', requireModerator, async (req, res) => {
   try {
     const { reason } = req.body;
-    await moderationService.hideOpinion(req.params.opinionId, req.user!.claims.sub, reason);
+    await moderationService.hideOpinion(req.params.opinionId, req.user!.id, reason);
     res.json({ message: "Opinion hidden" });
   } catch (error) {
     console.error("Error hiding opinion:", error);
@@ -233,7 +233,7 @@ router.get('/admin/opinions', requireAdmin, async (req, res) => {
 
 router.delete('/admin/:opinionId', requireAdmin, async (req, res) => {
   try {
-    await moderationService.deleteOpinionAdmin(req.params.opinionId, req.user!.claims.sub);
+    await moderationService.deleteOpinionAdmin(req.params.opinionId, req.user!.id);
     res.json({ message: "Opinion deleted" });
   } catch (error) {
     console.error("Error deleting opinion:", error);
