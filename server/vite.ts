@@ -68,15 +68,35 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // In production, built files are in dist/public (from vite build output)
-  const distPath = path.resolve(import.meta.dirname, "..", "dist", "public");
+  // In Vercel serverless, try multiple path resolution strategies
+  // Strategy 1: Use process.cwd() (Vercel's working directory is project root)
+  let distPath = path.resolve(process.cwd(), "dist", "public");
+  
+  // Strategy 2: Try relative to import.meta.dirname (for local/bundled scenarios)
+  if (!fs.existsSync(distPath)) {
+    distPath = path.resolve(import.meta.dirname, "..", "dist", "public");
+  }
+  
+  // Strategy 3: Try just dist/public from cwd (fallback)
+  if (!fs.existsSync(distPath)) {
+    distPath = path.join(process.cwd(), "dist", "public");
+  }
 
   if (!fs.existsSync(distPath)) {
+    // Log all attempted paths for debugging
+    const attemptedPaths = [
+      path.resolve(process.cwd(), "dist", "public"),
+      path.resolve(import.meta.dirname, "..", "dist", "public"),
+      path.join(process.cwd(), "dist", "public"),
+    ];
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory. Attempted paths: ${attemptedPaths.join(", ")}. ` +
+      `Current working directory: ${process.cwd()}, import.meta.dirname: ${import.meta.dirname}. ` +
+      `Make sure to build the client first with 'npm run build'.`
     );
   }
 
+  log(`Serving static files from: ${distPath}`);
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
