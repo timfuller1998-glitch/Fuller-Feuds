@@ -97,10 +97,51 @@ export function serveStatic(app: Express) {
   }
 
   log(`Serving static files from: ${distPath}`);
-  app.use(express.static(distPath));
+  
+  // List files in dist/public for debugging
+  try {
+    const files = fs.readdirSync(distPath);
+    log(`Found ${files.length} files in dist/public. Sample: ${files.slice(0, 5).join(", ")}`);
+  } catch (e) {
+    log(`Warning: Could not list files in ${distPath}: ${e}`);
+  }
+  
+  // Serve static files with proper headers
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      // Ensure JavaScript files are served with correct Content-Type
+      if (filePath.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      } else if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      } else if (filePath.endsWith('.html')) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      }
+    },
+    index: false // Don't serve index.html automatically for directories
+  }));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // fall through to index.html only for routes that don't match static files
+  // This must come after express.static so static files are served first
+  app.use("*", (req, res, next) => {
+    // Check if this is a static file request (has extension and not /api)
+    const hasExtension = /\.[a-zA-Z0-9]+$/.test(req.path);
+    const isApiRoute = req.path.startsWith('/api');
+    
+    if (hasExtension && !isApiRoute) {
+      // This should have been handled by express.static
+      // If we reach here, the file doesn't exist
+      log(`Static file not found: ${req.path}`);
+      return res.status(404).json({ error: 'File not found' });
+    }
+    
+    // Only serve index.html for routes without file extensions (SPA routing)
+    const indexPath = path.resolve(distPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      log(`index.html not found at: ${indexPath}`);
+      res.status(404).json({ error: 'index.html not found' });
+    }
   });
 }
