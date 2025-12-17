@@ -27,7 +27,7 @@ router.post('/users/:userId/suspend', requireModerator, async (req, res) => {
 router.post('/users/:userId/ban', requireModerator, async (req, res) => {
   try {
     const { reason } = req.body;
-    await moderationService.banUser(req.params.userId, req.user!.claims.sub, reason);
+    await moderationService.banUser(req.params.userId, req.user!.id, reason);
     res.json({ message: "User banned successfully" });
   } catch (error) {
     console.error("Error banning user:", error);
@@ -50,7 +50,7 @@ router.post('/users/:userId/reinstate', requireModerator, async (req, res) => {
 router.post('/topics/:topicId/hide', requireModerator, async (req, res) => {
   try {
     const { reason } = req.body;
-    await moderationService.hideTopic(req.params.topicId, req.user!.claims.sub, reason);
+    await moderationService.hideTopic(req.params.topicId, req.user!.id, reason);
     res.json({ message: "Topic hidden successfully" });
   } catch (error) {
     console.error("Error hiding topic:", error);
@@ -72,7 +72,7 @@ router.post('/topics/:topicId/archive', requireModerator, async (req, res) => {
 router.post('/topics/:topicId/restore', requireModerator, async (req, res) => {
   try {
     const { reason } = req.body;
-    await moderationService.restoreTopic(req.params.topicId, req.user!.claims.sub, reason);
+    await moderationService.restoreTopic(req.params.topicId, req.user!.id, reason);
     res.json({ message: "Topic restored successfully" });
   } catch (error) {
     console.error("Error restoring topic:", error);
@@ -148,7 +148,7 @@ router.put('/users/:userId/status', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Valid status is required' });
     }
 
-    await moderationService.updateUserStatus(req.params.userId, status, req.user!.claims.sub);
+    await moderationService.updateUserStatus(req.params.userId, status, req.user!.id);
     res.json({ message: "User status updated successfully" });
   } catch (error) {
     console.error("Error updating user status:", error);
@@ -238,7 +238,7 @@ router.delete('/opinions/:opinionId', requireAdmin, async (req, res) => {
 
 router.delete('/topics/:topicId', requireAdmin, async (req, res) => {
   try {
-    await moderationService.deleteTopicAdmin(req.params.topicId, req.user!.claims.sub);
+    await moderationService.deleteTopicAdmin(req.params.topicId, req.user!.id);
     res.json({ message: "Topic deleted successfully" });
   } catch (error) {
     console.error("Error deleting topic:", error);
