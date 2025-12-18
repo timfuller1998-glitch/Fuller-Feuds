@@ -6,15 +6,10 @@ import routes from "./routes/index.js";
 import { serveStatic, log } from "./vite.js";
 // Force inclusion of static files by importing
 import "./static-loader.js";
-// Try to import the auto-generated static-files module (if it exists)
-// This is optional - if it doesn't exist, we'll handle it gracefully
-let staticIndexHtml: string | null = null;
-try {
-  const staticFilesModule = await import("./static-files.js");
-  staticIndexHtml = staticFilesModule.staticIndexHtml || null;
-} catch {
-  // File doesn't exist or wasn't included - that's OK, serveStatic will handle it
-}
+// Import static-files to force Vercel to include server/static directory
+import { staticIndexHtml } from "./static-files.js";
+// Access it to ensure it's not tree-shaken
+void staticIndexHtml;
 import { startScheduledJobs } from "./scheduled-jobs.js";
 import { BadgeRepository } from "./repositories/badgeRepository.js";
 import { setupAuth } from "./auth.js";

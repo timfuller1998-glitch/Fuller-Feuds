@@ -67,41 +67,14 @@ try {
   
   // Verify index.html exists
   const indexPath = path.join(targetDir, 'index.html');
-  
-  // Always create the import file (even if index.html doesn't exist yet)
-  // This ensures the import in server/index.ts always works
-  const importFile = path.resolve(__dirname, '..', 'server', 'static-files.ts');
-  let importContent;
-  
   if (fs.existsSync(indexPath)) {
     console.log(`[Copy Static] ✓✓✓ index.html confirmed at: ${indexPath}`);
-    
-    // Create import file that reads the actual file
-    importContent = `// Auto-generated file to force Vercel to include static files
-import fs from 'fs';
-import path from 'path';
-
-const staticDir = path.resolve(import.meta.dirname, 'static');
-const indexPath = path.join(staticDir, 'index.html');
-
-// Read at module load to force inclusion
-export const staticIndexHtml = fs.existsSync(indexPath) 
-  ? fs.readFileSync(indexPath, 'utf-8')
-  : null;
-
-export const staticDirPath = staticDir;
-`;
   } else {
     console.warn(`[Copy Static] ⚠ WARNING: index.html not found at: ${indexPath}`);
-    // Create empty import file so import doesn't fail
-    importContent = `// Auto-generated file (static files not found during build)
-export const staticIndexHtml: string | null = null;
-export const staticDirPath: string = '';
-`;
   }
   
-  fs.writeFileSync(importFile, importContent);
-  console.log(`[Copy Static] ✓ Created import file: ${importFile}`);
+  // Note: static-files.ts is now committed to the repo
+  // It will automatically read from server/static when the module loads
   
   // Also verify the directory exists and list its contents for debugging
   if (fs.existsSync(targetDir)) {
