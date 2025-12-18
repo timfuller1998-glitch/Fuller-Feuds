@@ -27,6 +27,27 @@ if (connectionString.startsWith('DATABASE_URL=')) {
 // Trim any whitespace
 const trimmedConnectionString = connectionString.trim();
 
+// Validate the connection string format
+if (!trimmedConnectionString.startsWith('postgresql://') && !trimmedConnectionString.startsWith('postgres://')) {
+  throw new Error(
+    `Invalid DATABASE_URL format. Expected postgresql:// or postgres:// URL. ` +
+    `Got: ${trimmedConnectionString.substring(0, 50)}... ` +
+    `Make sure special characters in the password are URL-encoded.`
+  );
+}
+
+// Try to validate it's a valid URI
+try {
+  new URL(trimmedConnectionString);
+} catch (error) {
+  throw new Error(
+    `Invalid DATABASE_URL format: ${error instanceof Error ? error.message : 'URI malformed'}. ` +
+    `Make sure the connection string is a valid PostgreSQL URL. ` +
+    `Format: postgresql://user:password@host:port/database ` +
+    `(Note: special characters in password must be URL-encoded)`
+  );
+}
+
 // Production-ready connection pool configuration
 const client = postgres(trimmedConnectionString, {
   prepare: false, // Disable prepared statements for better connection reuse
