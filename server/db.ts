@@ -3,8 +3,11 @@ import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from "../shared/schema.js";
 
-// Load environment variables
-config({ path: '.env', override: true });
+// Load environment variables from .env file only in development
+// In production (Vercel), environment variables are provided by the platform
+if (process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1') {
+  config({ path: '.env', override: true });
+}
 
 let connectionString = process.env.DATABASE_URL;
 console.log('DATABASE_URL read from env:', connectionString);
