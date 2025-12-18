@@ -8,7 +8,8 @@
       "config": {
         "includeFiles": [
           "server/static/**",
-          "server/static/**/*"
+          "server/static/**/*",
+          "server/static"
         ],
         "runtime": "nodejs18.x",
         "maxLambdaSize": "50mb"
