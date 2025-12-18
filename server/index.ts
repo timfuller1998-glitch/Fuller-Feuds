@@ -59,33 +59,101 @@ app.use(attachUserRole);
 // Mount API routes
 app.use('/api', routes);
 
-// Diagnostic route to check static file setup (remove in production if needed)
-if (process.env.NODE_ENV === 'production') {
-  app.get('/api/debug/static', (req, res) => {
-    const distPath = path.resolve(process.cwd(), "dist", "public");
-    const altPath = path.resolve(import.meta.dirname, "..", "dist", "public");
-    
+// Diagnostic route to check static file setup
+app.get('/api/debug/static', (req, res) => {
+  const cwd = process.cwd();
+  const dirname = import.meta.dirname;
+  
+  const pathsToCheck = [
+    path.resolve(cwd, "dist", "public"),
+    path.resolve(dirname, "..", "dist", "public"),
+    path.resolve(dirname, "..", "..", "dist", "public"),
+    path.resolve(cwd, "dist"),
+    path.resolve(cwd, "public"),
+  ];
+  
+  const results: Record<string, any> = {
+    environment: {
+      cwd,
+      importMetaDirname: dirname,
+      nodeEnv: process.env.NODE_ENV,
+      vercel: process.env.VERCEL,
+    },
+    paths: {},
+    cwdContents: [],
+    recommendations: []
+  };
+  
+  // Check each path
+  for (const checkPath of pathsToCheck) {
     try {
-      const files = fs.existsSync(distPath) ? fs.readdirSync(distPath) : [];
-      const altFiles = fs.existsSync(altPath) ? fs.readdirSync(altPath) : [];
+      const exists = fs.existsSync(checkPath);
+      const info: any = { exists };
       
-      res.json({
-        cwd: process.cwd(),
-        importMetaDirname: import.meta.dirname,
-        distPath,
-        distPathExists: fs.existsSync(distPath),
-        distPathFiles: files.slice(0, 10),
-        altPath,
-        altPathExists: fs.existsSync(altPath),
-        altPathFiles: altFiles.slice(0, 10),
-        indexHtmlExists: fs.existsSync(path.join(distPath, "index.html")),
-        env: process.env.NODE_ENV,
-      });
+      if (exists) {
+        const stats = fs.statSync(checkPath);
+        info.isDirectory = stats.isDirectory();
+        info.isFile = stats.isFile();
+        
+        if (stats.isDirectory()) {
+          try {
+            const files = fs.readdirSync(checkPath);
+            info.files = files.slice(0, 20);
+            info.fileCount = files.length;
+            info.hasIndexHtml = files.includes("index.html");
+            
+            if (files.includes("index.html")) {
+              const indexPath = path.join(checkPath, "index.html");
+              info.indexHtmlPath = indexPath;
+              info.indexHtmlExists = fs.existsSync(indexPath);
+            }
+          } catch (e: any) {
+            info.readError = e.message;
+          }
+        }
+      }
+      
+      results.paths[checkPath] = info;
     } catch (error: any) {
-      res.json({ error: error.message, stack: error.stack });
+      results.paths[checkPath] = { error: error.message };
     }
-  });
-}
+  }
+  
+  // List cwd contents
+  try {
+    if (fs.existsSync(cwd)) {
+      results.cwdContents = fs.readdirSync(cwd).slice(0, 50);
+    }
+  } catch (e: any) {
+    results.cwdReadError = e.message;
+  }
+  
+  // Check if dist exists
+  const distPath = path.resolve(cwd, "dist");
+  if (fs.existsSync(distPath)) {
+    try {
+      results.distContents = fs.readdirSync(distPath).slice(0, 20);
+    } catch (e: any) {
+      results.distReadError = e.message;
+    }
+  }
+  
+  // Add recommendations
+  const foundPath = Object.entries(results.paths).find(([_, info]: [string, any]) => 
+    info.exists && info.isDirectory && info.hasIndexHtml
+  );
+  
+  if (foundPath) {
+    results.recommendations.push(`✓ Use path: ${foundPath[0]}`);
+  } else {
+    results.recommendations.push("✗ No valid dist/public directory found");
+    results.recommendations.push("1. Check Vercel build logs - did 'npm run build' complete?");
+    results.recommendations.push("2. Verify dist/public exists after build");
+    results.recommendations.push("3. Check includeFiles pattern in vercel.json");
+  }
+  
+  res.json(results);
+});
 
 // Create HTTP server
 const server = createServer(app);
