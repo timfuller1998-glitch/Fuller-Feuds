@@ -65,22 +65,37 @@ export async function setupVite(app: Express, server: Server) {
 
 export function serveStatic(app: Express) {
   // Find the dist/public directory
-  // In Vercel, files are included via includeFiles and available at runtime
+  // In Vercel, files included via includeFiles are available relative to process.cwd()
+  // process.cwd() in Vercel serverless functions is typically /var/task (project root)
   let distPath: string | null = null;
   
+  // Priority order based on Vercel's file structure
+  // 1. process.cwd()/dist/public - Most common in Vercel (files included at root)
+  // 2. Relative to import.meta.dirname - Fallback for local/bundled scenarios
   const possiblePaths = [
-    path.resolve(process.cwd(), "dist", "public"),
-    path.resolve(import.meta.dirname, "..", "dist", "public"),
-    path.resolve(import.meta.dirname, "..", "..", "dist", "public"),
-    // In Vercel, included files might be at the function root
-    path.resolve(process.cwd(), "public"),
+    path.resolve(process.cwd(), "dist", "public"), // Primary: Vercel includes files at project root
+    path.resolve(import.meta.dirname, "..", "dist", "public"), // Fallback 1: Relative to server/
+    path.resolve(import.meta.dirname, "..", "..", "dist", "public"), // Fallback 2: If server is nested
   ];
+  
+  // Log attempted paths for debugging
+  log(`Attempting to find dist/public. cwd: ${process.cwd()}, dirname: ${import.meta.dirname}`);
   
   for (const possiblePath of possiblePaths) {
     if (fs.existsSync(possiblePath)) {
       distPath = possiblePath;
-      log(`Serving static files from: ${distPath}`);
+      log(`✓ Found dist/public at: ${distPath}`);
+      
+      // Verify index.html exists
+      const indexPath = path.join(distPath, "index.html");
+      if (fs.existsSync(indexPath)) {
+        log(`✓ index.html found at: ${indexPath}`);
+      } else {
+        log(`⚠ WARNING: index.html not found at: ${indexPath}`);
+      }
       break;
+    } else {
+      log(`✗ Path does not exist: ${possiblePath}`);
     }
   }
   
@@ -109,17 +124,30 @@ export function serveStatic(app: Express) {
   }
   
   // Serve static files with proper headers
+  // This middleware must come BEFORE the catch-all route
   app.use(express.static(distPath, {
     setHeaders: (res, filePath) => {
+      // Set correct Content-Type headers for different file types
       if (filePath.endsWith('.js')) {
         res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
       } else if (filePath.endsWith('.css')) {
         res.setHeader('Content-Type', 'text/css; charset=utf-8');
       } else if (filePath.endsWith('.html')) {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      } else if (filePath.endsWith('.json')) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      } else if (filePath.endsWith('.svg')) {
+        res.setHeader('Content-Type', 'image/svg+xml');
+      } else if (filePath.endsWith('.png')) {
+        res.setHeader('Content-Type', 'image/png');
+      } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+        res.setHeader('Content-Type', 'image/jpeg');
+      } else if (filePath.endsWith('.woff') || filePath.endsWith('.woff2')) {
+        res.setHeader('Content-Type', 'font/woff2');
       }
     },
-    index: false // Don't serve index.html automatically
+    index: false, // Don't serve index.html automatically for directories
+    maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0' // Cache static files in production
   }));
   
   // SPA fallback: serve index.html for routes without file extensions
