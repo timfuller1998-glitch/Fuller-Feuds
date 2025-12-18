@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { TopicService } from '../services/topicService';
-import { OpinionService } from '../services/opinionService';
-import { InteractionRepository } from '../repositories/interactionRepository';
-import { CumulativeOpinionService } from '../services/cumulativeOpinionService';
-import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth';
+import { TopicService } from '../services/topicService.js';
+import { OpinionService } from '../services/opinionService.js';
+import { InteractionRepository } from '../repositories/interactionRepository.js';
+import { CumulativeOpinionService } from '../services/cumulativeOpinionService.js';
+import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertTopicSchema, insertOpinionSchema } from '@shared/schema';
 import { z } from 'zod';
 

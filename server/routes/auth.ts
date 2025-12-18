@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { UserRepository } from '../repositories/userRepository';
-import { isAuthenticated } from '../middleware/auth';
+import { UserRepository } from '../repositories/userRepository.js';
+import { isAuthenticated } from '../middleware/auth.js';
 
 const router = Router();
 const userRepository = new UserRepository();

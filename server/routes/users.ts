@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import { UserRepository } from '../repositories/userRepository';
-import { AnalyticsService } from '../services/analyticsService';
-import { InteractionRepository } from '../repositories/interactionRepository';
-import { TopicService } from '../services/topicService';
-import { isAuthenticated, requireAdmin } from '../middleware/auth';
+import { UserRepository } from '../repositories/userRepository.js';
+import { AnalyticsService } from '../services/analyticsService.js';
+import { InteractionRepository } from '../repositories/interactionRepository.js';
+import { TopicService } from '../services/topicService.js';
+import { isAuthenticated, requireAdmin } from '../middleware/auth.js';
 import type { UpsertUser } from '@shared/schema';
-import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService';
-import { invalidateUserCache, invalidateUserBadgesCache, invalidateUserDebateStatsCache } from '../services/cacheInvalidation';
+import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
+import { invalidateUserCache, invalidateUserBadgesCache, invalidateUserDebateStatsCache } from '../services/cacheInvalidation.js';
 
 const router = Router();
 const userRepository = new UserRepository();

@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { OpinionService } from '../services/opinionService';
-import { DebateService } from '../services/debateService';
-import { ModerationService } from '../services/moderationService';
-import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth';
+import { OpinionService } from '../services/opinionService.js';
+import { DebateService } from '../services/debateService.js';
+import { ModerationService } from '../services/moderationService.js';
+import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertOpinionSchema } from '@shared/schema';
 import { z } from 'zod';
-import { invalidateVoteCache } from '../services/cacheInvalidation';
+import { invalidateVoteCache } from '../services/cacheInvalidation.js';
 
 const router = Router();
 const opinionService = new OpinionService();

@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { DebateService } from '../services/debateService';
-import { isAuthenticated } from '../middleware/auth';
+import { DebateService } from '../services/debateService.js';
+import { isAuthenticated } from '../middleware/auth.js';
 
 const router = Router();
 const debateService = new DebateService();

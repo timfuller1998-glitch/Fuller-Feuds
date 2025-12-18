@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { ModerationService } from '../services/moderationService';
-import { TopicService } from '../services/topicService';
-import { TopicRepository } from '../repositories/topicRepository';
-import { OpinionRepository } from '../repositories/opinionRepository';
-import { AIService } from '../aiService';
-import { requireModerator, requireAdmin } from '../middleware/auth';
+import { ModerationService } from '../services/moderationService.js';
+import { TopicService } from '../services/topicService.js';
+import { TopicRepository } from '../repositories/topicRepository.js';
+import { OpinionRepository } from '../repositories/opinionRepository.js';
+import { AIService } from '../aiService.js';
+import { requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertBannedPhraseSchema } from '@shared/schema';
 import { z } from 'zod';
 
