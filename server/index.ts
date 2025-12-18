@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import path from "path";
 import fs from "fs";
-import routes from "./routes";
+import routes from "./routes/index.js";
 import { setupVite, serveStatic, log } from "./vite";
 import { startScheduledJobs } from "./scheduled-jobs";
 import { BadgeRepository } from "./repositories/badgeRepository";
