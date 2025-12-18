@@ -7,15 +7,11 @@
       "use": "@vercel/node",
       "config": {
         "runtime": "nodejs18.x",
-        "maxLambdaSize": "50mb"
+        "maxLambdaSize": "50mb",
+        "includeFiles": "server/static/**"
       }
     }
   ],
-  "functions": {
-    "server/index.ts": {
-      "includeFiles": "{dist/public/**,server/static/**}"
-    }
-  },
   "routes": [
     {
       "src": "/api/(.*)",
