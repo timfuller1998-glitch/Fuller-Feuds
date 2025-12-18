@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { Opinion, Topic, CumulativeOpinion } from '@shared/schema';
+import type { Opinion, Topic, CumulativeOpinion } from '../shared/schema.js';
 
 // Temporarily disable OpenAI for testing - remove this when you have API key
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({

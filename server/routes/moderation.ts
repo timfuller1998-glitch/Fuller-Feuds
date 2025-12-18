@@ -5,7 +5,7 @@ import { TopicRepository } from '../repositories/topicRepository.js';
 import { OpinionRepository } from '../repositories/opinionRepository.js';
 import { AIService } from '../aiService.js';
 import { requireModerator, requireAdmin } from '../middleware/auth.js';
-import { insertBannedPhraseSchema } from '@shared/schema';
+import { insertBannedPhraseSchema } from '../../shared/schema.js';
 import { z } from 'zod';
 
 const router = Router();

@@ -3,7 +3,7 @@ import { OpinionService } from '../services/opinionService.js';
 import { DebateService } from '../services/debateService.js';
 import { ModerationService } from '../services/moderationService.js';
 import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
-import { insertOpinionSchema } from '@shared/schema';
+import { insertOpinionSchema } from '../../shared/schema.js';
 import { z } from 'zod';
 import { invalidateVoteCache } from '../services/cacheInvalidation.js';
 

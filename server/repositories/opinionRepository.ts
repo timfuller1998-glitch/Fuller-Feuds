@@ -1,7 +1,7 @@
 import { db } from '../db.js';
-import { opinions, users, userProfiles, opinionVotes, opinionFlags } from '@shared/schema';
+import { opinions, users, userProfiles, opinionVotes, opinionFlags } from '../../shared/schema.js';
 import { eq, desc, and, or, ne, sql } from 'drizzle-orm';
-import type { InsertOpinion, Opinion } from '@shared/schema';
+import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { aggregateFallacyCounts } from '../utils/fallacyUtils.js';
 
 export class OpinionRepository {

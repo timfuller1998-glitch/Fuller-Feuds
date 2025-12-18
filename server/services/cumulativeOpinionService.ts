@@ -1,10 +1,10 @@
 import { db } from '../db.js';
-import { opinions, users, userProfiles } from '@shared/schema';
+import { opinions, users, userProfiles } from '../../shared/schema.js';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import { CumulativeOpinionRepository } from '../repositories/cumulativeOpinionRepository.js';
 import { TopicRepository } from '../repositories/topicRepository.js';
 import { AIService } from '../aiService.js';
-import type { CumulativeOpinion } from '@shared/schema';
+import type { CumulativeOpinion } from '../../shared/schema.js';
 
 export class CumulativeOpinionService {
   private cumulativeOpinionRepo = new CumulativeOpinionRepository();

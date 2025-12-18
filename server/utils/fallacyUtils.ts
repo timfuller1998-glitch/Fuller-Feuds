@@ -1,7 +1,7 @@
 import { db } from '../db.js';
-import { opinionFlags, topicFlags, debateMessageFlags } from '@shared/schema';
+import { opinionFlags, topicFlags, debateMessageFlags } from '../../shared/schema.js';
 import { count, inArray, sql, SQL } from 'drizzle-orm';
-import { FALLACY_OPTIONS } from '@shared/fallacies';
+import { FALLACY_OPTIONS } from '../../shared/fallacies.js';
 
 /**
  * Aggregates fallacy counts for a list of entities (opinions, topics, or debate messages)

@@ -1,5 +1,5 @@
 import { db } from "../db.js";
-import { bannedPhrases } from "@shared/schema";
+import { bannedPhrases } from '../../shared/schema.js';
 
 export interface ContentFilterResult {
   isAllowed: boolean;

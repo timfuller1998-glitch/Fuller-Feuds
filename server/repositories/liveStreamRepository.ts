@@ -1,7 +1,7 @@
 import { db } from '../db.js';
-import { liveStreams, topics } from '@shared/schema';
+import { liveStreams, topics } from '../../shared/schema.js';
 import { eq, desc, and, sql } from 'drizzle-orm';
-import type { InsertLiveStream, LiveStream } from '@shared/schema';
+import type { InsertLiveStream, LiveStream } from '../../shared/schema.js';
 
 export class LiveStreamRepository {
   async create(stream: InsertLiveStream): Promise<LiveStream> {

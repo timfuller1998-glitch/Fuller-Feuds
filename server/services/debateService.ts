@@ -1,6 +1,6 @@
 import { DebateRepository } from '../repositories/debateRepository.js';
 import { OpinionRepository } from '../repositories/opinionRepository.js';
-import type { DebateRoom, DebateMessage, InsertDebateVote } from '@shared/schema';
+import type { DebateRoom, DebateMessage, InsertDebateVote } from '../../shared/schema.js';
 
 export class DebateService {
   private debateRepository: DebateRepository;

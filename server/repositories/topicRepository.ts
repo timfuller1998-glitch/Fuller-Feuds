@@ -1,7 +1,7 @@
 import { db } from '../db.js';
-import { topics, opinions, opinionVotes, topicFlags, users } from '@shared/schema';
+import { topics, opinions, opinionVotes, topicFlags, users } from '../../shared/schema.js';
 import { eq, desc, and, sql, count } from 'drizzle-orm';
-import type { InsertTopic, Topic, TopicWithCounts, TopicInsert } from '@shared/schema';
+import type { InsertTopic, Topic, TopicWithCounts, TopicInsert } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
 
 export class TopicRepository {

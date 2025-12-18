@@ -4,7 +4,7 @@ import { OpinionService } from '../services/opinionService.js';
 import { InteractionRepository } from '../repositories/interactionRepository.js';
 import { CumulativeOpinionService } from '../services/cumulativeOpinionService.js';
 import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
-import { insertTopicSchema, insertOpinionSchema } from '@shared/schema';
+import { insertTopicSchema, insertOpinionSchema } from '../../shared/schema.js';
 import { z } from 'zod';
 
 const router = Router();

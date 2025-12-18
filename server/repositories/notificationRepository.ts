@@ -1,12 +1,12 @@
 import { db } from '../db.js';
-import { notifications, pushSubscriptions } from '@shared/schema';
+import { notifications, pushSubscriptions } from '../../shared/schema.js';
 import { eq, desc, and } from 'drizzle-orm';
 import type {
   Notification,
   InsertNotification,
   PushSubscription,
   InsertPushSubscription
-} from '@shared/schema';
+} from '../../shared/schema.js';
 
 export class NotificationRepository {
   async createNotification(notification: InsertNotification): Promise<Notification> {

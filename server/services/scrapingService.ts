@@ -8,8 +8,8 @@ import { UserRepository } from '../repositories/userRepository.js';
 import { TopicRepository } from '../repositories/topicRepository.js';
 import { AIService } from '../aiService.js';
 import { db } from '../db.js';
-import { seedingJobs } from '@shared/schema';
-import type { Topic, User } from '@shared/schema';
+import { seedingJobs } from '../../shared/schema.js';
+import type { Topic, User } from '../../shared/schema.js';
 
 export interface SeedingResult {
   jobId: string;

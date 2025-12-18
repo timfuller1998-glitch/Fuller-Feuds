@@ -1,7 +1,7 @@
 import { db } from '../db.js';
-import { users, userProfiles, userDebateStats, notifications, pushSubscriptions } from '@shared/schema';
+import { users, userProfiles, userDebateStats, notifications, pushSubscriptions } from '../../shared/schema.js';
 import { eq, desc } from 'drizzle-orm';
-import type { User, UserProfile, UserDebateStats, Notification, PushSubscription, UpsertUser } from '@shared/schema';
+import type { User, UserProfile, UserDebateStats, Notification, PushSubscription, UpsertUser } from '../../shared/schema.js';
 
 export class UserRepository {
   async create(user: UpsertUser): Promise<User> {

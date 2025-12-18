@@ -9,9 +9,9 @@ import {
   bannedPhrases,
   moderationActions,
   debateMessages
-} from '@shared/schema';
+} from '../../shared/schema.js';
 import { eq, desc, sql, inArray } from 'drizzle-orm';
-import type { BannedPhrase, InsertBannedPhrase } from '@shared/schema';
+import type { BannedPhrase, InsertBannedPhrase } from '../../shared/schema.js';
 
 export class ModerationRepository {
   async flagOpinion(opinionId: string, userId: string, fallacyType: string): Promise<void> {

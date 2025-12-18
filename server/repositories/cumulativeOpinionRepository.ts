@@ -1,7 +1,7 @@
 import { db } from '../db.js';
-import { cumulativeOpinions } from '@shared/schema';
+import { cumulativeOpinions } from '../../shared/schema.js';
 import { eq } from 'drizzle-orm';
-import type { CumulativeOpinion } from '@shared/schema';
+import type { CumulativeOpinion } from '../../shared/schema.js';
 
 export class CumulativeOpinionRepository {
   async findByTopicId(topicId: string): Promise<CumulativeOpinion | undefined> {

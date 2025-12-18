@@ -2,7 +2,7 @@ import { OpinionRepository } from '../repositories/opinionRepository.js';
 import { UserRepository } from '../repositories/userRepository.js';
 import { InteractionRepository } from '../repositories/interactionRepository.js';
 import { AIService } from '../aiService.js';
-import type { InsertOpinion, Opinion } from '@shared/schema';
+import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
 import { invalidateOpinionCache } from './cacheInvalidation.js';
 

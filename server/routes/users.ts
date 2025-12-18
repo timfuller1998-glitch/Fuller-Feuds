@@ -4,7 +4,7 @@ import { AnalyticsService } from '../services/analyticsService.js';
 import { InteractionRepository } from '../repositories/interactionRepository.js';
 import { TopicService } from '../services/topicService.js';
 import { isAuthenticated, requireAdmin } from '../middleware/auth.js';
-import type { UpsertUser } from '@shared/schema';
+import type { UpsertUser } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
 import { invalidateUserCache, invalidateUserBadgesCache, invalidateUserDebateStatsCache } from '../services/cacheInvalidation.js';
 

@@ -9,7 +9,7 @@ import {
   topics,
   debateMessageFlags,
   userProfiles
-} from '@shared/schema';
+} from '../../shared/schema.js';
 import { eq, and, or, desc, sql, inArray, lt } from 'drizzle-orm';
 import type {
   InsertDebateRoom,
@@ -19,7 +19,7 @@ import type {
   DebateVote,
   UserDebateStats,
   InsertUserDebateStats
-} from '@shared/schema';
+} from '../../shared/schema.js';
 
 export class DebateRepository {
   async createDebateRoom(room: InsertDebateRoom): Promise<DebateRoom> {

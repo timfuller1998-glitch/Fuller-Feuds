@@ -1,7 +1,7 @@
 import { TopicRepository } from '../repositories/topicRepository.js';
 import { OpinionService } from './opinionService.js';
 import { AIService } from '../aiService.js';
-import type { InsertTopic, TopicWithCounts, InsertOpinion, TopicInsert } from '@shared/schema';
+import type { InsertTopic, TopicWithCounts, InsertOpinion, TopicInsert } from '../../shared/schema.js';
 import { withCache, getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
 import { invalidateTopicCache, invalidateTopicsListCache } from './cacheInvalidation.js';
 

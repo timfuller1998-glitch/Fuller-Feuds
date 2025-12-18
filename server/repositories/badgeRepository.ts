@@ -1,7 +1,7 @@
 import { db } from '../db.js';
-import { badges, userBadges, users, debateRooms, opinions, topics, debateMessages, debateMessageFlags } from '@shared/schema';
+import { badges, userBadges, users, debateRooms, opinions, topics, debateMessages, debateMessageFlags } from '../../shared/schema.js';
 import { eq, and, or, count, asc, inArray } from 'drizzle-orm';
-import { BADGE_DEFINITIONS } from '@shared/badgeDefinitions';
+import { BADGE_DEFINITIONS } from '../../shared/badgeDefinitions.js';
 
 export class BadgeRepository {
   async initializeBadges(): Promise<void> {
