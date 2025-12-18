@@ -1,15 +1,6 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "functions": {
-    "server/index.ts": {
-      "includeFiles": [
-        "dist/**",
-        "dist/public/**",
-        "dist/public/**/*"
-      ]
-    }
-  },
   "builds": [
     {
       "src": "server/index.ts",
