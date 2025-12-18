@@ -3,14 +3,13 @@
   "buildCommand": "npm run build",
   "builds": [
     {
+      "src": "dist/public/**",
+      "use": "@vercel/static"
+    },
+    {
       "src": "server/index.ts",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": [
-          "server/static/**",
-          "server/static/**/*",
-          "server/static"
-        ],
         "runtime": "nodejs18.x",
         "maxLambdaSize": "50mb"
       }
