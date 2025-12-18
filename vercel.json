@@ -1,6 +1,15 @@
 {
   "version": 2,
-  "buildCommand": "npm run build 2>&1 | tee build.log && echo '=== Build Verification ===' && ls -la dist/ 2>&1 && ls -la dist/public/ 2>&1 || (echo 'Build verification failed' && cat build.log)",
+  "buildCommand": "npm run build",
+  "functions": {
+    "server/index.ts": {
+      "includeFiles": [
+        "dist/**",
+        "dist/public/**",
+        "dist/public/**/*"
+      ]
+    }
+  },
   "builds": [
     {
       "src": "server/index.ts",
