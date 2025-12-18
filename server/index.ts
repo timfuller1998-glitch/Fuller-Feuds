@@ -73,17 +73,6 @@ app.get('/api/debug/static', (req, res) => {
     path.resolve(cwd, "public"),
   ];
   
-  // Also check what's in the server directory
-  const serverDirPath = path.resolve(dirname);
-  if (fs.existsSync(serverDirPath)) {
-    try {
-      const serverContents = fs.readdirSync(serverDirPath);
-      results.serverContents = serverContents.slice(0, 50);
-    } catch (e: any) {
-      results.serverReadError = e.message;
-    }
-  }
-  
   const results: Record<string, any> = {
     environment: {
       cwd,
@@ -147,6 +136,17 @@ app.get('/api/debug/static', (req, res) => {
       results.distContents = fs.readdirSync(distPath).slice(0, 20);
     } catch (e: any) {
       results.distReadError = e.message;
+    }
+  }
+  
+  // Also check what's in the server directory (to see if static exists)
+  const serverDirPath = path.resolve(dirname);
+  if (fs.existsSync(serverDirPath)) {
+    try {
+      const serverContents = fs.readdirSync(serverDirPath);
+      results.serverContents = serverContents.slice(0, 50);
+    } catch (e: any) {
+      results.serverReadError = e.message;
     }
   }
   
