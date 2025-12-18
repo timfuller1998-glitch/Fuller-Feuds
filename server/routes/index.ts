@@ -1,13 +1,13 @@
 import express from 'express';
-import authRoutes from './auth';
-import topicRoutes from './topics';
-import userRoutes from './users';
-import opinionRoutes from './opinions';
-import debateRoutes from './debates';
-import moderationRoutes from './moderation';
-import statsRoutes from './stats';
-import objectRoutes from './objects';
-import seedingRoutes from './seeding';
+import authRoutes from './auth.js';
+import topicRoutes from './topics.js';
+import userRoutes from './users.js';
+import opinionRoutes from './opinions.js';
+import debateRoutes from './debates.js';
+import moderationRoutes from './moderation.js';
+import statsRoutes from './stats.js';
+import objectRoutes from './objects.js';
+import seedingRoutes from './seeding.js';
 
 const router = express.Router();
 

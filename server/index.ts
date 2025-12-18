@@ -3,12 +3,12 @@ import { createServer } from "http";
 import path from "path";
 import fs from "fs";
 import routes from "./routes/index.js";
-import { setupVite, serveStatic, log } from "./vite";
-import { startScheduledJobs } from "./scheduled-jobs";
-import { BadgeRepository } from "./repositories/badgeRepository";
-import { setupAuth } from "./auth";
-import { attachUserRole } from "./middleware/permissions";
-import { getCacheStats } from "./services/cacheService";
+import { setupVite, serveStatic, log } from "./vite.js";
+import { startScheduledJobs } from "./scheduled-jobs.js";
+import { BadgeRepository } from "./repositories/badgeRepository.js";
+import { setupAuth } from "./auth.js";
+import { attachUserRole } from "./middleware/permissions.js";
+import { getCacheStats } from "./services/cacheService.js";
 
 const badgeRepository = new BadgeRepository();
 
