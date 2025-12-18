@@ -9,6 +9,9 @@ const __dirname = path.dirname(__filename);
 const sourceDir = path.resolve(__dirname, '..', 'dist', 'public');
 const targetDir = path.resolve(__dirname, '..', 'server', 'static');
 
+// Also try copying to a .vercel-ignored location that will be included
+const altTargetDir = path.resolve(__dirname, '..', '.vercel-static');
+
 console.log(`[Copy Static] Source: ${sourceDir}`);
 console.log(`[Copy Static] Target: ${targetDir}`);
 
@@ -71,7 +74,18 @@ try {
   } else {
     console.warn(`[Copy Static] ⚠ WARNING: index.html not found at: ${indexPath}`);
   }
+  
+  // Also verify the directory exists and list its contents for debugging
+  if (fs.existsSync(targetDir)) {
+    const verifyFiles = fs.readdirSync(targetDir);
+    console.log(`[Copy Static] Verification: ${targetDir} contains ${verifyFiles.length} items`);
+    console.log(`[Copy Static] Verification files: ${verifyFiles.slice(0, 20).join(', ')}`);
+  } else {
+    console.error(`[Copy Static] ✗ CRITICAL: Target directory does not exist after copy: ${targetDir}`);
+    process.exit(1);
+  }
 } catch (error) {
   console.error(`[Copy Static] ✗ Copy failed:`, error);
+  console.error(`[Copy Static] Error stack:`, error.stack);
   process.exit(1);
 }
