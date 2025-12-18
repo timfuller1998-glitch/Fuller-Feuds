@@ -109,6 +109,26 @@ export function serveStatic(app: Express) {
     } else {
       log(`[Static Files] dist/ does not exist at: ${distPathCheck}`);
     }
+    
+    // Check what's in the server directory (to see if static exists)
+    const serverDirPath = path.resolve(dirname);
+    if (fs.existsSync(serverDirPath)) {
+      try {
+        const serverContents = fs.readdirSync(serverDirPath);
+        log(`[Static Files] Contents of server/ (${serverDirPath}): ${serverContents.slice(0, 30).join(", ")}`);
+        
+        // Specifically check if server/static exists
+        const serverStaticPath = path.resolve(serverDirPath, "static");
+        if (fs.existsSync(serverStaticPath)) {
+          const staticContents = fs.readdirSync(serverStaticPath);
+          log(`[Static Files] ✓ server/static EXISTS with ${staticContents.length} files: ${staticContents.slice(0, 10).join(", ")}`);
+        } else {
+          log(`[Static Files] ✗ server/static does NOT exist at: ${serverStaticPath}`);
+        }
+      } catch (e) {
+        log(`[Static Files] Could not read server directory: ${e}`);
+      }
+    }
   } catch (e) {
     log(`[Static Files] Could not read cwd contents: ${e}`);
   }

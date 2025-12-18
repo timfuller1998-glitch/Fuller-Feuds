@@ -65,12 +65,24 @@ app.get('/api/debug/static', (req, res) => {
   const dirname = import.meta.dirname;
   
   const pathsToCheck = [
+    path.resolve(dirname, "static"), // Check server/static first (copied during build)
     path.resolve(cwd, "dist", "public"),
     path.resolve(dirname, "..", "dist", "public"),
     path.resolve(dirname, "..", "..", "dist", "public"),
     path.resolve(cwd, "dist"),
     path.resolve(cwd, "public"),
   ];
+  
+  // Also check what's in the server directory
+  const serverDirPath = path.resolve(dirname);
+  if (fs.existsSync(serverDirPath)) {
+    try {
+      const serverContents = fs.readdirSync(serverDirPath);
+      results.serverContents = serverContents.slice(0, 50);
+    } catch (e: any) {
+      results.serverReadError = e.message;
+    }
+  }
   
   const results: Record<string, any> = {
     environment: {
@@ -166,7 +178,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   res.status(status).json({ message });
   // Don't re-throw in production - it crashes the serverless function
   if (process.env.NODE_ENV === 'development') {
-    throw err;
+  throw err;
   }
 });
 
@@ -184,30 +196,30 @@ if (app.get("env") === "development") {
 // In Vercel serverless, @vercel/node handles the server
 // Only start listening in non-serverless environments
 if (process.env.VERCEL !== '1') {
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: process.env.NODE_ENV === 'production' ? "0.0.0.0" : "localhost",
-    reusePort: process.env.NODE_ENV === 'production',
-  }, async () => {
-    log(`serving on port ${port}`);
+const port = parseInt(process.env.PORT || '5000', 10);
+server.listen({
+  port,
+  host: process.env.NODE_ENV === 'production' ? "0.0.0.0" : "localhost",
+  reusePort: process.env.NODE_ENV === 'production',
+}, async () => {
+  log(`serving on port ${port}`);
 
-    // Initialize badges in the database
-    try {
-      await badgeRepository.initializeBadges();
-      log("Badges initialized successfully");
-    } catch (error: any) {
-      log("Error initializing badges:", error);
-    }
+  // Initialize badges in the database
+  try {
+    await badgeRepository.initializeBadges();
+    log("Badges initialized successfully");
+  } catch (error: any) {
+    log("Error initializing badges:", error);
+  }
 
-    startScheduledJobs();
+  startScheduledJobs();
 
-    // Log cache stats periodically (every 5 minutes)
-    setInterval(() => {
-      const stats = getCacheStats();
-      log(`[Cache Stats] Hits: ${stats.hits}, Misses: ${stats.misses}, Hit Rate: ${stats.hitRate.toFixed(2)}%, Memory Size: ${stats.memorySize}, Invalidations: ${stats.invalidations}`);
-    }, 5 * 60 * 1000);
-  });
+  // Log cache stats periodically (every 5 minutes)
+  setInterval(() => {
+    const stats = getCacheStats();
+    log(`[Cache Stats] Hits: ${stats.hits}, Misses: ${stats.misses}, Hit Rate: ${stats.hitRate.toFixed(2)}%, Memory Size: ${stats.memorySize}, Invalidations: ${stats.invalidations}`);
+  }, 5 * 60 * 1000);
+});
 } else {
   // In Vercel, initialize badges and start jobs asynchronously
   (async () => {
