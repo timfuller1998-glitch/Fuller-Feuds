@@ -10,10 +10,12 @@ if (process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1') {
 }
 
 let connectionString = process.env.DATABASE_URL;
-console.log('DATABASE_URL read from env:', connectionString);
 
 if (!connectionString) {
-  throw new Error('DATABASE_URL environment variable is required');
+  const errorMsg = process.env.VERCEL === '1' 
+    ? 'DATABASE_URL environment variable is required. Please set it in Vercel project settings (Settings → Environment Variables).'
+    : 'DATABASE_URL environment variable is required. Please set it in your .env file or environment.';
+  throw new Error(errorMsg);
 }
 
 // Fix: Remove duplicate "DATABASE_URL=" prefix if it exists (copy-paste error)
