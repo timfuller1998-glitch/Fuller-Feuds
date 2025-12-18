@@ -131,33 +131,8 @@ export function serveStatic(app: Express) {
     return; // Exit early, don't set up static serving
   }
 
-  log(`Serving static files from: ${distPath}`);
-  
-  // List files in dist/public for debugging
-  try {
-    const files = fs.readdirSync(distPath);
-    log(`Found ${files.length} files in dist/public. Sample: ${files.slice(0, 5).join(", ")}`);
-  } catch (e) {
-    log(`Warning: Could not list files in ${distPath}: ${e}`);
-  }
-  
-  // Serve static files with proper headers
-  app.use(express.static(distPath, {
-    setHeaders: (res, filePath) => {
-      // Ensure JavaScript files are served with correct Content-Type
-      if (filePath.endsWith('.js')) {
-        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-      } else if (filePath.endsWith('.css')) {
-        res.setHeader('Content-Type', 'text/css; charset=utf-8');
-      } else if (filePath.endsWith('.html')) {
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      }
-    },
-    index: false // Don't serve index.html automatically for directories
-  }));
-
-  // fall through to index.html only for routes that don't match static files
-  // This must come after express.static so static files are served first
+  // In Vercel, static files (JS, CSS, images) are served by @vercel/static
+  // We only need to serve index.html for SPA client-side routing
   // Use app.get instead of app.use to only match GET requests
   app.get("*", (req, res) => {
     // Skip API routes - they should be handled by the API router
@@ -165,22 +140,19 @@ export function serveStatic(app: Express) {
       return res.status(404).json({ error: 'API route not found' });
     }
     
-    // Check if this is a static file request (has extension)
+    // Skip static file requests - they're handled by Vercel's static file serving
+    // Static files have extensions and should be served by @vercel/static builder
     const hasExtension = /\.[a-zA-Z0-9]+$/.test(req.path);
-    
     if (hasExtension) {
-      // This should have been handled by express.static
-      // If we reach here, the file doesn't exist - return 404
-      log(`Static file not found: ${req.path}`);
+      // Let Vercel handle static files, or return 404 if not found
       return res.status(404).json({ error: 'File not found' });
     }
     
-    // Only serve index.html for routes without file extensions (SPA routing)
-    const indexPath = path.resolve(distPath, "index.html");
-    if (fs.existsSync(indexPath)) {
+    // Serve index.html for SPA routes (routes without file extensions)
+    if (indexPath && fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
     } else {
-      log(`index.html not found at: ${indexPath}`);
+      log(`index.html not found. Path: ${indexPath}`);
       res.status(404).json({ error: 'index.html not found' });
     }
   });
