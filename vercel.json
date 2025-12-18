@@ -1,15 +1,15 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build && ls -la dist && ls -la dist/public || echo 'Build output check failed'",
   "builds": [
     {
       "src": "server/index.ts",
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
+          "dist/**",
           "dist/public/**",
-          "dist/public/**/*",
-          "dist/public"
+          "dist/public/**/*"
         ],
         "runtime": "nodejs18.x",
         "maxLambdaSize": "50mb"
