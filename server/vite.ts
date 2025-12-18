@@ -65,7 +65,7 @@ export async function setupVite(app: Express, server: Server) {
 
 export function serveStatic(app: Express) {
   // In Vercel serverless, try multiple path resolution strategies
-  // Strategy 1: Use process.cwd() (Vercel's working directory is project root)
+  // Strategy 1: Use process.cwd() (Vercel's working directory is /var/task)
   let distPath = path.resolve(process.cwd(), "dist", "public");
   
   // Strategy 2: Try relative to import.meta.dirname (for local/bundled scenarios)
@@ -73,9 +73,19 @@ export function serveStatic(app: Express) {
     distPath = path.resolve(import.meta.dirname, "..", "dist", "public");
   }
   
-  // Strategy 3: Try just dist/public from cwd (fallback)
+  // Strategy 3: Try relative to import.meta.dirname going up to project root
+  if (!fs.existsSync(distPath)) {
+    distPath = path.resolve(import.meta.dirname, "..", "..", "dist", "public");
+  }
+  
+  // Strategy 4: Try just dist/public from cwd (fallback)
   if (!fs.existsSync(distPath)) {
     distPath = path.join(process.cwd(), "dist", "public");
+  }
+  
+  // Strategy 5: In Vercel, included files might be at the root level
+  if (!fs.existsSync(distPath)) {
+    distPath = path.resolve(process.cwd(), "public");
   }
 
   if (!fs.existsSync(distPath)) {
