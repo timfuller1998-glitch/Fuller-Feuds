@@ -133,14 +133,19 @@ export function serveStatic(app: Express) {
 
   // fall through to index.html only for routes that don't match static files
   // This must come after express.static so static files are served first
-  app.use("*", (req, res, next) => {
-    // Check if this is a static file request (has extension and not /api)
-    const hasExtension = /\.[a-zA-Z0-9]+$/.test(req.path);
-    const isApiRoute = req.path.startsWith('/api');
+  // Use app.get instead of app.use to only match GET requests
+  app.get("*", (req, res) => {
+    // Skip API routes - they should be handled by the API router
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API route not found' });
+    }
     
-    if (hasExtension && !isApiRoute) {
+    // Check if this is a static file request (has extension)
+    const hasExtension = /\.[a-zA-Z0-9]+$/.test(req.path);
+    
+    if (hasExtension) {
       // This should have been handled by express.static
-      // If we reach here, the file doesn't exist
+      // If we reach here, the file doesn't exist - return 404
       log(`Static file not found: ${req.path}`);
       return res.status(404).json({ error: 'File not found' });
     }
