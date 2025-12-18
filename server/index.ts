@@ -3,7 +3,7 @@ import { createServer } from "http";
 import path from "path";
 import fs from "fs";
 import routes from "./routes/index.js";
-import { setupVite, serveStatic, log } from "./vite.js";
+import { serveStatic, log } from "./vite.js";
 import { startScheduledJobs } from "./scheduled-jobs.js";
 import { BadgeRepository } from "./repositories/badgeRepository.js";
 import { setupAuth } from "./auth.js";
@@ -106,6 +106,8 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 // setting up all the other routes so the catch-all route
 // doesn't interfere with the other routes
 if (app.get("env") === "development") {
+  // Dynamically import setupVite only in development to avoid bundling Vite/Rollup in production
+  const { setupVite } = await import("./vite.js");
   await setupVite(app, server);
 } else {
   serveStatic(app);
