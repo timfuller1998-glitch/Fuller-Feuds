@@ -69,40 +69,112 @@ export function serveStatic(app: Express) {
   // process.cwd() in Vercel serverless functions is typically /var/task (project root)
   let distPath: string | null = null;
   
+  const cwd = process.cwd();
+  const dirname = import.meta.dirname;
+  
   // Priority order based on Vercel's file structure
-  // 1. process.cwd()/dist/public - Most common in Vercel (files included at root)
-  // 2. Relative to import.meta.dirname - Fallback for local/bundled scenarios
+  // Try multiple strategies to find dist/public
   const possiblePaths = [
-    path.resolve(process.cwd(), "dist", "public"), // Primary: Vercel includes files at project root
-    path.resolve(import.meta.dirname, "..", "dist", "public"), // Fallback 1: Relative to server/
-    path.resolve(import.meta.dirname, "..", "..", "dist", "public"), // Fallback 2: If server is nested
+    // Strategy 1: Direct from cwd (most common in Vercel)
+    path.resolve(cwd, "dist", "public"),
+    // Strategy 2: Relative to server directory
+    path.resolve(dirname, "..", "dist", "public"),
+    // Strategy 3: If server is nested deeper
+    path.resolve(dirname, "..", "..", "dist", "public"),
+    // Strategy 4: Check if dist exists at root
+    path.resolve(cwd, "dist"),
+    // Strategy 5: Check if files are at function root (unlikely but possible)
+    path.resolve(cwd, "public"),
   ];
   
-  // Log attempted paths for debugging
-  log(`Attempting to find dist/public. cwd: ${process.cwd()}, dirname: ${import.meta.dirname}`);
+  // Log environment info for debugging
+  log(`[Static Files] Searching for dist/public`);
+  log(`[Static Files] cwd: ${cwd}`);
+  log(`[Static Files] import.meta.dirname: ${dirname}`);
+  log(`[Static Files] __dirname equivalent: ${path.dirname(new URL(import.meta.url).pathname)}`);
   
-  for (const possiblePath of possiblePaths) {
-    if (fs.existsSync(possiblePath)) {
-      distPath = possiblePath;
-      log(`✓ Found dist/public at: ${distPath}`);
-      
-      // Verify index.html exists
-      const indexPath = path.join(distPath, "index.html");
-      if (fs.existsSync(indexPath)) {
-        log(`✓ index.html found at: ${indexPath}`);
-      } else {
-        log(`⚠ WARNING: index.html not found at: ${indexPath}`);
-      }
-      break;
+  // Try to list what's actually in cwd for debugging
+  try {
+    const cwdContents = fs.existsSync(cwd) ? fs.readdirSync(cwd) : [];
+    log(`[Static Files] Contents of cwd (${cwd}): ${cwdContents.slice(0, 20).join(", ")}`);
+    
+    // Check if dist exists
+    const distPathCheck = path.resolve(cwd, "dist");
+    if (fs.existsSync(distPathCheck)) {
+      const distContents = fs.readdirSync(distPathCheck);
+      log(`[Static Files] Contents of dist/: ${distContents.join(", ")}`);
     } else {
-      log(`✗ Path does not exist: ${possiblePath}`);
+      log(`[Static Files] dist/ does not exist at: ${distPathCheck}`);
+    }
+  } catch (e) {
+    log(`[Static Files] Could not read cwd contents: ${e}`);
+  }
+  
+  // Try each possible path
+  for (const possiblePath of possiblePaths) {
+    log(`[Static Files] Checking: ${possiblePath}`);
+    if (fs.existsSync(possiblePath)) {
+      // Verify it's a directory and has files
+      try {
+        const stats = fs.statSync(possiblePath);
+        if (stats.isDirectory()) {
+          const files = fs.readdirSync(possiblePath);
+          log(`[Static Files] ✓ Found directory with ${files.length} files: ${possiblePath}`);
+          log(`[Static Files] Sample files: ${files.slice(0, 10).join(", ")}`);
+          
+          // Verify index.html exists
+          const indexPath = path.join(possiblePath, "index.html");
+          if (fs.existsSync(indexPath)) {
+            distPath = possiblePath;
+            log(`[Static Files] ✓✓✓ SUCCESS: Using ${distPath} (index.html confirmed)`);
+            break;
+          } else {
+            log(`[Static Files] ⚠ Directory found but index.html missing at: ${indexPath}`);
+            // Still use it if it has files (might be a different structure)
+            if (files.length > 0) {
+              distPath = possiblePath;
+              log(`[Static Files] Using ${distPath} despite missing index.html`);
+              break;
+            }
+          }
+        } else {
+          log(`[Static Files] ✗ Path exists but is not a directory: ${possiblePath}`);
+        }
+      } catch (e) {
+        log(`[Static Files] ✗ Error checking path: ${possiblePath}, error: ${e}`);
+      }
+    } else {
+      log(`[Static Files] ✗ Path does not exist: ${possiblePath}`);
     }
   }
   
   if (!distPath) {
-    const errorMsg = `Could not find dist/public directory. Tried: ${possiblePaths.join(", ")}. ` +
-      `Current working directory: ${process.cwd()}, import.meta.dirname: ${import.meta.dirname}.`;
-    log(`ERROR: ${errorMsg}`);
+    // Comprehensive error message with debugging info
+    let debugInfo = `Attempted paths:\n${possiblePaths.map(p => `  - ${p}`).join("\n")}\n\n`;
+    debugInfo += `Environment:\n`;
+    debugInfo += `  - cwd: ${cwd}\n`;
+    debugInfo += `  - dirname: ${dirname}\n`;
+    debugInfo += `  - NODE_ENV: ${process.env.NODE_ENV}\n`;
+    debugInfo += `  - VERCEL: ${process.env.VERCEL}\n`;
+    
+    // Try to list what's in cwd
+    try {
+      if (fs.existsSync(cwd)) {
+        const cwdContents = fs.readdirSync(cwd);
+        debugInfo += `\nContents of cwd:\n  ${cwdContents.slice(0, 30).join(", ")}\n`;
+      }
+    } catch (e) {
+      debugInfo += `\nCould not read cwd: ${e}\n`;
+    }
+    
+    const errorMsg = `Could not find dist/public directory.\n\n${debugInfo}\n\n` +
+      `Possible issues:\n` +
+      `1. Build didn't complete successfully (check Vercel build logs)\n` +
+      `2. includeFiles pattern doesn't match actual file structure\n` +
+      `3. Files are in a different location than expected\n\n` +
+      `Check /api/debug/static for more information.`;
+    
+    log(`[Static Files] ERROR: ${errorMsg}`);
     
     // Serve error page instead of crashing
     app.get("*", (req, res) => {
@@ -111,11 +183,24 @@ export function serveStatic(app: Express) {
       }
       res.status(500).send(`
         <html>
-          <head><title>Build Error</title></head>
+          <head>
+            <title>Build Error - Static Files Not Found</title>
+            <style>
+              body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+              pre { background: #2a2a2a; padding: 15px; border-radius: 5px; overflow-x: auto; }
+              h1 { color: #ff6b6b; }
+            </style>
+          </head>
           <body>
-            <h1>Static files not found</h1>
-            <p>${errorMsg}</p>
-            <p>Check Vercel build logs to ensure 'npm run build' completed successfully.</p>
+            <h1>Static Files Not Found</h1>
+            <pre>${errorMsg.replace(/\n/g, '<br>')}</pre>
+            <p><strong>Action Required:</strong></p>
+            <ol>
+              <li>Check Vercel build logs to ensure 'npm run build' completed successfully</li>
+              <li>Verify that dist/public directory exists after build</li>
+              <li>Check /api/debug/static endpoint for detailed debugging information</li>
+              <li>Verify includeFiles pattern in vercel.json matches your build output</li>
+            </ol>
           </body>
         </html>
       `);
