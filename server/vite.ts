@@ -64,52 +64,83 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // In Vercel, static files are served by @vercel/static builder
-  // SPA routing is handled by Vercel's routes configuration (vercel.json)
-  // This function is only used for local development
-  
-  // For local development, try to find and serve static files
+  // Find the dist/public directory
+  // In Vercel, files are included via includeFiles and available at runtime
   let distPath: string | null = null;
   
   const possiblePaths = [
     path.resolve(process.cwd(), "dist", "public"),
     path.resolve(import.meta.dirname, "..", "dist", "public"),
     path.resolve(import.meta.dirname, "..", "..", "dist", "public"),
+    // In Vercel, included files might be at the function root
+    path.resolve(process.cwd(), "public"),
   ];
   
   for (const possiblePath of possiblePaths) {
     if (fs.existsSync(possiblePath)) {
       distPath = possiblePath;
-      log(`Found dist/public at: ${distPath}`);
+      log(`Serving static files from: ${distPath}`);
       break;
     }
   }
   
-  if (distPath) {
-    // Serve static files for local development
-    app.use(express.static(distPath, {
-      index: false
-    }));
+  if (!distPath) {
+    const errorMsg = `Could not find dist/public directory. Tried: ${possiblePaths.join(", ")}. ` +
+      `Current working directory: ${process.cwd()}, import.meta.dirname: ${import.meta.dirname}.`;
+    log(`ERROR: ${errorMsg}`);
     
-    // Serve index.html for SPA routes
+    // Serve error page instead of crashing
     app.get("*", (req, res) => {
       if (req.path.startsWith('/api')) {
         return res.status(404).json({ error: 'API route not found' });
       }
-      
-      const hasExtension = /\.[a-zA-Z0-9]+$/.test(req.path);
-      if (hasExtension) {
-        return res.status(404).json({ error: 'File not found' });
-      }
-      
-      const indexPath = path.resolve(distPath!, "index.html");
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(404).json({ error: 'index.html not found' });
-      }
+      res.status(500).send(`
+        <html>
+          <head><title>Build Error</title></head>
+          <body>
+            <h1>Static files not found</h1>
+            <p>${errorMsg}</p>
+            <p>Check Vercel build logs to ensure 'npm run build' completed successfully.</p>
+          </body>
+        </html>
+      `);
     });
-  } else {
-    log(`INFO: dist/public not found. In Vercel, static files are handled by @vercel/static builder.`);
+    return;
   }
+  
+  // Serve static files with proper headers
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      } else if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      } else if (filePath.endsWith('.html')) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      }
+    },
+    index: false // Don't serve index.html automatically
+  }));
+  
+  // SPA fallback: serve index.html for routes without file extensions
+  app.get("*", (req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    
+    // Skip static file requests (they should have been handled by express.static)
+    const hasExtension = /\.[a-zA-Z0-9]+$/.test(req.path);
+    if (hasExtension) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    
+    // Serve index.html for SPA routes
+    const indexPath = path.resolve(distPath!, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).json({ error: 'index.html not found' });
+    }
+  });
 }

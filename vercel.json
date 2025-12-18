@@ -6,13 +6,10 @@
       "src": "server/index.ts",
       "use": "@vercel/node",
       "config": {
+        "includeFiles": ["dist/public/**"],
         "runtime": "nodejs18.x",
         "maxLambdaSize": "50mb"
       }
-    },
-    {
-      "src": "dist/public/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -21,12 +18,8 @@
       "dest": "/server/index.ts"
     },
     {
-      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json|map))",
-      "dest": "/$1"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/server/index.ts"
     }
   ]
 }
