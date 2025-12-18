@@ -67,6 +67,10 @@ try {
   
   // Verify index.html exists
   const indexPath = path.join(targetDir, 'index.html');
+  // #region agent log
+  const logData = {location:'copy-static.js:67',message:'After copy - verifying files',data:{targetDir,indexPath,sourceDir,fileCount:copiedFiles.length,hasIndexHtml:fs.existsSync(indexPath),files:copiedFiles.slice(0,10)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+  // #endregion
   if (fs.existsSync(indexPath)) {
     console.log(`[Copy Static] ✓✓✓ index.html confirmed at: ${indexPath}`);
   } else {

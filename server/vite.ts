@@ -70,11 +70,20 @@ try {
   // Try server/static first (created by copy-static.js during build)
   const staticPath = path.resolve(import.meta.dirname, "static");
   const indexPath = path.join(staticPath, "index.html");
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:71',message:'Module load - checking server/static',data:{staticPath,indexPath,dirname:import.meta.dirname,exists:fs.existsSync(staticPath),indexExists:fs.existsSync(indexPath)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
   if (fs.existsSync(indexPath)) {
     // Actually read the file to force Vercel to include it
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:75',message:'Reading server/static/index.html',data:{indexPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     fs.readFileSync(indexPath, "utf-8");
   }
-} catch {
+} catch (error: any) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:79',message:'Error checking server/static',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
   // Ignore - file might not exist during build, that's OK
 }
 
@@ -82,11 +91,20 @@ try {
   // Also try dist/public (where vite builds to)
   const distPublicPath = path.resolve(process.cwd(), "dist", "public");
   const distIndexPath = path.join(distPublicPath, "index.html");
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:86',message:'Module load - checking dist/public',data:{distPublicPath,distIndexPath,cwd:process.cwd(),exists:fs.existsSync(distPublicPath),indexExists:fs.existsSync(distIndexPath)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
   if (fs.existsSync(distIndexPath)) {
     // Actually read the file to force Vercel to include it
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:90',message:'Reading dist/public/index.html',data:{distIndexPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     fs.readFileSync(distIndexPath, "utf-8");
   }
-} catch {
+} catch (error: any) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:94',message:'Error checking dist/public',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
   // Ignore - file might not exist during build, that's OK
 }
 
@@ -98,6 +116,10 @@ export function serveStatic(app: Express) {
   
   const cwd = process.cwd();
   const dirname = import.meta.dirname;
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:100',message:'serveStatic called - runtime check',data:{cwd,dirname,nodeEnv:process.env.NODE_ENV,vercel:process.env.VERCEL},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
   
   // Priority order based on Vercel's file structure
   // Try multiple strategies to find dist/public
@@ -165,6 +187,9 @@ export function serveStatic(app: Express) {
   // Try each possible path
   for (const possiblePath of possiblePaths) {
     log(`[Static Files] Checking: ${possiblePath}`);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:151',message:'Checking path',data:{possiblePath,exists:fs.existsSync(possiblePath)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     if (fs.existsSync(possiblePath)) {
       // Verify it's a directory and has files
       try {
@@ -176,9 +201,15 @@ export function serveStatic(app: Express) {
           
           // Verify index.html exists
           const indexPath = path.join(possiblePath, "index.html");
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:163',message:'Directory found, checking index.html',data:{possiblePath,indexPath,fileCount:files.length,hasIndexHtml:fs.existsSync(indexPath),files:files.slice(0,10)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+          // #endregion
           if (fs.existsSync(indexPath)) {
             distPath = possiblePath;
             log(`[Static Files] ✓✓✓ SUCCESS: Using ${distPath} (index.html confirmed)`);
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:168',message:'SUCCESS - found static files',data:{distPath,indexPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
             break;
           } else {
             log(`[Static Files] ⚠ Directory found but index.html missing at: ${indexPath}`);
@@ -192,8 +223,11 @@ export function serveStatic(app: Express) {
         } else {
           log(`[Static Files] ✗ Path exists but is not a directory: ${possiblePath}`);
         }
-      } catch (e) {
+      } catch (e: any) {
         log(`[Static Files] ✗ Error checking path: ${possiblePath}, error: ${e}`);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:182',message:'Error checking path',data:{possiblePath,error:e?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
       }
     } else {
       log(`[Static Files] ✗ Path does not exist: ${possiblePath}`);
