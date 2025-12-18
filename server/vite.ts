@@ -89,11 +89,25 @@ export function serveStatic(app: Express) {
       path.resolve(import.meta.dirname, "..", "dist", "public"),
       path.join(process.cwd(), "dist", "public"),
     ];
-    throw new Error(
-      `Could not find the build directory. Attempted paths: ${attemptedPaths.join(", ")}. ` +
+    const errorMsg = `Could not find the build directory. Attempted paths: ${attemptedPaths.join(", ")}. ` +
       `Current working directory: ${process.cwd()}, import.meta.dirname: ${import.meta.dirname}. ` +
-      `Make sure to build the client first with 'npm run build'.`
-    );
+      `Make sure to build the client first with 'npm run build'.`;
+    log(`ERROR: ${errorMsg}`);
+    
+    // Instead of throwing (which crashes the serverless function), serve an error page
+    app.use("*", (_req, res) => {
+      res.status(500).send(`
+        <html>
+          <head><title>Build Error</title></head>
+          <body>
+            <h1>Static files not found</h1>
+            <p>${errorMsg}</p>
+            <p>Check Vercel build logs to ensure 'npm run build' completed successfully.</p>
+          </body>
+        </html>
+      `);
+    });
+    return; // Exit early, don't set up static serving
   }
 
   log(`Serving static files from: ${distPath}`);

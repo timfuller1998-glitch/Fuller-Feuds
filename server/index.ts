@@ -94,8 +94,12 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
 
+  log(`Error: ${message}`, "error");
   res.status(status).json({ message });
-  throw err;
+  // Don't re-throw in production - it crashes the serverless function
+  if (process.env.NODE_ENV === 'development') {
+    throw err;
+  }
 });
 
 // importantly only setup vite in development and after
@@ -107,31 +111,48 @@ if (app.get("env") === "development") {
   serveStatic(app);
 }
 
-// ALWAYS serve the app on the port specified in the environment variable PORT
-// Other ports are firewalled. Default to 5000 if not specified.
-// this serves both the API and the client.
-// It is the only port that is not firewalled.
-const port = parseInt(process.env.PORT || '5000', 10);
-server.listen({
-  port,
-  host: process.env.NODE_ENV === 'production' ? "0.0.0.0" : "localhost",
-  reusePort: process.env.NODE_ENV === 'production',
-}, async () => {
-  log(`serving on port ${port}`);
+// In Vercel serverless, @vercel/node handles the server
+// Only start listening in non-serverless environments
+if (process.env.VERCEL !== '1') {
+  const port = parseInt(process.env.PORT || '5000', 10);
+  server.listen({
+    port,
+    host: process.env.NODE_ENV === 'production' ? "0.0.0.0" : "localhost",
+    reusePort: process.env.NODE_ENV === 'production',
+  }, async () => {
+    log(`serving on port ${port}`);
 
-  // Initialize badges in the database
-  try {
-    await badgeRepository.initializeBadges();
-    log("Badges initialized successfully");
-  } catch (error: any) {
-    log("Error initializing badges:", error);
-  }
+    // Initialize badges in the database
+    try {
+      await badgeRepository.initializeBadges();
+      log("Badges initialized successfully");
+    } catch (error: any) {
+      log("Error initializing badges:", error);
+    }
 
-  startScheduledJobs();
+    startScheduledJobs();
 
-  // Log cache stats periodically (every 5 minutes)
-  setInterval(() => {
-    const stats = getCacheStats();
-    log(`[Cache Stats] Hits: ${stats.hits}, Misses: ${stats.misses}, Hit Rate: ${stats.hitRate.toFixed(2)}%, Memory Size: ${stats.memorySize}, Invalidations: ${stats.invalidations}`);
-  }, 5 * 60 * 1000);
-});
+    // Log cache stats periodically (every 5 minutes)
+    setInterval(() => {
+      const stats = getCacheStats();
+      log(`[Cache Stats] Hits: ${stats.hits}, Misses: ${stats.misses}, Hit Rate: ${stats.hitRate.toFixed(2)}%, Memory Size: ${stats.memorySize}, Invalidations: ${stats.invalidations}`);
+    }, 5 * 60 * 1000);
+  });
+} else {
+  // In Vercel, initialize badges and start jobs asynchronously
+  (async () => {
+    try {
+      await badgeRepository.initializeBadges();
+      log("Badges initialized successfully");
+    } catch (error: any) {
+      log("Error initializing badges:", error);
+    }
+  })();
+  
+  // Don't start scheduled jobs in serverless - they won't work properly
+  // Vercel has its own cron job system if needed
+  log("Running in Vercel serverless environment");
+}
+
+// Export the app for Vercel
+export default app;
