@@ -4,8 +4,14 @@ import path from "path";
 import fs from "fs";
 import routes from "./routes/index.js";
 import { serveStatic, log } from "./vite.js";
-// Force inclusion of static files by importing the loader
+// Force inclusion of static files by importing
 import "./static-loader.js";
+// Also import the auto-generated static-files module if it exists
+try {
+  await import("./static-files.js");
+} catch {
+  // Ignore if file doesn't exist (might not be generated yet)
+}
 import { startScheduledJobs } from "./scheduled-jobs.js";
 import { BadgeRepository } from "./repositories/badgeRepository.js";
 import { setupAuth } from "./auth.js";

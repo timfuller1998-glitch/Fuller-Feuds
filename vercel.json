@@ -3,30 +3,29 @@
   "buildCommand": "npm run build",
   "builds": [
     {
-      "src": "dist/index.js",
+      "src": "server/index.ts",
       "use": "@vercel/node",
       "config": {
         "runtime": "nodejs18.x",
-        "maxLambdaSize": "50mb",
-        "includeFiles": "dist/public/**"
+        "maxLambdaSize": "50mb"
       }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/dist/index.js"
+      "dest": "/server/index.ts"
     },
     {
       "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json|xml|txt))",
-      "dest": "/dist/index.js",
+      "dest": "/server/index.ts",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable"
       }
     },
     {
       "src": "/(.*)",
-      "dest": "/dist/index.js"
+      "dest": "/server/index.ts"
     }
   ]
 }

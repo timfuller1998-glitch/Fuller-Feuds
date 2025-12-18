@@ -9,11 +9,6 @@ const __dirname = path.dirname(__filename);
 const sourceDir = path.resolve(__dirname, '..', 'dist', 'public');
 // Copy to server/static (for runtime access)
 const targetDir = path.resolve(__dirname, '..', 'server', 'static');
-// Also copy to server/public (alternative location that might get auto-included)
-const altTargetDir = path.resolve(__dirname, '..', 'server', 'public');
-
-// Also try copying to a .vercel-ignored location that will be included
-const altTargetDir = path.resolve(__dirname, '..', '.vercel-static');
 
 console.log(`[Copy Static] Source: ${sourceDir}`);
 console.log(`[Copy Static] Target: ${targetDir}`);
@@ -74,6 +69,26 @@ try {
   const indexPath = path.join(targetDir, 'index.html');
   if (fs.existsSync(indexPath)) {
     console.log(`[Copy Static] ✓✓✓ index.html confirmed at: ${indexPath}`);
+    
+    // Also create a direct import file that Vercel will bundle
+    // This forces Vercel to include the static directory
+    const importFile = path.resolve(__dirname, '..', 'server', 'static-files.ts');
+    const importContent = `// Auto-generated file to force Vercel to include static files
+import fs from 'fs';
+import path from 'path';
+
+const staticDir = path.resolve(import.meta.dirname, 'static');
+const indexPath = path.join(staticDir, 'index.html');
+
+// Read at module load to force inclusion
+export const staticIndexHtml = fs.existsSync(indexPath) 
+  ? fs.readFileSync(indexPath, 'utf-8')
+  : null;
+
+export const staticDirPath = staticDir;
+`;
+    fs.writeFileSync(importFile, importContent);
+    console.log(`[Copy Static] ✓ Created import file: ${importFile}`);
   } else {
     console.warn(`[Copy Static] ⚠ WARNING: index.html not found at: ${indexPath}`);
   }
