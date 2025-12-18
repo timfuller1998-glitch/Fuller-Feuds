@@ -93,10 +93,25 @@ export function serveStatic(app: Express) {
     const attemptedPaths = [
       path.resolve(process.cwd(), "dist", "public"),
       path.resolve(import.meta.dirname, "..", "dist", "public"),
+      path.resolve(import.meta.dirname, "..", "..", "dist", "public"),
       path.join(process.cwd(), "dist", "public"),
+      path.resolve(process.cwd(), "public"),
     ];
+    
+    // Try to list what's actually in the directories for debugging
+    let dirContents = "Could not read directories";
+    try {
+      const cwdContents = fs.existsSync(process.cwd()) ? fs.readdirSync(process.cwd()).join(", ") : "cwd does not exist";
+      const serverDirContents = fs.existsSync(import.meta.dirname) ? fs.readdirSync(import.meta.dirname).join(", ") : "server dir does not exist";
+      const distExists = fs.existsSync(path.resolve(process.cwd(), "dist")) ? "dist exists" : "dist does not exist";
+      dirContents = `cwd contents: ${cwdContents}; server dir: ${serverDirContents}; ${distExists}`;
+    } catch (e) {
+      dirContents = `Error reading directories: ${e}`;
+    }
+    
     const errorMsg = `Could not find the build directory. Attempted paths: ${attemptedPaths.join(", ")}. ` +
       `Current working directory: ${process.cwd()}, import.meta.dirname: ${import.meta.dirname}. ` +
+      `${dirContents}. ` +
       `Make sure to build the client first with 'npm run build'.`;
     log(`ERROR: ${errorMsg}`);
     
