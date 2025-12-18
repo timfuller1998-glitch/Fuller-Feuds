@@ -6,7 +6,11 @@
       "src": "server/index.ts",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["dist/public/**", "dist/public"],
+        "includeFiles": [
+          "dist/public/**",
+          "dist/public/**/*",
+          "dist/public"
+        ],
         "runtime": "nodejs18.x",
         "maxLambdaSize": "50mb"
       }
