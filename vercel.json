@@ -13,7 +13,7 @@
   ],
   "functions": {
     "server/index.ts": {
-      "includeFiles": ["dist/public/**", "server/static/**"]
+      "includeFiles": "{dist/public/**,server/static/**}"
     }
   },
   "routes": [
