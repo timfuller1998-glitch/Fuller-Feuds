@@ -1,5 +1,5 @@
 import webPush from 'web-push';
-import { NotificationService } from './services/notificationService';
+import { NotificationService } from './services/notificationService.js';
 import type { InsertNotification } from '../shared/schema';
 
 const notificationService = new NotificationService();

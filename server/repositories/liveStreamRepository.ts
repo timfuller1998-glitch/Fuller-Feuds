@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '../db.js';
 import { liveStreams, topics } from '@shared/schema';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import type { InsertLiveStream, LiveStream } from '@shared/schema';

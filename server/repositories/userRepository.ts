@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '../db.js';
 import { users, userProfiles, userDebateStats, notifications, pushSubscriptions } from '@shared/schema';
 import { eq, desc } from 'drizzle-orm';
 import type { User, UserProfile, UserDebateStats, Notification, PushSubscription, UpsertUser } from '@shared/schema';

@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '../db.js';
 import { topicInteractions, topics, opinions } from '@shared/schema';
 import { eq, and, or, sql, isNull, isNotNull, desc, notInArray, inArray } from 'drizzle-orm';
 import type { InsertTopicInteraction, TopicInteraction, TopicWithCounts } from '@shared/schema';

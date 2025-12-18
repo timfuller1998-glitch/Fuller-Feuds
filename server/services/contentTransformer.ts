@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { AIService } from '../aiService';
+import { AIService } from '../aiService.js';
 
 export type EmotionalIntensity = 'passionate' | 'measured' | 'analytical' | 'personal';
 

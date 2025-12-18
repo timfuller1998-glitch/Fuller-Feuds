@@ -1,4 +1,4 @@
-import { NotificationRepository } from '../repositories/notificationRepository';
+import { NotificationRepository } from '../repositories/notificationRepository.js';
 import type { InsertNotification, InsertPushSubscription } from '@shared/schema';
 
 export class NotificationService {

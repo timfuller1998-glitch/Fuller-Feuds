@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { requireAdmin } from '../middleware/auth';
-import { ScrapingService } from '../services/scrapingService';
-import { RedditScraper } from '../scrapers/redditScraper';
-import { ContentTransformer } from '../services/contentTransformer';
-import { TopicRepository } from '../repositories/topicRepository';
-import { AIService } from '../aiService';
+import { requireAdmin } from '../middleware/auth.js';
+import { ScrapingService } from '../services/scrapingService.js';
+import { RedditScraper } from '../scrapers/redditScraper.js';
+import { ContentTransformer } from '../services/contentTransformer.js';
+import { TopicRepository } from '../repositories/topicRepository.js';
+import { AIService } from '../aiService.js';
 
 const router = Router();
 const scrapingService = new ScrapingService();

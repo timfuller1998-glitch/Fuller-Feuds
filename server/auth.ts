@@ -4,7 +4,7 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
-import { UserRepository } from "./repositories/userRepository";
+import { UserRepository } from "./repositories/userRepository.js";
 
 const userRepository = new UserRepository();
 

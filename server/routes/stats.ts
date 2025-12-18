@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { AnalyticsService } from '../services/analyticsService';
-import { getCacheStats } from '../services/cacheService';
-import { requireAdmin } from '../middleware/auth';
+import { AnalyticsService } from '../services/analyticsService.js';
+import { getCacheStats } from '../services/cacheService.js';
+import { requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 const analyticsService = new AnalyticsService();

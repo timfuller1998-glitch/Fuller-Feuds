@@ -1,8 +1,8 @@
-import { db } from '../db';
+import { db } from '../db.js';
 import { opinions, users, userProfiles, opinionVotes, opinionFlags } from '@shared/schema';
 import { eq, desc, and, or, ne, sql } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '@shared/schema';
-import { aggregateFallacyCounts } from '../utils/fallacyUtils';
+import { aggregateFallacyCounts } from '../utils/fallacyUtils.js';
 
 export class OpinionRepository {
   async create(opinion: InsertOpinion): Promise<Opinion> {

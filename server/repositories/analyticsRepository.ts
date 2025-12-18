@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '../db.js';
 import { opinions, users, topics, userProfiles } from '@shared/schema';
 import { sql, and, gte, eq, inArray } from 'drizzle-orm';
 

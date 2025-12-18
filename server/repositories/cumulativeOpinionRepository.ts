@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '../db.js';
 import { cumulativeOpinions } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import type { CumulativeOpinion } from '@shared/schema';

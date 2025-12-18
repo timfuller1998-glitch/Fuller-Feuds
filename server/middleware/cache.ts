@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService';
+import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
 import { createHash } from 'crypto';
 
 interface CacheOptions {

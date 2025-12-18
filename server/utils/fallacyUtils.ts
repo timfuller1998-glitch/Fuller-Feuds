@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '../db.js';
 import { opinionFlags, topicFlags, debateMessageFlags } from '@shared/schema';
 import { count, inArray, sql, SQL } from 'drizzle-orm';
 import { FALLACY_OPTIONS } from '@shared/fallacies';

@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '../db.js';
 import { badges, userBadges, users, debateRooms, opinions, topics, debateMessages, debateMessageFlags } from '@shared/schema';
 import { eq, and, or, count, asc, inArray } from 'drizzle-orm';
 import { BADGE_DEFINITIONS } from '@shared/badgeDefinitions';
