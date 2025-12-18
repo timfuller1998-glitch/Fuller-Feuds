@@ -8,7 +8,7 @@
       "config": {
         "runtime": "nodejs18.x",
         "maxLambdaSize": "50mb",
-        "includeFiles": "server/static/**"
+        "includeFiles": "dist/public/**"
       }
     }
   ],
