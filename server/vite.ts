@@ -64,71 +64,33 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // In Vercel serverless, try multiple path resolution strategies
-  // Strategy 1: Use process.cwd() (Vercel's working directory is /var/task)
-  let distPath = path.resolve(process.cwd(), "dist", "public");
+  // In Vercel, static files are served by @vercel/static builder
+  // We only need to serve index.html for SPA routing
+  // Static assets (JS, CSS, images) are handled by Vercel automatically
   
-  // Strategy 2: Try relative to import.meta.dirname (for local/bundled scenarios)
-  if (!fs.existsSync(distPath)) {
-    distPath = path.resolve(import.meta.dirname, "..", "dist", "public");
-  }
+  // Try to find index.html for SPA fallback
+  // In Vercel, static files from dist/public are served directly
+  // So we only need to handle the index.html fallback for client-side routing
+  let indexPath: string | null = null;
   
-  // Strategy 3: Try relative to import.meta.dirname going up to project root
-  if (!fs.existsSync(distPath)) {
-    distPath = path.resolve(import.meta.dirname, "..", "..", "dist", "public");
-  }
+  // Try multiple paths to find index.html
+  const possiblePaths = [
+    path.resolve(process.cwd(), "dist", "public", "index.html"),
+    path.resolve(import.meta.dirname, "..", "dist", "public", "index.html"),
+    path.resolve(import.meta.dirname, "..", "..", "dist", "public", "index.html"),
+  ];
   
-  // Strategy 4: Try just dist/public from cwd (fallback)
-  if (!fs.existsSync(distPath)) {
-    distPath = path.join(process.cwd(), "dist", "public");
-  }
-  
-  // Strategy 5: In Vercel, included files might be at the root level
-  if (!fs.existsSync(distPath)) {
-    distPath = path.resolve(process.cwd(), "public");
-  }
-
-  if (!fs.existsSync(distPath)) {
-    // Log all attempted paths for debugging
-    const attemptedPaths = [
-      path.resolve(process.cwd(), "dist", "public"),
-      path.resolve(import.meta.dirname, "..", "dist", "public"),
-      path.resolve(import.meta.dirname, "..", "..", "dist", "public"),
-      path.join(process.cwd(), "dist", "public"),
-      path.resolve(process.cwd(), "public"),
-    ];
-    
-    // Try to list what's actually in the directories for debugging
-    let dirContents = "Could not read directories";
-    try {
-      const cwdContents = fs.existsSync(process.cwd()) ? fs.readdirSync(process.cwd()).join(", ") : "cwd does not exist";
-      const serverDirContents = fs.existsSync(import.meta.dirname) ? fs.readdirSync(import.meta.dirname).join(", ") : "server dir does not exist";
-      const distExists = fs.existsSync(path.resolve(process.cwd(), "dist")) ? "dist exists" : "dist does not exist";
-      dirContents = `cwd contents: ${cwdContents}; server dir: ${serverDirContents}; ${distExists}`;
-    } catch (e) {
-      dirContents = `Error reading directories: ${e}`;
+  for (const possiblePath of possiblePaths) {
+    if (fs.existsSync(possiblePath)) {
+      indexPath = possiblePath;
+      log(`Found index.html at: ${indexPath}`);
+      break;
     }
-    
-    const errorMsg = `Could not find the build directory. Attempted paths: ${attemptedPaths.join(", ")}. ` +
-      `Current working directory: ${process.cwd()}, import.meta.dirname: ${import.meta.dirname}. ` +
-      `${dirContents}. ` +
-      `Make sure to build the client first with 'npm run build'.`;
-    log(`ERROR: ${errorMsg}`);
-    
-    // Instead of throwing (which crashes the serverless function), serve an error page
-    app.use("*", (_req, res) => {
-      res.status(500).send(`
-        <html>
-          <head><title>Build Error</title></head>
-          <body>
-            <h1>Static files not found</h1>
-            <p>${errorMsg}</p>
-            <p>Check Vercel build logs to ensure 'npm run build' completed successfully.</p>
-          </body>
-        </html>
-      `);
-    });
-    return; // Exit early, don't set up static serving
+  }
+  
+  if (!indexPath) {
+    log(`WARNING: Could not find index.html. Static files should be served by Vercel's @vercel/static builder.`);
+    // Still set up the SPA route handler - Vercel will serve static files
   }
 
   // In Vercel, static files (JS, CSS, images) are served by @vercel/static
