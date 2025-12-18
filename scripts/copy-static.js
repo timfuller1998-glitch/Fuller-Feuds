@@ -7,7 +7,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const sourceDir = path.resolve(__dirname, '..', 'dist', 'public');
+// Copy to server/static (for runtime access)
 const targetDir = path.resolve(__dirname, '..', 'server', 'static');
+// Also copy to server/public (alternative location that might get auto-included)
+const altTargetDir = path.resolve(__dirname, '..', 'server', 'public');
 
 // Also try copying to a .vercel-ignored location that will be included
 const altTargetDir = path.resolve(__dirname, '..', '.vercel-static');

@@ -65,24 +65,29 @@ export async function setupVite(app: Express, server: Server) {
 
 // Force bundler to include static files by attempting to read them at module load time
 // This ensures the directories are included even if includeFiles doesn't work
+// Vercel will include files that are read via fs operations at module load time
 try {
-  // Try server/static first (created by copy-static.js)
+  // Try server/static first (created by copy-static.js during build)
   const staticPath = path.resolve(import.meta.dirname, "static");
-  if (fs.existsSync(staticPath)) {
-    fs.readdirSync(staticPath);
+  const indexPath = path.join(staticPath, "index.html");
+  if (fs.existsSync(indexPath)) {
+    // Actually read the file to force Vercel to include it
+    fs.readFileSync(indexPath, "utf-8");
   }
 } catch {
-  // Ignore - directory might not exist during build, that's OK
+  // Ignore - file might not exist during build, that's OK
 }
 
 try {
   // Also try dist/public (where vite builds to)
   const distPublicPath = path.resolve(process.cwd(), "dist", "public");
-  if (fs.existsSync(distPublicPath)) {
-    fs.readdirSync(distPublicPath);
+  const distIndexPath = path.join(distPublicPath, "index.html");
+  if (fs.existsSync(distIndexPath)) {
+    // Actually read the file to force Vercel to include it
+    fs.readFileSync(distIndexPath, "utf-8");
   }
 } catch {
-  // Ignore - directory might not exist during build, that's OK
+  // Ignore - file might not exist during build, that's OK
 }
 
 export function serveStatic(app: Express) {

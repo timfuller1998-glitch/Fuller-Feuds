@@ -4,6 +4,8 @@ import path from "path";
 import fs from "fs";
 import routes from "./routes/index.js";
 import { serveStatic, log } from "./vite.js";
+// Force inclusion of static files by importing the loader
+import "./static-loader.js";
 import { startScheduledJobs } from "./scheduled-jobs.js";
 import { BadgeRepository } from "./repositories/badgeRepository.js";
 import { setupAuth } from "./auth.js";
