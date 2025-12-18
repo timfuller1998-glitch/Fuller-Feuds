@@ -1,5 +1,5 @@
-import { AnalyticsRepository } from '../repositories/analyticsRepository';
-import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService';
+import { AnalyticsRepository } from '../repositories/analyticsRepository.js';
+import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
 
 export class AnalyticsService {
   private repository: AnalyticsRepository;

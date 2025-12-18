@@ -1,9 +1,9 @@
-import { TopicRepository } from '../repositories/topicRepository';
-import { OpinionService } from './opinionService';
-import { AIService } from '../aiService';
+import { TopicRepository } from '../repositories/topicRepository.js';
+import { OpinionService } from './opinionService.js';
+import { AIService } from '../aiService.js';
 import type { InsertTopic, TopicWithCounts, InsertOpinion, TopicInsert } from '@shared/schema';
-import { withCache, getCache, setCache, cacheKey, CACHE_TTL } from './cacheService';
-import { invalidateTopicCache, invalidateTopicsListCache } from './cacheInvalidation';
+import { withCache, getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
+import { invalidateTopicCache, invalidateTopicsListCache } from './cacheInvalidation.js';
 
 export class TopicService {
   private repository: TopicRepository;

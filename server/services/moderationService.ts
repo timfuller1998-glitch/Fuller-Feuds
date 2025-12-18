@@ -1,4 +1,4 @@
-import { ModerationRepository } from '../repositories/moderationRepository';
+import { ModerationRepository } from '../repositories/moderationRepository.js';
 import type { BannedPhrase, InsertBannedPhrase } from '@shared/schema';
 
 export class ModerationService {

@@ -1,10 +1,10 @@
-import { OpinionRepository } from '../repositories/opinionRepository';
-import { UserRepository } from '../repositories/userRepository';
-import { InteractionRepository } from '../repositories/interactionRepository';
-import { AIService } from '../aiService';
+import { OpinionRepository } from '../repositories/opinionRepository.js';
+import { UserRepository } from '../repositories/userRepository.js';
+import { InteractionRepository } from '../repositories/interactionRepository.js';
+import { AIService } from '../aiService.js';
 import type { InsertOpinion, Opinion } from '@shared/schema';
-import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService';
-import { invalidateOpinionCache } from './cacheInvalidation';
+import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
+import { invalidateOpinionCache } from './cacheInvalidation.js';
 
 export class OpinionService {
   private repository: OpinionRepository;

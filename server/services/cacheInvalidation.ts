@@ -1,4 +1,4 @@
-import { invalidatePattern, deleteCache, cacheKey } from './cacheService';
+import { invalidatePattern, deleteCache, cacheKey } from './cacheService.js';
 
 /**
  * Cache invalidation helpers for different entity types

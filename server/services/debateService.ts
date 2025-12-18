@@ -1,5 +1,5 @@
-import { DebateRepository } from '../repositories/debateRepository';
-import { OpinionRepository } from '../repositories/opinionRepository';
+import { DebateRepository } from '../repositories/debateRepository.js';
+import { OpinionRepository } from '../repositories/opinionRepository.js';
 import type { DebateRoom, DebateMessage, InsertDebateVote } from '@shared/schema';
 
 export class DebateService {

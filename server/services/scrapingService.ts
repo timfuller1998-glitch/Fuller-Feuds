@@ -1,13 +1,13 @@
 import { randomUUID } from 'crypto';
 import { eq, desc } from 'drizzle-orm';
-import { RedditScraper } from '../scrapers/redditScraper';
-import { ContentTransformer, type TransformedOpinion } from './contentTransformer';
-import { TopicService } from './topicService';
-import { OpinionService } from './opinionService';
-import { UserRepository } from '../repositories/userRepository';
-import { TopicRepository } from '../repositories/topicRepository';
-import { AIService } from '../aiService';
-import { db } from '../db';
+import { RedditScraper } from '../scrapers/redditScraper.js';
+import { ContentTransformer, type TransformedOpinion } from './contentTransformer.js';
+import { TopicService } from './topicService.js';
+import { OpinionService } from './opinionService.js';
+import { UserRepository } from '../repositories/userRepository.js';
+import { TopicRepository } from '../repositories/topicRepository.js';
+import { AIService } from '../aiService.js';
+import { db } from '../db.js';
 import { seedingJobs } from '@shared/schema';
 import type { Topic, User } from '@shared/schema';
 
