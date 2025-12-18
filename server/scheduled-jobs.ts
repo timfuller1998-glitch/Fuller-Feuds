@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { log } from './vite.js';
+import { log } from './utils/logger.js';
 import { TopicService } from './services/topicService.js';
 import { OpinionService } from './services/opinionService.js';
 import { CumulativeOpinionService } from './services/cumulativeOpinionService.js';
