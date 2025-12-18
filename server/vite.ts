@@ -86,16 +86,16 @@ export function serveStatic(app: Express) {
   
   // Priority order based on Vercel's file structure
   // Try multiple strategies to find dist/public
-  // NOTE: Vercel serves static files from .vercel/output/static, but we also check other locations
+  // NOTE: server/static is created by copy-static.js during build and should be most reliable
   const possiblePaths = [
-    // Strategy 1: Vercel's static output (if using @vercel/static builder)
-    path.resolve(cwd, ".vercel", "output", "static"),
-    // Strategy 2: Direct from cwd (most common in Vercel)
-    path.resolve(cwd, "dist", "public"),
-    // Strategy 3: Copied to server/static during build (fallback)
+    // Strategy 1: Copied to server/static during build (most reliable - created by copy-static.js)
     path.resolve(dirname, "static"),
-    // Strategy 4: Relative to server directory
+    // Strategy 2: Direct from cwd (where includeFiles places files)
+    path.resolve(cwd, "dist", "public"),
+    // Strategy 3: Relative to server directory
     path.resolve(dirname, "..", "dist", "public"),
+    // Strategy 4: Vercel's static output (if using @vercel/static builder)
+    path.resolve(cwd, ".vercel", "output", "static"),
     // Strategy 5: If server is nested deeper
     path.resolve(dirname, "..", "..", "dist", "public"),
     // Strategy 6: Check if dist exists at root
