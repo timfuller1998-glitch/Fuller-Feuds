@@ -35,8 +35,12 @@ const trimmedConnectionString = connectionString.trim();
 try {
   const url = new URL(trimmedConnectionString);
   const maskedUrl = `${url.protocol}//${url.username ? '***:***@' : ''}${url.hostname}:${url.port || '5432'}${url.pathname}`;
+  console.error(`[DB CONNECTION] Parsed hostname: ${url.hostname}, port: ${url.port || '5432'}, database: ${url.pathname?.replace('/','')}`);
+  console.error(`[DB CONNECTION] Full connection string (masked): ${maskedUrl}`);
   fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'Connection string parsed',data:{hostname:url.hostname,port:url.port||'5432',database:url.pathname?.replace('/',''),maskedUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
 } catch(e) {
+  console.error(`[DB CONNECTION] Failed to parse connection string: ${e}`);
+  console.error(`[DB CONNECTION] First 100 chars of connection string: ${trimmedConnectionString.substring(0, 100)}`);
   fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'Failed to parse connection string',data:{error:String(e),first50:trimmedConnectionString.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
 }
 // #endregion
@@ -95,6 +99,12 @@ export const checkDbConnection = async (): Promise<boolean> => {
   } catch (error) {
     // #region agent log
     const errorData = error instanceof Error ? {message:error.message,code:(error as any).code,errno:(error as any).errno,syscall:(error as any).syscall,hostname:(error as any).hostname} : {error:String(error)};
+    console.error('[DB CONNECTION] Health check failed:', errorData);
+    if ((error as any).hostname) {
+      console.error(`[DB CONNECTION] ERROR: Cannot resolve hostname: ${(error as any).hostname}`);
+      console.error(`[DB CONNECTION] ACTION REQUIRED: Update DATABASE_URL in Vercel to use correct Supabase hostname`);
+      console.error(`[DB CONNECTION] Expected format: postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres`);
+    }
     fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:69',message:'Health check failed',data:errorData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     console.error('Database connection failed:', error);
