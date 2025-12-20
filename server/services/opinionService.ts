@@ -1,25 +1,15 @@
-<<<<<<< Current (Your changes)
 import { OpinionRepository } from '../repositories/opinionRepository.js';
 import { UserRepository } from '../repositories/userRepository.js';
 import { InteractionRepository } from '../repositories/interactionRepository.js';
+import { CumulativeOpinionService } from './cumulativeOpinionService.js';
 import { AIService } from '../aiService.js';
+import { lexiconAnalysisService } from './lexiconAnalysisService.js';
+import { db } from '../db.js';
+import { opinions, cumulativeOpinions } from '../../shared/schema.js';
+import { eq, and, sql, asc } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
-import { invalidateOpinionCache } from './cacheInvalidation.js';
-=======
-import { OpinionRepository } from '../repositories/opinionRepository';
-import { UserRepository } from '../repositories/userRepository';
-import { InteractionRepository } from '../repositories/interactionRepository';
-import { CumulativeOpinionService } from './cumulativeOpinionService';
-import { AIService } from '../aiService';
-import { lexiconAnalysisService } from './lexiconAnalysisService';
-import { db } from '../db';
-import { opinions, cumulativeOpinions } from '@shared/schema';
-import { eq, and, sql, asc } from 'drizzle-orm';
-import type { InsertOpinion, Opinion } from '@shared/schema';
-import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService';
-import { invalidateOpinionCache, invalidateTopicCache, invalidateCumulativeOpinionCache } from './cacheInvalidation';
->>>>>>> Incoming (Background Agent changes)
+import { invalidateOpinionCache, invalidateTopicCache, invalidateCumulativeOpinionCache } from './cacheInvalidation.js';
 
 export class OpinionService {
   private repository: OpinionRepository;
