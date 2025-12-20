@@ -1,4 +1,4 @@
-import { SentimentIntensityAnalyzer } from 'vader-sentiment';
+import * as vader from 'vader-sentiment';
 
 /**
  * Lexicon-based analysis service for instant opinion scoring
@@ -62,7 +62,7 @@ export class LexiconAnalysisService {
    * Maps sentiment compound score (-1 to +1) to taste score (-100 to +100)
    */
   private analyzeTaste(text: string): number {
-    const result = SentimentIntensityAnalyzer.polarity_scores(text);
+    const result = vader.SentimentIntensityAnalyzer.polarity_scores(text);
     const compound = result.compound || 0;
     
     // Map VADER compound score (-1 to +1) to taste score (-100 to +100)

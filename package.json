@@ -90,7 +90,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "^1.2.5",
     "vaul": "^1.1.2",
-    "vader-sentiment": "^3.0.2",
+    "vader-sentiment": "^1.1.3",
     "vite-plugin-pwa": "^1.1.0",
     "web-push": "^3.6.7",
     "wouter": "^3.3.5",
