@@ -1,16 +1,15 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "builds": [
-    {
-      "src": "server/index.ts",
-      "use": "@vercel/node",
-      "config": {
-        "runtime": "nodejs18.x",
-        "maxLambdaSize": "50mb"
-      }
+  "outputDirectory": "dist/public",
+  "functions": {
+    "server/index.ts": {
+      "runtime": "nodejs18.x",
+      "maxDuration": 30,
+      "memory": 1024,
+      "includeFiles": ["dist/public/**", "server/static/**"]
     }
-  ],
+  },
   "routes": [
     {
       "src": "/api/(.*)",
