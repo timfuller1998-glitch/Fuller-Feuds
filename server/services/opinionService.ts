@@ -164,7 +164,26 @@ export class OpinionService {
     await db.transaction(async (tx) => {
       // Calculate distribution from all available scores
       // Include opinions with taste/passion even if political scores missing (FILTER handles NULLs)
-      const [distribution] = await tx.execute(sql`
+      const [distribution] = await tx.execute(sql<{
+        avg_economic: number | null;
+        avg_authoritarian: number | null;
+        avg_taste: number | null;
+        avg_passion: number | null;
+        auth_cap: number;
+        lib_cap: number;
+        auth_soc: number;
+        lib_soc: number;
+        revulsion: number;
+        aversion: number;
+        neutral_taste: number;
+        preference: number;
+        delight: number;
+        academic: number;
+        measured: number;
+        moderate_passion: number;
+        passionate: number;
+        aggressive: number;
+      }>`
         SELECT 
           AVG(topic_economic_score) FILTER (WHERE topic_economic_score IS NOT NULL) as avg_economic,
           AVG(topic_authoritarian_score) FILTER (WHERE topic_authoritarian_score IS NOT NULL) as avg_authoritarian,
@@ -199,10 +218,10 @@ export class OpinionService {
       // Update cumulative_opinions atomically
       await tx.update(cumulativeOpinions)
         .set({
-          averageTasteScore: Math.round(distribution.avg_taste || 0),
-          averagePassionScore: Math.round(distribution.avg_passion || 0),
-          averageEconomicScore: Math.round(distribution.avg_economic || 0),
-          averageAuthoritarianScore: Math.round(distribution.avg_authoritarian || 0),
+          averageTasteScore: Math.round((distribution.avg_taste as number) || 0),
+          averagePassionScore: Math.round((distribution.avg_passion as number) || 0),
+          averageEconomicScore: Math.round((distribution.avg_economic as number) || 0),
+          averageAuthoritarianScore: Math.round((distribution.avg_authoritarian as number) || 0),
           tasteDistribution: {
             revulsion: distribution.revulsion || 0,
             aversion: distribution.aversion || 0,
@@ -236,7 +255,7 @@ export class OpinionService {
   }
 
   private async calculateDiversityScore(tx: any, topicId: string, scoreColumn: string): Promise<number> {
-    const [result] = await tx.execute(sql`
+    const [result] = await tx.execute(sql<{ stddev: number | null; count: number }>`
       SELECT 
         STDDEV(${sql.raw(scoreColumn)}) as stddev,
         COUNT(*) as count
@@ -246,7 +265,7 @@ export class OpinionService {
         AND status IN ('approved', 'pending')
     `);
     
-    if (!result.count || result.count < 2) return 0;
+    if (!result.count || result.count < 2 || !result.stddev) return 0;
     
     // Normalize standard deviation to 0-100 scale
     // Max possible stddev for -100 to +100 range is ~57.7 (when evenly split)
@@ -256,7 +275,7 @@ export class OpinionService {
 
   async checkAndTriggerSummaryUpdate(topicId: string): Promise<void> {
     // Get actual count from database (not from cumulativeOpinions which may be stale)
-    const [last24hResult] = await db.execute(sql`
+    const [last24hResult] = await db.execute(sql<{ count: number }>`
       SELECT COUNT(*)::integer as count
       FROM opinions
       WHERE topic_id = ${topicId}
@@ -270,7 +289,7 @@ export class OpinionService {
     const lastUpdateTime = existing?.updatedAt || new Date(0);
     
     // Count opinions created since last summary update
-    const [sinceUpdateResult] = await db.execute(sql`
+    const [sinceUpdateResult] = await db.execute(sql<{ count: number }>`
       SELECT COUNT(*)::integer as count
       FROM opinions
       WHERE topic_id = ${topicId}
@@ -281,11 +300,11 @@ export class OpinionService {
     
     // Tier 1: Hot topic (>50 opinions/24h) - update every 10 new
     if (last24h > 50 && opinionsSinceUpdate >= 10) {
-      await this.cumulativeOpinionService.queueSummaryRegeneration(topicId);
+      await this.cumulativeOpinionService.refreshCumulativeOpinion(topicId);
     }
     // Tier 2: Active topic (10-50/24h) - update every 25 new
     else if (last24h > 10 && opinionsSinceUpdate >= 25) {
-      await this.cumulativeOpinionService.queueSummaryRegeneration(topicId);
+      await this.cumulativeOpinionService.refreshCumulativeOpinion(topicId);
     }
     // Tier 3: Cold topics handled by daily CRON
   }
