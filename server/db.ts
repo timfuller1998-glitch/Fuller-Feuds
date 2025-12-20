@@ -74,11 +74,13 @@ try {
 // #endregion
 
 // Production-ready connection pool configuration
+// Supabase requires SSL connections
 const client = postgres(trimmedConnectionString, {
   prepare: false, // Disable prepared statements for better connection reuse
   max: parseInt(process.env.DATABASE_MAX_CONNECTIONS || '10', 10), // Max connections in pool
   idle_timeout: parseInt(process.env.DATABASE_IDLE_TIMEOUT || '20', 10), // Close idle connections after 20s
   connect_timeout: parseInt(process.env.DATABASE_CONNECT_TIMEOUT || '10', 10), // Connection timeout
+  ssl: 'require', // Supabase requires SSL connections
   onnotice: () => {}, // Ignore PostgreSQL notices to reduce log noise
 });
 
