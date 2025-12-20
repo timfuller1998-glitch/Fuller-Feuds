@@ -1,9 +1,9 @@
-import { db } from '../db';
-import { opinions } from '@shared/schema';
+import { db } from '../db.js';
+import { opinions } from '../../shared/schema.js';
 import { and, sql, eq, asc } from 'drizzle-orm';
-import { AIService } from '../aiService';
-import { TopicRepository } from '../repositories/topicRepository';
-import type { Opinion } from '@shared/schema';
+import { AIService } from '../aiService.js';
+import { TopicRepository } from '../repositories/topicRepository.js';
+import type { Opinion } from '../../shared/schema.js';
 
 /**
  * Batch processing service for political score analysis
@@ -127,7 +127,7 @@ export class OpinionBatchService {
     });
     
     // Trigger distribution update after batch completes (import dynamically to avoid circular dependency)
-    const { OpinionService } = await import('./opinionService');
+    const { OpinionService } = await import('./opinionService.js');
     const opinionService = new OpinionService();
     await opinionService.updateTopicDistribution(topicId);
   }
