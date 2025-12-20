@@ -243,4 +243,9 @@ server.listen({
 }
 
 // Export the app for Vercel
+// #region agent log
+const logData = {location:'server/index.ts:240',message:'Server module loaded',data:{nodeEnv:process.env.NODE_ENV,vercel:process.env.VERCEL,hasRoutes:!!routes},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+console.log('[DEBUG]', JSON.stringify(logData));
+fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
+// #endregion
 export default app;
