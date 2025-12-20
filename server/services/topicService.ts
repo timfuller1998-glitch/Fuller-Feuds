@@ -126,6 +126,11 @@ export class TopicService {
 
     const topic = await this.repository.create(finalTopicData);
 
+    // Generate embedding for semantic search (async, don't block topic creation)
+    this.generateAndStoreEmbedding(topic.id, `${data.title} ${description}`).catch(error => {
+      console.error(`[TopicService] Error generating embedding for topic ${topic.id}:`, error);
+    });
+
     // Invalidate caches after creating topic
     await invalidateTopicsListCache();
 
@@ -176,7 +181,22 @@ export class TopicService {
   }
 
   async updateEmbedding(topicId: string, embedding: number[]): Promise<void> {
+    // Update both JSONB embedding (backup) and vector embedding (for pgvector)
     await this.repository.updateEmbedding(topicId, embedding);
+    await this.repository.updateEmbeddingVector(topicId, embedding);
+  }
+
+  /**
+   * Generate embedding and store in both JSONB and vector formats
+   */
+  private async generateAndStoreEmbedding(topicId: string, text: string): Promise<void> {
+    try {
+      const embedding = await AIService.generateEmbedding(text);
+      await this.updateEmbedding(topicId, embedding);
+    } catch (error) {
+      console.error(`[TopicService] Failed to generate embedding for topic ${topicId}:`, error);
+      throw error;
+    }
   }
 
   async deleteTopic(id: string): Promise<void> {

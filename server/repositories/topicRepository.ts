@@ -1,8 +1,11 @@
 import { db } from '../db.js';
 import { topics, opinions, opinionVotes, topicFlags, users } from '../../shared/schema.js';
 import { eq, desc, and, sql, count } from 'drizzle-orm';
-import type { InsertTopic, Topic, TopicWithCounts, TopicInsert } from '../../shared/schema.js';
-import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
+
+import type { InsertTopic, Topic, TopicWithCounts, TopicInsert } from '@shared/schema';
+import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService';
+import { AIService } from '../aiService';
+
 
 export class TopicRepository {
   async create(topic: TopicInsert): Promise<Topic> {
@@ -21,6 +24,11 @@ export class TopicRepository {
 
     const counts = await this.getTopicCounts(id);
     const preview = await this.getTopicPreview(id);
+    
+    // Get cumulative opinion for distribution data
+    const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository');
+    const cumulativeRepo = new CumulativeOpinionRepository();
+    const cumulative = await cumulativeRepo.findByTopicId(id);
 
     return {
       ...topic,
@@ -29,13 +37,38 @@ export class TopicRepository {
       previewContent: preview.content,
       previewAuthor: preview.author,
       previewIsAI: preview.isAI,
-      diversityScore: 0, // TODO: Implement diversity calculation
-      politicalDistribution: {
-        authoritarianCapitalist: 0,
-        authoritarianSocialist: 0,
-        libertarianCapitalist: 0,
-        libertarianSocialist: 0,
-      },
+      diversityScore: cumulative?.diversityScore ?? 0,
+      avgTasteScore: typeof cumulative?.averageTasteScore === 'number' ? cumulative.averageTasteScore : undefined,
+      avgPassionScore: typeof cumulative?.averagePassionScore === 'number' ? cumulative.averagePassionScore : undefined,
+      politicalDistribution: (() => {
+        const dist = cumulative?.politicalDistribution;
+        if (
+          dist &&
+          typeof dist === 'object' &&
+          dist !== null &&
+          'authoritarianCapitalist' in dist &&
+          'authoritarianSocialist' in dist &&
+          'libertarianCapitalist' in dist &&
+          'libertarianSocialist' in dist &&
+          typeof (dist as any).authoritarianCapitalist === 'number' &&
+          typeof (dist as any).authoritarianSocialist === 'number' &&
+          typeof (dist as any).libertarianCapitalist === 'number' &&
+          typeof (dist as any).libertarianSocialist === 'number'
+        ) {
+          return {
+            authoritarianCapitalist: (dist as any).authoritarianCapitalist,
+            authoritarianSocialist: (dist as any).authoritarianSocialist,
+            libertarianCapitalist: (dist as any).libertarianCapitalist,
+            libertarianSocialist: (dist as any).libertarianSocialist,
+          };
+        }
+        return {
+          authoritarianCapitalist: 0,
+          authoritarianSocialist: 0,
+          libertarianCapitalist: 0,
+          libertarianSocialist: 0,
+        };
+      })(),
     };
   }
 
@@ -70,10 +103,14 @@ export class TopicRepository {
       .limit(limit);
 
     // Get counts for each topic
+    const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository');
+    const cumulativeRepo = new CumulativeOpinionRepository();
+    
     const topicsWithCounts = await Promise.all(
       topicsList.map(async (topic) => {
         const counts = await this.getTopicCounts(topic.id);
         const preview = await this.getTopicPreview(topic.id);
+        const cumulative = await cumulativeRepo.findByTopicId(topic.id);
 
         return {
           ...topic,
@@ -82,18 +119,84 @@ export class TopicRepository {
           previewContent: preview.content,
           previewAuthor: preview.author,
           previewIsAI: preview.isAI,
-          diversityScore: 0, // TODO: Implement diversity calculation
-          politicalDistribution: {
-            authoritarianCapitalist: 0,
-            authoritarianSocialist: 0,
-            libertarianCapitalist: 0,
-            libertarianSocialist: 0,
-          },
+          diversityScore: cumulative?.diversityScore ?? 0,
+          avgTasteScore: typeof cumulative?.averageTasteScore === 'number' ? cumulative.averageTasteScore : undefined,
+          avgPassionScore: typeof cumulative?.averagePassionScore === 'number' ? cumulative.averagePassionScore : undefined,
+          politicalDistribution: (() => {
+            const dist = cumulative?.politicalDistribution;
+            if (
+              dist &&
+              typeof dist === 'object' &&
+              dist !== null &&
+              'authoritarianCapitalist' in dist &&
+              'authoritarianSocialist' in dist &&
+              'libertarianCapitalist' in dist &&
+              'libertarianSocialist' in dist &&
+              typeof (dist as any).authoritarianCapitalist === 'number' &&
+              typeof (dist as any).authoritarianSocialist === 'number' &&
+              typeof (dist as any).libertarianCapitalist === 'number' &&
+              typeof (dist as any).libertarianSocialist === 'number'
+            ) {
+              return {
+                authoritarianCapitalist: (dist as any).authoritarianCapitalist,
+                authoritarianSocialist: (dist as any).authoritarianSocialist,
+                libertarianCapitalist: (dist as any).libertarianCapitalist,
+                libertarianSocialist: (dist as any).libertarianSocialist,
+              };
+            }
+            return {
+              authoritarianCapitalist: 0,
+              authoritarianSocialist: 0,
+              libertarianCapitalist: 0,
+              libertarianSocialist: 0,
+            };
+          })(),
         };
       })
     );
 
-    return topicsWithCounts;
+    // Convert any `null` values in avgTasteScore and avgPassionScore to `undefined`
+    // to satisfy the TopicWithCounts type expectation (`number | undefined`, not `number | null | undefined`)
+    // Also ensure politicalDistribution is properly typed
+    const normalizedTopicsWithCounts: TopicWithCounts[] = topicsWithCounts.map(t => {
+      const dist = t.politicalDistribution;
+      const validDist: {
+        authoritarianCapitalist: number;
+        authoritarianSocialist: number;
+        libertarianCapitalist: number;
+        libertarianSocialist: number;
+      } = (
+        dist &&
+        typeof dist === 'object' &&
+        'authoritarianCapitalist' in dist &&
+        'authoritarianSocialist' in dist &&
+        'libertarianCapitalist' in dist &&
+        'libertarianSocialist' in dist &&
+        typeof (dist as any).authoritarianCapitalist === 'number' &&
+        typeof (dist as any).authoritarianSocialist === 'number' &&
+        typeof (dist as any).libertarianCapitalist === 'number' &&
+        typeof (dist as any).libertarianSocialist === 'number'
+      ) ? {
+        authoritarianCapitalist: (dist as any).authoritarianCapitalist,
+        authoritarianSocialist: (dist as any).authoritarianSocialist,
+        libertarianCapitalist: (dist as any).libertarianCapitalist,
+        libertarianSocialist: (dist as any).libertarianSocialist,
+      } : {
+        authoritarianCapitalist: 0,
+        authoritarianSocialist: 0,
+        libertarianCapitalist: 0,
+        libertarianSocialist: 0,
+      };
+      
+      return {
+        ...t,
+        avgTasteScore: t.avgTasteScore === null ? undefined : t.avgTasteScore,
+        avgPassionScore: t.avgPassionScore === null ? undefined : t.avgPassionScore,
+        politicalDistribution: validDist,
+      } as TopicWithCounts;
+    });
+
+    return normalizedTopicsWithCounts;
   }
 
   async updateEmbedding(topicId: string, embedding: number[]): Promise<void> {
@@ -145,11 +248,18 @@ export class TopicRepository {
       .orderBy(desc(topics.createdAt));
 
     // Get counts for each topic (simplified version)
+    const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository');
+    const cumulativeRepo = new CumulativeOpinionRepository();
+    
     const topicsWithCounts = await Promise.all(
       topicsList.map(async (topic) => {
         const counts = await this.getTopicCounts(topic.id);
         const preview = await this.getTopicPreview(topic.id);
+        const cumulative = await cumulativeRepo.findByTopicId(topic.id);
 
+        const avgTaste = cumulative?.averageTasteScore;
+        const avgPassion = cumulative?.averagePassionScore;
+        
         return {
           ...topic,
           opinionsCount: counts.opinionsCount,
@@ -157,13 +267,38 @@ export class TopicRepository {
           previewContent: preview.content,
           previewAuthor: preview.author,
           previewIsAI: preview.isAI,
-          diversityScore: 0,
-          politicalDistribution: {
-            authoritarianCapitalist: 0,
-            authoritarianSocialist: 0,
-            libertarianCapitalist: 0,
-            libertarianSocialist: 0,
-          },
+          diversityScore: cumulative?.diversityScore ?? 0,
+          avgTasteScore: typeof avgTaste === 'number' ? avgTaste : (avgTaste === null ? undefined : undefined),
+          avgPassionScore: typeof avgPassion === 'number' ? avgPassion : (avgPassion === null ? undefined : undefined),
+          politicalDistribution: (() => {
+            const dist = cumulative?.politicalDistribution;
+            if (
+              dist &&
+              typeof dist === 'object' &&
+              dist !== null &&
+              'authoritarianCapitalist' in dist &&
+              'authoritarianSocialist' in dist &&
+              'libertarianCapitalist' in dist &&
+              'libertarianSocialist' in dist &&
+              typeof (dist as any).authoritarianCapitalist === 'number' &&
+              typeof (dist as any).authoritarianSocialist === 'number' &&
+              typeof (dist as any).libertarianCapitalist === 'number' &&
+              typeof (dist as any).libertarianSocialist === 'number'
+            ) {
+              return {
+                authoritarianCapitalist: (dist as any).authoritarianCapitalist,
+                authoritarianSocialist: (dist as any).authoritarianSocialist,
+                libertarianCapitalist: (dist as any).libertarianCapitalist,
+                libertarianSocialist: (dist as any).libertarianSocialist,
+              };
+            }
+            return {
+              authoritarianCapitalist: 0,
+              authoritarianSocialist: 0,
+              libertarianCapitalist: 0,
+              libertarianSocialist: 0,
+            };
+          })(),
         };
       })
     );
@@ -304,5 +439,115 @@ export class TopicRepository {
     await setCache(cacheKey, result, CACHE_TTL.MEDIUM);
     
     return result;
+  }
+
+  /**
+   * Search topics by vector similarity using pgvector
+   * @param embedding - Query embedding vector (1536 dimensions)
+   * @param limit - Maximum number of results
+   * @param threshold - Minimum similarity threshold (0-1)
+   */
+  async searchByVector(embedding: number[], limit: number = 20, threshold: number = 0.7): Promise<Topic[]> {
+    const embeddingStr = `[${embedding.join(',')}]`;
+    
+    const results = await db.execute(sql`
+      SELECT *, 
+        1 - (embedding_vec <=> ${embeddingStr}::vector) as similarity
+      FROM topics
+      WHERE embedding_vec IS NOT NULL
+        AND is_active = true
+        AND 1 - (embedding_vec <=> ${embeddingStr}::vector) >= ${threshold}
+      ORDER BY embedding_vec <=> ${embeddingStr}::vector
+      LIMIT ${limit * 2}
+    `);
+    
+    return results.map((r: any) => ({ 
+      ...r, 
+      similarity: Number(r.similarity) 
+    })) as Topic[];
+  }
+
+  /**
+   * Search topics by keywords using PostgreSQL full-text search
+   * @param query - Search query string
+   * @param limit - Maximum number of results
+   */
+  async searchByKeywords(query: string, limit: number = 20): Promise<Topic[]> {
+    const results = await db.execute(sql`
+      SELECT *, 
+        ts_rank(to_tsvector('english', title || ' ' || description), 
+                plainto_tsquery('english', ${query})) as rank
+      FROM topics
+      WHERE is_active = true
+        AND to_tsvector('english', title || ' ' || description) @@ 
+            plainto_tsquery('english', ${query})
+      ORDER BY rank DESC
+      LIMIT ${limit * 2}
+    `);
+    
+    return results.map((r: any) => r) as Topic[];
+  }
+
+  /**
+   * Hybrid search combining semantic (vector) and keyword search
+   * Uses Reciprocal Rank Fusion (RRF) to merge results
+   * @param query - Search query string
+   * @param limit - Maximum number of results
+   */
+  async hybridSearch(query: string, limit: number = 20): Promise<Topic[]> {
+    // Generate embedding for semantic search
+    const queryEmbedding = await AIService.generateEmbedding(query);
+    
+    // Perform both searches in parallel
+    const [semanticResults, keywordResults] = await Promise.all([
+      this.searchByVector(queryEmbedding, limit * 2),
+      this.searchByKeywords(query, limit * 2)
+    ]);
+    
+    // Reciprocal Rank Fusion with k=60 (standard parameter)
+    return this.reciprocalRankFusion(semanticResults, keywordResults, 60).slice(0, limit);
+  }
+
+  /**
+   * Reciprocal Rank Fusion (RRF) for merging search results
+   * Combines results from multiple search methods with weighted scoring
+   */
+  private reciprocalRankFusion(
+    list1: Topic[],
+    list2: Topic[],
+    k: number = 60
+  ): Topic[] {
+    const scores = new Map<string, number>();
+    
+    // Score each result from semantic search
+    list1.forEach((item, rank) => {
+      const score = 1 / (k + rank + 1);
+      scores.set(item.id, (scores.get(item.id) || 0) + score);
+    });
+    
+    // Score each result from keyword search
+    list2.forEach((item, rank) => {
+      const score = 1 / (k + rank + 1);
+      scores.set(item.id, (scores.get(item.id) || 0) + score);
+    });
+    
+    // Combine and deduplicate
+    const allItems = Array.from(new Set([...list1, ...list2]));
+    
+    // Sort by combined score
+    return allItems
+      .sort((a, b) => (scores.get(b.id) || 0) - (scores.get(a.id) || 0));
+  }
+
+  /**
+   * Update embedding vector column (for pgvector)
+   */
+  async updateEmbeddingVector(topicId: string, embedding: number[]): Promise<void> {
+    const embeddingStr = `[${embedding.join(',')}]`;
+    await db.execute(sql`
+      UPDATE topics 
+      SET embedding_vec = ${embeddingStr}::vector
+      WHERE id = ${topicId}
+    `);
   }
 }

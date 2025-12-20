@@ -99,6 +99,10 @@ export const opinions = pgTable("opinions", {
   references: text("references").array().default(sql`ARRAY[]::text[]`), // Reference links/URLs
   topicEconomicScore: integer("topic_economic_score"), // -100 (capitalist) to +100 (socialist) - this opinion's political stance on economic axis
   topicAuthoritarianScore: integer("topic_authoritarian_score"), // -100 (libertarian) to +100 (authoritarian) - this opinion's political stance on authoritarian axis
+  tasteScore: integer("taste_score"), // -100 to +100 (revulsion to delight)
+  passionScore: integer("passion_score"), // -100 to +100 (academic to aggressive)
+  analysisConfidence: varchar("analysis_confidence", { length: 10 }), // 'high', 'medium', 'low'
+  analyzedAt: timestamp("analyzed_at"), // When scores were computed
   likesCount: integer("likes_count").default(0),
   dislikesCount: integer("dislikes_count").default(0),
   repliesCount: integer("replies_count").default(0),
@@ -116,6 +120,13 @@ export const cumulativeOpinions = pgTable("cumulative_opinions", {
   confidence: varchar("confidence", { length: 20 }).default("medium"), // 'high', 'medium', 'low'
   averageEconomicScore: integer("average_economic_score"), // Average economic position of all opinions
   averageAuthoritarianScore: integer("average_authoritarian_score"), // Average authoritarian position of all opinions
+  averageTasteScore: integer("average_taste_score"), // Average taste score
+  averagePassionScore: integer("average_passion_score"), // Average passion score
+  tasteDistribution: jsonb("taste_distribution"), // {revulsion: 5, aversion: 12, neutral: 20, preference: 8, delight: 3}
+  passionDistribution: jsonb("passion_distribution"), // {academic: 3, measured: 25, moderate: 15, passionate: 10, aggressive: 2}
+  politicalDistribution: jsonb("political_distribution"), // {authoritarianCapitalist: 10, libertarianCapitalist: 5, ...}
+  tasteDiversity: integer("taste_diversity"), // How diverse taste scores are (0-100)
+  passionDiversity: integer("passion_diversity"), // How diverse passion scores are (0-100)
   diversityScore: integer("diversity_score"), // How politically diverse the opinions are (0-100)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -482,6 +493,8 @@ export type TopicWithCounts = Topic & {
   previewAuthor?: string;
   previewIsAI?: boolean;
   diversityScore?: number;
+  avgTasteScore?: number;
+  avgPassionScore?: number;
   politicalDistribution?: {
     authoritarianCapitalist: number;
     authoritarianSocialist: number;

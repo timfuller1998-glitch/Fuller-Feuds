@@ -113,3 +113,14 @@ export async function invalidateCategoryCache(category?: string): Promise<void> 
     await invalidatePattern('topics:category:*');
   }
 }
+
+/**
+ * Invalidate cumulative opinion cache for a topic
+ */
+export async function invalidateCumulativeOpinionCache(topicId: string): Promise<void> {
+  await Promise.all([
+    deleteCache(`cumulative:${topicId}`),
+    invalidatePattern(`cumulative:${topicId}:*`),
+    invalidateTopicCache(topicId), // Also invalidate topic cache since it includes cumulative data
+  ]);
+}

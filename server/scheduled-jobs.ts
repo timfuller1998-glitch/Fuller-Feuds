@@ -1,14 +1,16 @@
 import cron from 'node-cron';
-import { log } from './utils/logger.js';
-import { TopicService } from './services/topicService.js';
-import { OpinionService } from './services/opinionService.js';
-import { CumulativeOpinionService } from './services/cumulativeOpinionService.js';
-import { DebateService } from './services/debateService.js';
+import { log } from './vite';
+import { TopicService } from './services/topicService';
+import { OpinionService } from './services/opinionService';
+import { CumulativeOpinionService } from './services/cumulativeOpinionService';
+import { DebateService } from './services/debateService';
+import { OpinionBatchService } from './services/opinionBatchService';
 
 const topicService = new TopicService();
 const opinionService = new OpinionService();
 const cumulativeOpinionService = new CumulativeOpinionService();
 const debateService = new DebateService();
+const opinionBatchService = new OpinionBatchService();
 
 export function startScheduledJobs() {
   cron.schedule('0 2 * * *', async () => {
@@ -53,6 +55,19 @@ export function startScheduledJobs() {
   });
 
   log('[CRON] Scheduled daily AI summary update at 2:00 AM ' + (process.env.CRON_TZ || 'UTC'));
+
+  // Batch process opinions for political scores every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
+    log('[CRON] Processing opinion batch for political scores');
+    try {
+      await opinionBatchService.processPendingOpinions();
+    } catch (error) {
+      log(`[CRON ERROR] Batch processing failed: ${error}`);
+      // TODO: Send alert to monitoring system
+    }
+  });
+
+  log('[CRON] Scheduled batch opinion processing every 5 minutes');
 
   // Auto-archive ended debates with no activity for 7 days
   cron.schedule('0 3 * * *', async () => {

@@ -6,10 +6,14 @@ import * as schema from "../shared/schema.js";
 // Load environment variables from .env file only in development
 // In production (Vercel), environment variables are provided by the platform
 if (process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1') {
-  config({ path: '.env', override: true });
+config({ path: '.env', override: true });
 }
 
 let connectionString = process.env.DATABASE_URL;
+
+// #region agent log
+fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:12',message:'DATABASE_URL env var check',data:{hasValue:!!connectionString,length:connectionString?.length,isVercel:process.env.VERCEL==='1',nodeEnv:process.env.NODE_ENV},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+// #endregion
 
 if (!connectionString) {
   const errorMsg = process.env.VERCEL === '1' 
@@ -26,6 +30,16 @@ if (connectionString.startsWith('DATABASE_URL=')) {
 
 // Trim any whitespace
 const trimmedConnectionString = connectionString.trim();
+
+// #region agent log
+try {
+  const url = new URL(trimmedConnectionString);
+  const maskedUrl = `${url.protocol}//${url.username ? '***:***@' : ''}${url.hostname}:${url.port || '5432'}${url.pathname}`;
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'Connection string parsed',data:{hostname:url.hostname,port:url.port||'5432',database:url.pathname?.replace('/',''),maskedUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+} catch(e) {
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'Failed to parse connection string',data:{error:String(e),first50:trimmedConnectionString.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+}
+// #endregion
 
 // Validate the connection string format
 if (!trimmedConnectionString.startsWith('postgresql://') && !trimmedConnectionString.startsWith('postgres://')) {
@@ -48,6 +62,13 @@ try {
   );
 }
 
+// #region agent log
+try {
+  const url = new URL(trimmedConnectionString);
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:52',message:'Creating postgres client',data:{hostname:url.hostname,port:url.port||'5432',maxConnections:process.env.DATABASE_MAX_CONNECTIONS||'10',connectTimeout:process.env.DATABASE_CONNECT_TIMEOUT||'10'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+} catch(e) {}
+// #endregion
+
 // Production-ready connection pool configuration
 const client = postgres(trimmedConnectionString, {
   prepare: false, // Disable prepared statements for better connection reuse
@@ -62,10 +83,20 @@ export const pool = client;
 
 // Health check function for monitoring
 export const checkDbConnection = async (): Promise<boolean> => {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:64',message:'Health check started',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
   try {
     await client`SELECT 1`;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:66',message:'Health check succeeded',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     return true;
   } catch (error) {
+    // #region agent log
+    const errorData = error instanceof Error ? {message:error.message,code:(error as any).code,errno:(error as any).errno,syscall:(error as any).syscall,hostname:(error as any).hostname} : {error:String(error)};
+    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:69',message:'Health check failed',data:errorData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     console.error('Database connection failed:', error);
     return false;
   }

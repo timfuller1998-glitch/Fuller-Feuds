@@ -86,7 +86,19 @@ export class AIService {
 
   static async generateCumulativeOpinion(
     topic: Topic,
-    opinions: Opinion[]
+    opinions: Opinion[],
+    distributions?: {
+      averageEconomicScore?: number;
+      averageAuthoritarianScore?: number;
+      averageTasteScore?: number;
+      averagePassionScore?: number;
+      tasteDistribution?: any;
+      passionDistribution?: any;
+      politicalDistribution?: any;
+      tasteDiversity?: number;
+      passionDiversity?: number;
+      diversityScore?: number;
+    }
   ): Promise<OpinionAnalysis> {
     // Return mock data if OpenAI is not configured
     if (!openai) {
@@ -149,10 +161,44 @@ export class AIService {
       `Content: ${opinion.content}`
     ).join('\n\n');
 
+    // Build distribution context for AI
+    let distributionContext = '';
+    if (distributions) {
+      distributionContext = `
+
+OPINION STATISTICS:
+- Political Distribution: 
+  * Authoritarian Capitalist: ${distributions.politicalDistribution?.authoritarianCapitalist || 0}
+  * Libertarian Capitalist: ${distributions.politicalDistribution?.libertarianCapitalist || 0}
+  * Authoritarian Socialist: ${distributions.politicalDistribution?.authoritarianSocialist || 0}
+  * Libertarian Socialist: ${distributions.politicalDistribution?.libertarianSocialist || 0}
+- Average Political Position: Economic ${distributions.averageEconomicScore || 0} (Socialist -100 to Capitalist +100), Authoritarian ${distributions.averageAuthoritarianScore || 0} (Libertarian -100 to Authoritarian +100)
+- Political Diversity Score: ${distributions.diversityScore || 0}/100
+
+- Taste Distribution (Emotional Response):
+  * Revulsion: ${distributions.tasteDistribution?.revulsion || 0}
+  * Aversion: ${distributions.tasteDistribution?.aversion || 0}
+  * Neutral: ${distributions.tasteDistribution?.neutral || 0}
+  * Preference: ${distributions.tasteDistribution?.preference || 0}
+  * Delight: ${distributions.tasteDistribution?.delight || 0}
+- Average Taste Score: ${distributions.averageTasteScore || 0} (Revulsion -100 to Delight +100)
+- Taste Diversity: ${distributions.tasteDiversity || 0}/100
+
+- Passion Distribution (Intensity):
+  * Academic: ${distributions.passionDistribution?.academic || 0}
+  * Measured: ${distributions.passionDistribution?.measured || 0}
+  * Moderate: ${distributions.passionDistribution?.moderate || 0}
+  * Passionate: ${distributions.passionDistribution?.passionate || 0}
+  * Aggressive: ${distributions.passionDistribution?.aggressive || 0}
+- Average Passion Score: ${distributions.averagePassionScore || 0} (Academic -100 to Aggressive +100)
+- Passion Diversity: ${distributions.passionDiversity || 0}/100`;
+    }
+
     const prompt = `
 You are analyzing a debate topic titled "${topic.title}".
 
 Topic Description: ${topic.description}
+${distributionContext}
 
 Here are all the opinions expressed by users:
 
@@ -170,6 +216,7 @@ Focus on:
 3. Noting areas of consensus or significant disagreement
 4. Maintaining objectivity and balance
 5. Being concise but comprehensive
+6. Incorporating the distribution statistics to provide context about the political, emotional, and intensity dimensions of the debate
 
 Return only valid JSON.`;
 
@@ -669,6 +716,153 @@ Return only valid JSON with economicScore and authoritarianScore fields.`;
       console.error("[Opinion Analysis] Error analyzing opinion political stance:", error);
       // Return neutral scores on error
       return { economicScore: 0, authoritarianScore: 0 };
+    }
+  }
+
+  /**
+   * Batch analyze multiple opinions for political stance
+   * More efficient than analyzing individually - processes up to 50 opinions in a single API call
+   * @param topic - The topic these opinions are about
+   * @param opinions - Array of opinions with id and content
+   * @returns Array of analysis results with opinionId, economicScore, and authoritarianScore
+   */
+  static async batchAnalyzeOpinions(
+    topic: Topic,
+    opinions: Array<{ id: string; content: string }>
+  ): Promise<Array<{ opinionId: string; economicScore: number; authoritarianScore: number }>> {
+    // Return neutral scores if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning neutral scores for batch analysis');
+      return opinions.map(o => ({
+        opinionId: o.id,
+        economicScore: 0,
+        authoritarianScore: 0
+      }));
+    }
+
+    if (opinions.length === 0) {
+      return [];
+    }
+
+    try {
+      // Build prompt with all opinions
+      const opinionsList = opinions.map((o, idx) => 
+        `Opinion ${idx + 1} (ID: ${o.id}):\n"${o.content}"`
+      ).join('\n\n');
+
+      const prompt = `
+Analyze the following opinions on the topic "${topic.title}" and determine each opinion's political position on a 2-dimensional political compass.
+
+${opinionsList}
+
+For each opinion, provide analysis in the following JSON format:
+{
+  "opinions": [
+    {"opinionId": "uuid-1", "economicScore": -50, "authoritarianScore": 25},
+    {"opinionId": "uuid-2", "economicScore": 30, "authoritarianScore": -20}
+  ]
+}
+
+ECONOMIC AXIS (-100 to +100):
+-100 to -51: Very Socialist (strong wealth redistribution, extensive government control of economy, anti-capitalist)
+-50 to -21: Socialist (supports wealth redistribution, market regulation, public ownership of key industries)
+-20 to +20: Mixed Economy (balanced approach, regulated capitalism, some social programs)
++21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
++51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
+
+NOTE: -100 = Socialist, +100 = Capitalist
+
+AUTHORITARIAN AXIS (-100 to +100):
+-100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
+-50 to -21: Libertarian (personal freedom priority, limited government power, strong individual rights)
+-20 to +20: Moderate (balanced authority and freedom, pragmatic governance)
++21 to +50: Authoritarian (strong government control, order over freedom, limited civil liberties)
++51 to +100: Very Authoritarian (total state control, strict social order, minimal individual freedoms)
+
+ECONOMIC indicators:
+- Views on taxation, welfare, healthcare, education funding
+- Stance on business regulation, labor rights, unions
+- Opinions on wealth inequality and redistribution
+- Free market vs. planned economy preferences
+
+AUTHORITARIAN indicators:
+- Views on government surveillance, law enforcement, military
+- Stance on censorship, free speech, personal privacy
+- Opinions on drug policy, gun rights, personal freedoms
+- Traditional values vs. progressive social policies
+
+Return only valid JSON with an "opinions" array containing all results.`;
+
+      console.log(`[Batch Opinion Analysis] Analyzing ${opinions.length} opinions using batch API`);
+      
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a political science expert who analyzes ideological positions on a 2D political compass objectively and accurately. Always respond with valid JSON only."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 2000, // More tokens for batch analysis
+        temperature: 0.3
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      
+      if (!responseContent) {
+        console.error("[Batch Opinion Analysis] No response from OpenAI");
+        return opinions.map(o => ({
+          opinionId: o.id,
+          economicScore: 0,
+          authoritarianScore: 0
+        }));
+      }
+
+      // Parse JSON response
+      let jsonText = responseContent.trim();
+      const jsonMatch = jsonText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[1];
+      }
+
+      const aiAnalysis = JSON.parse(jsonText);
+      const results = aiAnalysis.opinions || [];
+
+      // Map results back to opinion IDs and clamp scores
+      const analysisMap = new Map<string, { economicScore: number; authoritarianScore: number }>();
+      
+      for (const result of results) {
+        const economicScore = Math.max(-100, Math.min(100, result.economicScore || 0));
+        const authoritarianScore = Math.max(-100, Math.min(100, result.authoritarianScore || 0));
+        
+        analysisMap.set(result.opinionId, {
+          economicScore: Math.round(economicScore),
+          authoritarianScore: Math.round(authoritarianScore)
+        });
+      }
+
+      // Return results for all opinions (use neutral scores if not in response)
+      return opinions.map(opinion => {
+        const analysis = analysisMap.get(opinion.id) || { economicScore: 0, authoritarianScore: 0 };
+        return {
+          opinionId: opinion.id,
+          ...analysis
+        };
+      });
+
+    } catch (error) {
+      console.error("[Batch Opinion Analysis] Error analyzing opinions:", error);
+      // Return neutral scores on error
+      return opinions.map(o => ({
+        opinionId: o.id,
+        economicScore: 0,
+        authoritarianScore: 0
+      }));
     }
   }
 

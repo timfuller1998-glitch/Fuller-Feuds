@@ -9,6 +9,8 @@ import type { CumulativeOpinion } from '../../shared/schema.js';
 export class CumulativeOpinionService {
   private cumulativeOpinionRepo = new CumulativeOpinionRepository();
   private topicRepo = new TopicRepository();
+  private summaryRegenerationQueue = new Set<string>();
+  private processingQueue = false;
 
   async getCumulativeOpinion(topicId: string): Promise<CumulativeOpinion | undefined> {
     return await this.cumulativeOpinionRepo.findByTopicId(topicId);
