@@ -2,27 +2,26 @@
   "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist/public",
-  "builds": [
-    {
-      "src": "server/index.ts",
-      "use": "@vercel/node"
+  "functions": {
+    "api/**/*.ts": {
+      "includeFiles": "dist/public/**"
     }
-  ],
+  },
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/server/index.ts"
+      "dest": "/api/index.ts"
     },
     {
       "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json|xml|txt))",
-      "dest": "/server/index.ts",
+      "dest": "/api/index.ts",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable"
       }
     },
     {
       "src": "/(.*)",
-      "dest": "/server/index.ts"
+      "dest": "/api/index.ts"
     }
   ]
 }
