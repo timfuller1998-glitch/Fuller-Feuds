@@ -4,9 +4,6 @@
   "outputDirectory": "dist/public",
   "functions": {
     "server/index.ts": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 30,
-      "memory": 1024,
       "includeFiles": "dist/public/**"
     }
   },
