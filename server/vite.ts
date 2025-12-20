@@ -201,23 +201,35 @@ export function serveStatic(app: Express) {
           
           // Verify index.html exists
           const indexPath = path.join(possiblePath, "index.html");
+          const assetsPath = path.join(possiblePath, "assets");
+          const hasIndexHtml = fs.existsSync(indexPath);
+          const hasAssets = fs.existsSync(assetsPath) && fs.statSync(assetsPath).isDirectory();
+          
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:163',message:'Directory found, checking index.html',data:{possiblePath,indexPath,fileCount:files.length,hasIndexHtml:fs.existsSync(indexPath),files:files.slice(0,10)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:163',message:'Directory found, checking index.html and assets',data:{possiblePath,indexPath,assetsPath,fileCount:files.length,hasIndexHtml,hasAssets,files:files.slice(0,10)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
           // #endregion
-          if (fs.existsSync(indexPath)) {
-            distPath = possiblePath;
-            log(`[Static Files] ✓✓✓ SUCCESS: Using ${distPath} (index.html confirmed)`);
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:168',message:'SUCCESS - found static files',data:{distPath,indexPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
-            break;
+          
+          // Prefer paths that have both index.html AND assets directory
+          if (hasIndexHtml) {
+            if (hasAssets || !distPath) {
+              distPath = possiblePath;
+              log(`[Static Files] ✓✓✓ SUCCESS: Using ${distPath} (index.html confirmed${hasAssets ? ', assets confirmed' : ''})`);
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:168',message:'SUCCESS - found static files',data:{distPath,indexPath,hasAssets},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              // #endregion
+              // If this path has assets, we're done. Otherwise keep looking for a better one.
+              if (hasAssets) {
+                break;
+              }
+            } else {
+              log(`[Static Files] ⚠ Found index.html but no assets, keeping current selection`);
+            }
           } else {
             log(`[Static Files] ⚠ Directory found but index.html missing at: ${indexPath}`);
-            // Still use it if it has files (might be a different structure)
-            if (files.length > 0) {
+            // Still use it if it has files (might be a different structure) and we don't have a better option
+            if (files.length > 0 && !distPath) {
               distPath = possiblePath;
               log(`[Static Files] Using ${distPath} despite missing index.html`);
-              break;
             }
           }
         } else {
