@@ -1,10 +1,10 @@
 import cron from 'node-cron';
-import { log } from './vite';
-import { TopicService } from './services/topicService';
-import { OpinionService } from './services/opinionService';
-import { CumulativeOpinionService } from './services/cumulativeOpinionService';
-import { DebateService } from './services/debateService';
-import { OpinionBatchService } from './services/opinionBatchService';
+import { log } from './utils/logger.js';
+import { TopicService } from './services/topicService.js';
+import { OpinionService } from './services/opinionService.js';
+import { CumulativeOpinionService } from './services/cumulativeOpinionService.js';
+import { DebateService } from './services/debateService.js';
+import { OpinionBatchService } from './services/opinionBatchService.js';
 
 const topicService = new TopicService();
 const opinionService = new OpinionService();
