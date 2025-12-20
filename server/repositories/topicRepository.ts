@@ -2,9 +2,9 @@ import { db } from '../db.js';
 import { topics, opinions, opinionVotes, topicFlags, users } from '../../shared/schema.js';
 import { eq, desc, and, sql, count } from 'drizzle-orm';
 
-import type { InsertTopic, Topic, TopicWithCounts, TopicInsert } from '@shared/schema';
-import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService';
-import { AIService } from '../aiService';
+import type { InsertTopic, Topic, TopicWithCounts, TopicInsert } from '../../shared/schema.js';
+import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
+import { AIService } from '../aiService.js';
 
 
 export class TopicRepository {
