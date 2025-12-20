@@ -282,7 +282,7 @@ export class OpinionService {
         AND created_at > NOW() - INTERVAL '24 hours'
         AND status IN ('approved', 'pending')
     `);
-    const last24h = last24hResult.count;
+    const last24h = (last24hResult as { count: number }).count;
     
     // Get last update time from cumulative opinion
     const existing = await this.cumulativeOpinionService.getCumulativeOpinion(topicId);
@@ -296,7 +296,7 @@ export class OpinionService {
         AND created_at > ${lastUpdateTime}
         AND status IN ('approved', 'pending')
     `);
-    const opinionsSinceUpdate = sinceUpdateResult.count;
+    const opinionsSinceUpdate = (sinceUpdateResult as { count: number }).count;
     
     // Tier 1: Hot topic (>50 opinions/24h) - update every 10 new
     if (last24h > 50 && opinionsSinceUpdate >= 10) {
