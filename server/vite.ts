@@ -123,12 +123,12 @@ export function serveStatic(app: Express) {
   
   // Priority order based on Vercel's file structure
   // Try multiple strategies to find dist/public
-  // NOTE: server/static is created by copy-static.js during build and should be most reliable
+  // NOTE: Prefer dist/public over server/static since it has the assets directory
   const possiblePaths = [
-    // Strategy 1: Copied to server/static during build (most reliable - created by copy-static.js)
-    path.resolve(dirname, "static"),
-    // Strategy 2: Direct from cwd (where includeFiles places files)
+    // Strategy 1: Direct from cwd (where includeFiles places files) - PREFERRED (has assets)
     path.resolve(cwd, "dist", "public"),
+    // Strategy 2: Copied to server/static during build (fallback if dist/public not available)
+    path.resolve(dirname, "static"),
     // Strategy 3: Relative to server directory
     path.resolve(dirname, "..", "dist", "public"),
     // Strategy 4: Vercel's static output (if using @vercel/static builder)
@@ -211,18 +211,21 @@ export function serveStatic(app: Express) {
           
           // Prefer paths that have both index.html AND assets directory
           if (hasIndexHtml) {
-            if (hasAssets || !distPath) {
+            // Always prefer a path with assets over one without
+            const currentHasAssets = distPath ? fs.existsSync(path.join(distPath, "assets")) && fs.statSync(path.join(distPath, "assets")).isDirectory() : false;
+            
+            if (hasAssets || !distPath || !currentHasAssets) {
               distPath = possiblePath;
               log(`[Static Files] ✓✓✓ SUCCESS: Using ${distPath} (index.html confirmed${hasAssets ? ', assets confirmed' : ''})`);
               // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:168',message:'SUCCESS - found static files',data:{distPath,indexPath,hasAssets},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:168',message:'SUCCESS - found static files',data:{distPath,indexPath,hasAssets,currentHasAssets},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
               // #endregion
               // If this path has assets, we're done. Otherwise keep looking for a better one.
               if (hasAssets) {
                 break;
               }
             } else {
-              log(`[Static Files] ⚠ Found index.html but no assets, keeping current selection`);
+              log(`[Static Files] ⚠ Found index.html but no assets, keeping current selection with assets`);
             }
           } else {
             log(`[Static Files] ⚠ Directory found but index.html missing at: ${indexPath}`);
