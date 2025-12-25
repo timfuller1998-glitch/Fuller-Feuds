@@ -81,6 +81,57 @@ app.use(attachUserRole);
 // Mount API routes
 app.use('/api', routes);
 
+// Diagnostic route to check served HTML
+app.get('/api/debug/html', (req, res) => {
+  const cwd = process.cwd();
+  const dirname = import.meta.dirname;
+  
+  const possibleHtmlPaths = [
+    path.resolve(cwd, "dist", "public", "index.html"),
+    path.resolve(dirname, "static", "index.html"),
+    path.resolve(dirname, "..", "dist", "public", "index.html"),
+  ];
+  
+  let htmlContent = null;
+  let htmlPath = null;
+  
+  for (const htmlPathCheck of possibleHtmlPaths) {
+    if (fs.existsSync(htmlPathCheck)) {
+      try {
+        htmlContent = fs.readFileSync(htmlPathCheck, 'utf-8');
+        htmlPath = htmlPathCheck;
+        break;
+      } catch (e) {
+        // Continue to next path
+      }
+    }
+  }
+  
+  if (htmlContent) {
+    // Extract asset references from HTML
+    const jsMatches = htmlContent.match(/<script[^>]*src=["']([^"']+)["']/g) || [];
+    const cssMatches = htmlContent.match(/<link[^>]*href=["']([^"']+)["']/g) || [];
+    
+    res.json({
+      htmlPath,
+      htmlLength: htmlContent.length,
+      htmlPreview: htmlContent.substring(0, 500),
+      assetReferences: {
+        scripts: jsMatches,
+        stylesheets: cssMatches,
+      },
+      hostname: req.hostname,
+      protocol: req.protocol,
+    });
+  } else {
+    res.json({
+      error: 'HTML not found',
+      checkedPaths: possibleHtmlPaths,
+      hostname: req.hostname,
+    });
+  }
+});
+
 // Diagnostic route to check static file setup
 app.get('/api/debug/static', (req, res) => {
   const cwd = process.cwd();
