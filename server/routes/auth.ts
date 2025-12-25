@@ -8,8 +8,15 @@ const userRepository = new UserRepository();
 // GET /api/auth/user - Get current user info
 router.get('/user', async (req, res) => {
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.ts:12',message:'Auth check started',data:{hasIsAuthenticated:typeof req.isAuthenticated==='function',isAuthenticatedResult:typeof req.isAuthenticated==='function'?req.isAuthenticated():undefined,hasSession:!!req.session,sessionId:req.session?.id,hasUser:!!req.user,userId:req.user?.id,cookies:Object.keys(req.cookies||{}),cookieHeader:req.get('cookie')?.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     // Check if user is authenticated
     if (!req.isAuthenticated || !req.isAuthenticated()) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.ts:15',message:'Auth check failed',data:{hasIsAuthenticated:typeof req.isAuthenticated==='function',hasSession:!!req.session,sessionId:req.session?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return res.status(401).json({ error: 'Not authenticated' });
     }
 

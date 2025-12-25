@@ -22,6 +22,14 @@ export function getSession() {
     throw new Error('SESSION_SECRET environment variable is required');
   }
 
+  // Determine if we're in a secure environment (HTTPS)
+  // On Vercel, requests are always HTTPS, so secure should be true
+  const isSecure = process.env.VERCEL === '1' || process.env.NODE_ENV === "production";
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.ts:25',message:'Session config',data:{isSecure,nodeEnv:process.env.NODE_ENV,vercel:process.env.VERCEL,hasSessionSecret:!!process.env.SESSION_SECRET},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  
   return session({
     secret: process.env.SESSION_SECRET,
     store: sessionStore,
@@ -29,9 +37,11 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecure, // Always secure on Vercel/production
       maxAge: sessionTtl,
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      sameSite: isSecure ? "lax" : "lax", // Use 'lax' for better cross-site compatibility
+      // Don't set domain - let browser handle it (works better with Vercel's multiple domains)
+      // path: '/' is default
     },
   });
 }
