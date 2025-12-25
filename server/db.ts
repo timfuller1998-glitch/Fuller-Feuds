@@ -36,8 +36,8 @@ fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{metho
 
 if (!connectionString) {
   const errorMsg = process.env.VERCEL === '1' 
-    ? 'DATABASE_URL environment variable is required. Please set it in Vercel project settings (Settings → Environment Variables).'
-    : 'DATABASE_URL environment variable is required. Please set it in your .env file or environment.';
+    ? 'DATABASE_URL environment variable is required. Please set your Supabase connection string in Vercel project settings (Settings → Environment Variables). The database is Supabase, not Vercel - you just need to configure the connection string in Vercel\'s environment variables.'
+    : 'DATABASE_URL environment variable is required. Please set your Supabase connection string in your .env file or environment.';
   throw new Error(errorMsg);
 }
 
@@ -122,9 +122,11 @@ export const checkDbConnection = async (): Promise<boolean> => {
     const errorData = error instanceof Error ? {message:error.message,code:(error as any).code,errno:(error as any).errno,syscall:(error as any).syscall,hostname:(error as any).hostname} : {error:String(error)};
     console.error('[DB CONNECTION] Health check failed:', errorData);
     if ((error as any).hostname) {
-      console.error(`[DB CONNECTION] ERROR: Cannot resolve hostname: ${(error as any).hostname}`);
-      console.error(`[DB CONNECTION] ACTION REQUIRED: Update DATABASE_URL in Vercel to use correct Supabase hostname`);
+      console.error(`[DB CONNECTION] ERROR: Cannot resolve Supabase hostname: ${(error as any).hostname}`);
+      console.error(`[DB CONNECTION] The database IS Supabase - this is a connection issue, not a Vercel database issue.`);
+      console.error(`[DB CONNECTION] ACTION REQUIRED: Update DATABASE_URL in Vercel environment variables to use correct Supabase connection string`);
       console.error(`[DB CONNECTION] Expected format: postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres`);
+      console.error(`[DB CONNECTION] Get your connection string from: Supabase Dashboard → Settings → Database → Connection string`);
     }
     fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:69',message:'Health check failed',data:errorData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
