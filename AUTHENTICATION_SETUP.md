@@ -7,22 +7,30 @@ The backend authentication system is fully implemented and working. The server i
 ## 🔧 Database URL Configuration
 
 ### For Vercel (Production - Serverless):
-Use **Connection Pooler** in **Transaction Mode** (recommended for serverless):
 
+**Option 1: Connection Pooler - Transaction Mode** (Recommended, but shows PREPARE warning)
+- Go to Supabase Dashboard → Settings → Database → Connection Pooling → **Transaction mode**
+- Copy the connection string (URI format)
+- The code automatically disables prepared statements for Transaction mode
+- **Note**: Supabase may show a warning about PREPARE statements - this is expected and safe to ignore
+
+**Option 2: Connection Pooler - Session Mode** (Alternative if Transaction mode doesn't work)
+- Go to Supabase Dashboard → Settings → Database → Connection Pooling → **Session mode**
+- Copy the connection string (URI format)
+- The code automatically enables prepared statements for Session mode
+- Less optimal for serverless but fully compatible
+
+**Connection String Format:**
 ```env
 DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
 ```
 
-**How to get it:**
-1. Go to Supabase Dashboard → Settings → Database
-2. Under "Connection Pooling", select **Transaction mode**
-3. Copy the connection string (URI format)
-4. Set it in Vercel → Settings → Environment Variables
+**Set in Vercel:**
+- Vercel → Settings → Environment Variables → Add `DATABASE_URL`
 
 **Why Pooler for Vercel:**
 - Serverless functions are short-lived
 - Pooler manages connections efficiently
-- Transaction mode assigns connections per transaction (perfect for serverless)
 - Prevents connection exhaustion
 
 ### For Local Development:

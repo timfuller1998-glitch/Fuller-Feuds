@@ -94,10 +94,19 @@ try {
 
 // Production-ready connection pool configuration
 // Supabase requires SSL connections
-// For Vercel/serverless: Use Connection Pooler (Transaction mode) - port 6543
-// For local dev: Can use Direct connection (port 5432) or Pooler (port 6543)
+// Detect connection mode from connection string:
+// - Transaction mode (port 6543): prepare: false (required)
+// - Session mode (port 6543): prepare: true (optional, better performance)
+// - Direct connection (port 5432): prepare: true (optional, better performance)
+const url = new URL(trimmedConnectionString);
+const isTransactionPooler = url.port === '6543' && url.hostname.includes('pooler');
+const isSessionPooler = url.port === '6543' && url.hostname.includes('pooler') && !isTransactionPooler;
+const usePreparedStatements = !isTransactionPooler; // Only disable for Transaction mode
+
+console.error(`[DB CONNECTION] Connection mode: ${isTransactionPooler ? 'Transaction Pooler' : isSessionPooler ? 'Session Pooler' : 'Direct'}, Prepared statements: ${usePreparedStatements}`);
+
 const client = postgres(trimmedConnectionString, {
-  prepare: false, // Disable prepared statements for connection pooler compatibility
+  prepare: usePreparedStatements, // Disable for Transaction mode, enable for Session/Direct
   max: parseInt(process.env.DATABASE_MAX_CONNECTIONS || '10', 10), // Max connections in pool
   idle_timeout: parseInt(process.env.DATABASE_IDLE_TIMEOUT || '20', 10), // Close idle connections after 20s
   connect_timeout: parseInt(process.env.DATABASE_CONNECT_TIMEOUT || '10', 10), // Connection timeout
