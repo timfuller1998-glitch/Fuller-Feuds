@@ -3,13 +3,32 @@ import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from "../shared/schema.js";
 
-// Load environment variables from .env file only in development
-// In production (Vercel), environment variables are provided by the platform
-if (process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1') {
-config({ path: '.env', override: true });
+// Load environment variables from .env file ONLY in local development
+// NEVER load .env in Vercel/production - environment variables come from Vercel dashboard
+// Vercel sets VERCEL=1, so we check for that first
+const isVercel = process.env.VERCEL === '1';
+const isProduction = process.env.NODE_ENV === 'production';
+const shouldLoadEnv = !isVercel && !isProduction;
+
+if (shouldLoadEnv) {
+  console.log('[DB] Loading .env file for local development');
+  config({ path: '.env', override: true });
+} else {
+  console.log(`[DB] Skipping .env load - Vercel: ${isVercel}, Production: ${isProduction}`);
 }
 
 let connectionString = process.env.DATABASE_URL;
+
+// Log environment info for debugging
+console.error(`[DB CONNECTION] Environment check:`, {
+  isVercel,
+  isProduction,
+  shouldLoadEnv,
+  hasDatabaseUrl: !!connectionString,
+  databaseUrlLength: connectionString?.length,
+  nodeEnv: process.env.NODE_ENV,
+  vercelEnv: process.env.VERCEL
+});
 
 // #region agent log
 fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:12',message:'DATABASE_URL env var check',data:{hasValue:!!connectionString,length:connectionString?.length,isVercel:process.env.VERCEL==='1',nodeEnv:process.env.NODE_ENV},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
