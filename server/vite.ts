@@ -335,7 +335,7 @@ export function serveStatic(app: Express) {
         }
       }
       if (!exists) {
-        // Try alternative paths (Vite might put assets in subdirectories)
+        // Try alternative paths (Vite puts assets in assets/ subdirectory)
         const fileName = path.basename(req.path);
         const altPaths = [
           path.join(distPath, 'assets', fileName), // Most common: assets subdirectory
@@ -343,12 +343,28 @@ export function serveStatic(app: Express) {
           path.join(distPath, 'assets', req.path.replace(/^\//, '')), // assets without leading slash
         ];
         for (const altPath of altPaths) {
-          if (fs.existsSync(altPath)) {
-            console.log(`[STATIC REQUEST] Found at alternative path: ${altPath}`);
-            return res.sendFile(altPath);
+          try {
+            if (fs.existsSync(altPath)) {
+              console.log(`[STATIC REQUEST] Found at alternative path: ${altPath}`);
+              // Set proper content type based on file extension
+              const ext = path.extname(fileName).toLowerCase();
+              if (ext === '.js') {
+                res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+              } else if (ext === '.css') {
+                res.setHeader('Content-Type', 'text/css; charset=utf-8');
+              }
+              return res.sendFile(altPath);
+            }
+          } catch (e) {
+            console.log(`[STATIC REQUEST] Error checking alternative path ${altPath}: ${e}`);
           }
         }
         console.log(`[STATIC REQUEST] File not found at any path. Tried: ${requestedPath} and ${altPaths.join(', ')}`);
+      } else {
+        // File exists at requested path, let express.static handle it
+        if (process.env.VERCEL === '1') {
+          console.log(`[STATIC REQUEST] File exists at requested path: ${requestedPath}`);
+        }
       }
     }
     next();
@@ -378,6 +394,38 @@ export function serveStatic(app: Express) {
     index: false, // Don't serve index.html automatically for directories
     maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0' // Cache static files in production
   }));
+  
+  // Serve assets directory at root level (Vite outputs assets to /assets/ but HTML references them at root)
+  // This handles requests like /index-xxx.js that should serve from /assets/index-xxx.js
+  const assetsPath = path.join(distPath, 'assets');
+  if (fs.existsSync(assetsPath)) {
+    app.use((req, res, next) => {
+      // Only handle root-level asset file requests (not /assets/... requests)
+      const hasExtension = /\.[a-zA-Z0-9]+$/.test(req.path);
+      const isRootLevelAsset = hasExtension && !req.path.startsWith('/assets/') && !req.path.startsWith('/api/');
+      
+      if (isRootLevelAsset) {
+        const fileName = path.basename(req.path);
+        const assetFilePath = path.join(assetsPath, fileName);
+        
+        if (fs.existsSync(assetFilePath)) {
+          // Set proper content type
+          const ext = path.extname(fileName).toLowerCase();
+          if (ext === '.js') {
+            res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+          } else if (ext === '.css') {
+            res.setHeader('Content-Type', 'text/css; charset=utf-8');
+          } else if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
+            res.setHeader('Content-Type', ext === '.png' ? 'image/png' : 'image/jpeg');
+          }
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          return res.sendFile(assetFilePath);
+        }
+      }
+      next();
+    });
+    log(`[Static Files] Serving assets directory files at root level: ${assetsPath}`);
+  }
   
   // SPA fallback: serve index.html for routes without file extensions
   app.get("*", (req, res, next) => {
