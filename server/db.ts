@@ -51,12 +51,23 @@ if (connectionString.startsWith('DATABASE_URL=')) {
 const trimmedConnectionString = connectionString.trim();
 
 // #region agent log
+let parsedUrl: URL | null = null;
 try {
-  const url = new URL(trimmedConnectionString);
-  const maskedUrl = `${url.protocol}//${url.username ? '***:***@' : ''}${url.hostname}:${url.port || '5432'}${url.pathname}`;
-  console.error(`[DB CONNECTION] Parsed hostname: ${url.hostname}, port: ${url.port || '5432'}, database: ${url.pathname?.replace('/','')}`);
+  parsedUrl = new URL(trimmedConnectionString);
+  const maskedUrl = `${parsedUrl.protocol}//${parsedUrl.username ? '***:***@' : ''}${parsedUrl.hostname}:${parsedUrl.port || '5432'}${parsedUrl.pathname}`;
+  console.error(`[DB CONNECTION] Parsed hostname: ${parsedUrl.hostname}, port: ${parsedUrl.port || '5432'}, database: ${parsedUrl.pathname?.replace('/','')}`);
   console.error(`[DB CONNECTION] Full connection string (masked): ${maskedUrl}`);
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'Connection string parsed',data:{hostname:url.hostname,port:url.port||'5432',database:url.pathname?.replace('/',''),maskedUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  
+  // Detect if using direct connection on Vercel (should use pooler instead)
+  if (isVercel && parsedUrl.hostname.includes('db.') && parsedUrl.hostname.includes('.supabase.co') && parsedUrl.port !== '6543') {
+    console.error(`[DB CONNECTION] ⚠️  WARNING: Using direct connection (db.*.supabase.co) on Vercel!`);
+    console.error(`[DB CONNECTION] ⚠️  Direct connections may fail with DNS errors on Vercel's serverless network.`);
+    console.error(`[DB CONNECTION] ⚠️  SOLUTION: Use Connection Pooler (Transaction mode) from Supabase Dashboard.`);
+    console.error(`[DB CONNECTION] ⚠️  Go to: Supabase Dashboard → Settings → Database → Connection Pooling → Transaction mode`);
+    console.error(`[DB CONNECTION] ⚠️  The pooler connection string should look like: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres`);
+  }
+  
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'Connection string parsed',data:{hostname:parsedUrl.hostname,port:parsedUrl.port||'5432',database:parsedUrl.pathname?.replace('/',''),maskedUrl,isDirectConnection:parsedUrl.hostname.includes('db.')&&parsedUrl.hostname.includes('.supabase.co'),isVercel},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
 } catch(e) {
   console.error(`[DB CONNECTION] Failed to parse connection string: ${e}`);
   console.error(`[DB CONNECTION] First 100 chars of connection string: ${trimmedConnectionString.substring(0, 100)}`);
@@ -135,11 +146,28 @@ export const checkDbConnection = async (): Promise<boolean> => {
     const errorData = error instanceof Error ? {message:error.message,code:(error as any).code,errno:(error as any).errno,syscall:(error as any).syscall,hostname:(error as any).hostname} : {error:String(error)};
     console.error('[DB CONNECTION] Health check failed:', errorData);
     if ((error as any).hostname) {
-      console.error(`[DB CONNECTION] ERROR: Cannot resolve Supabase hostname: ${(error as any).hostname}`);
-      console.error(`[DB CONNECTION] The database IS Supabase - this is a connection issue, not a Vercel database issue.`);
-      console.error(`[DB CONNECTION] ACTION REQUIRED: Update DATABASE_URL in Vercel environment variables to use correct Supabase connection string`);
-      console.error(`[DB CONNECTION] Expected format: postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres`);
-      console.error(`[DB CONNECTION] Get your connection string from: Supabase Dashboard → Settings → Database → Connection string`);
+      const hostname = (error as any).hostname;
+      const isDirectConnection = hostname.includes('db.') && hostname.includes('.supabase.co');
+      
+      console.error(`[DB CONNECTION] ERROR: Cannot resolve Supabase hostname: ${hostname}`);
+      console.error(`[DB CONNECTION] Error code: ${(error as any).code || 'UNKNOWN'}, Error: ${(error as any).message || 'Unknown error'}`);
+      
+      if (isVercel && isDirectConnection) {
+        console.error(`[DB CONNECTION] ⚠️  ROOT CAUSE: Using direct connection (db.*.supabase.co) on Vercel serverless.`);
+        console.error(`[DB CONNECTION] ⚠️  Direct connections often fail with DNS resolution errors (ENOTFOUND) on Vercel's network.`);
+        console.error(`[DB CONNECTION] ✅ SOLUTION: Switch to Connection Pooler (Transaction mode)`);
+        console.error(`[DB CONNECTION] ✅ Steps:`);
+        console.error(`[DB CONNECTION]    1. Go to Supabase Dashboard → Settings → Database → Connection Pooling`);
+        console.error(`[DB CONNECTION]    2. Select "Transaction mode" tab`);
+        console.error(`[DB CONNECTION]    3. Copy the connection string (URI format)`);
+        console.error(`[DB CONNECTION]    4. Update DATABASE_URL in Vercel: Settings → Environment Variables`);
+        console.error(`[DB CONNECTION] ✅ Pooler format: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres`);
+        console.error(`[DB CONNECTION] ✅ Note: Ignore the "PREPARE statements not compatible" warning - it's expected and safe.`);
+      } else {
+        console.error(`[DB CONNECTION] The database IS Supabase - this is a connection issue, not a Vercel database issue.`);
+        console.error(`[DB CONNECTION] ACTION REQUIRED: Update DATABASE_URL in Vercel environment variables to use correct Supabase connection string`);
+        console.error(`[DB CONNECTION] Get your connection string from: Supabase Dashboard → Settings → Database → Connection string`);
+      }
     }
     fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:69',message:'Health check failed',data:errorData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion

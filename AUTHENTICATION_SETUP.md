@@ -34,6 +34,13 @@ DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].poole
 - Serverless functions are short-lived
 - Pooler manages connections efficiently
 - Prevents connection exhaustion
+- **Direct connections (db.*.supabase.co) often fail with DNS errors (ENOTFOUND) on Vercel's network**
+
+**⚠️ Troubleshooting: If you see `ENOTFOUND db.*.supabase.co` errors:**
+- **Problem**: You're using the direct connection string on Vercel
+- **Solution**: Switch to Connection Pooler (Transaction mode) as described above
+- The direct connection hostname (`db.vrutowfygjodifolelyd.supabase.co`) may not resolve from Vercel's serverless network
+- The pooler hostname (`aws-0-[REGION].pooler.supabase.com`) is designed for serverless environments
 
 ### For Local Development:
 You can use either:
