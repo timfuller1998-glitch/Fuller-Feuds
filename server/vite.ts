@@ -459,9 +459,9 @@ export function serveStatic(app: Express) {
   });
   
   // Also explicitly serve assets directory (though express.static should handle this)
-  const assetsPath = path.join(distPath, 'assets');
-  if (fs.existsSync(assetsPath)) {
-    app.use('/assets', express.static(assetsPath, {
+  const assetsDirPath = path.join(distPath, 'assets');
+  if (fs.existsSync(assetsDirPath)) {
+    app.use('/assets', express.static(assetsDirPath, {
       setHeaders: (res, filePath) => {
         const ext = path.extname(filePath).toLowerCase();
         if (ext === '.js') {
@@ -473,7 +473,7 @@ export function serveStatic(app: Express) {
       },
       maxAge: '1y'
     }));
-    log(`[Static Files] Explicitly serving /assets directory: ${assetsPath}`);
+    log(`[Static Files] Explicitly serving /assets directory: ${assetsDirPath}`);
   }
   
   
