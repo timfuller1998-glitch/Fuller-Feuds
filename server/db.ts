@@ -94,8 +94,10 @@ try {
 
 // Production-ready connection pool configuration
 // Supabase requires SSL connections
+// For Vercel/serverless: Use Connection Pooler (Transaction mode) - port 6543
+// For local dev: Can use Direct connection (port 5432) or Pooler (port 6543)
 const client = postgres(trimmedConnectionString, {
-  prepare: false, // Disable prepared statements for better connection reuse
+  prepare: false, // Disable prepared statements for connection pooler compatibility
   max: parseInt(process.env.DATABASE_MAX_CONNECTIONS || '10', 10), // Max connections in pool
   idle_timeout: parseInt(process.env.DATABASE_IDLE_TIMEOUT || '20', 10), // Close idle connections after 20s
   connect_timeout: parseInt(process.env.DATABASE_CONNECT_TIMEOUT || '10', 10), // Connection timeout

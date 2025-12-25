@@ -4,24 +4,33 @@
 
 The backend authentication system is fully implemented and working. The server is running on port 5000.
 
-## 🔧 Fix Required: Database URL
+## 🔧 Database URL Configuration
 
-Your `.env` file has an incorrect Supabase pooler URL. Update it:
+### For Vercel (Production - Serverless):
+Use **Connection Pooler** in **Transaction Mode** (recommended for serverless):
 
-### Current (Not Working):
 ```env
-DATABASE_URL=postgresql://postgres:px%25HMVW8yTsF@odifolelyd.pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
 ```
 
-### Fixed (Use Direct Connection):
-```env
-DATABASE_URL=postgresql://postgres:px%25HMVW8yTsF@db.odifolelyd.supabase.co:5432/postgres
-```
+**How to get it:**
+1. Go to Supabase Dashboard → Settings → Database
+2. Under "Connection Pooling", select **Transaction mode**
+3. Copy the connection string (URI format)
+4. Set it in Vercel → Settings → Environment Variables
 
-**Changes:**
-- `odifolelyd.pooler.supabase.com` → `db.odifolelyd.supabase.co`
-- Port `6543` → `5432`
-- Remove `?pgbouncer=true`
+**Why Pooler for Vercel:**
+- Serverless functions are short-lived
+- Pooler manages connections efficiently
+- Transaction mode assigns connections per transaction (perfect for serverless)
+- Prevents connection exhaustion
+
+### For Local Development:
+You can use either:
+- **Direct Connection** (port 5432): `postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres`
+- **Connection Pooler** (port 6543): `postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres`
+
+Both work locally, but pooler is recommended to match production.
 
 ---
 
