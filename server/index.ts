@@ -20,11 +20,17 @@ const badgeRepository = new BadgeRepository();
 
 const app = express();
 
+// Trust Vercel's proxy to get correct protocol (HTTPS) from x-forwarded-proto header
+// This is critical for secure cookies to work correctly
+if (process.env.VERCEL === '1') {
+  app.set('trust proxy', 1);
+}
+
 // Log request info for debugging domain issues
 app.use((req, res, next) => {
   // Only log in production to help debug domain issues
   if (process.env.VERCEL === '1') {
-    console.log(`[REQUEST] ${req.method} ${req.path} - Host: ${req.hostname}, Origin: ${req.get('origin')}, Protocol: ${req.protocol}`);
+    console.log(`[REQUEST] ${req.method} ${req.path} - Host: ${req.hostname}, Origin: ${req.get('origin')}, Protocol: ${req.protocol}, X-Forwarded-Proto: ${req.get('x-forwarded-proto')}`);
   }
   next();
 });

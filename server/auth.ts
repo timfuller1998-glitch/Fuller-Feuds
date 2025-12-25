@@ -24,6 +24,8 @@ export function getSession() {
 
   // Determine if we're in a secure environment (HTTPS)
   // On Vercel, requests are always HTTPS, so secure should be true
+  // Note: This function is called at module load time, so we can't check req.protocol here
+  // The secure flag will be evaluated per-request by Express based on trust proxy setting
   const isSecure = process.env.VERCEL === '1' || process.env.NODE_ENV === "production";
   
   // #region agent log
@@ -35,11 +37,12 @@ export function getSession() {
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    name: 'connect.sid', // Explicit session cookie name
     cookie: {
       httpOnly: true,
-      secure: isSecure, // Always secure on Vercel/production
+      secure: isSecure, // Will be true on Vercel/production
       maxAge: sessionTtl,
-      sameSite: isSecure ? "lax" : "lax", // Use 'lax' for better cross-site compatibility
+      sameSite: 'lax', // Use 'lax' for better cross-site compatibility
       // Don't set domain - let browser handle it (works better with Vercel's multiple domains)
       // path: '/' is default
     },
