@@ -8,16 +8,18 @@ The backend authentication system is fully implemented and working. The server i
 
 ### For Vercel (Production - Serverless):
 
-**Option 1: Connection Pooler - Transaction Mode** (Recommended, but shows PREPARE warning)
+**Option 1: Connection Pooler - Transaction Mode** (Recommended for serverless)
 - Go to Supabase Dashboard → Settings → Database → Connection Pooling → **Transaction mode**
 - Copy the connection string (URI format)
-- The code automatically disables prepared statements for Transaction mode
-- **Note**: Supabase may show a warning about PREPARE statements - this is expected and safe to ignore
+- **Note**: Supabase may show a warning "PREPARE statements are not compatible" - this is EXPECTED and SAFE to ignore
+- The code uses `prepare: false` which is required for Transaction mode
+- This is the recommended mode for Vercel/serverless
 
-**Option 2: Connection Pooler - Session Mode** (Alternative if Transaction mode doesn't work)
-- Go to Supabase Dashboard → Settings → Database → Connection Pooling → **Session mode**
+**Option 2: Connection Pooler - Session Mode** (Alternative if Transaction mode has issues)
+- Go to Supabase Dashboard → Settings → Database → Connection Pooling → **Session mode**  
 - Copy the connection string (URI format)
-- The code automatically enables prepared statements for Session mode
+- The code uses `prepare: false` by default (works fine, but not optimal)
+- To enable prepared statements for better performance, add `DATABASE_USE_PREPARED_STATEMENTS=true` in Vercel env vars
 - Less optimal for serverless but fully compatible
 
 **Connection String Format:**
