@@ -310,7 +310,7 @@ export function serveStatic(app: Express) {
   }
   
   // Serve assets directory at root level FIRST (before express.static)
-  // Vite outputs assets to /assets/ but HTML references them at root
+  // Vite outputs assets to /assets/ but HTML may reference them at root
   // This handles requests like /index-xxx.js that should serve from /assets/index-xxx.js
   const assetsPath = path.join(distPath, 'assets');
   if (fs.existsSync(assetsPath)) {
@@ -323,10 +323,12 @@ export function serveStatic(app: Express) {
         const fileName = path.basename(req.path);
         const assetFilePath = path.resolve(assetsPath, fileName);
         
+        if (process.env.VERCEL === '1') {
+          console.log(`[ASSETS MIDDLEWARE] Checking root-level asset: ${req.path} -> ${assetFilePath} (exists: ${fs.existsSync(assetFilePath)})`);
+        }
+        
         if (fs.existsSync(assetFilePath)) {
-          if (process.env.VERCEL === '1') {
-            console.log(`[ASSETS] Serving ${req.path} from ${assetFilePath}`);
-          }
+          console.log(`[ASSETS MIDDLEWARE] ✓ Serving ${req.path} from ${assetFilePath}`);
           // Set proper content type
           const ext = path.extname(fileName).toLowerCase();
           if (ext === '.js') {
@@ -340,6 +342,10 @@ export function serveStatic(app: Express) {
           }
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
           return res.sendFile(assetFilePath);
+        } else {
+          if (process.env.VERCEL === '1') {
+            console.log(`[ASSETS MIDDLEWARE] ✗ File not found: ${assetFilePath}`);
+          }
         }
       }
       next();
