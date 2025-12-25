@@ -338,6 +338,11 @@ export function serveStatic(app: Express) {
   
   // SPA fallback: serve index.html for routes without file extensions
   app.get("*", (req, res, next) => {
+    // Log for debugging domain issues
+    if (process.env.VERCEL === '1') {
+      console.log(`[STATIC] SPA fallback - Path: ${req.path}, Host: ${req.hostname}, HasExtension: ${/\.[a-zA-Z0-9]+$/.test(req.path)}`);
+    }
+    
     // Skip API routes
     if (req.path.startsWith('/api')) {
       return next();
@@ -346,15 +351,18 @@ export function serveStatic(app: Express) {
     // Skip static file requests (they should have been handled by express.static)
     const hasExtension = /\.[a-zA-Z0-9]+$/.test(req.path);
     if (hasExtension) {
-      return res.status(404).json({ error: 'File not found' });
+      console.log(`[STATIC] 404 - Static file not found: ${req.path} (Host: ${req.hostname})`);
+      return res.status(404).json({ error: 'File not found', path: req.path, hostname: req.hostname });
     }
     
     // Serve index.html for SPA routes
     const indexPath = path.resolve(distPath!, "index.html");
     if (fs.existsSync(indexPath)) {
+      console.log(`[STATIC] Serving index.html for SPA route: ${req.path} (Host: ${req.hostname})`);
       res.sendFile(indexPath);
     } else {
-      res.status(404).json({ error: 'index.html not found' });
+      console.error(`[STATIC] ERROR - index.html not found at: ${indexPath} (Host: ${req.hostname}, distPath: ${distPath})`);
+      res.status(404).json({ error: 'index.html not found', indexPath, distPath, hostname: req.hostname });
     }
   });
 }

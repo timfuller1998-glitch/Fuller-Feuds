@@ -19,6 +19,16 @@ import { getCacheStats } from "./services/cacheService.js";
 const badgeRepository = new BadgeRepository();
 
 const app = express();
+
+// Log request info for debugging domain issues
+app.use((req, res, next) => {
+  // Only log in production to help debug domain issues
+  if (process.env.VERCEL === '1') {
+    console.log(`[REQUEST] ${req.method} ${req.path} - Host: ${req.hostname}, Origin: ${req.get('origin')}, Protocol: ${req.protocol}`);
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
