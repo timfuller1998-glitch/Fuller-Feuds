@@ -26,7 +26,7 @@ export class TopicRepository {
     const preview = await this.getTopicPreview(id);
     
     // Get cumulative opinion for distribution data
-    const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository');
+    const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository.js');
     const cumulativeRepo = new CumulativeOpinionRepository();
     const cumulative = await cumulativeRepo.findByTopicId(id);
 
@@ -103,7 +103,7 @@ export class TopicRepository {
       .limit(limit);
 
     // Get counts for each topic
-    const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository');
+    const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository.js');
     const cumulativeRepo = new CumulativeOpinionRepository();
     
     const topicsWithCounts = await Promise.all(
@@ -248,7 +248,7 @@ export class TopicRepository {
       .orderBy(desc(topics.createdAt));
 
     // Get counts for each topic (simplified version)
-    const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository');
+    const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository.js');
     const cumulativeRepo = new CumulativeOpinionRepository();
     
     const topicsWithCounts = await Promise.all(
@@ -317,7 +317,7 @@ export class TopicRepository {
       ));
 
     // Import AIService for cosine similarity
-    const { AIService } = await import('../aiService');
+    const { AIService } = await import('../aiService.js');
 
     // Calculate similarity for each topic
     const similarTopics: { topic: Topic; similarity: number }[] = [];
