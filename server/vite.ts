@@ -311,6 +311,49 @@ export function serveStatic(app: Express) {
   
   // Serve static files with proper headers
   // This middleware must come BEFORE the catch-all route
+  app.use((req, res, next) => {
+    // Log static file requests for debugging
+    const hasExtension = /\.[a-zA-Z0-9]+$/.test(req.path);
+    if (hasExtension && !req.path.startsWith('/api')) {
+      const requestedPath = path.join(distPath, req.path);
+      const exists = fs.existsSync(requestedPath);
+      if (process.env.VERCEL === '1') {
+        console.log(`[STATIC REQUEST] ${req.path} -> ${requestedPath} (exists: ${exists}, distPath: ${distPath})`);
+        // List what's actually in distPath for debugging
+        try {
+          if (fs.existsSync(distPath)) {
+            const contents = fs.readdirSync(distPath);
+            console.log(`[STATIC REQUEST] Contents of distPath: ${contents.slice(0, 20).join(', ')}`);
+            const assetsDir = path.join(distPath, 'assets');
+            if (fs.existsSync(assetsDir)) {
+              const assets = fs.readdirSync(assetsDir);
+              console.log(`[STATIC REQUEST] Assets directory contents: ${assets.slice(0, 10).join(', ')}`);
+            }
+          }
+        } catch (e) {
+          console.log(`[STATIC REQUEST] Could not list distPath contents: ${e}`);
+        }
+      }
+      if (!exists) {
+        // Try alternative paths (Vite might put assets in subdirectories)
+        const fileName = path.basename(req.path);
+        const altPaths = [
+          path.join(distPath, 'assets', fileName), // Most common: assets subdirectory
+          path.join(distPath, req.path.replace(/^\//, '')), // Without leading slash
+          path.join(distPath, 'assets', req.path.replace(/^\//, '')), // assets without leading slash
+        ];
+        for (const altPath of altPaths) {
+          if (fs.existsSync(altPath)) {
+            console.log(`[STATIC REQUEST] Found at alternative path: ${altPath}`);
+            return res.sendFile(altPath);
+          }
+        }
+        console.log(`[STATIC REQUEST] File not found at any path. Tried: ${requestedPath} and ${altPaths.join(', ')}`);
+      }
+    }
+    next();
+  });
+  
   app.use(express.static(distPath, {
     setHeaders: (res, filePath) => {
       // Set correct Content-Type headers for different file types
