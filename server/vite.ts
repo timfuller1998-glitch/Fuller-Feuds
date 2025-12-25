@@ -421,6 +421,8 @@ export function serveStatic(app: Express) {
     next();
   });
   
+  // Serve static files with proper headers
+  // This will serve files from distPath and all subdirectories (including /assets/)
   app.use(express.static(distPath, {
     setHeaders: (res, filePath) => {
       // Set correct Content-Type headers for different file types
@@ -445,6 +447,34 @@ export function serveStatic(app: Express) {
     index: false, // Don't serve index.html automatically for directories
     maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0' // Cache static files in production
   }));
+  
+  // Add explicit logging for /assets/ requests to debug custom domain issues
+  app.use('/assets', (req, res, next) => {
+    if (process.env.VERCEL === '1') {
+      const assetPath = path.join(distPath, 'assets', req.path);
+      const exists = fs.existsSync(assetPath);
+      console.log(`[ASSETS ROUTE] ${req.path} -> ${assetPath} (exists: ${exists}, hostname: ${req.hostname})`);
+    }
+    next();
+  });
+  
+  // Also explicitly serve assets directory (though express.static should handle this)
+  const assetsPath = path.join(distPath, 'assets');
+  if (fs.existsSync(assetsPath)) {
+    app.use('/assets', express.static(assetsPath, {
+      setHeaders: (res, filePath) => {
+        const ext = path.extname(filePath).toLowerCase();
+        if (ext === '.js') {
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+        } else if (ext === '.css') {
+          res.setHeader('Content-Type', 'text/css; charset=utf-8');
+        }
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      },
+      maxAge: '1y'
+    }));
+    log(`[Static Files] Explicitly serving /assets directory: ${assetsPath}`);
+  }
   
   
   // SPA fallback: serve index.html for routes without file extensions
