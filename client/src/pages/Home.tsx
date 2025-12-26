@@ -12,7 +12,11 @@ import {
   Radio,
   Flame,
   MessageCircle,
-  Grid
+  Grid,
+  Clock,
+  Calendar,
+  MessageSquare,
+  Users
 } from "lucide-react";
 import climateImage from '@assets/generated_images/Climate_change_debate_thumbnail_3b0bbda7.png';
 
@@ -81,38 +85,111 @@ export default function Home() {
   }
 
   // 2. Hot Debates - Topics with most recent activity
-  if (recentOpinions && recentOpinions.length > 0 && topics.length > 0) {
+  if (topics.length > 0) {
     // Group opinions by topic to find topics with recent activity
     const topicActivity = new Map<string, Date>();
-    recentOpinions.forEach(opinion => {
-      const currentDate = topicActivity.get(opinion.topicId);
-      const opinionDate = new Date(opinion.createdAt || 0);
-      if (!currentDate || opinionDate > currentDate) {
-        topicActivity.set(opinion.topicId, opinionDate);
-      }
-    });
+    if (recentOpinions && recentOpinions.length > 0) {
+      recentOpinions.forEach(opinion => {
+        const currentDate = topicActivity.get(opinion.topicId);
+        const opinionDate = new Date(opinion.createdAt || 0);
+        if (!currentDate || opinionDate > currentDate) {
+          topicActivity.set(opinion.topicId, opinionDate);
+        }
+      });
+    }
 
     const hotTopics = topics
-      .filter(topic => topicActivity.has(topic.id))
+      .filter(topic => topicActivity.has(topic.id) || topics.length <= 5)
       .sort((a, b) => {
         const dateA = topicActivity.get(a.id)?.getTime() || 0;
         const dateB = topicActivity.get(b.id)?.getTime() || 0;
-        return dateB - dateA;
+        if (dateA !== dateB) {
+          return dateB - dateA;
+        }
+        // Fallback to participant count if no activity
+        return b.participantCount - a.participantCount;
       })
       .slice(0, 5);
 
-    if (hotTopics.length > 0) {
+    if (hotTopics.length > 0 || topics.length > 0) {
       sections.push({
         title: "Hot Debates",
         icon: Flame,
-        topics: hotTopics,
-        totalCount: topicActivity.size,
+        topics: hotTopics.length > 0 ? hotTopics : topics.slice(0, 5),
+        totalCount: topicActivity.size || topics.length,
         linkPath: "/hot-debates"
       });
     }
   }
 
-  // 3. My Topics - Topics where user has participated
+  // 3. New This Week - Topics created in the last 7 days
+  if (topics.length > 0) {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    const newTopics = topics
+      .filter(topic => {
+        const createdAt = new Date(topic.createdAt || 0);
+        return createdAt >= oneWeekAgo;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateB - dateA;
+      })
+      .slice(0, 5);
+
+    // Show section even if no new topics this week, use newest topics instead
+    const topicsToShow = newTopics.length > 0 
+      ? newTopics 
+      : [...topics].sort((a, b) => {
+          const dateA = new Date(a.createdAt || 0).getTime();
+          const dateB = new Date(b.createdAt || 0).getTime();
+          return dateB - dateA;
+        }).slice(0, 5);
+
+    sections.push({
+      title: "New This Week",
+      icon: Calendar,
+      topics: topicsToShow,
+      totalCount: newTopics.length || topics.length
+    });
+  }
+
+  // 4. Most Debated - Sort by opinionsCount
+  if (topics.length > 0) {
+    const mostDebated = [...topics]
+      .sort((a, b) => (b.opinionsCount || 0) - (a.opinionsCount || 0))
+      .slice(0, 5);
+    sections.push({
+      title: "Most Debated",
+      icon: MessageSquare,
+      topics: mostDebated,
+      totalCount: topics.length
+    });
+  }
+
+  // 5. Diverse Perspectives - Filter by diversityScore
+  if (topics.length > 0) {
+    const diverseTopics = topics
+      .filter(topic => (topic.diversityScore || 0) > 0)
+      .sort((a, b) => (b.diversityScore || 0) - (a.diversityScore || 0))
+      .slice(0, 5);
+
+    // Show section even if no diverse topics, use topics with most participants instead
+    const topicsToShow = diverseTopics.length > 0
+      ? diverseTopics
+      : [...topics].sort((a, b) => b.participantCount - a.participantCount).slice(0, 5);
+
+    sections.push({
+      title: "Diverse Perspectives",
+      icon: Users,
+      topics: topicsToShow,
+      totalCount: diverseTopics.length || topics.length
+    });
+  }
+
+  // 6. My Topics - Topics where user has participated
   if (user && recentOpinions && topics.length > 0) {
     const myTopicIds = new Set(
       recentOpinions
@@ -133,7 +210,7 @@ export default function Home() {
     }
   }
 
-  // 4. My Current Debates - Active debate rooms as topic previews
+  // 7. My Current Debates - Active debate rooms as topic previews
   if (user && activeDebateRooms && activeDebateRooms.length > 0 && topics.length > 0) {
     const debateTopicIds = new Set(activeDebateRooms.map(room => room.topicId).filter(Boolean));
     const debateTopics = topics
@@ -216,21 +293,6 @@ export default function Home() {
 
   return (
     <div className="h-[100dvh] overflow-y-auto snap-y snap-mandatory -webkit-overflow-scrolling-touch">
-      {/* Hero Section */}
-      <section className="min-h-[100dvh] snap-start flex flex-col items-center justify-center px-4 py-8">
-        <div className="text-center space-y-3 sm:space-y-4">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
-            Every opinion. One fair fight.
-          </h1>
-          <div className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed space-y-1">
-            <p>Submit your opinion. Change the summary</p>
-            <p>Debate 1v1. no comments, no crowd.</p>
-            <p>See both sides or step in to change minds.</p>
-            <p>Break echo chamber, one fair fight at a time.</p>
-          </div>
-        </div>
-      </section>
-
       {/* Stack Sections */}
       {topicSections.length === 0 ? (
         <section className="min-h-[100dvh] snap-start flex items-center justify-center">
@@ -256,6 +318,21 @@ export default function Home() {
           />
         ))
       )}
+
+      {/* Hero Section - Footer */}
+      <section className="min-h-[100dvh] snap-start flex flex-col items-center justify-center px-4 py-8">
+        <div className="text-center space-y-3 sm:space-y-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
+            Every opinion. One fair fight.
+          </h1>
+          <div className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed space-y-1">
+            <p>Submit your opinion. Change the summary</p>
+            <p>Debate 1v1. no comments, no crowd.</p>
+            <p>See both sides or step in to change minds.</p>
+            <p>Break echo chamber, one fair fight at a time.</p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

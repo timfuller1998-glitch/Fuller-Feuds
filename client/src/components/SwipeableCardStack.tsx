@@ -135,7 +135,15 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
   const cardState = cardStates.get(currentIndex) || { isFlipped: false, timeOnBackMs: 0 };
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center" style={{ minHeight: '480px', maxWidth: '340px', margin: '0 auto' }}>
+    <div 
+      className="relative w-full h-full flex items-center justify-center" 
+      style={{ 
+        width: 'min(calc(100vw - 2rem), 400px)',
+        aspectRatio: '5/7',
+        margin: '0 auto',
+        maxWidth: '400px'
+      }}
+    >
       {/* Third card (furthest back) */}
       {thirdTopic && (
         <div

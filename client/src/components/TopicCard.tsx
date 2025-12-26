@@ -326,7 +326,6 @@ export default function TopicCard({
         
         <Card
           className="hover-elevate active-elevate-2 overflow-hidden cursor-pointer relative w-full h-full"
-          style={{ minHeight: "280px" }}
           onClick={handleFlip}
         >
           <div
@@ -339,7 +338,7 @@ export default function TopicCard({
           >
             {/* Front Side */}
             <div 
-              className="absolute inset-0 p-4 sm:p-6 min-h-[280px] flex flex-col h-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
+              className="absolute inset-0 p-3 sm:p-4 md:p-6 flex flex-col h-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
             >
             {/* Categories and Diversity Badge */}
             <div className="absolute top-2 left-2 flex gap-1 flex-wrap z-20 pointer-events-auto">
@@ -427,7 +426,7 @@ export default function TopicCard({
 
           {/* Back Side */}
           <div 
-            className="absolute inset-0 p-4 sm:p-6 min-h-[280px] flex flex-col h-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
+            className="absolute inset-0 p-3 sm:p-4 md:p-6 flex flex-col h-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
             style={{
               transform: "rotateY(180deg)",
             }}
