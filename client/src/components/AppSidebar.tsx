@@ -203,8 +203,8 @@ export default function AppSidebar({
       <SidebarHeader className="border-b p-4">
         <Link href="/" onClick={handleLinkClick} data-testid="link-home-logo">
           <div className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2 transition-colors">
-            <div className="p-2 rounded-lg bg-primary text-primary-foreground">
-              <MessageCircle className="w-5 h-5" />
+            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary text-primary-foreground overflow-hidden">
+              <img src="/logo.png" alt="Fuller Feuds" className="w-full h-full object-contain" />
             </div>
             <div>
               <h2 className="font-bold text-lg">Fuller Feuds</h2>
