@@ -40,6 +40,7 @@ async function resizeIcons() {
       await sharp(sourcePath)
         .resize(icon.size, icon.size, {
           fit: 'contain',
+          position: 'center',
           background: { r: 255, g: 255, b: 255, alpha: 1 } // White background
         })
         .png()

@@ -30,6 +30,7 @@ async function createLogo() {
     await sharp(sourcePath)
       .resize(512, 512, {
         fit: 'contain',
+        position: 'center',
         background: { r: 255, g: 255, b: 255, alpha: 1 } // White background
       })
       .png()
