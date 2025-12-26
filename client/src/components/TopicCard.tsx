@@ -504,31 +504,35 @@ export default function TopicCard({
             </div>
 
             {/* Content Area - Centered in top 2/3rds */}
-            <div className="flex-1 flex items-center justify-center" style={{ minHeight: "66%" }}>
-              <div className="text-center px-4 w-full">
+            <div className="flex-1 flex items-center justify-center overflow-hidden min-h-0" style={{ minHeight: "66%" }}>
+              <div className="text-center px-4 w-full h-full flex flex-col justify-center min-h-0 max-h-full">
                 {summaryLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : cumulativeData?.summary ? (
-                  <div>
-                    <div className="flex items-center justify-center gap-2 mb-3">
+                  <div className="flex flex-col h-full justify-center min-h-0 max-h-full">
+                    <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0">
                       <Sparkles className="w-4 h-4 text-primary" />
                       <h3 className="font-semibold text-sm">AI Summary</h3>
                     </div>
-                    <p className="text-sm leading-relaxed" data-testid={`text-ai-summary-${id}`}>
-                      {cumulativeData.summary}
-                    </p>
+                    <div className="flex-1 min-h-0 overflow-hidden flex items-center">
+                      <p className="text-sm leading-relaxed line-clamp-4 overflow-hidden w-full" data-testid={`text-ai-summary-${id}`}>
+                        {cumulativeData.summary}
+                      </p>
+                    </div>
                   </div>
                 ) : (
-                  <div>
-                    <div className="flex items-center justify-center gap-2 mb-3">
+                  <div className="flex flex-col h-full justify-center min-h-0 max-h-full">
+                    <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0">
                       <Sparkles className="w-4 h-4 text-muted-foreground" />
                       <h3 className="font-semibold text-sm text-muted-foreground">Description</h3>
                     </div>
-                    <p className="text-sm leading-relaxed text-muted-foreground" data-testid={`text-description-${id}`}>
-                      {description}
-                    </p>
+                    <div className="flex-1 min-h-0 overflow-hidden flex items-center">
+                      <p className="text-sm leading-relaxed text-muted-foreground line-clamp-4 overflow-hidden w-full" data-testid={`text-description-${id}`}>
+                        {description}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
