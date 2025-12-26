@@ -3,6 +3,14 @@ import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import TopicCard from "./TopicCard";
 import type { TopicWithCounts } from "@shared/schema";
 
+// Calculate card dimensions based on viewport
+const getCardDimensions = () => {
+  const maxWidth = 400;
+  const width = Math.min(window.innerWidth - 32, maxWidth); // 2rem padding
+  const height = (width * 7) / 5; // 5:7 aspect ratio
+  return { width, height };
+};
+
 interface SwipeableCardStackProps {
   topics: TopicWithCounts[];
   onSwipe: (topic: TopicWithCounts, direction: 'left' | 'right' | 'up', cardState: CardState) => void;
@@ -20,6 +28,16 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
   const [swipeDirection, setSwipeDirection] = useState<'like' | 'dislike' | 'opinion' | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0);
   const [triggerOpinionForm, setTriggerOpinionForm] = useState(0);
+  const [dimensions, setDimensions] = useState(getCardDimensions());
+
+  // Update dimensions on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setDimensions(getCardDimensions());
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const currentTopic = topics[currentIndex];
   const nextTopic = topics[currentIndex + 1];
@@ -136,10 +154,10 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
 
   return (
     <div 
-      className="relative w-full h-full flex items-center justify-center" 
+      className="relative flex items-center justify-center"
       style={{ 
-        width: 'min(calc(100vw - 2rem), 400px)',
-        aspectRatio: '5/7',
+        width: `${dimensions.width}px`,
+        height: `${dimensions.height}px`,
         margin: '0 auto',
         maxWidth: '400px'
       }}
@@ -147,7 +165,7 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
       {/* Third card (furthest back) */}
       {thirdTopic && (
         <div
-          className="absolute w-full"
+          className="absolute w-full h-full"
           style={{
             transform: "scale(0.9) translateY(20px)",
             zIndex: 1,
@@ -164,7 +182,7 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
       {/* Second card (middle) */}
       {nextTopic && (
         <div
-          className="absolute w-full"
+          className="absolute w-full h-full"
           style={{
             transform: "scale(0.95) translateY(10px)",
             zIndex: 2,
@@ -182,7 +200,7 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
 
       {/* Top card (draggable) */}
       <motion.div
-        className="absolute w-full z-30"
+        className="absolute w-full h-full z-30"
         style={{
           x,
           y,
