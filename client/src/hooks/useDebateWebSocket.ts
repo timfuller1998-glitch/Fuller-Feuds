@@ -16,6 +16,8 @@ type WebSocketMessage =
 export function useDebateWebSocket(userId?: string) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 5;
   const { incrementUnread, openWindows } = useDebateContext();
   const { toast } = useToast();
   
@@ -104,6 +106,7 @@ export function useDebateWebSocket(userId?: string) {
 
     ws.onopen = () => {
       console.log('[WebSocket] Connected');
+      reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
       
       // Authenticate - server expects authToken, which is the userId
       ws.send(JSON.stringify({
@@ -159,17 +162,63 @@ export function useDebateWebSocket(userId?: string) {
 
     ws.onerror = (error) => {
       console.error('[WebSocket] Error:', error);
+      console.error('[WebSocket] Connection details:', {
+        url: wsUrl,
+        readyState: ws.readyState,
+        readyStateText: ws.readyState === WebSocket.CONNECTING ? 'CONNECTING' :
+                        ws.readyState === WebSocket.OPEN ? 'OPEN' :
+                        ws.readyState === WebSocket.CLOSING ? 'CLOSING' :
+                        ws.readyState === WebSocket.CLOSED ? 'CLOSED' : 'UNKNOWN',
+        reconnectAttempts: reconnectAttemptsRef.current
+      });
+      
+      // Only show error toast after multiple failed attempts to avoid spam
+      if (reconnectAttemptsRef.current >= 2) {
+        const { toast } = handlersRef.current;
+        toast({
+          title: 'Connection Error',
+          description: 'Unable to connect to the server. Real-time features may be unavailable.',
+          variant: 'destructive',
+          duration: 5000,
+        });
+      }
     };
 
-    ws.onclose = () => {
-      console.log('[WebSocket] Disconnected');
+    ws.onclose = (event) => {
+      console.log('[WebSocket] Disconnected', {
+        code: event.code,
+        reason: event.reason || 'No reason provided',
+        wasClean: event.wasClean,
+        reconnectAttempts: reconnectAttemptsRef.current
+      });
+      
       wsRef.current = null;
       
-      // Attempt to reconnect after 3 seconds
-      reconnectTimeoutRef.current = setTimeout(() => {
-        console.log('[WebSocket] Attempting to reconnect...');
-        connect();
-      }, 3000);
+      // Don't reconnect if it was a clean close or auth error
+      if (event.code === 1000 || event.code === 1008) {
+        console.log('[WebSocket] Clean close or policy violation, not reconnecting');
+        reconnectAttemptsRef.current = 0;
+        return;
+      }
+      
+      // Attempt to reconnect with exponential backoff
+      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+        reconnectAttemptsRef.current++;
+        const delay = Math.min(3000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000); // Max 30 seconds
+        console.log(`[WebSocket] Attempting to reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, delay);
+      } else {
+        console.error('[WebSocket] Max reconnection attempts reached. Stopping reconnection attempts.');
+        const { toast } = handlersRef.current;
+        toast({
+          title: 'Connection Failed',
+          description: 'Unable to establish a connection. Please refresh the page to try again.',
+          variant: 'destructive',
+          duration: 8000,
+        });
+      }
     };
   }, [userId, handleNewMessage, handleNotification, handleDebateEnded, handleNewDebateCreated]);
 
