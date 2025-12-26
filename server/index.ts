@@ -15,6 +15,7 @@ import { BadgeRepository } from "./repositories/badgeRepository.js";
 import { setupAuth } from "./auth.js";
 import { attachUserRole } from "./middleware/permissions.js";
 import { getCacheStats } from "./services/cacheService.js";
+import { setupWebSocketServer } from "./websocket.js";
 
 const badgeRepository = new BadgeRepository();
 
@@ -242,6 +243,9 @@ app.get('/api/debug/static', (req, res) => {
 
 // Create HTTP server
 const server = createServer(app);
+
+// Setup WebSocket server
+setupWebSocketServer(server);
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
