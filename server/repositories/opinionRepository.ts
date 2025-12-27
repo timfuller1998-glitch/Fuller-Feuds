@@ -15,6 +15,10 @@ function removeDateObjects(obj: any): any {
   if (obj instanceof Date) {
     return undefined; // Remove Date objects
   }
+  // Check for Date-like objects (from different contexts or serialization)
+  if (typeof obj === 'object' && obj !== null && obj.constructor?.name === 'Date') {
+    return undefined;
+  }
   if (Array.isArray(obj)) {
     return obj.map(removeDateObjects).filter(item => item !== undefined);
   }
@@ -23,6 +27,11 @@ function removeDateObjects(obj: any): any {
     for (const [key, value] of Object.entries(obj)) {
       // Skip timestamp fields that should use database defaults
       if (key === 'analyzedAt' || key === 'createdAt' || key === 'updatedAt') {
+        continue;
+      }
+      // Skip any field that might contain Date objects
+      if (value instanceof Date || (typeof value === 'object' && value !== null && value.constructor?.name === 'Date')) {
+        console.warn(`[removeDateObjects] Skipping Date object in field: ${key}`);
         continue;
       }
       const cleanedValue = removeDateObjects(value);
@@ -37,15 +46,31 @@ function removeDateObjects(obj: any): any {
 
 export class OpinionRepository {
   async create(opinion: InsertOpinion): Promise<Opinion> {
+    // Log the incoming opinion data to identify Date objects
+    console.log('[OpinionRepository] Incoming opinion data:', JSON.stringify(opinion, (key, value) => {
+      if (value instanceof Date) {
+        return `[Date: ${value.toISOString()}]`;
+      }
+      return value;
+    }));
+    
     // Ensure status defaults to 'approved' if not specified
     // Remove any Date objects that might cause issues with postgres library
     // Use recursive function to clean all Date objects from the data
     const cleanedOpinion = removeDateObjects(opinion);
     
-    const opinionData = {
-      ...cleanedOpinion,
-      status: opinion.status || 'approved',
-    };
+    // Create a completely fresh object to avoid any prototype chain issues
+    const opinionData: any = {};
+    if (cleanedOpinion && typeof cleanedOpinion === 'object') {
+      for (const [key, value] of Object.entries(cleanedOpinion)) {
+        if (value instanceof Date) {
+          console.error(`[OpinionRepository] Date object still present after cleaning: ${key}`);
+          continue;
+        }
+        opinionData[key] = value;
+      }
+    }
+    opinionData.status = opinion.status || 'approved';
     
     // Final safety check - ensure no Date objects remain
     const finalData: any = {};
@@ -54,7 +79,39 @@ export class OpinionRepository {
         console.error(`[OpinionRepository] ERROR: Date object found in final data: ${key}`, value);
         continue;
       }
+      // Check for Date objects in nested structures
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        const hasDate = Object.values(value).some(v => v instanceof Date);
+        if (hasDate) {
+          console.error(`[OpinionRepository] ERROR: Date object found in nested object: ${key}`, value);
+          // Recursively clean nested objects
+          finalData[key] = removeDateObjects(value);
+          continue;
+        }
+      }
       finalData[key] = value;
+    }
+    
+    // Log the final data being sent to database
+    console.log('[OpinionRepository] Final data being inserted:', JSON.stringify(finalData, (key, value) => {
+      if (value instanceof Date) {
+        return `[Date: ${value.toISOString()}]`;
+      }
+      return value;
+    }));
+    
+    // One more check before database insert
+    const hasAnyDate = Object.values(finalData).some(v => {
+      if (v instanceof Date) return true;
+      if (typeof v === 'object' && v !== null) {
+        return Object.values(v).some(nested => nested instanceof Date);
+      }
+      return false;
+    });
+    
+    if (hasAnyDate) {
+      console.error('[OpinionRepository] CRITICAL: Date object detected in finalData before insert!', finalData);
+      throw new Error('Date object detected in opinion data - this should have been filtered out');
     }
     
     const [created] = await db.insert(opinions).values(finalData).returning();
