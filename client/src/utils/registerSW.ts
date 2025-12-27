@@ -8,7 +8,8 @@ export interface SWRegistrationCallbacks {
 
 export function registerServiceWorker(callbacks: SWRegistrationCallbacks = {}) {
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
+    // Register immediately, don't wait for load event
+    (async () => {
       try {
         const registration = await navigator.serviceWorker.register('/service-worker.js', {
           scope: '/'
@@ -16,10 +17,21 @@ export function registerServiceWorker(callbacks: SWRegistrationCallbacks = {}) {
 
         console.log('[SW] Service Worker registered:', registration);
 
-        // Check for updates every hour
-        setInterval(() => {
+        // Check for updates immediately on registration
+        registration.update();
+
+        // Check for updates every 15 minutes (reduced from 1 hour)
+        const updateInterval = setInterval(() => {
           registration.update();
-        }, 60 * 60 * 1000);
+        }, 15 * 60 * 1000);
+
+        // Check for updates when app becomes visible (user returns to app)
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden && registration) {
+            console.log('[SW] App became visible, checking for updates');
+            registration.update();
+          }
+        });
 
         // Handle updates
         registration.addEventListener('updatefound', () => {
@@ -35,12 +47,15 @@ export function registerServiceWorker(callbacks: SWRegistrationCallbacks = {}) {
           });
         });
 
+        // Store interval ID for potential cleanup (though we keep it running)
+        (registration as any)._updateInterval = updateInterval;
+
         callbacks.onSuccess?.(registration);
       } catch (error) {
         console.error('[SW] Registration failed:', error);
         callbacks.onError?.(error as Error);
       }
-    });
+    })();
   }
 }
 

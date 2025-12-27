@@ -334,6 +334,14 @@ export function serveStatic(app: Express) {
     log(`[Static Files] Serving assets directory files at root level: ${assetsPath}`);
   }
   
+  // Ensure service worker is never cached - critical for PWA updates
+  app.get('/service-worker.js', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+  });
+
   // Serve static files with proper headers
   // This middleware must come BEFORE the catch-all route
   app.use((req, res, next) => {

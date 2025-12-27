@@ -1,8 +1,8 @@
 // Service Worker for Fuller Feuds PWA
 // Handles push notifications, offline caching, and app updates
 
-const CACHE_NAME = 'fuller-feuds-v1';
-const RUNTIME_CACHE = 'fuller-feuds-runtime-v1';
+const CACHE_NAME = '{{CACHE_VERSION}}';
+const RUNTIME_CACHE = '{{RUNTIME_CACHE_VERSION}}';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -34,10 +34,16 @@ self.addEventListener('activate', (event) => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
+          // Delete all caches that don't match current cache names
+          // This ensures old versions are cleaned up
+          if (!cacheName.startsWith('fuller-feuds-')) {
+            return Promise.resolve();
+          }
           if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
             console.log('[Service Worker] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
+          return Promise.resolve();
         })
       );
     }).then(() => clients.claim())
@@ -87,21 +93,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets - Cache First with network fallback
+  // Static assets - Stale-While-Revalidate strategy
+  // Serve cached version immediately, fetch fresh in background
   event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) {
-        return cached;
-      }
-      return fetch(request).then(response => {
-        // Cache successful responses
-        if (response && response.status === 200) {
-          return caches.open(CACHE_NAME).then(cache => {
+    caches.open(CACHE_NAME).then(cache => {
+      return caches.match(request).then(cached => {
+        // Fetch fresh version in background
+        const fetchPromise = fetch(request).then(response => {
+          // Only cache successful responses
+          if (response && response.status === 200) {
             cache.put(request, response.clone());
-            return response;
-          });
+          }
+          return response;
+        }).catch(() => {
+          // If fetch fails, we'll use cached version if available
+          console.log('[Service Worker] Network fetch failed, using cache if available');
+        });
+
+        // Return cached version immediately if available, otherwise wait for fetch
+        if (cached) {
+          // Return cached version immediately, but still fetch in background
+          fetchPromise.catch(() => {}); // Suppress errors from background fetch
+          return cached;
         }
-        return response;
+        // No cache available, wait for network fetch
+        return fetchPromise;
       });
     })
   );
