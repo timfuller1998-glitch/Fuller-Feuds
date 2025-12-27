@@ -93,30 +93,85 @@ export class OpinionRepository {
         console.error(`[OpinionRepository] CRITICAL: Date object found in finalData: ${key}`, value);
         delete finalData[key];
       }
+      // Check nested structures
+      if (Array.isArray(value)) {
+        value.forEach((item, idx) => {
+          if (item instanceof Date) {
+            console.error(`[OpinionRepository] CRITICAL: Date object found in array ${key}[${idx}]`);
+          }
+        });
+      }
     }
     
-    const [created] = await db.insert(opinions).values(finalData).returning();
+    // Log the exact data being inserted
+    console.log('[OpinionRepository] About to insert opinion with data:', JSON.stringify(finalData));
+    
+    // Explicitly ensure no timestamp fields are included
+    const insertData: any = {};
+    const allowedFields = ['topicId', 'userId', 'content', 'status', 'debateStatus', 'references', 
+                          'topicEconomicScore', 'topicAuthoritarianScore', 'tasteScore', 
+                          'passionScore', 'analysisConfidence'];
+    for (const field of allowedFields) {
+      if (finalData[field] !== undefined) {
+        // Double-check it's not a Date
+        if (finalData[field] instanceof Date) {
+          console.error(`[OpinionRepository] Date object in allowed field ${field} - skipping`);
+          continue;
+        }
+        insertData[field] = finalData[field];
+      }
+    }
+    
+    // Log the exact data being inserted
+    console.log('[OpinionRepository] About to insert opinion with data:', JSON.stringify(insertData));
+    
+    let created;
+    try {
+      created = await db.insert(opinions).values(insertData).returning();
+      console.log('[OpinionRepository] Successfully inserted opinion:', created[0]?.id);
+    } catch (error) {
+      console.error('[OpinionRepository] ERROR during opinion insert:', error);
+      console.error('[OpinionRepository] Data that caused error:', JSON.stringify(insertData, null, 2));
+      // Check for Date objects one more time
+      const hasDate = Object.values(insertData).some(v => {
+        if (v instanceof Date) return true;
+        if (Array.isArray(v)) return v.some(item => item instanceof Date);
+        return false;
+      });
+      if (hasDate) {
+        console.error('[OpinionRepository] Date object detected in insertData!');
+      }
+      throw error;
+    }
 
     // Update user profile opinion counts (this logic should move to service layer)
     // Use sql template for timestamp to avoid Date object issues with postgres library
-    await db
-      .insert(userProfiles)
-      .values({
-        userId: opinion.userId,
-        opinionCount: 1,
-        totalOpinions: 1,
-        economicScore: 0,
-        authoritarianScore: 0,
-        updatedAt: sql`now()`
-      })
-      .onConflictDoUpdate({
-        target: userProfiles.userId,
-        set: {
-          opinionCount: sql`${userProfiles.opinionCount} + 1`,
-          totalOpinions: sql`${userProfiles.totalOpinions} + 1`,
+    try {
+      await db
+        .insert(userProfiles)
+        .values({
+          userId: opinion.userId,
+          opinionCount: 1,
+          totalOpinions: 1,
+          economicScore: 0,
+          authoritarianScore: 0,
           updatedAt: sql`now()`
-        }
-      });
+        })
+        .onConflictDoUpdate({
+          target: userProfiles.userId,
+          set: {
+            opinionCount: sql`${userProfiles.opinionCount} + 1`,
+            totalOpinions: sql`${userProfiles.totalOpinions} + 1`,
+            updatedAt: sql`now()`
+          }
+        });
+    } catch (error) {
+      console.error('[OpinionRepository] ERROR during userProfiles insert:', error);
+      // Don't fail opinion creation if userProfiles update fails
+      console.warn('[OpinionRepository] Continuing despite userProfiles insert error');
+    }
+    
+    const [createdOpinion] = created;
 
     return created;
   }
