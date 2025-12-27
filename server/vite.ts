@@ -64,8 +64,7 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 // Force bundler to include static files by attempting to read them at module load time
-// This ensures the directories are included even if includeFiles doesn't work
-// Vercel will include files that are read via fs operations at module load time
+// This ensures the directories are included during build
 try {
   // Try server/static first (created by copy-static.js during build)
   const staticPath = path.resolve(import.meta.dirname, "static");
@@ -74,7 +73,7 @@ try {
   fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:71',message:'Module load - checking server/static',data:{staticPath,indexPath,dirname:import.meta.dirname,exists:fs.existsSync(staticPath),indexExists:fs.existsSync(indexPath)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
   // #endregion
   if (fs.existsSync(indexPath)) {
-    // Actually read the file to force Vercel to include it
+    // Actually read the file to ensure it's included in build
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:75',message:'Reading server/static/index.html',data:{indexPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
@@ -95,7 +94,7 @@ try {
   fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:86',message:'Module load - checking dist/public',data:{distPublicPath,distIndexPath,cwd:process.cwd(),exists:fs.existsSync(distPublicPath),indexExists:fs.existsSync(distIndexPath)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
   if (fs.existsSync(distIndexPath)) {
-    // Actually read the file to force Vercel to include it
+    // Actually read the file to ensure it's included in build
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:90',message:'Reading dist/public/index.html',data:{distIndexPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
@@ -110,34 +109,25 @@ try {
 
 export function serveStatic(app: Express) {
   // Find the dist/public directory
-  // In Vercel, files included via includeFiles are available relative to process.cwd()
-  // process.cwd() in Vercel serverless functions is typically /var/task (project root)
+  // Try multiple strategies to find dist/public
+  // NOTE: Prefer dist/public over server/static since it has the assets directory
   let distPath: string | null = null;
   
   const cwd = process.cwd();
   const dirname = import.meta.dirname;
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:100',message:'serveStatic called - runtime check',data:{cwd,dirname,nodeEnv:process.env.NODE_ENV,vercel:process.env.VERCEL},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-  
-  // Priority order based on Vercel's file structure
-  // Try multiple strategies to find dist/public
-  // NOTE: Prefer dist/public over server/static since it has the assets directory
   const possiblePaths = [
-    // Strategy 1: Direct from cwd (where includeFiles places files) - PREFERRED (has assets)
+    // Strategy 1: Direct from cwd - PREFERRED (has assets)
     path.resolve(cwd, "dist", "public"),
     // Strategy 2: Copied to server/static during build (fallback if dist/public not available)
     path.resolve(dirname, "static"),
     // Strategy 3: Relative to server directory
     path.resolve(dirname, "..", "dist", "public"),
-    // Strategy 4: Vercel's static output (if using @vercel/static builder)
-    path.resolve(cwd, ".vercel", "output", "static"),
-    // Strategy 5: If server is nested deeper
+    // Strategy 4: If server is nested deeper
     path.resolve(dirname, "..", "..", "dist", "public"),
-    // Strategy 6: Check if dist exists at root
+    // Strategy 5: Check if dist exists at root
     path.resolve(cwd, "dist"),
-    // Strategy 7: Check if files are at function root (unlikely but possible)
+    // Strategy 6: Check if files are at function root (unlikely but possible)
     path.resolve(cwd, "public"),
   ];
   
@@ -256,7 +246,6 @@ export function serveStatic(app: Express) {
     debugInfo += `  - cwd: ${cwd}\n`;
     debugInfo += `  - dirname: ${dirname}\n`;
     debugInfo += `  - NODE_ENV: ${process.env.NODE_ENV}\n`;
-    debugInfo += `  - VERCEL: ${process.env.VERCEL}\n`;
     
     // Try to list what's in cwd
     try {
@@ -270,9 +259,9 @@ export function serveStatic(app: Express) {
     
     const errorMsg = `Could not find dist/public directory.\n\n${debugInfo}\n\n` +
       `Possible issues:\n` +
-      `1. Build didn't complete successfully (check Vercel build logs)\n` +
-      `2. includeFiles pattern doesn't match actual file structure\n` +
-      `3. Files are in a different location than expected\n\n` +
+      `1. Build didn't complete successfully (check build logs)\n` +
+      `2. Files are in a different location than expected\n` +
+      `3. Build output directory doesn't match expected structure\n\n` +
       `Check /api/debug/static for more information.`;
     
     log(`[Static Files] ERROR: ${errorMsg}`);
@@ -297,10 +286,10 @@ export function serveStatic(app: Express) {
             <pre>${errorMsg.replace(/\n/g, '<br>')}</pre>
             <p><strong>Action Required:</strong></p>
             <ol>
-              <li>Check Vercel build logs to ensure 'npm run build' completed successfully</li>
+              <li>Check build logs to ensure 'npm run build' completed successfully</li>
               <li>Verify that dist/public directory exists after build</li>
               <li>Check /api/debug/static endpoint for detailed debugging information</li>
-              <li>Verify includeFiles pattern in vercel.json matches your build output</li>
+              <li>Ensure build process copies files to dist/public correctly</li>
             </ol>
           </body>
         </html>
@@ -323,10 +312,6 @@ export function serveStatic(app: Express) {
         const fileName = path.basename(req.path);
         const assetFilePath = path.resolve(assetsPath, fileName);
         
-        if (process.env.VERCEL === '1') {
-          console.log(`[ASSETS MIDDLEWARE] Checking root-level asset: ${req.path} -> ${assetFilePath} (exists: ${fs.existsSync(assetFilePath)})`);
-        }
-        
         if (fs.existsSync(assetFilePath)) {
           console.log(`[ASSETS MIDDLEWARE] ✓ Serving ${req.path} from ${assetFilePath}`);
           // Set proper content type
@@ -342,10 +327,6 @@ export function serveStatic(app: Express) {
           }
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
           return res.sendFile(assetFilePath);
-        } else {
-          if (process.env.VERCEL === '1') {
-            console.log(`[ASSETS MIDDLEWARE] ✗ File not found: ${assetFilePath}`);
-          }
         }
       }
       next();
@@ -361,23 +342,7 @@ export function serveStatic(app: Express) {
     if (hasExtension && !req.path.startsWith('/api')) {
       const requestedPath = path.join(distPath, req.path);
       const exists = fs.existsSync(requestedPath);
-      if (process.env.VERCEL === '1') {
-        console.log(`[STATIC REQUEST] ${req.path} -> ${requestedPath} (exists: ${exists}, distPath: ${distPath})`);
-        // List what's actually in distPath for debugging
-        try {
-          if (fs.existsSync(distPath)) {
-            const contents = fs.readdirSync(distPath);
-            console.log(`[STATIC REQUEST] Contents of distPath: ${contents.slice(0, 20).join(', ')}`);
-            const assetsDir = path.join(distPath, 'assets');
-            if (fs.existsSync(assetsDir)) {
-              const assets = fs.readdirSync(assetsDir);
-              console.log(`[STATIC REQUEST] Assets directory contents: ${assets.slice(0, 10).join(', ')}`);
-            }
-          }
-        } catch (e) {
-          console.log(`[STATIC REQUEST] Could not list distPath contents: ${e}`);
-        }
-      }
+      
       if (!exists) {
         // Try alternative paths (Vite puts assets in assets/ subdirectory)
         const fileName = path.basename(req.path);
@@ -411,11 +376,6 @@ export function serveStatic(app: Express) {
         }
         console.log(`[STATIC REQUEST] File not found at any path. Tried: ${requestedPath} and ${altPaths.join(', ')}`);
         // Don't call next() here - let express.static try, then our later middleware will handle it
-      } else {
-        // File exists at requested path, let express.static handle it
-        if (process.env.VERCEL === '1') {
-          console.log(`[STATIC REQUEST] File exists at requested path: ${requestedPath}`);
-        }
       }
     }
     next();
@@ -448,15 +408,7 @@ export function serveStatic(app: Express) {
     maxAge: process.env.NODE_ENV === 'production' ? '1y' : '0' // Cache static files in production
   }));
   
-  // Add explicit logging for /assets/ requests to debug custom domain issues
-  app.use('/assets', (req, res, next) => {
-    if (process.env.VERCEL === '1') {
-      const assetPath = path.join(distPath, 'assets', req.path);
-      const exists = fs.existsSync(assetPath);
-      console.log(`[ASSETS ROUTE] ${req.path} -> ${assetPath} (exists: ${exists}, hostname: ${req.hostname})`);
-    }
-    next();
-  });
+  // Explicitly serve assets directory
   
   // Also explicitly serve assets directory (though express.static should handle this)
   const assetsDirPath = path.join(distPath, 'assets');
@@ -479,11 +431,6 @@ export function serveStatic(app: Express) {
   
   // SPA fallback: serve index.html for routes without file extensions
   app.get("*", (req, res, next) => {
-    // Log for debugging domain issues
-    if (process.env.VERCEL === '1') {
-      console.log(`[STATIC] SPA fallback - Path: ${req.path}, Host: ${req.hostname}, HasExtension: ${/\.[a-zA-Z0-9]+$/.test(req.path)}`);
-    }
-    
     // Skip API routes
     if (req.path.startsWith('/api')) {
       return next();

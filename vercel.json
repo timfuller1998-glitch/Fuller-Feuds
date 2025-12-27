@@ -1,4 +1,5 @@
 {
+  "_comment": "This file is for Vercel deployments only. For Render deployments, use render.yaml instead.",
   "version": 2,
   "buildCommand": "npm run build",
   "functions": {

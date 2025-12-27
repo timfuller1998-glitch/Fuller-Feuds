@@ -6,7 +6,7 @@ import routes from "./routes/index.js";
 import { serveStatic, log } from "./vite.js";
 // Force inclusion of static files by importing
 import "./static-loader.js";
-// Import static-files to force Vercel to include server/static directory
+// Import static-files to ensure server/static directory is included
 import { staticIndexHtml } from "./static-files.js";
 // Access it to ensure it's not tree-shaken
 void staticIndexHtml;
@@ -21,16 +21,15 @@ const badgeRepository = new BadgeRepository();
 
 const app = express();
 
-// Trust Vercel's proxy to get correct protocol (HTTPS) from x-forwarded-proto header
-// This is critical for secure cookies to work correctly
-if (process.env.VERCEL === '1') {
+// Trust proxy to get correct protocol (HTTPS) from x-forwarded-proto header
+// This is critical for secure cookies to work correctly in production
+if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
-// Log request info for debugging domain issues
+// Log request info for debugging (optional - can be enabled via env var)
 app.use((req, res, next) => {
-  // Only log in production to help debug domain issues
-  if (process.env.VERCEL === '1') {
+  if (process.env.LOG_REQUESTS === 'true') {
     console.log(`[REQUEST] ${req.method} ${req.path} - Host: ${req.hostname}, Origin: ${req.get('origin')}, Protocol: ${req.protocol}, X-Forwarded-Proto: ${req.get('x-forwarded-proto')}`);
   }
   next();
@@ -152,7 +151,6 @@ app.get('/api/debug/static', (req, res) => {
       cwd,
       importMetaDirname: dirname,
       nodeEnv: process.env.NODE_ENV,
-      vercel: process.env.VERCEL,
     },
     paths: {},
     cwdContents: [],
@@ -233,9 +231,9 @@ app.get('/api/debug/static', (req, res) => {
     results.recommendations.push(`✓ Use path: ${foundPath[0]}`);
   } else {
     results.recommendations.push("✗ No valid dist/public directory found");
-    results.recommendations.push("1. Check Vercel build logs - did 'npm run build' complete?");
+    results.recommendations.push("1. Check build logs - did 'npm run build' complete?");
     results.recommendations.push("2. Verify dist/public exists after build");
-    results.recommendations.push("3. Check includeFiles pattern in vercel.json");
+    results.recommendations.push("3. Ensure build process copies files correctly");
   }
   
   res.json(results);
@@ -253,7 +251,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
   log(`Error: ${message}`, "error");
   res.status(status).json({ message });
-  // Don't re-throw in production - it crashes the serverless function
+  // Don't re-throw in production
   if (process.env.NODE_ENV === 'development') {
   throw err;
   }
@@ -270,9 +268,28 @@ if (app.get("env") === "development") {
   serveStatic(app);
 }
 
-// In Vercel serverless, @vercel/node handles the server
-// Only start listening in non-serverless environments
-if (process.env.VERCEL !== '1') {
+// Health check endpoint for Render monitoring
+app.get('/health', async (req, res) => {
+  try {
+    const { checkDbConnection } = await import('./db.js');
+    const dbHealthy = await checkDbConnection();
+    
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      database: dbHealthy ? 'connected' : 'disconnected',
+      websocket: 'enabled'
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
+// Start the server
 const port = parseInt(process.env.PORT || '5000', 10);
 server.listen({
   port,
@@ -297,26 +314,3 @@ server.listen({
     log(`[Cache Stats] Hits: ${stats.hits}, Misses: ${stats.misses}, Hit Rate: ${stats.hitRate.toFixed(2)}%, Memory Size: ${stats.memorySize}, Invalidations: ${stats.invalidations}`);
   }, 5 * 60 * 1000);
 });
-} else {
-  // In Vercel, initialize badges and start jobs asynchronously
-  (async () => {
-    try {
-      await badgeRepository.initializeBadges();
-      log("Badges initialized successfully");
-    } catch (error: any) {
-      log("Error initializing badges:", error);
-    }
-  })();
-  
-  // Don't start scheduled jobs in serverless - they won't work properly
-  // Vercel has its own cron job system if needed
-  log("Running in Vercel serverless environment");
-}
-
-// Export the app for Vercel
-// #region agent log
-const logData = {location:'server/index.ts:240',message:'Server module loaded',data:{nodeEnv:process.env.NODE_ENV,vercel:process.env.VERCEL,hasRoutes:!!routes},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-console.log('[DEBUG]', JSON.stringify(logData));
-fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{});
-// #endregion
-export default app;

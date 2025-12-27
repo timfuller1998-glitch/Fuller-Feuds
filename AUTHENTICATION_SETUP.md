@@ -6,41 +6,39 @@ The backend authentication system is fully implemented and working. The server i
 
 ## 🔧 Database URL Configuration
 
-### For Vercel (Production - Serverless):
+### For Production (Render):
 
-**Option 1: Connection Pooler - Transaction Mode** (Recommended for serverless)
+**Option 1: Connection Pooler - Transaction Mode** (Recommended)
 - Go to Supabase Dashboard → Settings → Database → Connection Pooling → **Transaction mode**
 - Copy the connection string (URI format)
 - **Note**: Supabase may show a warning "PREPARE statements are not compatible" - this is EXPECTED and SAFE to ignore
 - The code uses `prepare: false` which is required for Transaction mode
-- This is the recommended mode for Vercel/serverless
+- This is the recommended mode for production
 
-**Option 2: Connection Pooler - Session Mode** (Alternative if Transaction mode has issues)
+**Option 2: Connection Pooler - Session Mode** (Alternative)
 - Go to Supabase Dashboard → Settings → Database → Connection Pooling → **Session mode**  
 - Copy the connection string (URI format)
 - The code uses `prepare: false` by default (works fine, but not optimal)
-- To enable prepared statements for better performance, add `DATABASE_USE_PREPARED_STATEMENTS=true` in Vercel env vars
-- Less optimal for serverless but fully compatible
+- To enable prepared statements for better performance, add `DATABASE_USE_PREPARED_STATEMENTS=true` in environment variables
+- Less optimal but fully compatible
+
+**Option 3: Direct Connection** (Also works on Render)
+- Go to Supabase Dashboard → Settings → Database → Connection string
+- Copy the direct connection string (port 5432)
+- Works fine on Render (unlike serverless platforms)
 
 **Connection String Format:**
 ```env
+# Pooler (Transaction mode - recommended)
 DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+
+# Direct connection (also works)
+DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
 ```
 
-**Set in Vercel:**
-- Vercel → Settings → Environment Variables → Add `DATABASE_URL`
-
-**Why Pooler for Vercel:**
-- Serverless functions are short-lived
-- Pooler manages connections efficiently
-- Prevents connection exhaustion
-- **Direct connections (db.*.supabase.co) often fail with DNS errors (ENOTFOUND) on Vercel's network**
-
-**⚠️ Troubleshooting: If you see `ENOTFOUND db.*.supabase.co` errors:**
-- **Problem**: You're using the direct connection string on Vercel
-- **Solution**: Switch to Connection Pooler (Transaction mode) as described above
-- The direct connection hostname (`db.vrutowfygjodifolelyd.supabase.co`) may not resolve from Vercel's serverless network
-- The pooler hostname (`aws-0-[REGION].pooler.supabase.com`) is designed for serverless environments
+**Set in Render:**
+- Render Dashboard → Your Service → Environment → Add `DATABASE_URL`
+- Also set `NODE_ENV=production` and `SESSION_SECRET`
 
 ### For Local Development:
 You can use either:

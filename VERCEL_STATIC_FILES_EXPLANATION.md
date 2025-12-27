@@ -1,5 +1,7 @@
 # Understanding Vercel Static File Serving - Complete Guide
 
+> **Note**: This document is specific to Vercel deployments. For Render deployments, static file serving is simpler since Render uses a persistent server. The `serveStatic` function in `server/vite.ts` handles static files automatically on Render without the need for `includeFiles` or complex routing configuration.
+
 ## 1. The Fix
 
 **Changed `vercel.json` to:**
@@ -222,6 +224,7 @@ Vercel's NOT_FOUND error protects you from:
 3. **Keep `vercel.json` routes simple - just route to your function**
 4. **Test file paths at runtime, not just build time**
 5. **When in doubt, serve from the function - it's more reliable**
+
 
 
 

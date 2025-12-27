@@ -4,30 +4,26 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from "../shared/schema.js";
 
 // Load environment variables from .env file ONLY in local development
-// NEVER load .env in Vercel/production - environment variables come from Vercel dashboard
-// Vercel sets VERCEL=1, so we check for that first
-const isVercel = process.env.VERCEL === '1';
+// In production, environment variables come from the hosting platform (Render, etc.)
 const isProduction = process.env.NODE_ENV === 'production';
-const shouldLoadEnv = !isVercel && !isProduction;
+const shouldLoadEnv = !isProduction;
 
 if (shouldLoadEnv) {
   console.log('[DB] Loading .env file for local development');
   config({ path: '.env', override: true });
 } else {
-  console.log(`[DB] Skipping .env load - Vercel: ${isVercel}, Production: ${isProduction}`);
+  console.log(`[DB] Skipping .env load - Production: ${isProduction}`);
 }
 
 let connectionString = process.env.DATABASE_URL;
 
 // Log environment info for debugging
 console.error(`[DB CONNECTION] Environment check:`, {
-  isVercel,
   isProduction,
   shouldLoadEnv,
   hasDatabaseUrl: !!connectionString,
   databaseUrlLength: connectionString?.length,
-  nodeEnv: process.env.NODE_ENV,
-  vercelEnv: process.env.VERCEL
+  nodeEnv: process.env.NODE_ENV
 });
 
 // #region agent log
@@ -35,10 +31,7 @@ fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{metho
 // #endregion
 
 if (!connectionString) {
-  const errorMsg = process.env.VERCEL === '1' 
-    ? 'DATABASE_URL environment variable is required. Please set your Supabase connection string in Vercel project settings (Settings → Environment Variables). The database is Supabase, not Vercel - you just need to configure the connection string in Vercel\'s environment variables.'
-    : 'DATABASE_URL environment variable is required. Please set your Supabase connection string in your .env file or environment.';
-  throw new Error(errorMsg);
+  throw new Error('DATABASE_URL environment variable is required. Please set your Supabase connection string in your .env file (local) or environment variables (production).');
 }
 
 // Fix: Remove duplicate "DATABASE_URL=" prefix if it exists (copy-paste error)
@@ -58,16 +51,7 @@ try {
   console.error(`[DB CONNECTION] Parsed hostname: ${parsedUrl.hostname}, port: ${parsedUrl.port || '5432'}, database: ${parsedUrl.pathname?.replace('/','')}`);
   console.error(`[DB CONNECTION] Full connection string (masked): ${maskedUrl}`);
   
-  // Detect if using direct connection on Vercel (should use pooler instead)
-  if (isVercel && parsedUrl.hostname.includes('db.') && parsedUrl.hostname.includes('.supabase.co') && parsedUrl.port !== '6543') {
-    console.error(`[DB CONNECTION] ⚠️  WARNING: Using direct connection (db.*.supabase.co) on Vercel!`);
-    console.error(`[DB CONNECTION] ⚠️  Direct connections may fail with DNS errors on Vercel's serverless network.`);
-    console.error(`[DB CONNECTION] ⚠️  SOLUTION: Use Connection Pooler (Transaction mode) from Supabase Dashboard.`);
-    console.error(`[DB CONNECTION] ⚠️  Go to: Supabase Dashboard → Settings → Database → Connection Pooling → Transaction mode`);
-    console.error(`[DB CONNECTION] ⚠️  The pooler connection string should look like: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres`);
-  }
-  
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'Connection string parsed',data:{hostname:parsedUrl.hostname,port:parsedUrl.port||'5432',database:parsedUrl.pathname?.replace('/',''),maskedUrl,isDirectConnection:parsedUrl.hostname.includes('db.')&&parsedUrl.hostname.includes('.supabase.co'),isVercel},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'Connection string parsed',data:{hostname:parsedUrl.hostname,port:parsedUrl.port||'5432',database:parsedUrl.pathname?.replace('/',''),maskedUrl,isDirectConnection:parsedUrl.hostname.includes('db.')&&parsedUrl.hostname.includes('.supabase.co')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
 } catch(e) {
   console.error(`[DB CONNECTION] Failed to parse connection string: ${e}`);
   console.error(`[DB CONNECTION] First 100 chars of connection string: ${trimmedConnectionString.substring(0, 100)}`);
@@ -152,20 +136,13 @@ export const checkDbConnection = async (): Promise<boolean> => {
       console.error(`[DB CONNECTION] ERROR: Cannot resolve Supabase hostname: ${hostname}`);
       console.error(`[DB CONNECTION] Error code: ${(error as any).code || 'UNKNOWN'}, Error: ${(error as any).message || 'Unknown error'}`);
       
-      if (isVercel && isDirectConnection) {
-        console.error(`[DB CONNECTION] ⚠️  ROOT CAUSE: Using direct connection (db.*.supabase.co) on Vercel serverless.`);
-        console.error(`[DB CONNECTION] ⚠️  Direct connections often fail with DNS resolution errors (ENOTFOUND) on Vercel's network.`);
-        console.error(`[DB CONNECTION] ✅ SOLUTION: Switch to Connection Pooler (Transaction mode)`);
-        console.error(`[DB CONNECTION] ✅ Steps:`);
-        console.error(`[DB CONNECTION]    1. Go to Supabase Dashboard → Settings → Database → Connection Pooling`);
-        console.error(`[DB CONNECTION]    2. Select "Transaction mode" tab`);
-        console.error(`[DB CONNECTION]    3. Copy the connection string (URI format)`);
-        console.error(`[DB CONNECTION]    4. Update DATABASE_URL in Vercel: Settings → Environment Variables`);
+      if (isDirectConnection) {
+        console.error(`[DB CONNECTION] ⚠️  Using direct connection (db.*.supabase.co).`);
+        console.error(`[DB CONNECTION] ⚠️  If you experience connection issues, consider using Connection Pooler instead.`);
+        console.error(`[DB CONNECTION] ✅ To use pooler: Go to Supabase Dashboard → Settings → Database → Connection Pooling`);
         console.error(`[DB CONNECTION] ✅ Pooler format: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres`);
-        console.error(`[DB CONNECTION] ✅ Note: Ignore the "PREPARE statements not compatible" warning - it's expected and safe.`);
       } else {
-        console.error(`[DB CONNECTION] The database IS Supabase - this is a connection issue, not a Vercel database issue.`);
-        console.error(`[DB CONNECTION] ACTION REQUIRED: Update DATABASE_URL in Vercel environment variables to use correct Supabase connection string`);
+        console.error(`[DB CONNECTION] ACTION REQUIRED: Update DATABASE_URL environment variable with correct Supabase connection string`);
         console.error(`[DB CONNECTION] Get your connection string from: Supabase Dashboard → Settings → Database → Connection string`);
       }
     }

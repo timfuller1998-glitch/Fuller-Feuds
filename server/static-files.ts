@@ -1,4 +1,4 @@
-// Auto-generated file to force Vercel to include static files
+// Auto-generated file to ensure static files are included in build
 // This file is updated by scripts/copy-static.js during build
 import fs from 'fs';
 import path from 'path';
