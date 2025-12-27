@@ -872,7 +872,7 @@ Return only valid JSON with an "opinions" array containing all results.`;
    */
   static async generateEmbedding(text: string): Promise<number[]> {
     if (!openai) {
-      throw new Error("OpenAI not configured - cannot generate embedding");
+      throw new Error("OpenAI API key not configured. Set OPENAI_API_KEY environment variable.");
     }
 
     try {
@@ -885,7 +885,8 @@ Return only valid JSON with an "opinions" array containing all results.`;
       return response.data[0].embedding;
     } catch (error) {
       console.error("Error generating embedding:", error);
-      throw new Error("Failed to generate embedding");
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to generate embedding: ${errorMessage}`);
     }
   }
 

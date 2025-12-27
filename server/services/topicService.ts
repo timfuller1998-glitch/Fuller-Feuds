@@ -183,7 +183,12 @@ export class TopicService {
   async updateEmbedding(topicId: string, embedding: number[]): Promise<void> {
     // Update both JSONB embedding (backup) and vector embedding (for pgvector)
     await this.repository.updateEmbedding(topicId, embedding);
-    await this.repository.updateEmbeddingVector(topicId, embedding);
+    try {
+      await this.repository.updateEmbeddingVector(topicId, embedding);
+    } catch (error) {
+      // Log but don't fail if pgvector update fails (JSONB embedding still works)
+      console.warn(`[TopicService] Failed to update vector embedding for topic ${topicId}, but JSONB embedding was saved:`, error);
+    }
   }
 
   /**

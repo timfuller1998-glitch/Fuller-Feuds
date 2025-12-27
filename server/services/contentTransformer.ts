@@ -236,7 +236,18 @@ Return JSON only:
   }
 
   /**
-   * Generate diverse opinions for a topic from scratch
+   * Check if an error is retryable (truncation or incomplete response)
+   */
+  private static isRetryableError(error: any): boolean {
+    const message = error?.message || '';
+    return message.includes('truncated') || 
+           message.includes('incomplete') ||
+           message.includes('Invalid AI response format') ||
+           message.includes('received') && message.includes('opinions');
+  }
+
+  /**
+   * Generate diverse opinions for a topic from scratch with retry logic
    * Returns array of unique opinions with varied stances and intensities
    */
   static async generateOpinions(
@@ -248,9 +259,28 @@ Return JSON only:
     intensity: EmotionalIntensity;
     authorName: string;
   }>> {
+    return this.generateOpinionsWithRetry(topicTitle, count, 2);
+  }
+
+  /**
+   * Generate opinions with retry logic and exponential backoff
+   * @param topicTitle - The topic to generate opinions for
+   * @param count - Number of opinions to generate
+   * @param maxRetries - Maximum number of retry attempts (default: 2)
+   */
+  private static async generateOpinionsWithRetry(
+    topicTitle: string,
+    count: number,
+    maxRetries: number = 2
+  ): Promise<Array<{
+    content: string;
+    stance: 'for' | 'against' | 'nuanced';
+    intensity: EmotionalIntensity;
+    authorName: string;
+  }>> {
     if (!openai) {
       console.log('OpenAI not configured - cannot generate opinions');
-      throw new Error('OpenAI API key required for opinion generation');
+      throw new Error('OpenAI API key required for opinion generation. Set OPENAI_API_KEY environment variable.');
     }
 
     // Calculate stance distribution: ~40% for, ~40% against, ~20% nuanced
@@ -258,7 +288,16 @@ Return JSON only:
     const againstCount = Math.round(count * 0.4);
     const nuancedCount = count - forCount - againstCount;
 
-    const prompt = `Generate exactly ${count} diverse, unique opinions on the topic: "${topicTitle}"
+    let attempt = 0;
+    let lastError: Error | null = null;
+
+    while (attempt <= maxRetries) {
+      try {
+        // Increase token multiplier on retry attempts
+        const tokenMultiplier = attempt === 0 ? 600 : 800;
+        const maxTokens = Math.min(16000, Math.max(2000, count * tokenMultiplier));
+
+        const prompt = `Generate exactly ${count} diverse, unique opinions on the topic: "${topicTitle}"
 
 Requirements:
 1. Stance distribution: ${forCount} FOR, ${againstCount} AGAINST, ${nuancedCount} NUANCED
@@ -281,59 +320,100 @@ Return JSON array with exactly ${count} items:
   ]
 }`;
 
-    try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert at generating diverse, well-reasoned debate opinions. Create unique perspectives with varied stances and emotional tones. Always respond with valid JSON only."
-          },
-          {
-            role: "user",
-            content: prompt
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert at generating diverse, well-reasoned debate opinions. Create unique perspectives with varied stances and emotional tones. Always respond with valid JSON only."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.8, // Higher temperature for more diversity
+          max_tokens: maxTokens,
+        });
+
+        const responseContent = completion.choices[0]?.message?.content;
+        if (!responseContent) {
+          throw new Error("No response from OpenAI");
+        }
+
+        // Check for truncation indicators before parsing
+        const trimmedContent = responseContent.trim();
+        const appearsTruncated = 
+          trimmedContent.endsWith('...') ||
+          (!trimmedContent.endsWith('}') && !trimmedContent.endsWith(']'));
+
+        let aiResponse;
+        try {
+          aiResponse = JSON.parse(responseContent);
+        } catch (parseError) {
+          const errorSnippet = responseContent.length > 500 
+            ? responseContent.substring(0, 500) + '...' 
+            : responseContent;
+          console.error(`[Attempt ${attempt + 1}] Failed to parse AI response. Snippet:`, errorSnippet);
+          if (appearsTruncated) {
+            throw new Error(`AI response was truncated (max_tokens limit reached). Response ends with: "${trimmedContent.slice(-50)}". Increase max_tokens or reduce opinion count.`);
           }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.8, // Higher temperature for more diversity
-        max_tokens: Math.min(4000, count * 400), // ~400 tokens per opinion
-      });
+          throw new Error(`Invalid AI response format. Parse error: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+        }
 
-      const responseContent = completion.choices[0]?.message?.content;
-      if (!responseContent) {
-        throw new Error("No response from OpenAI");
+        const opinions = aiResponse.opinions || [];
+        
+        // Check for incomplete response (truncation after parsing)
+        if (opinions.length < count) {
+          const errorMsg = `AI response incomplete - received ${opinions.length}/${count} opinions. This may indicate truncation.`;
+          console.warn(`[Attempt ${attempt + 1}] ${errorMsg}`);
+          
+          // Retry if we haven't exhausted attempts
+          if (attempt < maxRetries) {
+            throw new Error(errorMsg);
+          }
+          
+          // On final attempt, return what we got (partial results)
+          console.warn(`[Final attempt] Returning partial results: ${opinions.length}/${count} opinions`);
+        }
+        
+        // Validate we got the right count (warn if slightly off, but don't fail)
+        if (opinions.length !== count && opinions.length >= count) {
+          console.warn(`Expected ${count} opinions, got ${opinions.length}`);
+        }
+
+        // Ensure each opinion has required fields
+        return opinions.map((op: any) => ({
+          content: op.content || 'No content generated',
+          stance: (op.stance === 'for' || op.stance === 'against' || op.stance === 'nuanced') 
+            ? op.stance 
+            : 'nuanced',
+          intensity: (['passionate', 'measured', 'analytical', 'personal'].includes(op.intensity))
+            ? op.intensity
+            : this.assignIntensities(1)[0],
+          authorName: op.authorName || 'Alex',
+        }));
+
+      } catch (error) {
+        lastError = error as Error;
+        const isRetryable = this.isRetryableError(error);
+        
+        if (attempt < maxRetries && isRetryable) {
+          attempt++;
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s
+          console.log(`[Retry ${attempt}/${maxRetries}] Retrying after ${delay}ms delay with increased token limit...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        // Not retryable or max retries reached
+        console.error(`[Attempt ${attempt + 1}] Error generating opinions:`, error);
+        throw error;
       }
-
-      let aiResponse;
-      try {
-        aiResponse = JSON.parse(responseContent);
-      } catch (parseError) {
-        console.error("Failed to parse AI response:", responseContent);
-        throw new Error("Invalid AI response format");
-      }
-
-      const opinions = aiResponse.opinions || [];
-      
-      // Validate we got the right count
-      if (opinions.length !== count) {
-        console.warn(`Expected ${count} opinions, got ${opinions.length}`);
-      }
-
-      // Ensure each opinion has required fields
-      return opinions.map((op: any) => ({
-        content: op.content || 'No content generated',
-        stance: (op.stance === 'for' || op.stance === 'against' || op.stance === 'nuanced') 
-          ? op.stance 
-          : 'nuanced',
-        intensity: (['passionate', 'measured', 'analytical', 'personal'].includes(op.intensity))
-          ? op.intensity
-          : this.assignIntensities(1)[0],
-        authorName: op.authorName || 'Alex',
-      }));
-    } catch (error) {
-      console.error("Error generating opinions:", error);
-      throw error;
     }
+    
+    throw lastError || new Error("Failed to generate opinions after retries");
   }
 
   private static basicClean(text: string): string {

@@ -543,11 +543,22 @@ export class TopicRepository {
    * Update embedding vector column (for pgvector)
    */
   async updateEmbeddingVector(topicId: string, embedding: number[]): Promise<void> {
-    const embeddingStr = `[${embedding.join(',')}]`;
-    await db.execute(sql`
-      UPDATE topics 
-      SET embedding_vec = ${embeddingStr}::vector
-      WHERE id = ${topicId}
-    `);
+    try {
+      const embeddingStr = `[${embedding.join(',')}]`;
+      await db.execute(sql`
+        UPDATE topics 
+        SET embedding_vec = ${embeddingStr}::vector
+        WHERE id = ${topicId}
+      `);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('vector') || errorMessage.includes('type') || errorMessage.includes('does not exist')) {
+        console.error('[TopicRepository] pgvector extension not available. Error:', errorMessage);
+        console.warn('[TopicRepository] Topic embedding will be stored in JSONB format only. Install pgvector extension for vector similarity search.');
+        // Don't throw - allow topic creation to succeed with JSONB embedding only
+        return;
+      }
+      throw new Error(`Failed to update embedding vector: ${errorMessage}`);
+    }
   }
 }

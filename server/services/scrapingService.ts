@@ -154,14 +154,32 @@ export class ScrapingService {
   }
 
   private async findOrCreateTopic(neutralTitle: string, adminUserId: string): Promise<{ topic: Topic; isNew: boolean }> {
-    // Generate embedding for semantic search
-    const embedding = await AIService.generateEmbedding(neutralTitle);
-    
-    // Search existing topics with 0.85 similarity threshold
-    const similar = await this.topicRepository.findSimilarByEmbedding(embedding, 0.85);
-    
-    if (similar.length > 0) {
-      return { topic: similar[0], isNew: false };
+    // Try to generate embedding for semantic search
+    let embedding: number[] | null = null;
+    try {
+      embedding = await AIService.generateEmbedding(neutralTitle);
+      
+      // Search existing topics with 0.85 similarity threshold
+      const similar = await this.topicRepository.findSimilarByEmbedding(embedding, 0.85);
+      
+      if (similar.length > 0) {
+        return { topic: similar[0], isNew: false };
+      }
+    } catch (error) {
+      console.error('Error generating embedding for topic matching:', error);
+      // Fallback: use text-based search instead of embedding
+      try {
+        const existing = await this.topicRepository.findWithFilters({ 
+          search: neutralTitle, 
+          limit: 1 
+        });
+        if (existing.length > 0 && existing[0].title.toLowerCase() === neutralTitle.toLowerCase()) {
+          return { topic: existing[0], isNew: false };
+        }
+      } catch (searchError) {
+        console.error('Error in fallback topic search:', searchError);
+      }
+      // Continue with topic creation if embedding/search fails
     }
     
     // Create new topic
@@ -170,11 +188,14 @@ export class ScrapingService {
       description: `Debate topic: ${neutralTitle}`,
     }, adminUserId);
     
-    // Generate and store embedding for future matching
-    try {
-      await this.topicRepository.updateEmbedding(topic.id, embedding);
-    } catch (error) {
-      console.error('Error updating topic embedding:', error);
+    // Generate and store embedding for future matching (if we have it)
+    if (embedding) {
+      try {
+        await this.topicRepository.updateEmbedding(topic.id, embedding);
+      } catch (error) {
+        console.error('Error updating topic embedding:', error);
+        // Don't fail topic creation if embedding update fails
+      }
     }
     
     return { topic, isNew: true };
