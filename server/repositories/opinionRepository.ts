@@ -1,4 +1,5 @@
 import { db } from '../db.js';
+import { pool } from '../db.js';
 import { opinions, users, userProfiles, opinionVotes, opinionFlags } from '../../shared/schema.js';
 import { eq, desc, and, or, ne, sql } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
@@ -145,28 +146,25 @@ export class OpinionRepository {
     }
 
     // Update user profile opinion counts (this logic should move to service layer)
-    // Use sql template for timestamp to avoid Date object issues with postgres library
+    // Use raw SQL to avoid any drizzle/postgres-js Date object handling issues
     try {
-      await db
-        .insert(userProfiles)
-        .values({
-          userId: opinion.userId,
-          opinionCount: 1,
-          totalOpinions: 1,
-          economicScore: 0,
-          authoritarianScore: 0,
-          updatedAt: sql`now()`
-        })
-        .onConflictDoUpdate({
-          target: userProfiles.userId,
-          set: {
-            opinionCount: sql`${userProfiles.opinionCount} + 1`,
-            totalOpinions: sql`${userProfiles.totalOpinions} + 1`,
-            updatedAt: sql`now()`
-          }
-        });
+      console.log('[OpinionRepository] About to update userProfile with raw SQL for userId:', opinion.userId);
+      
+      // Use raw SQL query to avoid any Date object issues with drizzle
+      await pool`
+        INSERT INTO user_profiles (user_id, opinion_count, total_opinions, economic_score, authoritarian_score)
+        VALUES (${opinion.userId}, 1, 1, 0, 0)
+        ON CONFLICT (user_id) 
+        DO UPDATE SET 
+          opinion_count = user_profiles.opinion_count + 1,
+          total_opinions = user_profiles.total_opinions + 1,
+          updated_at = NOW()
+      `;
+      
+      console.log('[OpinionRepository] Successfully updated userProfile');
     } catch (error) {
       console.error('[OpinionRepository] ERROR during userProfiles insert:', error);
+      console.error('[OpinionRepository] Error stack:', error instanceof Error ? error.stack : 'No stack');
       // Don't fail opinion creation if userProfiles update fails
       console.warn('[OpinionRepository] Continuing despite userProfiles insert error');
     }
