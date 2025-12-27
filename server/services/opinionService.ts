@@ -73,10 +73,21 @@ export class OpinionService {
     const localAnalysis = lexiconAnalysisService.analyzeOpinionLocally(data.content);
     
     // 2. Create opinion with taste/passion scores
-    // Explicitly exclude analyzedAt - it should only be set when AI analysis completes
-    const { analyzedAt, ...dataWithoutAnalyzedAt } = data as any;
+    // Filter out any Date objects to prevent postgres library errors
+    const cleanData: any = {};
+    for (const [key, value] of Object.entries(data)) {
+      // Skip Date objects and timestamp fields
+      if (value instanceof Date) {
+        continue;
+      }
+      if (key === 'analyzedAt' || key === 'createdAt' || key === 'updatedAt') {
+        continue;
+      }
+      cleanData[key] = value;
+    }
+    
     const opinionData = {
-      ...dataWithoutAnalyzedAt,
+      ...cleanData,
       tasteScore: localAnalysis.taste.score,
       passionScore: localAnalysis.passion.score,
       analysisConfidence: localAnalysis.confidence,

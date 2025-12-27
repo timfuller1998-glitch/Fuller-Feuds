@@ -4,16 +4,60 @@ import { eq, desc, and, or, ne, sql } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { aggregateFallacyCounts } from '../utils/fallacyUtils.js';
 
+/**
+ * Recursively remove all Date objects from an object
+ * This prevents postgres library errors when Date objects are passed
+ */
+function removeDateObjects(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (obj instanceof Date) {
+    return undefined; // Remove Date objects
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(removeDateObjects).filter(item => item !== undefined);
+  }
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      // Skip timestamp fields that should use database defaults
+      if (key === 'analyzedAt' || key === 'createdAt' || key === 'updatedAt') {
+        continue;
+      }
+      const cleanedValue = removeDateObjects(value);
+      if (cleanedValue !== undefined) {
+        cleaned[key] = cleanedValue;
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
 export class OpinionRepository {
   async create(opinion: InsertOpinion): Promise<Opinion> {
     // Ensure status defaults to 'approved' if not specified
     // Remove any Date objects that might cause issues with postgres library
-    const { analyzedAt, createdAt, updatedAt, ...cleanOpinion } = opinion as any;
+    // Use recursive function to clean all Date objects from the data
+    const cleanedOpinion = removeDateObjects(opinion);
+    
     const opinionData = {
-      ...cleanOpinion,
+      ...cleanedOpinion,
       status: opinion.status || 'approved',
     };
-    const [created] = await db.insert(opinions).values(opinionData).returning();
+    
+    // Final safety check - ensure no Date objects remain
+    const finalData: any = {};
+    for (const [key, value] of Object.entries(opinionData)) {
+      if (value instanceof Date) {
+        console.error(`[OpinionRepository] ERROR: Date object found in final data: ${key}`, value);
+        continue;
+      }
+      finalData[key] = value;
+    }
+    
+    const [created] = await db.insert(opinions).values(finalData).returning();
 
     // Update user profile opinion counts (this logic should move to service layer)
     // Use sql template for timestamp to avoid Date object issues with postgres library
