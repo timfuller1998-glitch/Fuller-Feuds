@@ -246,7 +246,7 @@ export class OpinionService {
           },
           tasteDiversity: Math.round(tasteDiversity),
           passionDiversity: Math.round(passionDiversity),
-          updatedAt: new Date()
+          updatedAt: sql`now()`
         })
         .where(eq(cumulativeOpinions.topicId, topicId));
     });

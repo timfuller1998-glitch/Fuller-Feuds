@@ -120,7 +120,7 @@ export class OpinionBatchService {
           .set({
             topicEconomicScore: result.economicScore,
             topicAuthoritarianScore: result.authoritarianScore,
-            analyzedAt: new Date()
+            analyzedAt: sql`now()`
           })
           .where(eq(opinions.id, result.opinionId));
       }

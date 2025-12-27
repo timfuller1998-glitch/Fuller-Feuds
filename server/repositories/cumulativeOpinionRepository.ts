@@ -1,6 +1,6 @@
 import { db } from '../db.js';
 import { cumulativeOpinions } from '../../shared/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { CumulativeOpinion } from '../../shared/schema.js';
 
 export class CumulativeOpinionRepository {
@@ -21,7 +21,7 @@ export class CumulativeOpinionRepository {
         .update(cumulativeOpinions)
         .set({
           ...data,
-          updatedAt: new Date(),
+          updatedAt: sql`now()`,
         })
         .where(eq(cumulativeOpinions.topicId, topicId))
         .returning();

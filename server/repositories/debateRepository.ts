@@ -259,7 +259,7 @@ export class DebateRepository {
     // Update room's last message timestamp
     await db
       .update(debateRooms)
-      .set({ lastMessageAt: new Date() })
+      .set({ lastMessageAt: sql`now()` })
       .where(eq(debateRooms.id, roomId));
 
     return message;

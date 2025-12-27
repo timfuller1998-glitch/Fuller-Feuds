@@ -1,6 +1,6 @@
 import { db } from '../db.js';
 import { users, userProfiles, userDebateStats, notifications, pushSubscriptions } from '../../shared/schema.js';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import type { User, UserProfile, UserDebateStats, Notification, PushSubscription, UpsertUser } from '../../shared/schema.js';
 
 export class UserRepository {
@@ -22,7 +22,7 @@ export class UserRepository {
             firstName: userData.firstName,
             lastName: userData.lastName,
             profileImageUrl: userData.profileImageUrl,
-            updatedAt: new Date(),
+            updatedAt: sql`now()`,
           },
         })
         .returning();
@@ -45,7 +45,7 @@ export class UserRepository {
               firstName: userData.firstName,
               lastName: userData.lastName,
               profileImageUrl: userData.profileImageUrl,
-              updatedAt: new Date(),
+              updatedAt: sql`now()`,
             })
             .where(eq(users.email, userData.email!))
             .returning();
@@ -91,7 +91,7 @@ export class UserRepository {
   }): Promise<void> {
     await db
       .update(users)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, updatedAt: sql`now()` })
       .where(eq(users.id, userId));
   }
 
@@ -100,7 +100,7 @@ export class UserRepository {
       .update(users)
       .set({
         followedCategories: categories,
-        updatedAt: new Date()
+        updatedAt: sql`now()`
       })
       .where(eq(users.id, userId));
   }
@@ -111,7 +111,7 @@ export class UserRepository {
       .set({
         onboardingStep: step,
         onboardingComplete: complete,
-        updatedAt: new Date()
+        updatedAt: sql`now()`
       })
       .where(eq(users.id, userId))
       .returning();

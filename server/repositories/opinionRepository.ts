@@ -16,6 +16,7 @@ export class OpinionRepository {
     const [created] = await db.insert(opinions).values(opinionData).returning();
 
     // Update user profile opinion counts (this logic should move to service layer)
+    // Use sql template for timestamp to avoid Date object issues with postgres library
     await db
       .insert(userProfiles)
       .values({
@@ -24,14 +25,14 @@ export class OpinionRepository {
         totalOpinions: 1,
         economicScore: 0,
         authoritarianScore: 0,
-        updatedAt: new Date()
+        updatedAt: sql`now()`
       })
       .onConflictDoUpdate({
         target: userProfiles.userId,
         set: {
           opinionCount: sql`${userProfiles.opinionCount} + 1`,
           totalOpinions: sql`${userProfiles.totalOpinions} + 1`,
-          updatedAt: new Date()
+          updatedAt: sql`now()`
         }
       });
 
