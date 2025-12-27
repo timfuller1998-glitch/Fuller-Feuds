@@ -7,8 +7,10 @@ import { aggregateFallacyCounts } from '../utils/fallacyUtils.js';
 export class OpinionRepository {
   async create(opinion: InsertOpinion): Promise<Opinion> {
     // Ensure status defaults to 'approved' if not specified
+    // Remove any Date objects that might cause issues with postgres library
+    const { analyzedAt, createdAt, updatedAt, ...cleanOpinion } = opinion as any;
     const opinionData = {
-      ...opinion,
+      ...cleanOpinion,
       status: opinion.status || 'approved',
     };
     const [created] = await db.insert(opinions).values(opinionData).returning();

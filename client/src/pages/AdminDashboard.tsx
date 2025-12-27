@@ -141,6 +141,17 @@ export default function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/topics'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/audit-log'] });
       setDeleteTopicId(null);
+      toast({
+        title: 'Topic Deleted',
+        description: 'The topic has been successfully deleted.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Delete Failed',
+        description: error.message || 'Failed to delete topic',
+        variant: 'destructive',
+      });
     },
   });
 
@@ -153,6 +164,17 @@ export default function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/opinions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/audit-log'] });
       setDeleteOpinionId(null);
+      toast({
+        title: 'Opinion Deleted',
+        description: 'The opinion has been successfully deleted.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Delete Failed',
+        description: error.message || 'Failed to delete opinion',
+        variant: 'destructive',
+      });
     },
   });
 

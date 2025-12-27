@@ -179,7 +179,15 @@ export class ModerationRepository {
   }
 
   async deleteTopicAdmin(topicId: string, adminId: string): Promise<void> {
-    await db.update(topics).set({ status: 'hidden' }).where(eq(topics.id, topicId));
+    // Soft delete: set both isActive to false and status to hidden
+    // This ensures it's hidden from admin dashboard (which filters by isActive)
+    await db.update(topics)
+      .set({ 
+        isActive: false,
+        status: 'hidden' 
+      })
+      .where(eq(topics.id, topicId));
+    
     await db.insert(moderationActions).values({
       moderatorId: adminId,
       actionType: 'delete_topic',
@@ -190,7 +198,11 @@ export class ModerationRepository {
   }
 
   async deleteOpinionAdmin(opinionId: string, adminId: string): Promise<void> {
-    await db.update(opinions).set({ status: 'hidden' }).where(eq(opinions.id, opinionId));
+    // Hard delete: actually remove the opinion from the database
+    const { OpinionRepository } = await import('./opinionRepository.js');
+    const opinionRepo = new OpinionRepository();
+    
+    // Log the deletion action before deleting
     await db.insert(moderationActions).values({
       moderatorId: adminId,
       actionType: 'delete_opinion',
@@ -198,6 +210,9 @@ export class ModerationRepository {
       targetId: opinionId,
       reason: 'Opinion deleted by admin',
     });
+    
+    // Perform the actual deletion
+    await opinionRepo.delete(opinionId);
   }
 
   async createBannedPhrase(phrase: InsertBannedPhrase): Promise<BannedPhrase> {
