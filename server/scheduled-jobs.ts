@@ -12,44 +12,56 @@ const cumulativeOpinionService = new CumulativeOpinionService();
 const debateService = new DebateService();
 const opinionBatchService = new OpinionBatchService();
 
+export async function runAISummaryUpdate(): Promise<{
+  generated: number;
+  refreshed: number;
+  skipped: number;
+  errors: string[];
+}> {
+  const topicService = new TopicService();
+  const opinionService = new OpinionService();
+  const cumulativeOpinionService = new CumulativeOpinionService();
+  
+  const topics = await topicService.getTopics({ limit: 1000 });
+  let generated = 0;
+  let refreshed = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+  
+  for (const topic of topics) {
+    try {
+      const opinions = await opinionService.getOpinionsByTopic(topic.id);
+      
+      if (opinions.length > 0) {
+        const existingCumulative = await cumulativeOpinionService.getCumulativeOpinion(topic.id);
+        
+        if (existingCumulative) {
+          await cumulativeOpinionService.refreshCumulativeOpinion(topic.id);
+          refreshed++;
+          log(`[AI Summary] Refreshed summary for topic: ${topic.title}`);
+        } else {
+          await cumulativeOpinionService.generateCumulativeOpinion(topic.id);
+          generated++;
+          log(`[AI Summary] Generated summary for topic: ${topic.title}`);
+        }
+      } else {
+        skipped++;
+      }
+    } catch (error) {
+      const errorMsg = `Error processing topic ${topic.id}: ${error}`;
+      log(errorMsg);
+      errors.push(errorMsg);
+    }
+  }
+  
+  return { generated, refreshed, skipped, errors };
+}
+
 export function startScheduledJobs() {
   cron.schedule('0 2 * * *', async () => {
     log('[CRON] Starting daily AI summary update at 2:00 AM');
-    
-    try {
-      const topics = await topicService.getTopics({ limit: 1000 });
-      let generated = 0;
-      let refreshed = 0;
-      let skipped = 0;
-      
-      for (const topic of topics) {
-        try {
-          const opinions = await opinionService.getOpinionsByTopic(topic.id);
-          
-          if (opinions.length > 0) {
-            const existingCumulative = await cumulativeOpinionService.getCumulativeOpinion(topic.id);
-            
-            if (existingCumulative) {
-              await cumulativeOpinionService.refreshCumulativeOpinion(topic.id);
-              refreshed++;
-              log(`[CRON] Refreshed AI summary for topic: ${topic.title}`);
-            } else {
-              await cumulativeOpinionService.generateCumulativeOpinion(topic.id);
-              generated++;
-              log(`[CRON] Generated AI summary for topic: ${topic.title}`);
-            }
-          } else {
-            skipped++;
-          }
-        } catch (error) {
-          log(`[CRON] Error processing topic ${topic.id}: ${error}`);
-        }
-      }
-      
-      log(`[CRON] Daily AI summary update completed - Generated: ${generated}, Refreshed: ${refreshed}, Skipped: ${skipped}`);
-    } catch (error) {
-      log(`[CRON] Error in scheduled job: ${error}`);
-    }
+    const result = await runAISummaryUpdate();
+    log(`[CRON] Daily AI summary update completed - Generated: ${result.generated}, Refreshed: ${result.refreshed}, Skipped: ${result.skipped}`);
   }, {
     timezone: process.env.CRON_TZ || 'UTC'
   });

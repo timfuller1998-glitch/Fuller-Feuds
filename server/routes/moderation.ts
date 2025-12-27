@@ -7,6 +7,7 @@ import { AIService } from '../aiService.js';
 import { requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertBannedPhraseSchema } from '../../shared/schema.js';
 import { z } from 'zod';
+import { runAISummaryUpdate } from '../scheduled-jobs.js';
 
 const router = Router();
 const moderationService = new ModerationService();
@@ -280,6 +281,27 @@ router.post('/backfill-embeddings', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error("Error backfilling embeddings:", error);
     res.status(500).json({ message: "Failed to backfill embeddings", error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// AI Summary generation trigger
+router.post('/summaries/generate', requireAdmin, async (req, res) => {
+  try {
+    const result = await runAISummaryUpdate();
+    res.json({
+      success: true,
+      generated: result.generated,
+      refreshed: result.refreshed,
+      skipped: result.skipped,
+      errors: result.errors,
+      message: `Summary generation completed: ${result.generated} generated, ${result.refreshed} refreshed, ${result.skipped} skipped`
+    });
+  } catch (error) {
+    console.error('Error triggering AI summary generation:', error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to generate summaries'
+    });
   }
 });
 

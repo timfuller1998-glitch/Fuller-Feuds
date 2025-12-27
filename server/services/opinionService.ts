@@ -311,6 +311,16 @@ export class OpinionService {
     `);
     const opinionsSinceUpdate = (sinceUpdateResult as { count: number }).count;
     
+    // If no summary exists and we have at least 5 opinions, generate one
+    if (!existing) {
+      const totalOpinions = await this.getOpinionsByTopic(topicId);
+      if (totalOpinions.length >= 5) {
+        console.log(`[OpinionService] Topic ${topicId} reached 5 opinions, generating initial summary`);
+        await this.cumulativeOpinionService.generateCumulativeOpinion(topicId);
+        return; // Exit early since we just generated
+      }
+    }
+    
     // Tier 1: Hot topic (>50 opinions/24h) - update every 10 new
     if (last24h > 50 && opinionsSinceUpdate >= 10) {
       await this.cumulativeOpinionService.refreshCumulativeOpinion(topicId);

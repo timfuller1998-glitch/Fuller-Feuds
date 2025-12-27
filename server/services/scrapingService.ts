@@ -294,6 +294,25 @@ export class ScrapingService {
         }
       }
 
+      // Generate AI summary if we have enough opinions
+      if (opinionsCreated > 0) {
+        try {
+          const totalOpinions = await this.opinionService.getOpinionsByTopic(topic.id);
+          // Generate summary if we have at least 5 opinions
+          if (totalOpinions.length >= 5) {
+            const { CumulativeOpinionService } = await import('./cumulativeOpinionService.js');
+            const cumulativeService = new CumulativeOpinionService();
+            await cumulativeService.generateCumulativeOpinion(topic.id);
+            console.log(`[Seeding] Generated AI summary for topic: ${topic.title}`);
+          } else {
+            console.log(`[Seeding] Topic ${topic.title} has ${totalOpinions.length} opinions, waiting for 5+ before generating summary`);
+          }
+        } catch (error) {
+          console.error(`[Seeding] Failed to generate summary for topic ${topic.id}:`, error);
+          // Don't fail the seeding job if summary generation fails
+        }
+      }
+
       // Update job record
       await db.update(seedingJobs)
         .set({

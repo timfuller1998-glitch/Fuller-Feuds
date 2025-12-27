@@ -22,6 +22,9 @@ export function DataSeeding() {
   // AI Generate state
   const [topicTitle, setTopicTitle] = useState('');
   const [opinionCount, setOpinionCount] = useState(10);
+  
+  // Summary generation state
+  const [isGeneratingSummaries, setIsGeneratingSummaries] = useState(false);
 
   // Fetch available sources
   const { data: sources } = useQuery({
@@ -101,6 +104,30 @@ export function DataSeeding() {
     },
   });
 
+  // Summary generation mutation
+  const generateSummariesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/admin/summaries/generate');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Summary Generation Complete!',
+        description: data.message || `Generated ${data.generated} summaries, refreshed ${data.refreshed}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Generation Failed',
+        description: error.message || 'Failed to generate summaries',
+        variant: 'destructive',
+      });
+    },
+    onSettled: () => {
+      setIsGeneratingSummaries(false);
+    },
+  });
+
   const subreddits = (sources as any)?.sources?.[0]?.subreddits || [
     { id: 'changemyview', name: 'r/changemyview' },
     { id: 'unpopularopinion', name: 'r/unpopularopinion' },
@@ -110,6 +137,39 @@ export function DataSeeding() {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            AI Summary Management
+          </CardTitle>
+          <CardDescription>
+            Manually trigger AI summary generation for all topics
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={() => {
+              setIsGeneratingSummaries(true);
+              generateSummariesMutation.mutate();
+            }}
+            disabled={isGeneratingSummaries}
+          >
+            {isGeneratingSummaries ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating Summaries...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate All Summaries
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
