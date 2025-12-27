@@ -46,72 +46,53 @@ function removeDateObjects(obj: any): any {
 
 export class OpinionRepository {
   async create(opinion: InsertOpinion): Promise<Opinion> {
-    // Log the incoming opinion data to identify Date objects
-    console.log('[OpinionRepository] Incoming opinion data:', JSON.stringify(opinion, (key, value) => {
-      if (value instanceof Date) {
-        return `[Date: ${value.toISOString()}]`;
-      }
-      return value;
-    }));
-    
-    // Ensure status defaults to 'approved' if not specified
-    // Remove any Date objects that might cause issues with postgres library
-    // Use recursive function to clean all Date objects from the data
-    const cleanedOpinion = removeDateObjects(opinion);
-    
-    // Create a completely fresh object to avoid any prototype chain issues
-    const opinionData: any = {};
-    if (cleanedOpinion && typeof cleanedOpinion === 'object') {
-      for (const [key, value] of Object.entries(cleanedOpinion)) {
+    // Use JSON serialization to deeply clone and convert any Date objects to strings
+    // This ensures we have a completely clean plain object
+    let serialized: any;
+    try {
+      serialized = JSON.parse(JSON.stringify(opinion, (key, value) => {
+        // Convert Date objects to undefined so they're removed
         if (value instanceof Date) {
-          console.error(`[OpinionRepository] Date object still present after cleaning: ${key}`);
-          continue;
+          console.warn(`[OpinionRepository] Removing Date object from field: ${key}`);
+          return undefined;
         }
-        opinionData[key] = value;
-      }
-    }
-    opinionData.status = opinion.status || 'approved';
-    
-    // Final safety check - ensure no Date objects remain
-    const finalData: any = {};
-    for (const [key, value] of Object.entries(opinionData)) {
-      if (value instanceof Date) {
-        console.error(`[OpinionRepository] ERROR: Date object found in final data: ${key}`, value);
-        continue;
-      }
-      // Check for Date objects in nested structures
-      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        const hasDate = Object.values(value).some(v => v instanceof Date);
-        if (hasDate) {
-          console.error(`[OpinionRepository] ERROR: Date object found in nested object: ${key}`, value);
-          // Recursively clean nested objects
-          finalData[key] = removeDateObjects(value);
-          continue;
-        }
-      }
-      finalData[key] = value;
+        return value;
+      }));
+    } catch (error) {
+      console.error('[OpinionRepository] Error serializing opinion data:', error);
+      // Fallback to manual cleaning
+      serialized = removeDateObjects(opinion);
     }
     
-    // Log the final data being sent to database
-    console.log('[OpinionRepository] Final data being inserted:', JSON.stringify(finalData, (key, value) => {
-      if (value instanceof Date) {
-        return `[Date: ${value.toISOString()}]`;
-      }
-      return value;
-    }));
+    // Create a completely fresh plain object with only the fields we need
+    const finalData: any = {
+      topicId: serialized?.topicId,
+      userId: serialized?.userId,
+      content: serialized?.content,
+      status: serialized?.status || opinion.status || 'approved',
+      debateStatus: serialized?.debateStatus || opinion.debateStatus || 'open',
+      references: serialized?.references,
+      topicEconomicScore: serialized?.topicEconomicScore,
+      topicAuthoritarianScore: serialized?.topicAuthoritarianScore,
+      tasteScore: serialized?.tasteScore,
+      passionScore: serialized?.passionScore,
+      analysisConfidence: serialized?.analysisConfidence,
+      // Explicitly exclude all timestamp fields - let database defaults handle them
+    };
     
-    // One more check before database insert
-    const hasAnyDate = Object.values(finalData).some(v => {
-      if (v instanceof Date) return true;
-      if (typeof v === 'object' && v !== null) {
-        return Object.values(v).some(nested => nested instanceof Date);
+    // Remove undefined values to keep the object clean
+    Object.keys(finalData).forEach(key => {
+      if (finalData[key] === undefined) {
+        delete finalData[key];
       }
-      return false;
     });
     
-    if (hasAnyDate) {
-      console.error('[OpinionRepository] CRITICAL: Date object detected in finalData before insert!', finalData);
-      throw new Error('Date object detected in opinion data - this should have been filtered out');
+    // Final verification - ensure no Date objects
+    for (const [key, value] of Object.entries(finalData)) {
+      if (value instanceof Date) {
+        console.error(`[OpinionRepository] CRITICAL: Date object found in finalData: ${key}`, value);
+        delete finalData[key];
+      }
     }
     
     const [created] = await db.insert(opinions).values(finalData).returning();
