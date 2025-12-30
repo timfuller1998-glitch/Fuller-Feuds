@@ -6,7 +6,7 @@ import type { TopicWithCounts } from "@shared/schema";
 // Calculate card dimensions based on viewport
 const getCardDimensions = () => {
   const maxWidth = 400;
-  const width = Math.min(window.innerWidth - 32, maxWidth); // 2rem padding
+  const width = Math.min(window.innerWidth - 34, maxWidth); // 17px padding each side (34px total)
   const height = (width * 7) / 5; // 5:7 aspect ratio
   return { width, height };
 };

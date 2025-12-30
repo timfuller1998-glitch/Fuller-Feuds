@@ -2,15 +2,21 @@ import { LucideIcon } from "lucide-react";
 import SwipeableCardStack from "./SwipeableCardStack";
 import type { TopicWithCounts } from "@shared/schema";
 
+interface NextSection {
+  title: string;
+  icon: LucideIcon;
+}
+
 interface StackSectionProps {
   title: string;
   icon: LucideIcon;
   sectionKey: string;
   topics: TopicWithCounts[];
   onSwipe: (topic: TopicWithCounts, direction: 'left' | 'right' | 'up', cardState: { isFlipped: boolean; timeOnBackMs: number }) => void;
+  nextSection?: NextSection;
 }
 
-export default function StackSection({ title, icon: Icon, sectionKey, topics, onSwipe }: StackSectionProps) {
+export default function StackSection({ title, icon: Icon, sectionKey, topics, onSwipe, nextSection }: StackSectionProps) {
   const handleSwipe = (topic: TopicWithCounts, direction: 'left' | 'right' | 'up', cardState: { isFlipped: boolean; timeOnBackMs: number }) => {
     onSwipe(topic, direction, cardState);
   };
@@ -20,14 +26,19 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, on
     console.log(`Stack ${sectionKey} is empty`);
   };
 
+  const NextSectionIcon = nextSection?.icon;
+
   return (
     <section
-      className="min-h-[100dvh] snap-start flex flex-col items-center justify-center px-4 py-8"
+      className="min-h-[100dvh] snap-start flex flex-col items-center px-4 py-8"
       data-testid={`section-${sectionKey}`}
     >
+      {/* Top Spacer */}
+      <div className="h-16 flex-shrink-0" />
+
       {/* Section Header */}
-      <div className="mb-8 text-center">
-        <div className="inline-flex items-center gap-3 mb-2">
+      <div className="w-full flex justify-between items-center mb-0 flex-shrink-0">
+        <div className="inline-flex items-center gap-3">
           <div className="p-2 rounded-lg bg-primary/10">
             <Icon className="w-5 h-5 text-primary" />
           </div>
@@ -35,9 +46,9 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, on
             {title}
           </h2>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {topics.length} {topics.length === 1 ? 'debate' : 'debates'}
-        </p>
+        <span className="text-xl font-semibold text-muted-foreground">
+          {topics.length}
+        </span>
       </div>
 
       {/* Card Stack */}
@@ -54,6 +65,23 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, on
           </div>
         )}
       </div>
+
+      {/* Bottom Spacer */}
+      <div className="h-16 flex-shrink-0" />
+
+      {/* Next Section Preview */}
+      {nextSection && NextSectionIcon && (
+        <div className="w-full flex justify-between items-center opacity-60 flex-shrink-0">
+          <div className="inline-flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <NextSectionIcon className="w-5 h-5 text-primary" />
+            </div>
+            <h2 className="text-xl font-semibold text-muted-foreground">
+              {nextSection.title}
+            </h2>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

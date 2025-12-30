@@ -307,7 +307,7 @@ export default function Home() {
           </Card>
         </section>
       ) : (
-        topicSections.map((section) => (
+        topicSections.map((section, index) => (
           <StackSection
             key={section.title}
             title={section.title}
@@ -315,6 +315,14 @@ export default function Home() {
             sectionKey={section.title.toLowerCase().replace(/\s+/g, '-')}
             topics={section.topics}
             onSwipe={handleSwipe}
+            nextSection={
+              index < topicSections.length - 1
+                ? {
+                    title: topicSections[index + 1].title,
+                    icon: topicSections[index + 1].icon,
+                  }
+                : undefined
+            }
           />
         ))
       )}
