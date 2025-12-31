@@ -383,8 +383,6 @@ export default function TopicCard({
             onClick={handleFlip}
             style={{
               transformStyle: "preserve-3d",
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
             }}
           >
             {/* Front Side */}
