@@ -560,7 +560,7 @@ export default function TopicCard({
           <div 
             className="absolute inset-0 p-3 sm:p-4 md:p-6 flex flex-col h-full"
             style={{
-              transform: "rotateY(180deg)",
+              transform: "rotateY(180deg) scaleX(-1)",
               transformStyle: "preserve-3d",
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
