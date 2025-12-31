@@ -35,10 +35,14 @@ const getCardStyle = (offset: number, cardWidth: number) => {
   const scale = distance === 0 ? 1.0 : distance === 1 ? 0.92 : 0.85;
   const opacity = distance === 0 ? 1.0 : distance === 1 ? 0.7 : 0.5;
   const zIndex = distance === 0 ? 5 : distance === 1 ? 2 : 1;
-  const translateX = offset * cardWidth * 1.1; // 1.1 spacing factor for overlap
+  // Calculate translateX so cards peek out: 
+  // - offset 1: ~30% of card visible (70% hidden)
+  // - offset 2: ~15% of card visible (85% hidden)
+  const translateX = offset * cardWidth * 0.35; // Spacing factor for cards to peek out
   
   return {
-    transform: `translateX(${translateX}px) scale(${scale})`,
+    translateX,
+    scale,
     opacity,
     zIndex,
   };
@@ -176,11 +180,12 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
 
   return (
     <div 
-      className="relative flex items-center justify-center overflow-visible"
+      className="relative flex items-center justify-center"
       style={{ 
-        width: `${cardWidth * 5}px`, // Enough width for 5 cards
+        width: `${cardWidth}px`,
         height: `${dimensions.height}px`,
         margin: '0 auto',
+        overflow: 'visible',
       }}
     >
       {/* Render all 5 cards */}
@@ -200,17 +205,17 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
         // Non-current cards (static background cards)
         if (!isCurrent) {
           return (
-            <motion.div
-              key={`${card.id}-${offset}`}
+            <div
+              key={`${card.id}-${offset}-${currentIndex}`}
               className="absolute w-full h-full"
               style={{
-                ...style,
                 left: '50%',
                 marginLeft: `-${cardWidth / 2}px`,
+                zIndex: style.zIndex,
+                transform: `translateX(${style.translateX}px) scale(${style.scale})`,
+                opacity: style.opacity,
+                transition: 'transform 0.3s ease-out, opacity 0.3s ease-out',
               }}
-              initial={false}
-              animate={style}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
             >
               <TopicCard
                 {...card}
@@ -219,15 +224,20 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
                 onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
                 onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
               />
-            </motion.div>
+            </div>
           );
         }
 
         // Current card (draggable)
         return (
           <motion.div
-            key={`${card.id}-current`}
+            key={`${card.id}-current-${currentIndex}`}
             className="absolute w-full h-full"
+            drag
+            dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+            dragElastic={0.2}
+            onDrag={handleDrag}
+            onDragEnd={handleDragEnd}
             style={{
               x,
               y,
@@ -235,13 +245,8 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
               left: '50%',
               marginLeft: `-${cardWidth / 2}px`,
               zIndex: 5,
+              transformStyle: 'preserve-3d',
             }}
-            drag
-            dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-            dragElastic={0.2}
-            onDrag={handleDrag}
-            onDragEnd={handleDragEnd}
-            initial={{ scale: 1, opacity: 1 }}
             animate={{
               scale: 1,
               opacity: 1,
@@ -274,24 +279,33 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
               </div>
             )}
 
-            <TopicCard
-              {...card}
-              imageUrl={card.imageUrl ?? ""}
-              isActive={card.isActive ?? false}
-              onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
-              onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
-              showSwipeOverlay={
-                swipeDirection === 'like'
-                  ? 'like'
-                  : swipeDirection === 'dislike'
-                  ? 'dislike'
-                  : swipeDirection === 'opinion'
-                  ? 'opinion'
-                  : null
-              }
-              overlayOpacity={overlayOpacity}
-              triggerOpinionForm={triggerOpinionForm}
-            />
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                transformStyle: 'preserve-3d',
+                perspective: '1000px',
+              }}
+            >
+              <TopicCard
+                {...card}
+                imageUrl={card.imageUrl ?? ""}
+                isActive={card.isActive ?? false}
+                onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
+                onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
+                showSwipeOverlay={
+                  swipeDirection === 'like'
+                    ? 'like'
+                    : swipeDirection === 'dislike'
+                    ? 'dislike'
+                    : swipeDirection === 'opinion'
+                    ? 'opinion'
+                    : null
+                }
+                overlayOpacity={overlayOpacity}
+                triggerOpinionForm={triggerOpinionForm}
+              />
+            </div>
           </motion.div>
         );
       })}

@@ -49,7 +49,7 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, on
       </div>
 
       {/* Card Stack - Middle (centered in remaining space) */}
-      <div className="flex-1 w-full flex items-center justify-center min-h-0">
+      <div className="flex-1 w-full flex items-center justify-center min-h-0 overflow-visible">
         {topics.length > 0 ? (
           <SwipeableCardStack
             topics={topics}

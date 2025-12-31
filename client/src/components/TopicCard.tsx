@@ -371,13 +371,16 @@ export default function TopicCard({
         <Card
           className="hover-elevate active-elevate-2 overflow-hidden cursor-pointer relative w-full h-full"
           onClick={handleFlip}
+          style={{
+            transformStyle: "preserve-3d",
+            transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            transition: "transform 0.6s ease-in-out",
+          }}
         >
           <div
             className="relative w-full h-full"
             style={{
               transformStyle: "preserve-3d",
-              transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
-              transition: "transform 0.6s ease-in-out",
             }}
           >
             {/* Front Side */}
