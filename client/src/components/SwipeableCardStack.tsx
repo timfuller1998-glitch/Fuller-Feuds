@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
+import { motion, useMotionValue, useTransform, PanInfo, AnimatePresence } from "framer-motion";
 import TopicCard from "./TopicCard";
 import type { TopicWithCounts } from "@shared/schema";
 
@@ -22,13 +22,36 @@ interface CardState {
   timeOnBackMs: number;
 }
 
+// Helper function to get card at offset using circular array
+const getCardAtOffset = (topics: TopicWithCounts[], currentIndex: number, offset: number): TopicWithCounts | null => {
+  if (topics.length === 0) return null;
+  const index = (currentIndex + offset + topics.length) % topics.length;
+  return topics[index];
+};
+
+// Calculate card properties based on position
+const getCardStyle = (offset: number, cardWidth: number) => {
+  const distance = Math.abs(offset);
+  const scale = distance === 0 ? 1.0 : distance === 1 ? 0.92 : 0.85;
+  const opacity = distance === 0 ? 1.0 : distance === 1 ? 0.7 : 0.5;
+  const zIndex = distance === 0 ? 5 : distance === 1 ? 2 : 1;
+  const translateX = offset * cardWidth * 1.1; // 1.1 spacing factor for overlap
+  
+  return {
+    transform: `translateX(${translateX}px) scale(${scale})`,
+    opacity,
+    zIndex,
+  };
+};
+
 export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: SwipeableCardStackProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [cardStates, setCardStates] = useState<Map<number, CardState>>(new Map());
+  const [cardStates, setCardStates] = useState<Map<string, CardState>>(new Map()); // Use topic ID as key
   const [swipeDirection, setSwipeDirection] = useState<'like' | 'dislike' | 'opinion' | null>(null);
   const [overlayOpacity, setOverlayOpacity] = useState(0);
   const [triggerOpinionForm, setTriggerOpinionForm] = useState(0);
   const [dimensions, setDimensions] = useState(getCardDimensions());
+  const [isAnimating, setIsAnimating] = useState(false);
 
   // Update dimensions on window resize
   useEffect(() => {
@@ -39,31 +62,34 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const currentTopic = topics[currentIndex];
-  const nextTopic = topics[currentIndex + 1];
-  const thirdTopic = topics[currentIndex + 2];
+  // Get cards at different offsets
+  const prev2Card = getCardAtOffset(topics, currentIndex, -2);
+  const prev1Card = getCardAtOffset(topics, currentIndex, -1);
+  const currentCard = getCardAtOffset(topics, currentIndex, 0);
+  const next1Card = getCardAtOffset(topics, currentIndex, 1);
+  const next2Card = getCardAtOffset(topics, currentIndex, 2);
 
   // Motion values for drag
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-300, 300], [-15, 15]);
   
-  // Update card state when flip changes
-  const handleFlipChange = (index: number, isFlipped: boolean) => {
+  // Update card state when flip changes (using topic ID)
+  const handleFlipChange = (topicId: string, isFlipped: boolean) => {
     setCardStates(prev => {
       const newMap = new Map(prev);
-      const currentState = newMap.get(index) || { isFlipped: false, timeOnBackMs: 0 };
-      newMap.set(index, { ...currentState, isFlipped });
+      const currentState = newMap.get(topicId) || { isFlipped: false, timeOnBackMs: 0 };
+      newMap.set(topicId, { ...currentState, isFlipped });
       return newMap;
     });
   };
 
-  // Update time on back side
-  const handleBackTimeUpdate = (index: number, timeMs: number) => {
+  // Update time on back side (using topic ID)
+  const handleBackTimeUpdate = (topicId: string, timeMs: number) => {
     setCardStates(prev => {
       const newMap = new Map(prev);
-      const currentState = newMap.get(index) || { isFlipped: false, timeOnBackMs: 0 };
-      newMap.set(index, { ...currentState, timeOnBackMs: timeMs });
+      const currentState = newMap.get(topicId) || { isFlipped: false, timeOnBackMs: 0 };
+      newMap.set(topicId, { ...currentState, timeOnBackMs: timeMs });
       return newMap;
     });
   };
@@ -99,10 +125,12 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
     setSwipeDirection(null);
     setOverlayOpacity(0);
 
+    if (!currentCard) return;
+
     // Vertical swipe up (add opinion) - don't remove card, just trigger opinion dialog
     if (offset.y < -80 || velocity.y < -velocityThreshold) {
-      const cardState = cardStates.get(currentIndex) || { isFlipped: false, timeOnBackMs: 0 };
-      onSwipe(currentTopic, 'up', cardState);
+      const cardState = cardStates.get(currentCard.id) || { isFlipped: false, timeOnBackMs: 0 };
+      onSwipe(currentCard, 'up', cardState);
       // Trigger opinion form by updating timestamp
       setTriggerOpinionForm(Date.now());
       // Don't advance - keep the card, just open opinion dialog
@@ -111,38 +139,31 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
       return;
     }
 
-    // Horizontal swipe (like/dislike)
+    // Horizontal swipe (like/dislike) - move card to back
     if (Math.abs(offset.x) > swipeThreshold || Math.abs(velocity.x) > velocityThreshold) {
       const direction = offset.x > 0 ? 'right' : 'left';
-      const cardState = cardStates.get(currentIndex) || { isFlipped: false, timeOnBackMs: 0 };
-      onSwipe(currentTopic, direction, cardState);
-      setCurrentIndex(prev => prev + 1);
+      const cardState = cardStates.get(currentCard.id) || { isFlipped: false, timeOnBackMs: 0 };
+      onSwipe(currentCard, direction, cardState);
+      
+      // Move to next card (infinite loop)
+      setIsAnimating(true);
+      setCurrentIndex(prev => (prev + 1) % topics.length);
+      
+      // Reset drag position
       x.set(0);
       y.set(0);
+      
+      // Reset animation flag after transition
+      setTimeout(() => setIsAnimating(false), 300);
     }
     // Snap back
     else {
       x.set(0);
       y.set(0);
     }
-
-    // Check if we're out of topics
-    if (currentIndex >= topics.length - 1 && onEmpty) {
-      setTimeout(() => {
-        if (currentIndex >= topics.length - 1) {
-          onEmpty();
-        }
-      }, 300);
-    }
   };
 
-  useEffect(() => {
-    if (currentIndex >= topics.length && onEmpty) {
-      onEmpty();
-    }
-  }, [currentIndex, topics.length, onEmpty]);
-
-  if (!currentTopic) {
+  if (!currentCard || topics.length === 0) {
     return (
       <div className="w-full h-full flex items-center justify-center">
         <p className="text-muted-foreground">No more topics</p>
@@ -150,120 +171,130 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
     );
   }
 
-  const cardState = cardStates.get(currentIndex) || { isFlipped: false, timeOnBackMs: 0 };
+  const currentCardState = cardStates.get(currentCard.id) || { isFlipped: false, timeOnBackMs: 0 };
+  const cardWidth = dimensions.width;
 
   return (
     <div 
-      className="relative flex items-center justify-center"
+      className="relative flex items-center justify-center overflow-visible"
       style={{ 
-        width: `${dimensions.width}px`,
+        width: `${cardWidth * 5}px`, // Enough width for 5 cards
         height: `${dimensions.height}px`,
         margin: '0 auto',
-        maxWidth: '400px'
       }}
     >
-      {/* Third card (furthest back) */}
-      {thirdTopic && (
-        <div
-          className="absolute w-full h-full"
-          style={{
-            transform: "scale(0.9) translateY(20px)",
-            zIndex: 1,
-            opacity: 0.6,
-          }}
-        >
-          <TopicCard
-            {...thirdTopic}
-            imageUrl={thirdTopic.imageUrl ?? ""}
-            isActive={thirdTopic.isActive ?? false}
-          />
-        </div>
-      )}
-      {/* Second card (middle) */}
-      {nextTopic && (
-        <div
-          className="absolute w-full h-full"
-          style={{
-            transform: "scale(0.95) translateY(10px)",
-            zIndex: 2,
-            opacity: 0.8,
-            transition: "transform 0.3s ease-out",
-          }}
-        >
-          <TopicCard
-            {...nextTopic}
-            imageUrl={nextTopic.imageUrl ?? ""}
-            isActive={nextTopic.isActive ?? false}
-          />
-        </div>
-      )}
+      {/* Render all 5 cards */}
+      {[
+        { card: prev2Card, offset: -2, key: 'prev2' },
+        { card: prev1Card, offset: -1, key: 'prev1' },
+        { card: currentCard, offset: 0, key: 'current' },
+        { card: next1Card, offset: 1, key: 'next1' },
+        { card: next2Card, offset: 2, key: 'next2' },
+      ].map(({ card, offset, key }) => {
+        if (!card) return null;
+        
+        const isCurrent = offset === 0;
+        const style = getCardStyle(offset, cardWidth);
+        const cardState = cardStates.get(card.id) || { isFlipped: false, timeOnBackMs: 0 };
 
-      {/* Top card (draggable) */}
-      <motion.div
-        className="absolute w-full h-full z-30"
-        style={{
-          x,
-          y,
-          rotate,
-        }}
-        drag
-        dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-        dragElastic={0.2}
-        onDrag={handleDrag}
-        onDragEnd={handleDragEnd}
-        initial={{ scale: 1 }}
-        animate={{
-          scale: currentIndex < topics.length ? 1 : 0.8,
-          opacity: currentIndex < topics.length ? 1 : 0,
-        }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      >
-        {/* Swipe overlays */}
-        {swipeDirection === 'like' && (
-          <div
-            className="absolute inset-0 bg-green-500/50 rounded-lg z-40 pointer-events-none flex items-center justify-center"
-            style={{ opacity: overlayOpacity }}
-          >
-            <div className="text-6xl">✓</div>
-          </div>
-        )}
-        {swipeDirection === 'dislike' && (
-          <div
-            className="absolute inset-0 bg-red-500/50 rounded-lg z-40 pointer-events-none flex items-center justify-center"
-            style={{ opacity: overlayOpacity }}
-          >
-            <div className="text-6xl">✗</div>
-          </div>
-        )}
-        {swipeDirection === 'opinion' && (
-          <div
-            className="absolute inset-0 bg-purple-500/50 rounded-lg z-40 pointer-events-none flex items-center justify-center"
-            style={{ opacity: overlayOpacity }}
-          >
-            <div className="text-4xl">📝</div>
-          </div>
-        )}
+        // Non-current cards (static background cards)
+        if (!isCurrent) {
+          return (
+            <motion.div
+              key={`${card.id}-${offset}`}
+              className="absolute w-full h-full"
+              style={{
+                ...style,
+                left: '50%',
+                marginLeft: `-${cardWidth / 2}px`,
+              }}
+              initial={false}
+              animate={style}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            >
+              <TopicCard
+                {...card}
+                imageUrl={card.imageUrl ?? ""}
+                isActive={card.isActive ?? false}
+                onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
+                onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
+              />
+            </motion.div>
+          );
+        }
 
-        <TopicCard
-          {...currentTopic}
-          imageUrl={currentTopic.imageUrl ?? ""}
-          isActive={currentTopic.isActive ?? false}
-          onFlipChange={(isFlipped) => handleFlipChange(currentIndex, isFlipped)}
-          onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(currentIndex, timeMs)}
-          showSwipeOverlay={
-            swipeDirection === 'like'
-              ? 'like'
-              : swipeDirection === 'dislike'
-              ? 'dislike'
-              : swipeDirection === 'opinion'
-              ? 'opinion'
-              : null
-          }
-          overlayOpacity={overlayOpacity}
-          triggerOpinionForm={triggerOpinionForm}
-        />
-      </motion.div>
+        // Current card (draggable)
+        return (
+          <motion.div
+            key={`${card.id}-current`}
+            className="absolute w-full h-full"
+            style={{
+              x,
+              y,
+              rotate,
+              left: '50%',
+              marginLeft: `-${cardWidth / 2}px`,
+              zIndex: 5,
+            }}
+            drag
+            dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+            dragElastic={0.2}
+            onDrag={handleDrag}
+            onDragEnd={handleDragEnd}
+            initial={{ scale: 1, opacity: 1 }}
+            animate={{
+              scale: 1,
+              opacity: 1,
+            }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          >
+            {/* Swipe overlays */}
+            {swipeDirection === 'like' && (
+              <div
+                className="absolute inset-0 bg-green-500/50 rounded-lg z-40 pointer-events-none flex items-center justify-center"
+                style={{ opacity: overlayOpacity }}
+              >
+                <div className="text-6xl">✓</div>
+              </div>
+            )}
+            {swipeDirection === 'dislike' && (
+              <div
+                className="absolute inset-0 bg-red-500/50 rounded-lg z-40 pointer-events-none flex items-center justify-center"
+                style={{ opacity: overlayOpacity }}
+              >
+                <div className="text-6xl">✗</div>
+              </div>
+            )}
+            {swipeDirection === 'opinion' && (
+              <div
+                className="absolute inset-0 bg-purple-500/50 rounded-lg z-40 pointer-events-none flex items-center justify-center"
+                style={{ opacity: overlayOpacity }}
+              >
+                <div className="text-4xl">📝</div>
+              </div>
+            )}
+
+            <TopicCard
+              {...card}
+              imageUrl={card.imageUrl ?? ""}
+              isActive={card.isActive ?? false}
+              onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
+              onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
+              showSwipeOverlay={
+                swipeDirection === 'like'
+                  ? 'like'
+                  : swipeDirection === 'dislike'
+                  ? 'dislike'
+                  : swipeDirection === 'opinion'
+                  ? 'opinion'
+                  : null
+              }
+              overlayOpacity={overlayOpacity}
+              triggerOpinionForm={triggerOpinionForm}
+            />
+          </motion.div>
+        );
+      })}
     </div>
   );
 }
-
