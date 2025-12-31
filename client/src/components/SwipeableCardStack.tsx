@@ -32,13 +32,12 @@ const getCardAtOffset = (topics: TopicWithCounts[], currentIndex: number, offset
 // Calculate card properties based on position
 const getCardStyle = (offset: number, cardWidth: number) => {
   const distance = Math.abs(offset);
-  const scale = distance === 0 ? 1.0 : distance === 1 ? 0.92 : 0.85;
-  const opacity = distance === 0 ? 1.0 : distance === 1 ? 0.7 : 0.5;
-  const zIndex = distance === 0 ? 5 : distance === 1 ? 2 : 1;
-  // Calculate translateX so cards peek out: 
-  // - offset 1: ~30% of card visible (70% hidden)
-  // - offset 2: ~15% of card visible (85% hidden)
-  const translateX = offset * cardWidth * 0.35; // Spacing factor for cards to peek out
+  const scale = distance === 0 ? 1.0 : 0.88; // Slightly smaller for side cards
+  const opacity = distance === 0 ? 1.0 : 0.6; // More transparent for side cards
+  const zIndex = distance === 0 ? 5 : 2;
+  // Calculate translateX so cards are more hidden behind the center card
+  // Using smaller offset to bring them more under
+  const translateX = offset * cardWidth * 0.25; // Reduced spacing to bring cards more under
   
   return {
     translateX,
@@ -67,11 +66,9 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
   }, []);
 
   // Get cards at different offsets
-  const prev2Card = getCardAtOffset(topics, currentIndex, -2);
   const prev1Card = getCardAtOffset(topics, currentIndex, -1);
   const currentCard = getCardAtOffset(topics, currentIndex, 0);
   const next1Card = getCardAtOffset(topics, currentIndex, 1);
-  const next2Card = getCardAtOffset(topics, currentIndex, 2);
 
   // Motion values for drag
   const x = useMotionValue(0);
@@ -188,13 +185,11 @@ export default function SwipeableCardStack({ topics, onSwipe, onEmpty }: Swipeab
         overflow: 'visible',
       }}
     >
-      {/* Render all 5 cards */}
+      {/* Render 3 cards: prev1, current, next1 */}
       {[
-        { card: prev2Card, offset: -2, key: 'prev2' },
         { card: prev1Card, offset: -1, key: 'prev1' },
         { card: currentCard, offset: 0, key: 'current' },
         { card: next1Card, offset: 1, key: 'next1' },
-        { card: next2Card, offset: 2, key: 'next2' },
       ].map(({ card, offset, key }) => {
         if (!card) return null;
         

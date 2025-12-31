@@ -373,19 +373,23 @@ export default function TopicCard({
           onClick={handleFlip}
           style={{
             transformStyle: "preserve-3d",
-            transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
-            transition: "transform 0.6s ease-in-out",
           }}
         >
           <div
             className="relative w-full h-full"
             style={{
               transformStyle: "preserve-3d",
+              transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+              transition: "transform 0.6s ease-in-out",
             }}
           >
             {/* Front Side */}
             <div 
               className="absolute inset-0 p-3 sm:p-4 md:p-6 flex flex-col h-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
+              style={{
+                transform: "rotateY(0deg)",
+                transformStyle: "preserve-3d",
+              }}
             >
             {/* Categories and Diversity Badge */}
             <div className="absolute top-2 left-2 flex gap-1 flex-wrap z-20 pointer-events-auto">
@@ -550,6 +554,7 @@ export default function TopicCard({
             className="absolute inset-0 p-3 sm:p-4 md:p-6 flex flex-col h-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden]"
             style={{
               transform: "rotateY(180deg)",
+              transformStyle: "preserve-3d",
             }}
           >
             {/* Categories and Diversity Badge */}
