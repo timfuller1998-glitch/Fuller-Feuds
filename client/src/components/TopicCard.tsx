@@ -394,7 +394,8 @@ export default function TopicCard({
                 backfaceVisibility: "hidden",
                 WebkitBackfaceVisibility: "hidden",
                 opacity: isFlipped ? 0 : 1,
-                visibility: isFlipped ? "hidden" : "visible",
+                pointerEvents: isFlipped ? "none" : "auto",
+                transition: "opacity 0.6s ease-in-out",
               }}
             >
             {/* Categories and Diversity Badge */}
@@ -564,7 +565,8 @@ export default function TopicCard({
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
               opacity: isFlipped ? 1 : 0,
-              visibility: isFlipped ? "visible" : "hidden",
+              pointerEvents: isFlipped ? "auto" : "none",
+              transition: "opacity 0.6s ease-in-out",
             }}
           >
             {/* Categories and Diversity Badge */}
