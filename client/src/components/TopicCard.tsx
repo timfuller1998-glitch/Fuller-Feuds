@@ -7,14 +7,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageCircle, Users, Sparkles, Activity, Flag, Plus, ArrowRight, Loader2, Heart, Skull, Flame, BookOpen } from "lucide-react";
+import { MessageCircle, Users, Sparkles, Activity, Flag, Plus, ArrowRight, Loader2, Heart, Skull, Flame, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { getTopicCornerGlow } from "@/lib/politicalColors";
-import { insertOpinionSchema } from "@shared/schema";
+import { insertOpinionSchema, type Opinion } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -90,6 +90,7 @@ export default function TopicCard({
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [loginAction, setLoginAction] = useState<"like" | "opinion" | "debate" | "interact">("interact");
   const [timeOnBack, setTimeOnBack] = useState(0);
+  const [currentOpinionIndex, setCurrentOpinionIndex] = useState(0);
   const backSideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -110,6 +111,24 @@ export default function TopicCard({
       return response.json();
     },
     enabled: isFlipped && !!id,
+  });
+
+  // Fetch top-rated opinions for preview
+  const { data: topOpinions } = useQuery<Opinion[]>({
+    queryKey: ["/api/topics", id, "opinions", "preview"],
+    queryFn: async () => {
+      const response = await fetch(`/api/topics/${id}/opinions`);
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        throw new Error("Failed to fetch opinions");
+      }
+      const opinions = await response.json();
+      // Sort by likesCount and take top 3
+      return opinions
+        .sort((a: Opinion, b: Opinion) => (b.likesCount || 0) - (a.likesCount || 0))
+        .slice(0, 3);
+    },
+    enabled: !!id && isActive,
   });
 
   // Opinion form
@@ -218,6 +237,13 @@ export default function TopicCard({
     }
   }, [triggerOpinionForm, isAuthenticated]);
 
+  // Reset opinion index when topOpinions change
+  useEffect(() => {
+    if (topOpinions && topOpinions.length > 0) {
+      setCurrentOpinionIndex(0);
+    }
+  }, [topOpinions]);
+
   const handleAddOpinion = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isAuthenticated) {
@@ -241,6 +267,24 @@ export default function TopicCard({
   const handleNavigate = (e: React.MouseEvent) => {
     e.stopPropagation();
     setLocation(`/topic/${id}`);
+  };
+
+  const handlePrevOpinion = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (topOpinions && topOpinions.length > 0) {
+      setCurrentOpinionIndex((prev) => 
+        prev === 0 ? topOpinions.length - 1 : prev - 1
+      );
+    }
+  };
+
+  const handleNextOpinion = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (topOpinions && topOpinions.length > 0) {
+      setCurrentOpinionIndex((prev) => 
+        prev === topOpinions.length - 1 ? 0 : prev + 1
+      );
+    }
   };
 
   const onSubmitOpinion = (data: z.infer<typeof opinionFormSchema>) => {
@@ -414,10 +458,78 @@ export default function TopicCard({
 
             {/* Content Area - Centered in top 2/3rds */}
             <div className="flex-1 flex items-center justify-center" style={{ minHeight: "66%" }}>
-              <div className="text-center px-4">
-                <h3 className="font-semibold text-lg sm:text-xl leading-tight" data-testid={`text-topic-title-${id}`}>
+              <div className="text-center px-4 w-full">
+                <h3 className="font-semibold text-lg sm:text-xl leading-tight mb-3" data-testid={`text-topic-title-${id}`}>
                   {title}
                 </h3>
+                
+                {/* Opinion Preview */}
+                {topOpinions && topOpinions.length > 0 && (
+                  <div className="mt-4 relative">
+                    <div className="bg-muted/50 rounded-lg p-3 text-left min-h-[80px] flex items-center">
+                      {topOpinions.length > 1 && (
+                        <button
+                          onClick={handlePrevOpinion}
+                          className="absolute left-1 top-1/2 -translate-y-1/2 z-10 p-1 rounded-full bg-background/80 hover:bg-background border shadow-sm"
+                          aria-label="Previous opinion"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                      )}
+                      
+                      <div className="flex-1 px-6">
+                        <div className="flex items-center gap-2 mb-1">
+                          {topOpinions[currentOpinionIndex].author?.profileImageUrl && (
+                            <img 
+                              src={topOpinions[currentOpinionIndex].author.profileImageUrl} 
+                              alt={topOpinions[currentOpinionIndex].author.firstName || "User"}
+                              className="w-5 h-5 rounded-full"
+                            />
+                          )}
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {topOpinions[currentOpinionIndex].author?.firstName || "Anonymous"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            • {(topOpinions[currentOpinionIndex].likesCount || 0)} likes
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm leading-relaxed line-clamp-2 text-foreground/90">
+                          {topOpinions[currentOpinionIndex].content}
+                        </p>
+                      </div>
+                      
+                      {topOpinions.length > 1 && (
+                        <button
+                          onClick={handleNextOpinion}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 z-10 p-1 rounded-full bg-background/80 hover:bg-background border shadow-sm"
+                          aria-label="Next opinion"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    
+                    {topOpinions.length > 1 && (
+                      <div className="flex justify-center gap-1 mt-2">
+                        {topOpinions.map((_, index) => (
+                          <button
+                            key={index}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCurrentOpinionIndex(index);
+                            }}
+                            className={`h-1.5 rounded-full transition-all ${
+                              index === currentOpinionIndex 
+                                ? 'w-6 bg-primary' 
+                                : 'w-1.5 bg-muted-foreground/30'
+                            }`}
+                            aria-label={`Go to opinion ${index + 1}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
