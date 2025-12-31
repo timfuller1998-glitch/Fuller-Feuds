@@ -292,7 +292,7 @@ export default function Home() {
   const topicSections = sections.filter((s): s is SectionData => s.type !== 'opinions');
 
   return (
-    <div className="-mx-3 -my-3 sm:-mx-4 sm:-my-4 md:-mx-6 md:-my-6 -mb-20 h-full overflow-y-auto snap-y snap-mandatory -webkit-overflow-scrolling-touch">
+    <div className="absolute inset-0 -mx-3 -my-3 sm:-mx-4 sm:-my-4 md:-mx-6 md:-my-6 -mb-20 overflow-y-auto snap-y snap-mandatory -webkit-overflow-scrolling-touch">
       {/* Stack Sections */}
       {topicSections.length === 0 ? (
         <section className="min-h-[100dvh] snap-start flex items-center justify-center">
