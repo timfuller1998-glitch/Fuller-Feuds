@@ -393,6 +393,8 @@ export default function TopicCard({
                 transformStyle: "preserve-3d",
                 backfaceVisibility: "hidden",
                 WebkitBackfaceVisibility: "hidden",
+                opacity: isFlipped ? 0 : 1,
+                visibility: isFlipped ? "hidden" : "visible",
               }}
             >
             {/* Categories and Diversity Badge */}
@@ -561,6 +563,8 @@ export default function TopicCard({
               transformStyle: "preserve-3d",
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
+              opacity: isFlipped ? 1 : 0,
+              visibility: isFlipped ? "visible" : "hidden",
             }}
           >
             {/* Categories and Diversity Badge */}
