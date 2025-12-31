@@ -67,13 +67,15 @@ function AppWithSidebar({
   displayName, 
   searchQuery, 
   handleSearch,
-  isAuthenticated
+  isAuthenticated,
+  location
 }: {
   user: any;
   displayName: string;
   searchQuery: string;
   handleSearch: (query: string) => void;
   isAuthenticated: boolean;
+  location: string;
 }) {
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
 
@@ -121,7 +123,7 @@ function AppWithSidebar({
           )}
           <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} />
         </header>
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 pb-20">
+        <main className={`flex-1 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-20 ${location === "/" ? "overflow-y-hidden" : "overflow-y-auto"}`}>
           <div className="max-w-7xl mx-auto w-full">
             <Router />
           </div>
@@ -265,6 +267,7 @@ function MainApp() {
           searchQuery={searchQuery}
           handleSearch={handleSearch}
           isAuthenticated={isAuthenticated}
+          location={location}
         />
       </SidebarProvider>
     </DebateProvider>
