@@ -456,81 +456,87 @@ export default function TopicCard({
               )}
             </div>
 
-            {/* Content Area - Centered in top 2/3rds */}
-            <div className="flex-1 flex items-center justify-center" style={{ minHeight: "66%" }}>
-              <div className="text-center px-4 w-full">
-                <h3 className="font-semibold text-lg sm:text-xl leading-tight mb-3" data-testid={`text-topic-title-${id}`}>
-                  {title}
-                </h3>
-                
-                {/* Opinion Preview */}
-                {topOpinions && topOpinions.length > 0 && (
-                  <div className="mt-4 relative">
-                    <div className="bg-muted/50 rounded-lg p-3 text-left min-h-[80px] flex items-center">
-                      {topOpinions.length > 1 && (
-                        <button
-                          onClick={handlePrevOpinion}
-                          className="absolute left-1 top-1/2 -translate-y-1/2 z-10 p-1 rounded-full bg-background/80 hover:bg-background border shadow-sm"
-                          aria-label="Previous opinion"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                      )}
-                      
-                      <div className="flex-1 px-6">
-                        <div className="flex items-center gap-2 mb-1">
-                          {topOpinions[currentOpinionIndex].author?.profileImageUrl && (
-                            <img 
-                              src={topOpinions[currentOpinionIndex].author.profileImageUrl} 
-                              alt={topOpinions[currentOpinionIndex].author.firstName || "User"}
-                              className="w-5 h-5 rounded-full"
-                            />
-                          )}
-                          <span className="text-xs font-medium text-muted-foreground">
-                            {topOpinions[currentOpinionIndex].author?.firstName || "Anonymous"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            • {(topOpinions[currentOpinionIndex].likesCount || 0)} likes
-                          </span>
-                        </div>
-                        <p className="text-xs sm:text-sm leading-relaxed line-clamp-2 text-foreground/90">
+            {/* Title - Positioned under category tags */}
+            <div className="pt-8 px-4">
+              <h3 className="font-semibold text-lg sm:text-xl leading-tight" data-testid={`text-topic-title-${id}`}>
+                {title}
+              </h3>
+            </div>
+
+            {/* Opinion Preview - Fills remaining space */}
+            <div className="flex-1 flex flex-col min-h-0 px-4 pb-4">
+              {topOpinions && topOpinions.length > 0 ? (
+                <div className="flex-1 flex flex-col relative">
+                  <div className="bg-muted/50 rounded-lg p-3 sm:p-4 text-left flex-1 flex flex-col min-h-0 relative">
+                    {topOpinions.length > 1 && (
+                      <button
+                        onClick={handlePrevOpinion}
+                        className="absolute left-1 top-1/2 -translate-y-1/2 z-10 p-1 rounded-full bg-background/80 hover:bg-background border shadow-sm"
+                        aria-label="Previous opinion"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                    )}
+                    
+                    <div className="flex-1 flex flex-col px-6 min-h-0">
+                      <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+                        {topOpinions[currentOpinionIndex].author?.profileImageUrl && (
+                          <img 
+                            src={topOpinions[currentOpinionIndex].author.profileImageUrl} 
+                            alt={topOpinions[currentOpinionIndex].author.firstName || "User"}
+                            className="w-5 h-5 rounded-full"
+                          />
+                        )}
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {topOpinions[currentOpinionIndex].author?.firstName || "Anonymous"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          • {(topOpinions[currentOpinionIndex].likesCount || 0)} likes
+                        </span>
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <p className="text-sm sm:text-base leading-relaxed text-foreground/90 h-full overflow-y-auto">
                           {topOpinions[currentOpinionIndex].content}
                         </p>
                       </div>
-                      
-                      {topOpinions.length > 1 && (
-                        <button
-                          onClick={handleNextOpinion}
-                          className="absolute right-1 top-1/2 -translate-y-1/2 z-10 p-1 rounded-full bg-background/80 hover:bg-background border shadow-sm"
-                          aria-label="Next opinion"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      )}
                     </div>
                     
                     {topOpinions.length > 1 && (
-                      <div className="flex justify-center gap-1 mt-2">
-                        {topOpinions.map((_, index) => (
-                          <button
-                            key={index}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCurrentOpinionIndex(index);
-                            }}
-                            className={`h-1.5 rounded-full transition-all ${
-                              index === currentOpinionIndex 
-                                ? 'w-6 bg-primary' 
-                                : 'w-1.5 bg-muted-foreground/30'
-                            }`}
-                            aria-label={`Go to opinion ${index + 1}`}
-                          />
-                        ))}
-                      </div>
+                      <button
+                        onClick={handleNextOpinion}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 z-10 p-1 rounded-full bg-background/80 hover:bg-background border shadow-sm"
+                        aria-label="Next opinion"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
                     )}
                   </div>
-                )}
-              </div>
+                  
+                  {topOpinions.length > 1 && (
+                    <div className="flex justify-center gap-1 mt-2 flex-shrink-0">
+                      {topOpinions.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentOpinionIndex(index);
+                          }}
+                          className={`h-1.5 rounded-full transition-all ${
+                            index === currentOpinionIndex 
+                              ? 'w-6 bg-primary' 
+                              : 'w-1.5 bg-muted-foreground/30'
+                          }`}
+                          aria-label={`Go to opinion ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground">No opinions yet</p>
+                </div>
+              )}
             </div>
 
             <InteractiveElements />
