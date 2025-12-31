@@ -466,8 +466,8 @@ export default function TopicCard({
             {/* Opinion Preview - Fills remaining space */}
             <div className="flex-1 flex flex-col min-h-0 px-4 pb-4">
               {topOpinions && topOpinions.length > 0 ? (
-                <div className="flex-1 flex flex-col relative">
-                  <div className="bg-muted/50 rounded-lg p-3 sm:p-4 text-left flex-1 flex flex-col min-h-0 relative">
+                <div className="flex-1 flex flex-col relative min-h-0">
+                  <div className={`bg-muted/50 rounded-lg p-3 sm:p-4 text-left flex flex-col relative h-full ${topOpinions.length > 1 ? 'pb-10' : ''}`}>
                     {topOpinions.length > 1 && (
                       <button
                         onClick={handlePrevOpinion}
@@ -478,7 +478,7 @@ export default function TopicCard({
                       </button>
                     )}
                     
-                    <div className="flex-1 flex flex-col px-6 min-h-0">
+                    <div className="flex flex-col h-full min-h-0 px-6">
                       <div className="flex items-center gap-2 mb-2 flex-shrink-0">
                         {topOpinions[currentOpinionIndex].author?.profileImageUrl && (
                           <img 
@@ -494,8 +494,8 @@ export default function TopicCard({
                           • {(topOpinions[currentOpinionIndex].likesCount || 0)} likes
                         </span>
                       </div>
-                      <div className="flex-1 overflow-hidden">
-                        <p className="text-sm sm:text-base leading-relaxed text-foreground/90 h-full overflow-y-auto">
+                      <div className="flex-1 overflow-hidden min-h-0">
+                        <p className="text-sm sm:text-base leading-relaxed text-foreground/90 line-clamp-[20]">
                           {topOpinions[currentOpinionIndex].content}
                         </p>
                       </div>
@@ -513,7 +513,7 @@ export default function TopicCard({
                   </div>
                   
                   {topOpinions.length > 1 && (
-                    <div className="flex justify-center gap-1 mt-2 flex-shrink-0">
+                    <div className="absolute bottom-0 left-4 right-4 flex justify-center gap-1 pb-4">
                       {topOpinions.map((_, index) => (
                         <button
                           key={index}
