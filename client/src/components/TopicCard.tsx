@@ -512,12 +512,12 @@ export default function TopicCard({
                   </div>
                 ) : cumulativeData?.summary ? (
                   <div className="flex flex-col h-full justify-center min-h-0 max-h-full">
-                    <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0">
+                    <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0 mt-8">
                       <Sparkles className="w-4 h-4 text-primary" />
                       <h3 className="font-semibold text-sm">AI Summary</h3>
                     </div>
                     <div className="flex-1 min-h-0 overflow-hidden flex items-center">
-                      <p className="text-sm leading-relaxed line-clamp-4 overflow-hidden w-full" data-testid={`text-ai-summary-${id}`}>
+                      <p className="text-sm leading-relaxed overflow-hidden w-full h-full" data-testid={`text-ai-summary-${id}`}>
                         {cumulativeData.summary}
                       </p>
                     </div>
