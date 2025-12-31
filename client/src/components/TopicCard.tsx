@@ -368,19 +368,21 @@ export default function TopicCard({
           />
         )}
         
-        <Card
-          className="hover-elevate active-elevate-2 overflow-hidden cursor-pointer relative w-full h-full"
-          onClick={handleFlip}
+        {/* Transform wrapper - handles the flip animation */}
+        <div
           style={{
             transformStyle: "preserve-3d",
+            transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            transition: "transform 0.6s ease-in-out",
+            width: "100%",
+            height: "100%",
           }}
         >
-          <div
-            className="relative w-full h-full"
+          <Card
+            className="hover-elevate active-elevate-2 overflow-hidden cursor-pointer relative w-full h-full"
+            onClick={handleFlip}
             style={{
               transformStyle: "preserve-3d",
-              transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
-              transition: "transform 0.6s ease-in-out",
             }}
           >
             {/* Front Side */}
@@ -666,8 +668,8 @@ export default function TopicCard({
 
             <InteractiveElements />
           </div>
-          </div>
         </Card>
+        </div>
       </div>
 
       {/* Opinion Creation Dialog */}
