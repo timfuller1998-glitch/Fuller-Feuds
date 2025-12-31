@@ -30,14 +30,11 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, on
 
   return (
     <section
-      className="min-h-[100dvh] snap-start flex flex-col items-center px-4 py-8"
+      className="h-[100dvh] snap-start flex flex-col items-center px-4"
       data-testid={`section-${sectionKey}`}
     >
-      {/* Top Spacer */}
-      <div className="h-16 flex-shrink-0" />
-
-      {/* Section Header */}
-      <div className="w-full flex justify-between items-center mb-0 flex-shrink-0">
+      {/* Current Section Header - Top */}
+      <div className="w-full flex justify-between items-center py-4 flex-shrink-0">
         <div className="inline-flex items-center gap-3">
           <div className="p-2 rounded-lg bg-primary/10">
             <Icon className="w-5 h-5 text-primary" />
@@ -51,7 +48,7 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, on
         </span>
       </div>
 
-      {/* Card Stack */}
+      {/* Card Stack - Middle (centered in remaining space) */}
       <div className="flex-1 w-full flex items-center justify-center min-h-0">
         {topics.length > 0 ? (
           <SwipeableCardStack
@@ -66,14 +63,11 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, on
         )}
       </div>
 
-      {/* Bottom Spacer */}
-      <div className="h-16 flex-shrink-0" />
-
-      {/* Next Section Preview */}
+      {/* Next Section Title - Bottom */}
       {nextSection && NextSectionIcon && (
-        <div className="w-full flex justify-between items-center opacity-60 flex-shrink-0">
+        <div className="w-full flex justify-between items-center py-4 flex-shrink-0">
           <div className="inline-flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
+            <div className="p-2 rounded-lg bg-primary/10 opacity-60">
               <NextSectionIcon className="w-5 h-5 text-primary" />
             </div>
             <h2 className="text-xl font-semibold text-muted-foreground">
