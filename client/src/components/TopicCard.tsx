@@ -379,7 +379,7 @@ export default function TopicCard({
           }}
         >
           <Card
-            className="hover-elevate active-elevate-2 overflow-hidden cursor-pointer relative w-full h-full"
+            className="hover-elevate active-elevate-2 overflow-visible cursor-pointer relative w-full h-full"
             onClick={handleFlip}
             style={{
               transformStyle: "preserve-3d",
