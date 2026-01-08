@@ -7,6 +7,7 @@ import { isAuthenticated, requireAdmin } from '../middleware/auth.js';
 import type { UpsertUser } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
 import { invalidateUserCache, invalidateUserBadgesCache, invalidateUserDebateStatsCache } from '../services/cacheInvalidation.js';
+import { UnauthorizedError, ForbiddenError, AuthorizationError, DataAccessError } from '../utils/securityErrors.js';
 
 const router = Router();
 const userRepository = new UserRepository();
@@ -22,13 +23,19 @@ router.get('/me', isAuthenticated, async (req, res) => {
       return res.status(401).json({ message: "User not authenticated" });
     }
 
-    const userId = user.id;
-    const key = cacheKey('user', userId, 'profile');
+    const requestingUserId = user.id;
+    const requestingUserRole = req.userRole;
+    const key = cacheKey('user', requestingUserId, 'profile');
     
     // Try cache first
     let userData = await getCache(key);
     if (!userData) {
-      userData = await userRepository.findById(userId);
+      userData = await userRepository.findById(
+        requestingUserId,
+        requestingUserId,
+        requestingUserRole,
+        req
+      );
       
       // If user doesn't exist in database (shouldn't happen with local auth, but handle gracefully)
       if (!userData) {
@@ -40,7 +47,7 @@ router.get('/me', isAuthenticated, async (req, res) => {
     }
 
     // Hide isSynthetic from non-admins
-    const isAdmin = req.userRole === 'admin';
+    const isAdmin = requestingUserRole === 'admin';
     let responseUser: any = userData;
     if (!isAdmin) {
       const { isSynthetic, ...rest } = userData as any;
@@ -49,6 +56,9 @@ router.get('/me', isAuthenticated, async (req, res) => {
 
     res.json(responseUser);
   } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error fetching current user:", error);
     res.status(500).json({ message: "Failed to fetch user" });
   }
@@ -107,13 +117,20 @@ router.get('/active-distribution', async (req, res) => {
 // GET /api/users/:id - Get user by ID
 router.get('/:id', async (req, res) => {
   try {
-    const isAdmin = req.userRole === 'admin';
+    const requestingUserId = (req.user as Express.User)?.id;
+    const requestingUserRole = req.userRole;
+    const isAdmin = requestingUserRole === 'admin';
     const key = cacheKey('user', req.params.id, 'profile');
     
     // Try cache first
     let user = await getCache(key);
     if (!user) {
-      user = await userRepository.findById(req.params.id);
+      user = await userRepository.findById(
+        req.params.id,
+        requestingUserId,
+        requestingUserRole,
+        req
+      );
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -131,6 +148,9 @@ router.get('/:id', async (req, res) => {
     
     res.json(responseUser);
   } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error fetching user:", error);
     res.status(500).json({ message: "Failed to fetch user" });
   }
@@ -220,12 +240,19 @@ router.get('/me/recent-categories', isAuthenticated, async (req, res) => {
 // GET /api/users/:userId/debate-stats - Get user's debate statistics
 router.get('/:userId/debate-stats', async (req, res) => {
   try {
+    const requestingUserId = (req.user as Express.User)?.id;
+    const requestingUserRole = req.userRole;
     const key = cacheKey('user', req.params.userId, 'debate-stats');
     
     // Try cache first
     let stats = await getCache(key);
     if (!stats) {
-      stats = await userRepository.getDebateStats(req.params.userId);
+      stats = await userRepository.getDebateStats(
+        req.params.userId,
+        requestingUserId,
+        requestingUserRole,
+        req
+      );
       const defaultStats = stats || {
         totalDebates: 0,
         avgLogicalReasoning: 0,
@@ -241,6 +268,9 @@ router.get('/:userId/debate-stats', async (req, res) => {
     
     res.json(stats);
   } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error fetching debate stats:", error);
     res.status(500).json({ message: "Failed to fetch debate stats" });
   }
@@ -249,9 +279,29 @@ router.get('/:userId/debate-stats', async (req, res) => {
 // GET /api/users/me/debate-rooms - Get current user's debate rooms
 router.get('/me/debate-rooms', isAuthenticated, async (req, res) => {
   try {
-    // This will be handled by debate service, placeholder for now
-    res.json({ active: [], ended: [], archived: [] });
+    const user = req.user as Express.User;
+    if (!user || !user.id) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+    const requestingUserId = user.id;
+    const requestingUserRole = req.userRole;
+    
+    // Import DebateService dynamically to avoid circular dependencies
+    const { DebateService } = await import('../services/debateService.js');
+    const debateService = new DebateService();
+    
+    const rooms = await debateService.getUserDebateRooms(
+      requestingUserId,
+      requestingUserId,
+      requestingUserRole,
+      req
+    );
+    
+    res.json({ active: rooms, ended: [], archived: [] });
   } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error fetching debate rooms:", error);
     res.status(500).json({ message: "Failed to fetch debate rooms" });
   }

@@ -6,6 +6,7 @@ import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/a
 import { insertOpinionSchema } from '../../shared/schema.js';
 import { z } from 'zod';
 import { invalidateVoteCache } from '../services/cacheInvalidation.js';
+import { UnauthorizedError, ForbiddenError, AuthorizationError, DataAccessError } from '../utils/securityErrors.js';
 
 const router = Router();
 const opinionService = new OpinionService();
@@ -16,19 +17,23 @@ const moderationService = new ModerationService();
 router.get('/recent', async (req, res) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
-    const currentUserId = (req.user as Express.User)?.id;
+    const requestingUserId = (req.user as Express.User)?.id;
+    const requestingUserRole = req.userRole;
 
-    // TODO: Implement recent opinions in OpinionService
-    // const opinions = await opinionService.getRecentOpinions(limit, req.userRole, currentUserId);
-    const opinions: any[] = []; // Placeholder
-
-    // If user is authenticated, include their vote for each opinion
-    if (currentUserId) {
-      // TODO: Add vote information
-    }
+    const opinions = await opinionService.getRecentOpinions(
+      limit,
+      requestingUserRole,
+      requestingUserId,
+      requestingUserId,
+      requestingUserRole,
+      req
+    );
 
     res.json(opinions);
   } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error fetching recent opinions:", error);
     res.status(500).json({ message: "Failed to fetch recent opinions" });
   }
@@ -37,16 +42,24 @@ router.get('/recent', async (req, res) => {
 // GET /api/topics/:topicId/opinions - Get opinions for a topic
 router.get('/topics/:topicId', async (req, res) => {
   try {
-    // Get current user ID
-    const user = req.user as Express.User;
-    const currentUserId = user?.id;
-    const opinions = await opinionService.getOpinionsByTopic(req.params.topicId, {
-      userRole: req.userRole,
-      currentUserId,
-    });
+    const requestingUserId = (req.user as Express.User)?.id;
+    const requestingUserRole = req.userRole;
+    const opinions = await opinionService.getOpinionsByTopic(
+      req.params.topicId,
+      {
+        userRole: requestingUserRole,
+        currentUserId: requestingUserId,
+      },
+      requestingUserId,
+      requestingUserRole,
+      req
+    );
 
     res.json(opinions);
   } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error fetching opinions:", error);
     res.status(500).json({ message: "Failed to fetch opinions" });
   }
@@ -61,19 +74,29 @@ router.post('/topics/:topicId', isAuthenticated, async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
+    const requestingUserId = user.id;
+    const requestingUserRole = req.userRole;
+
     const validatedData = insertOpinionSchema.parse({
       ...req.body,
       topicId: req.params.topicId,
-      userId: user.id,
+      userId: requestingUserId,
     });
 
-    const opinion = await opinionService.createOpinion(validatedData);
+    const opinion = await opinionService.createOpinion(
+      validatedData,
+      requestingUserId,
+      requestingUserRole,
+      req
+    );
     res.status(201).json(opinion);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid data', details: error.errors });
     }
-
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error creating opinion:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     res.status(500).json({ 
@@ -86,12 +109,22 @@ router.post('/topics/:topicId', isAuthenticated, async (req, res) => {
 // GET /api/opinions/:opinionId - Get single opinion
 router.get('/:opinionId', async (req, res) => {
   try {
-    const opinion = await opinionService.getOpinion(req.params.opinionId);
+    const requestingUserId = (req.user as Express.User)?.id;
+    const requestingUserRole = req.userRole;
+    const opinion = await opinionService.getOpinion(
+      req.params.opinionId,
+      requestingUserId,
+      requestingUserRole,
+      req
+    );
     if (!opinion) {
       return res.status(404).json({ message: "Opinion not found" });
     }
     res.json(opinion);
   } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error fetching opinion:", error);
     res.status(500).json({ message: "Failed to fetch opinion" });
   }
@@ -100,9 +133,23 @@ router.get('/:opinionId', async (req, res) => {
 // PATCH /api/opinions/:opinionId - Update opinion
 router.patch('/:opinionId', isAuthenticated, async (req, res) => {
   try {
-    const opinion = await opinionService.updateOpinion(req.params.opinionId, req.body);
+    const requestingUserId = (req.user as Express.User)?.id;
+    if (!requestingUserId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    const requestingUserRole = req.userRole;
+    const opinion = await opinionService.updateOpinion(
+      req.params.opinionId,
+      req.body,
+      requestingUserId,
+      requestingUserRole,
+      req
+    );
     res.json(opinion);
   } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error updating opinion:", error);
     res.status(500).json({ message: "Failed to update opinion" });
   }
@@ -180,9 +227,17 @@ router.post('/:opinionId/flag', isAuthenticated, async (req, res) => {
 // POST /api/opinions/:opinionId/start-debate - Start debate from opinion
 router.post('/:opinionId/start-debate', isAuthenticated, async (req, res) => {
   try {
-    const debateRoom = await debateService.createDebateRoom(req.params.opinionId, req.user!.id);
+    const requestingUserId = (req.user as Express.User)?.id;
+    if (!requestingUserId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    // Note: createDebateRoom doesn't have security context parameters yet, but we still handle errors
+    const debateRoom = await debateService.createDebateRoom(req.params.opinionId, requestingUserId);
     res.json(debateRoom);
   } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error starting debate:", error);
     res.status(500).json({ message: "Failed to start debate" });
   }

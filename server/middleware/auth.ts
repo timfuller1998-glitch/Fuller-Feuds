@@ -1,4 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
+import { logSecurityEvent, extractRequestContext } from '../utils/securityLogger.js';
+import { UnauthorizedError } from '../utils/securityErrors.js';
 
 // Extend Express Request to include user info
 declare global {
@@ -14,32 +17,35 @@ declare global {
 
     interface Request {
       userRole?: string;
+      id?: string; // Request ID for tracing
     }
   }
 }
 
+// Middleware to generate and attach request ID for tracing
+export function attachRequestId(req: Request, res: Response, next: NextFunction) {
+  req.id = req.headers['x-request-id'] as string || randomUUID();
+  res.setHeader('X-Request-ID', req.id);
+  next();
+}
+
 export const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
-  // #region agent log
-  const authData = {
-    hasIsAuthenticated: typeof req.isAuthenticated === 'function',
-    isAuthenticatedResult: typeof req.isAuthenticated === 'function' ? req.isAuthenticated() : undefined,
-    hasSession: !!req.session,
-    sessionId: (req.session as any)?.id,
-    sessionCookie: (req.session as any)?.cookie,
-    hasUser: !!req.user,
-    userId: (req.user as any)?.id,
-    cookies: Object.keys(req.cookies || {}),
-    cookieHeader: req.get('cookie')?.substring(0, 200),
-    path: req.path,
-    method: req.method,
-  };
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'middleware/auth.ts:21',message:'isAuthenticated middleware check',data:authData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-  
   if (!req.isAuthenticated || !req.isAuthenticated()) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'middleware/auth.ts:25',message:'Authentication failed',data:{hasIsAuthenticated:typeof req.isAuthenticated==='function',hasSession:!!req.session,sessionId:(req.session as any)?.id,cookieHeader:req.get('cookie')?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'auth_failure', {
+      action: 'authenticate',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Authentication required',
+      errorCode: 'UNAUTHORIZED',
+      metadata: {
+        path: req.path,
+        method: req.method,
+      },
+    });
+
     return res.status(401).json({ error: 'Authentication required' });
   }
   next();
@@ -47,6 +53,21 @@ export const isAuthenticated = (req: Request, res: Response, next: NextFunction)
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   if (!req.isAuthenticated || !req.isAuthenticated()) {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'auth_failure', {
+      action: 'require_auth',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Authentication required',
+      errorCode: 'UNAUTHORIZED',
+      metadata: {
+        path: req.path,
+        method: req.method,
+      },
+    });
+
     return res.status(401).json({ error: 'Authentication required' });
   }
   next();
@@ -54,6 +75,24 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
 
 export const requireModerator = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user || (req.userRole !== 'moderator' && req.userRole !== 'admin')) {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'authorization_failure', {
+      userId: req.user?.id,
+      userRole: req.userRole,
+      action: 'moderate',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Moderator access required',
+      errorCode: 'FORBIDDEN',
+      metadata: {
+        path: req.path,
+        method: req.method,
+        requiredPermission: 'moderator',
+      },
+    });
+
     return res.status(403).json({ error: 'Moderator access required' });
   }
   next();
@@ -61,6 +100,24 @@ export const requireModerator = (req: Request, res: Response, next: NextFunction
 
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user || req.userRole !== 'admin') {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'authorization_failure', {
+      userId: req.user?.id,
+      userRole: req.userRole,
+      action: 'admin_access',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Admin access required',
+      errorCode: 'FORBIDDEN',
+      metadata: {
+        path: req.path,
+        method: req.method,
+        requiredPermission: 'admin',
+      },
+    });
+
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();

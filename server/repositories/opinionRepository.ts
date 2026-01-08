@@ -4,6 +4,9 @@ import { opinions, users, userProfiles, opinionVotes, opinionFlags } from '../..
 import { eq, desc, and, or, ne, sql } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { aggregateFallacyCounts } from '../utils/fallacyUtils.js';
+import { checkUserOwnership, checkModifyPermission } from '../utils/authorization.js';
+import { logDataAccess, logDatabaseOperation, logSecurityEvent } from '../utils/securityLogger.js';
+import type { Request } from 'express';
 
 /**
  * Recursively remove all Date objects from an object
@@ -46,8 +49,32 @@ function removeDateObjects(obj: any): any {
 }
 
 export class OpinionRepository {
-  async create(opinion: InsertOpinion): Promise<Opinion> {
-    // Use JSON serialization to deeply clone and convert any Date objects to strings
+  async create(opinion: InsertOpinion, requestingUserId?: string, req?: Request): Promise<Opinion> {
+    const startTime = Date.now();
+
+    // Ensure user is creating opinion for themselves
+    if (requestingUserId && opinion.userId !== requestingUserId) {
+      logSecurityEvent('warn', 'unauthorized_access', {
+        userId: requestingUserId,
+        action: 'create_opinion',
+        resourceType: 'opinion',
+        error: 'User attempted to create opinion for another user',
+        errorCode: 'UNAUTHORIZED_USER_ID',
+      });
+      throw new Error('Cannot create opinion for another user');
+    }
+
+    try {
+      logDataAccess({
+        userId: requestingUserId || opinion.userId,
+        action: 'create_opinion',
+        resourceType: 'opinion',
+        accessLevel: 'write',
+        ipAddress: req ? (req.ip || req.connection?.remoteAddress) : undefined,
+        userAgent: req?.headers['user-agent'],
+      });
+
+      // Use JSON serialization to deeply clone and convert any Date objects to strings
     // This ensures we have a completely clean plain object
     let serialized: any;
     try {
@@ -171,12 +198,85 @@ export class OpinionRepository {
     
     const [createdOpinion] = created;
 
+    const queryTime = Date.now() - startTime;
+    logDatabaseOperation({
+      userId: requestingUserId || opinion.userId,
+      action: 'create_opinion',
+      resourceType: 'opinion',
+      resourceId: createdOpinion.id,
+      tableName: 'opinions',
+      operation: 'insert',
+      queryTimeMs: queryTime,
+      rowsAffected: 1,
+    });
+
     return created;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId || opinion.userId,
+        action: 'create_opinion',
+        resourceType: 'opinion',
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'DATABASE_ERROR',
+      });
+      throw error;
+    }
   }
 
-  async findById(id: string): Promise<Opinion | undefined> {
-    const [opinion] = await db.select().from(opinions).where(eq(opinions.id, id)).limit(1);
-    return opinion;
+  async findById(id: string, requestingUserId?: string, requestingUserRole?: string, req?: Request): Promise<Opinion | undefined> {
+    const startTime = Date.now();
+
+    try {
+      logDataAccess({
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'read_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        accessLevel: 'read',
+        ipAddress: req ? (req.ip || req.connection?.remoteAddress) : undefined,
+        userAgent: req?.headers['user-agent'],
+      });
+
+      const [opinion] = await db.select().from(opinions).where(eq(opinions.id, id)).limit(1);
+
+      const queryTime = Date.now() - startTime;
+      logDatabaseOperation({
+        userId: requestingUserId,
+        action: 'read_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        tableName: 'opinions',
+        operation: 'select',
+        queryTimeMs: queryTime,
+        rowsAffected: opinion ? 1 : 0,
+      });
+
+      // Check if user can view this opinion (if private, only author can view)
+      if (opinion && opinion.debateStatus === 'private' && requestingUserId !== opinion.userId && requestingUserRole !== 'admin' && requestingUserRole !== 'moderator') {
+        logSecurityEvent('warn', 'unauthorized_access', {
+          userId: requestingUserId,
+          action: 'read_private_opinion',
+          resourceType: 'opinion',
+          resourceId: id,
+          error: 'Attempted to access private opinion',
+          errorCode: 'PRIVATE_OPINION_ACCESS_DENIED',
+        });
+        return undefined;
+      }
+
+      return opinion;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'read_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'DATABASE_ERROR',
+      });
+      throw error;
+    }
   }
 
   async findByTopicId(topicId: string, options?: {
@@ -281,13 +381,60 @@ export class OpinionRepository {
     return enrichedOpinions;
   }
 
-  async update(id: string, data: Partial<InsertOpinion>): Promise<Opinion> {
-    const [updated] = await db
-      .update(opinions)
-      .set(data)
-      .where(eq(opinions.id, id))
-      .returning();
-    return updated;
+  async update(id: string, data: Partial<InsertOpinion>, requestingUserId?: string, requestingUserRole?: string, req?: Request): Promise<Opinion> {
+    const startTime = Date.now();
+
+    try {
+      // First get the opinion to check ownership
+      const [existingOpinion] = await db.select().from(opinions).where(eq(opinions.id, id)).limit(1);
+      if (!existingOpinion) {
+        throw new Error(`Opinion ${id} not found`);
+      }
+
+      // Authorization check - users can only update their own opinions (unless moderator/admin)
+      checkModifyPermission(requestingUserId, existingOpinion.userId, requestingUserRole, 'opinion', req);
+
+      logDataAccess({
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'update_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        accessLevel: 'write',
+        ipAddress: req ? (req.ip || req.connection?.remoteAddress) : undefined,
+        userAgent: req?.headers['user-agent'],
+      });
+
+      const [updated] = await db
+        .update(opinions)
+        .set(data)
+        .where(eq(opinions.id, id))
+        .returning();
+
+      const queryTime = Date.now() - startTime;
+      logDatabaseOperation({
+        userId: requestingUserId,
+        action: 'update_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        tableName: 'opinions',
+        operation: 'update',
+        queryTimeMs: queryTime,
+        rowsAffected: updated ? 1 : 0,
+      });
+
+      return updated;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'update_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'DATABASE_ERROR',
+      });
+      throw error;
+    }
   }
 
   async updateCounts(id: string, likesCount: number, dislikesCount: number): Promise<void> {
@@ -297,8 +444,54 @@ export class OpinionRepository {
       .where(eq(opinions.id, id));
   }
 
-  async delete(id: string): Promise<void> {
-    await db.delete(opinions).where(eq(opinions.id, id));
+  async delete(id: string, requestingUserId?: string, requestingUserRole?: string, req?: Request): Promise<void> {
+    const startTime = Date.now();
+
+    try {
+      // First get the opinion to check ownership
+      const [existingOpinion] = await db.select().from(opinions).where(eq(opinions.id, id)).limit(1);
+      if (!existingOpinion) {
+        throw new Error(`Opinion ${id} not found`);
+      }
+
+      // Authorization check - users can only delete their own opinions (unless moderator/admin)
+      checkModifyPermission(requestingUserId, existingOpinion.userId, requestingUserRole, 'opinion', req);
+
+      logDataAccess({
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'delete_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        accessLevel: 'delete',
+        ipAddress: req ? (req.ip || req.connection?.remoteAddress) : undefined,
+        userAgent: req?.headers['user-agent'],
+      });
+
+      await db.delete(opinions).where(eq(opinions.id, id));
+
+      const queryTime = Date.now() - startTime;
+      logDatabaseOperation({
+        userId: requestingUserId,
+        action: 'delete_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        tableName: 'opinions',
+        operation: 'delete',
+        queryTimeMs: queryTime,
+        rowsAffected: 1,
+      });
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'delete_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'DATABASE_ERROR',
+      });
+      throw error;
+    }
   }
 
   async voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike' | null): Promise<void> {
@@ -319,13 +512,63 @@ export class OpinionRepository {
     }
   }
 
-  async getUserVoteOnOpinion(opinionId: string, userId: string): Promise<any | undefined> {
-    const [vote] = await db
-      .select()
-      .from(opinionVotes)
-      .where(and(eq(opinionVotes.opinionId, opinionId), eq(opinionVotes.userId, userId)))
-      .limit(1);
-    return vote;
+  async getUserVoteOnOpinion(opinionId: string, userId: string, requestingUserId?: string, req?: Request): Promise<any | undefined> {
+    // Authorization check - users can only see their own votes
+    if (requestingUserId && userId !== requestingUserId) {
+      logSecurityEvent('warn', 'unauthorized_access', {
+        userId: requestingUserId,
+        action: 'read_user_vote',
+        resourceType: 'opinion_vote',
+        resourceId: opinionId,
+        error: 'Attempted to access another user\'s vote',
+        errorCode: 'UNAUTHORIZED_VOTE_ACCESS',
+      });
+      throw new Error('Cannot access another user\'s vote');
+    }
+
+    const startTime = Date.now();
+
+    try {
+      logDataAccess({
+        userId: requestingUserId || userId,
+        action: 'read_opinion_vote',
+        resourceType: 'opinion_vote',
+        resourceId: opinionId,
+        accessLevel: 'read',
+        ipAddress: req ? (req.ip || req.connection?.remoteAddress) : undefined,
+        userAgent: req?.headers['user-agent'],
+      });
+
+      const [vote] = await db
+        .select()
+        .from(opinionVotes)
+        .where(and(eq(opinionVotes.opinionId, opinionId), eq(opinionVotes.userId, userId)))
+        .limit(1);
+
+      const queryTime = Date.now() - startTime;
+      logDatabaseOperation({
+        userId: requestingUserId || userId,
+        action: 'read_opinion_vote',
+        resourceType: 'opinion_vote',
+        resourceId: opinionId,
+        tableName: 'opinion_votes',
+        operation: 'select',
+        queryTimeMs: queryTime,
+        rowsAffected: vote ? 1 : 0,
+      });
+
+      return vote;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId || userId,
+        action: 'read_opinion_vote',
+        resourceType: 'opinion_vote',
+        resourceId: opinionId,
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'DATABASE_ERROR',
+      });
+      throw error;
+    }
   }
 
   async adoptOpinion(opinionId: string, userId: string, customContent?: string): Promise<any> {

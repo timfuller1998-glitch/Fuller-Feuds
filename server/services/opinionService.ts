@@ -10,6 +10,8 @@ import { eq, and, sql, asc } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
 import { invalidateOpinionCache, invalidateTopicCache, invalidateCumulativeOpinionCache } from './cacheInvalidation.js';
+import { logSecurityEvent } from '../utils/securityLogger.js';
+import type { Request } from 'express';
 
 export class OpinionService {
   private repository: OpinionRepository;
@@ -25,138 +27,396 @@ export class OpinionService {
     this.cumulativeOpinionService = new CumulativeOpinionService();
   }
 
-  async getOpinionsByTopic(topicId: string, options?: {
-    userRole?: string;
-    currentUserId?: string;
-  }): Promise<Opinion[]> {
-    const key = cacheKey('topic', topicId, 'opinions', options?.userRole, options?.currentUserId);
+  async getOpinionsByTopic(
+    topicId: string, 
+    options?: {
+      userRole?: string;
+      currentUserId?: string;
+    },
+    requestingUserId?: string,
+    requestingUserRole?: string,
+    req?: Request
+  ): Promise<Opinion[]> {
+    const startTime = Date.now();
     
-    // Try cache first
-    const cached = await getCache<Opinion[]>(key);
-    if (cached) {
-      return cached;
-    }
-
-    // Fetch from repository
-    const opinions = await this.repository.findByTopicId(topicId, options);
-    
-    // Cache for 2 minutes
-    await setCache(key, opinions, CACHE_TTL.MEDIUM);
-    
-    return opinions;
-  }
-
-  async getOpinion(id: string): Promise<Opinion | null> {
-    const key = cacheKey('opinion', id);
-    
-    // Try cache first
-    const cached = await getCache<Opinion>(key);
-    if (cached) {
-      return cached;
-    }
-
-    // Fetch from repository
-    const opinion = await this.repository.findById(id);
-    
-    if (!opinion) {
-      return null;
-    }
-
-    // Cache for 3 minutes
-    await setCache(key, opinion, CACHE_TTL.TOPIC_FULL);
-    
-    return opinion;
-  }
-
-  async createOpinion(data: InsertOpinion): Promise<Opinion> {
-    // 1. Analyze taste/passion immediately (lexicon-based)
-    const localAnalysis = lexiconAnalysisService.analyzeOpinionLocally(data.content);
-    
-    // 2. Create opinion with taste/passion scores
-    // Filter out any Date objects to prevent postgres library errors
-    const cleanData: any = {};
-    for (const [key, value] of Object.entries(data)) {
-      // Skip Date objects and timestamp fields
-      if (value instanceof Date) {
-        continue;
-      }
-      if (key === 'analyzedAt' || key === 'createdAt' || key === 'updatedAt') {
-        continue;
-      }
-      cleanData[key] = value;
-    }
-    
-    const opinionData = {
-      ...cleanData,
-      tasteScore: localAnalysis.taste.score,
-      passionScore: localAnalysis.passion.score,
-      analysisConfidence: localAnalysis.confidence,
-    };
-    const opinion = await this.repository.create(opinionData);
-    
-    // 3. Mark that user has an opinion on this topic
-    await this.interactionRepository.markHasOpinion(data.userId, data.topicId);
-    
-    // 4. Update topic distribution (debounced, handles partial distributions)
-    await this.updateTopicDistribution(data.topicId);
-    
-    // 5. Check if summary regeneration needed (tiered, uses actual counts)
-    await this.checkAndTriggerSummaryUpdate(data.topicId);
-    
-    // 6. Trigger AI political compass analysis every 5 opinions (existing logic)
-    const profile = await this.userRepository.getProfile(data.userId);
-    if (profile && profile.opinionCount && profile.opinionCount % 5 === 0) {
-      console.log(`[Trigger AI Analysis] User ${data.userId} reached ${profile.opinionCount} opinions`);
-
-      // Run analysis asynchronously
-      this.analyzeUserPoliticalCompass(data.userId).catch(error => {
-        console.error(`[AI Analysis ERROR] Failed to analyze political compass for user ${data.userId}:`, error);
+    // Log service entry for security-critical operations
+    if (requestingUserId) {
+      logSecurityEvent('info', 'data_access', {
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'get_opinions_by_topic',
+        resourceType: 'opinion',
+        resourceId: topicId,
+        ipAddress: req?.ip || req?.connection?.remoteAddress,
+        userAgent: req?.headers['user-agent'],
+        requestId: req?.id,
+        metadata: { service: 'OpinionService', method: 'getOpinionsByTopic' }
       });
     }
     
-    return opinion;
+    try {
+      const key = cacheKey('topic', topicId, 'opinions', options?.userRole, options?.currentUserId);
+      
+      // Try cache first
+      const cached = await getCache<Opinion[]>(key);
+      if (cached) {
+        return cached;
+      }
+
+      // Fetch from repository - pass through security context
+      const opinions = await this.repository.findByTopicId(topicId, options);
+      
+      // Cache for 2 minutes
+      await setCache(key, opinions, CACHE_TTL.MEDIUM);
+      
+      // Log slow operations
+      const duration = Date.now() - startTime;
+      if (duration > 1000) {
+        logSecurityEvent('warn', 'database_operation', {
+          userId: requestingUserId,
+          action: 'get_opinions_by_topic',
+          metadata: { duration, service: 'OpinionService' }
+        });
+      }
+      
+      return opinions;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'get_opinions_by_topic',
+        error: error instanceof Error ? error.message : String(error),
+        metadata: { service: 'OpinionService' }
+      });
+      throw error;
+    }
   }
 
-  async updateOpinion(id: string, data: Partial<InsertOpinion>): Promise<Opinion> {
-    const opinion = await this.repository.update(id, data);
+  async getOpinion(
+    id: string,
+    requestingUserId?: string,
+    requestingUserRole?: string,
+    req?: Request
+  ): Promise<Opinion | null> {
+    const startTime = Date.now();
     
-    // Invalidate caches after updating opinion
-    await invalidateOpinionCache(id, opinion.topicId);
+    // Log service entry for security-critical operations
+    if (requestingUserId) {
+      logSecurityEvent('info', 'data_access', {
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'get_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        ipAddress: req?.ip || req?.connection?.remoteAddress,
+        userAgent: req?.headers['user-agent'],
+        requestId: req?.id,
+        metadata: { service: 'OpinionService', method: 'getOpinion' }
+      });
+    }
     
-    return opinion;
+    try {
+      const key = cacheKey('opinion', id);
+      
+      // Try cache first
+      const cached = await getCache<Opinion>(key);
+      if (cached) {
+        return cached;
+      }
+
+      // Fetch from repository - pass through security context
+      const opinion = await this.repository.findById(id, requestingUserId, requestingUserRole, req);
+      
+      if (!opinion) {
+        return null;
+      }
+
+      // Cache for 3 minutes
+      await setCache(key, opinion, CACHE_TTL.TOPIC_FULL);
+      
+      // Log slow operations
+      const duration = Date.now() - startTime;
+      if (duration > 1000) {
+        logSecurityEvent('warn', 'database_operation', {
+          userId: requestingUserId,
+          action: 'get_opinion',
+          metadata: { duration, service: 'OpinionService' }
+        });
+      }
+      
+      return opinion;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'get_opinion',
+        error: error instanceof Error ? error.message : String(error),
+        metadata: { service: 'OpinionService' }
+      });
+      throw error;
+    }
+  }
+
+  async createOpinion(
+    data: InsertOpinion,
+    requestingUserId?: string,
+    requestingUserRole?: string,
+    req?: Request
+  ): Promise<Opinion> {
+    const startTime = Date.now();
+    
+    // Log service entry for security-critical operations
+    if (requestingUserId) {
+      logSecurityEvent('info', 'data_access', {
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'create_opinion',
+        resourceType: 'opinion',
+        ipAddress: req?.ip || req?.connection?.remoteAddress,
+        userAgent: req?.headers['user-agent'],
+        requestId: req?.id,
+        metadata: { service: 'OpinionService', method: 'createOpinion' }
+      });
+    }
+    
+    try {
+      // 1. Analyze taste/passion immediately (lexicon-based)
+      const localAnalysis = lexiconAnalysisService.analyzeOpinionLocally(data.content);
+      
+      // 2. Create opinion with taste/passion scores
+      // Filter out any Date objects to prevent postgres library errors
+      const cleanData: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        // Skip Date objects and timestamp fields
+        if (value instanceof Date) {
+          continue;
+        }
+        if (key === 'analyzedAt' || key === 'createdAt' || key === 'updatedAt') {
+          continue;
+        }
+        cleanData[key] = value;
+      }
+      
+      const opinionData = {
+        ...cleanData,
+        tasteScore: localAnalysis.taste.score,
+        passionScore: localAnalysis.passion.score,
+        analysisConfidence: localAnalysis.confidence,
+      };
+      
+      // Pass through security context to repository
+      const opinion = await this.repository.create(opinionData, requestingUserId, req);
+      
+      // 3. Mark that user has an opinion on this topic
+      await this.interactionRepository.markHasOpinion(data.userId, data.topicId);
+      
+      // 4. Update topic distribution (debounced, handles partial distributions)
+      await this.updateTopicDistribution(data.topicId);
+      
+      // 5. Check if summary regeneration needed (tiered, uses actual counts)
+      await this.checkAndTriggerSummaryUpdate(data.topicId);
+      
+      // 6. Trigger AI political compass analysis every 5 opinions (existing logic)
+      const profile = await this.userRepository.getProfile(data.userId, requestingUserId, requestingUserRole, req);
+      if (profile && profile.opinionCount && profile.opinionCount % 5 === 0) {
+        console.log(`[Trigger AI Analysis] User ${data.userId} reached ${profile.opinionCount} opinions`);
+
+        // Run analysis asynchronously
+        this.analyzeUserPoliticalCompass(data.userId).catch(error => {
+          console.error(`[AI Analysis ERROR] Failed to analyze political compass for user ${data.userId}:`, error);
+        });
+      }
+      
+      // Log slow operations
+      const duration = Date.now() - startTime;
+      if (duration > 1000) {
+        logSecurityEvent('warn', 'database_operation', {
+          userId: requestingUserId,
+          action: 'create_opinion',
+          metadata: { duration, service: 'OpinionService' }
+        });
+      }
+      
+      return opinion;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'create_opinion',
+        error: error instanceof Error ? error.message : String(error),
+        metadata: { service: 'OpinionService' }
+      });
+      throw error;
+    }
+  }
+
+  async updateOpinion(
+    id: string,
+    data: Partial<InsertOpinion>,
+    requestingUserId?: string,
+    requestingUserRole?: string,
+    req?: Request
+  ): Promise<Opinion> {
+    const startTime = Date.now();
+    
+    // Log service entry for security-critical operations
+    if (requestingUserId) {
+      logSecurityEvent('info', 'data_access', {
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'update_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        ipAddress: req?.ip || req?.connection?.remoteAddress,
+        userAgent: req?.headers['user-agent'],
+        requestId: req?.id,
+        metadata: { service: 'OpinionService', method: 'updateOpinion' }
+      });
+    }
+    
+    try {
+      // Pass through security context to repository
+      const opinion = await this.repository.update(id, data, requestingUserId, requestingUserRole, req);
+      
+      // Invalidate caches after updating opinion
+      await invalidateOpinionCache(id, opinion.topicId);
+      
+      // Log slow operations
+      const duration = Date.now() - startTime;
+      if (duration > 1000) {
+        logSecurityEvent('warn', 'database_operation', {
+          userId: requestingUserId,
+          action: 'update_opinion',
+          metadata: { duration, service: 'OpinionService' }
+        });
+      }
+      
+      return opinion;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'update_opinion',
+        error: error instanceof Error ? error.message : String(error),
+        metadata: { service: 'OpinionService' }
+      });
+      throw error;
+    }
   }
 
   async updateOpinionCounts(id: string, likesCount: number, dislikesCount: number): Promise<void> {
     await this.repository.updateCounts(id, likesCount, dislikesCount);
   }
 
-  async deleteOpinion(id: string): Promise<void> {
-    // Get topicId before deleting for cache invalidation
-    const opinion = await this.repository.findById(id);
-    const topicId = opinion?.topicId;
+  async deleteOpinion(
+    id: string,
+    requestingUserId?: string,
+    requestingUserRole?: string,
+    req?: Request
+  ): Promise<void> {
+    const startTime = Date.now();
     
-    await this.repository.delete(id);
+    // Log service entry for security-critical operations
+    if (requestingUserId) {
+      logSecurityEvent('info', 'data_access', {
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'delete_opinion',
+        resourceType: 'opinion',
+        resourceId: id,
+        ipAddress: req?.ip || req?.connection?.remoteAddress,
+        userAgent: req?.headers['user-agent'],
+        requestId: req?.id,
+        metadata: { service: 'OpinionService', method: 'deleteOpinion' }
+      });
+    }
     
-    // Invalidate caches after deleting opinion
-    await invalidateOpinionCache(id, topicId);
+    try {
+      // Get topicId before deleting for cache invalidation
+      const opinion = await this.repository.findById(id, requestingUserId, requestingUserRole, req);
+      const topicId = opinion?.topicId;
+      
+      // Pass through security context to repository
+      await this.repository.delete(id, requestingUserId, requestingUserRole, req);
+      
+      // Invalidate caches after deleting opinion
+      await invalidateOpinionCache(id, topicId);
+      
+      // Log slow operations
+      const duration = Date.now() - startTime;
+      if (duration > 1000) {
+        logSecurityEvent('warn', 'database_operation', {
+          userId: requestingUserId,
+          action: 'delete_opinion',
+          metadata: { duration, service: 'OpinionService' }
+        });
+      }
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'delete_opinion',
+        error: error instanceof Error ? error.message : String(error),
+        metadata: { service: 'OpinionService' }
+      });
+      throw error;
+    }
   }
 
-  async getRecentOpinions(limit = 50, userRole?: string, currentUserId?: string): Promise<Opinion[]> {
-    const key = cacheKey('opinions', 'recent', limit, userRole, currentUserId);
+  async getRecentOpinions(
+    limit = 50,
+    userRole?: string,
+    currentUserId?: string,
+    requestingUserId?: string,
+    requestingUserRole?: string,
+    req?: Request
+  ): Promise<Opinion[]> {
+    const startTime = Date.now();
     
-    // Try cache first
-    const cached = await getCache<Opinion[]>(key);
-    if (cached) {
-      return cached;
+    // Log service entry for security-critical operations
+    if (requestingUserId) {
+      logSecurityEvent('info', 'data_access', {
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'get_recent_opinions',
+        resourceType: 'opinion',
+        ipAddress: req?.ip || req?.connection?.remoteAddress,
+        userAgent: req?.headers['user-agent'],
+        requestId: req?.id,
+        metadata: { service: 'OpinionService', method: 'getRecentOpinions' }
+      });
     }
+    
+    try {
+      const key = cacheKey('opinions', 'recent', limit, userRole, currentUserId);
+      
+      // Try cache first
+      const cached = await getCache<Opinion[]>(key);
+      if (cached) {
+        return cached;
+      }
 
-    // Fetch from repository
-    const opinions = await this.repository.getRecentOpinions(limit, userRole, currentUserId);
-    
-    // Cache for 1 minute (short TTL for recent data)
-    await setCache(key, opinions, CACHE_TTL.SHORT);
-    
-    return opinions;
+      // Fetch from repository
+      const opinions = await this.repository.getRecentOpinions(limit, userRole, currentUserId);
+      
+      // Cache for 1 minute (short TTL for recent data)
+      await setCache(key, opinions, CACHE_TTL.SHORT);
+      
+      // Log slow operations
+      const duration = Date.now() - startTime;
+      if (duration > 1000) {
+        logSecurityEvent('warn', 'database_operation', {
+          userId: requestingUserId,
+          action: 'get_recent_opinions',
+          metadata: { duration, service: 'OpinionService' }
+        });
+      }
+      
+      return opinions;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'get_recent_opinions',
+        error: error instanceof Error ? error.message : String(error),
+        metadata: { service: 'OpinionService' }
+      });
+      throw error;
+    }
   }
 
   async updateTopicDistribution(topicId: string): Promise<void> {

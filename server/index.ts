@@ -14,6 +14,7 @@ import { startScheduledJobs } from "./scheduled-jobs.js";
 import { BadgeRepository } from "./repositories/badgeRepository.js";
 import { setupAuth } from "./auth.js";
 import { attachUserRole } from "./middleware/permissions.js";
+import { attachRequestId } from "./middleware/auth.js";
 import { getCacheStats } from "./services/cacheService.js";
 import { setupWebSocketServer } from "./websocket.js";
 
@@ -37,6 +38,9 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Attach request ID for tracing (should be early in the middleware chain)
+app.use(attachRequestId);
 
 // Serve static files from public folder (for PWA files: service-worker.js, manifest.json, icons)
 const publicPath = path.resolve(import.meta.dirname, "..", "public");

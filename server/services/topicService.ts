@@ -4,6 +4,8 @@ import { AIService } from '../aiService.js';
 import type { InsertTopic, TopicWithCounts, InsertOpinion, TopicInsert } from '../../shared/schema.js';
 import { withCache, getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
 import { invalidateTopicCache, invalidateTopicsListCache } from './cacheInvalidation.js';
+import { logSecurityEvent } from '../utils/securityLogger.js';
+import type { Request } from 'express';
 
 export class TopicService {
   private repository: TopicRepository;
@@ -37,26 +39,68 @@ export class TopicService {
     return topics;
   }
 
-  async getTopic(id: string): Promise<TopicWithCounts | null> {
-    const key = cacheKey('topic', id, 'full');
+  async getTopic(
+    id: string,
+    requestingUserId?: string,
+    requestingUserRole?: string,
+    req?: Request
+  ): Promise<TopicWithCounts | null> {
+    const startTime = Date.now();
     
-    // Try cache first
-    const cached = await getCache<TopicWithCounts>(key);
-    if (cached) {
-      return cached;
+    // Log service entry for security-critical operations
+    if (requestingUserId) {
+      logSecurityEvent('info', 'data_access', {
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'get_topic',
+        resourceType: 'topic',
+        resourceId: id,
+        ipAddress: req?.ip || req?.connection?.remoteAddress,
+        userAgent: req?.headers['user-agent'],
+        requestId: req?.id,
+        metadata: { service: 'TopicService', method: 'getTopic' }
+      });
     }
-
-    // Fetch from repository
-    const topic = await this.repository.findByIdWithCounts(id);
     
-    if (!topic) {
-      return null;
+    try {
+      const key = cacheKey('topic', id, 'full');
+      
+      // Try cache first
+      const cached = await getCache<TopicWithCounts>(key);
+      if (cached) {
+        return cached;
+      }
+
+      // Fetch from repository
+      const topic = await this.repository.findByIdWithCounts(id);
+      
+      if (!topic) {
+        return null;
+      }
+
+      // Cache for 3 minutes
+      await setCache(key, topic, CACHE_TTL.TOPIC_FULL);
+      
+      // Log slow operations
+      const duration = Date.now() - startTime;
+      if (duration > 1000) {
+        logSecurityEvent('warn', 'database_operation', {
+          userId: requestingUserId,
+          action: 'get_topic',
+          metadata: { duration, service: 'TopicService' }
+        });
+      }
+      
+      return topic;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'get_topic',
+        error: error instanceof Error ? error.message : String(error),
+        metadata: { service: 'TopicService' }
+      });
+      throw error;
     }
-
-    // Cache for 3 minutes
-    await setCache(key, topic, CACHE_TTL.TOPIC_FULL);
-    
-    return topic;
   }
 
   async createTopic(
@@ -72,112 +116,155 @@ export class TopicService {
       references?: string[];
       stance?: string; // Accept but ignore
     },
-    userId: string
+    userId: string,
+    requestingUserId?: string,
+    requestingUserRole?: string,
+    req?: Request
   ): Promise<TopicWithCounts> {
-    // Extract opinion-related fields that shouldn't be in topic data
-    const { initialOpinion, references, stance, categories: userCategories, ...topicData } = data;
+    const startTime = Date.now();
+    
+    // Log service entry for security-critical operations
+    if (requestingUserId) {
+      logSecurityEvent('info', 'data_access', {
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'create_topic',
+        resourceType: 'topic',
+        ipAddress: req?.ip || req?.connection?.remoteAddress,
+        userAgent: req?.headers['user-agent'],
+        requestId: req?.id,
+        metadata: { service: 'TopicService', method: 'createTopic' }
+      });
+    }
+    
+    try {
+      // Extract opinion-related fields that shouldn't be in topic data
+      const { initialOpinion, references, stance, categories: userCategories, ...topicData } = data;
 
-    // Use initialOpinion as description if provided, otherwise use title as fallback
-    // Description is required by schema, so we always provide one
-    const description = initialOpinion?.trim() || data.title || 'No description provided';
+      // Use initialOpinion as description if provided, otherwise use title as fallback
+      // Description is required by schema, so we always provide one
+      const description = initialOpinion?.trim() || data.title || 'No description provided';
 
-    // Handle categories: use provided categories if available, otherwise generate AI categories
-    let categories: string[] = [];
-    if (userCategories && Array.isArray(userCategories) && userCategories.length > 0) {
-      categories = userCategories.slice(0, 5); // Limit to 5 categories
-      // If less than 3 categories, supplement with AI-generated ones
-      if (categories.length < 3) {
+      // Handle categories: use provided categories if available, otherwise generate AI categories
+      let categories: string[] = [];
+      if (userCategories && Array.isArray(userCategories) && userCategories.length > 0) {
+        categories = userCategories.slice(0, 5); // Limit to 5 categories
+        // If less than 3 categories, supplement with AI-generated ones
+        if (categories.length < 3) {
+          try {
+            const aiCategories = await AIService.generateCategories(data.title);
+            // Merge unique categories, prioritizing user-provided ones
+            const allCategories = [...categories];
+            for (const aiCat of aiCategories) {
+              if (!allCategories.includes(aiCat) && allCategories.length < 5) {
+                allCategories.push(aiCat);
+              }
+            }
+            categories = allCategories.slice(0, 5);
+          } catch (error) {
+            console.error('Error generating AI categories, using user categories only:', error);
+          }
+        }
+      } else {
+        // No user categories provided, generate AI categories
         try {
-          const aiCategories = await AIService.generateCategories(data.title);
-          // Merge unique categories, prioritizing user-provided ones
-          const allCategories = [...categories];
-          for (const aiCat of aiCategories) {
-            if (!allCategories.includes(aiCat) && allCategories.length < 5) {
-              allCategories.push(aiCat);
+          categories = await AIService.generateCategories(data.title);
+        } catch (error) {
+          console.error('Error generating AI categories, using defaults:', error);
+          // Fallback to default categories if AI generation fails
+          categories = ['General', 'Politics', 'Society'];
+        }
+      }
+
+      // Build topic data with only valid database fields (excluding extended schema fields)
+      const finalTopicData: TopicInsert = {
+        title: data.title,
+        description,
+        categories,
+        createdById: userId,
+        ...(data.imageUrl !== undefined && { imageUrl: data.imageUrl }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+        ...(data.status !== undefined && { status: data.status }),
+        ...(data.embedding !== undefined && { embedding: data.embedding }),
+      };
+
+      const topic = await this.repository.create(finalTopicData);
+
+      // Generate embedding for semantic search (async, don't block topic creation)
+      this.generateAndStoreEmbedding(topic.id, `${data.title} ${description}`).catch(error => {
+        console.error(`[TopicService] Error generating embedding for topic ${topic.id}:`, error);
+      });
+
+      // Invalidate caches after creating topic
+      await invalidateTopicsListCache();
+
+      // Create initial opinion if provided
+      // Note: Do NOT pass security context to opinionService (per user preference)
+      if (initialOpinion && initialOpinion.trim()) {
+        try {
+          // Filter and validate references
+          let validReferences: string[] | undefined;
+          if (references && references.length > 0) {
+            validReferences = references
+              .filter(ref => ref.trim() !== '')
+              .filter(ref => {
+                try {
+                  new URL(ref);
+                  return true;
+                } catch {
+                  console.warn(`Invalid reference URL: ${ref}`);
+                  return false;
+                }
+              });
+            if (validReferences.length === 0) {
+              validReferences = undefined;
             }
           }
-          categories = allCategories.slice(0, 5);
+
+          const opinionData: InsertOpinion = {
+            topicId: topic.id,
+            userId,
+            content: initialOpinion.trim(),
+            references: validReferences,
+            status: 'approved',
+            debateStatus: 'open', // Set explicitly to ensure it's included
+          };
+          // Do NOT pass security context to opinionService (per user preference)
+          const createdOpinion = await this.opinionService.createOpinion(opinionData);
+          console.log(`[TopicService] Successfully created initial opinion ${createdOpinion.id} for topic ${topic.id}`);
         } catch (error) {
-          console.error('Error generating AI categories, using user categories only:', error);
-        }
-      }
-    } else {
-      // No user categories provided, generate AI categories
-      try {
-        categories = await AIService.generateCategories(data.title);
-      } catch (error) {
-        console.error('Error generating AI categories, using defaults:', error);
-        // Fallback to default categories if AI generation fails
-        categories = ['General', 'Politics', 'Society'];
-      }
-    }
-
-    // Build topic data with only valid database fields (excluding extended schema fields)
-    const finalTopicData: TopicInsert = {
-      title: data.title,
-      description,
-      categories,
-      createdById: userId,
-      ...(data.imageUrl !== undefined && { imageUrl: data.imageUrl }),
-      ...(data.isActive !== undefined && { isActive: data.isActive }),
-      ...(data.status !== undefined && { status: data.status }),
-      ...(data.embedding !== undefined && { embedding: data.embedding }),
-    };
-
-    const topic = await this.repository.create(finalTopicData);
-
-    // Generate embedding for semantic search (async, don't block topic creation)
-    this.generateAndStoreEmbedding(topic.id, `${data.title} ${description}`).catch(error => {
-      console.error(`[TopicService] Error generating embedding for topic ${topic.id}:`, error);
-    });
-
-    // Invalidate caches after creating topic
-    await invalidateTopicsListCache();
-
-    // Create initial opinion if provided
-    if (initialOpinion && initialOpinion.trim()) {
-      try {
-        // Filter and validate references
-        let validReferences: string[] | undefined;
-        if (references && references.length > 0) {
-          validReferences = references
-            .filter(ref => ref.trim() !== '')
-            .filter(ref => {
-              try {
-                new URL(ref);
-                return true;
-              } catch {
-                console.warn(`Invalid reference URL: ${ref}`);
-                return false;
-              }
-            });
-          if (validReferences.length === 0) {
-            validReferences = undefined;
+          console.error('[TopicService] Error creating initial opinion:', error);
+          if (error instanceof Error) {
+            console.error('[TopicService] Error message:', error.message);
+            console.error('[TopicService] Error stack:', error.stack);
           }
+          // Don't fail topic creation if opinion creation fails
         }
-
-        const opinionData: InsertOpinion = {
-          topicId: topic.id,
-          userId,
-          content: initialOpinion.trim(),
-          references: validReferences,
-          status: 'approved',
-          debateStatus: 'open', // Set explicitly to ensure it's included
-        };
-        const createdOpinion = await this.opinionService.createOpinion(opinionData);
-        console.log(`[TopicService] Successfully created initial opinion ${createdOpinion.id} for topic ${topic.id}`);
-      } catch (error) {
-        console.error('[TopicService] Error creating initial opinion:', error);
-        if (error instanceof Error) {
-          console.error('[TopicService] Error message:', error.message);
-          console.error('[TopicService] Error stack:', error.stack);
-        }
-        // Don't fail topic creation if opinion creation fails
       }
-    }
 
-    // Return enriched topic
-    return await this.getTopic(topic.id) as TopicWithCounts;
+      // Return enriched topic - pass through security context
+      const enrichedTopic = await this.getTopic(topic.id, requestingUserId, requestingUserRole, req) as TopicWithCounts;
+      
+      // Log slow operations
+      const duration = Date.now() - startTime;
+      if (duration > 1000) {
+        logSecurityEvent('warn', 'database_operation', {
+          userId: requestingUserId,
+          action: 'create_topic',
+          metadata: { duration, service: 'TopicService' }
+        });
+      }
+      
+      return enrichedTopic;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'create_topic',
+        error: error instanceof Error ? error.message : String(error),
+        metadata: { service: 'TopicService' }
+      });
+      throw error;
+    }
   }
 
   async updateEmbedding(topicId: string, embedding: number[]): Promise<void> {

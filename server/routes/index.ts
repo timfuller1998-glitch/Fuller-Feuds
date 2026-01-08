@@ -9,6 +9,8 @@ import moderationRoutes from './moderation.js';
 import statsRoutes from './stats.js';
 import objectRoutes from './objects.js';
 import seedingRoutes from './seeding.js';
+import healthRoutes from './health.js';
+import auditRoutes from './admin/audit.js';
 
 const router = express.Router();
 
@@ -20,8 +22,10 @@ router.use('/opinions', opinionRoutes);
 router.use('/debates', debateRoutes);
 router.use('/debate-rooms', debateRoomRoutes);
 router.use('/admin', moderationRoutes);
+router.use('/admin/audit', auditRoutes);
 router.use('/stats', statsRoutes);
 router.use('/objects', objectRoutes);
 router.use('/admin/seeding', seedingRoutes);
+router.use('/health', healthRoutes);
 
 export default router;

@@ -2,6 +2,8 @@ import { config } from "dotenv";
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from "../shared/schema.js";
+import { validateConnectionString, logConnectionStringAccess, getConnectionStringInfo } from './utils/connectionRotation.js';
+import { log } from './utils/logger.js';
 
 // Load environment variables from .env file ONLY in local development
 // In production, environment variables come from the hosting platform (Render, etc.)
@@ -32,6 +34,23 @@ fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{metho
 
 if (!connectionString) {
   throw new Error('DATABASE_URL environment variable is required. Please set your Supabase connection string in your .env file (local) or environment variables (production).');
+}
+
+// Validate connection string format
+if (!validateConnectionString(connectionString)) {
+  throw new Error('Invalid DATABASE_URL format. Connection string must be a valid PostgreSQL URL.');
+}
+
+// Log connection string access (masked)
+logConnectionStringAccess('initialization');
+const connectionInfo = getConnectionStringInfo();
+if (connectionInfo) {
+  log('Database connection initialized', 'db', 'info', {
+    hostname: connectionInfo.hostname,
+    port: connectionInfo.port,
+    database: connectionInfo.database,
+    isPooler: connectionInfo.isPooler,
+  });
 }
 
 // Fix: Remove duplicate "DATABASE_URL=" prefix if it exists (copy-paste error)

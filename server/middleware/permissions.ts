@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from '../db.js';
 import { users } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
+import { logSecurityEvent, extractRequestContext } from '../utils/securityLogger.js';
 
 // Extend Express Request to include user role
 declare global {
@@ -9,6 +10,7 @@ declare global {
     interface Request {
       userRole?: string;
       userStatus?: string;
+      id?: string; // Request ID for tracing
     }
   }
 }
@@ -16,6 +18,21 @@ declare global {
 // Middleware to check if user is authenticated
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'auth_failure', {
+      action: 'require_auth',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Authentication required',
+      errorCode: 'UNAUTHORIZED',
+      metadata: {
+        path: req.path,
+        method: req.method,
+      },
+    });
+
     return res.status(401).json({ error: 'Authentication required' });
   }
   next();
@@ -44,10 +61,43 @@ export async function attachUserRole(req: Request, res: Response, next: NextFunc
 // Middleware to check if user is admin or moderator
 export function requireModerator(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'auth_failure', {
+      action: 'require_moderator',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Authentication required',
+      errorCode: 'UNAUTHORIZED',
+      metadata: {
+        path: req.path,
+        method: req.method,
+      },
+    });
+
     return res.status(401).json({ error: 'Authentication required' });
   }
 
   if (req.userRole !== 'admin' && req.userRole !== 'moderator') {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'authorization_failure', {
+      userId: (req.user as any)?.id,
+      userRole: req.userRole,
+      action: 'moderate',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Insufficient permissions. Moderator or admin role required.',
+      errorCode: 'FORBIDDEN',
+      metadata: {
+        path: req.path,
+        method: req.method,
+        requiredPermission: 'moderator',
+      },
+    });
+
     return res.status(403).json({ error: 'Insufficient permissions. Moderator or admin role required.' });
   }
 
@@ -57,10 +107,43 @@ export function requireModerator(req: Request, res: Response, next: NextFunction
 // Middleware to check if user is admin only
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'auth_failure', {
+      action: 'require_admin',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Authentication required',
+      errorCode: 'UNAUTHORIZED',
+      metadata: {
+        path: req.path,
+        method: req.method,
+      },
+    });
+
     return res.status(401).json({ error: 'Authentication required' });
   }
 
   if (req.userRole !== 'admin') {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'authorization_failure', {
+      userId: (req.user as any)?.id,
+      userRole: req.userRole,
+      action: 'admin_access',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Insufficient permissions. Admin role required.',
+      errorCode: 'FORBIDDEN',
+      metadata: {
+        path: req.path,
+        method: req.method,
+        requiredPermission: 'admin',
+      },
+    });
+
     return res.status(403).json({ error: 'Insufficient permissions. Admin role required.' });
   }
 
@@ -70,14 +153,63 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 // Middleware to check if user account is active
 export function requireActiveAccount(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'auth_failure', {
+      action: 'require_active_account',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Authentication required',
+      errorCode: 'UNAUTHORIZED',
+      metadata: {
+        path: req.path,
+        method: req.method,
+      },
+    });
+
     return res.status(401).json({ error: 'Authentication required' });
   }
 
   if (req.userStatus === 'suspended') {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'authorization_failure', {
+      userId: (req.user as any)?.id,
+      userStatus: req.userStatus,
+      action: 'access_with_suspended_account',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Account suspended',
+      errorCode: 'ACCOUNT_SUSPENDED',
+      metadata: {
+        path: req.path,
+        method: req.method,
+      },
+    });
+
     return res.status(403).json({ error: 'Your account has been suspended' });
   }
 
   if (req.userStatus === 'banned') {
+    const requestContext = extractRequestContext(req);
+    
+    logSecurityEvent('warn', 'authorization_failure', {
+      userId: (req.user as any)?.id,
+      userStatus: req.userStatus,
+      action: 'access_with_banned_account',
+      ipAddress: requestContext.ipAddress,
+      userAgent: requestContext.userAgent,
+      requestId: requestContext.requestId || req.id,
+      error: 'Account banned',
+      errorCode: 'ACCOUNT_BANNED',
+      metadata: {
+        path: req.path,
+        method: req.method,
+      },
+    });
+
     return res.status(403).json({ error: 'Your account has been banned' });
   }
 

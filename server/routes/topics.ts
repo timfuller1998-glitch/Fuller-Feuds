@@ -6,6 +6,7 @@ import { CumulativeOpinionService } from '../services/cumulativeOpinionService.j
 import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertTopicSchema, insertOpinionSchema } from '../../shared/schema.js';
 import { z } from 'zod';
+import { UnauthorizedError, ForbiddenError, AuthorizationError, DataAccessError } from '../utils/securityErrors.js';
 
 const router = Router();
 const topicService = new TopicService();
@@ -16,7 +17,7 @@ const interactionRepository = new InteractionRepository();
 router.get('/', async (req, res) => {
   try {
     const { limit, category, search, createdBy } = req.query;
-
+    // Note: getTopics doesn't have security context parameters yet, but we still handle errors
     const topics = await topicService.getTopics({
       limit: limit ? parseInt(limit as string, 10) : undefined,
       category: category as string,
@@ -26,6 +27,9 @@ router.get('/', async (req, res) => {
 
     res.json(topics);
   } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error('Error fetching topics:', error);
     res.status(500).json({ error: 'Failed to fetch topics' });
   }
@@ -110,14 +114,24 @@ router.get('/:id/opinions', async (req, res) => {
   try {
     // Get current user ID - support both local auth (req.user.id) and Replit auth (req.user.claims.sub)
     const user = req.user as Express.User;
-    const currentUserId = user?.id || (req.user as any)?.claims?.sub;
-    const opinions = await opinionService.getOpinionsByTopic(req.params.id, {
-      userRole: req.userRole,
-      currentUserId,
-    });
+    const requestingUserId = user?.id || (req.user as any)?.claims?.sub;
+    const requestingUserRole = req.userRole;
+    const opinions = await opinionService.getOpinionsByTopic(
+      req.params.id,
+      {
+        userRole: requestingUserRole,
+        currentUserId: requestingUserId,
+      },
+      requestingUserId,
+      requestingUserRole,
+      req
+    );
 
     res.json(opinions);
   } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error('Error fetching opinions:', error);
     res.status(500).json({ error: 'Failed to fetch opinions' });
   }
@@ -133,19 +147,29 @@ router.post('/:id/opinions', isAuthenticated, async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
+    const requestingUserId = user.id;
+    const requestingUserRole = req.userRole;
+
     const validatedData = insertOpinionSchema.parse({
       ...req.body,
       topicId: req.params.id,
-      userId: user.id,
+      userId: requestingUserId,
     });
 
-    const opinion = await opinionService.createOpinion(validatedData);
+    const opinion = await opinionService.createOpinion(
+      validatedData,
+      requestingUserId,
+      requestingUserRole,
+      req
+    );
     res.status(201).json(opinion);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid data', details: error.errors });
     }
-
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error('Error creating opinion:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     res.status(500).json({ 
@@ -158,7 +182,14 @@ router.post('/:id/opinions', isAuthenticated, async (req, res) => {
 // GET /api/topics/:id - Get single topic
 router.get('/:id', async (req, res) => {
   try {
-    const topic = await topicService.getTopic(req.params.id);
+    const requestingUserId = (req.user as Express.User)?.id;
+    const requestingUserRole = req.userRole;
+    const topic = await topicService.getTopic(
+      req.params.id,
+      requestingUserId,
+      requestingUserRole,
+      req
+    );
 
     if (!topic) {
       return res.status(404).json({ error: 'Topic not found' });
@@ -166,6 +197,9 @@ router.get('/:id', async (req, res) => {
 
     res.json(topic);
   } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error('Error fetching topic:', error);
     res.status(500).json({ error: 'Failed to fetch topic' });
   }
@@ -237,6 +271,9 @@ router.post('/', isAuthenticated, async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
+    const requestingUserId = user.id;
+    const requestingUserRole = req.userRole;
+
     const validatedData = insertTopicSchema.parse(req.body);
     
     // Extract opinion-related fields before passing to service
@@ -255,7 +292,10 @@ router.post('/', isAuthenticated, async (req, res) => {
     
     const topic = await topicService.createTopic(
       topicDataForService,
-      user.id
+      requestingUserId,
+      requestingUserId,
+      requestingUserRole,
+      req
     );
 
     res.status(201).json(topic);
@@ -263,7 +303,9 @@ router.post('/', isAuthenticated, async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid data', details: error.errors });
     }
-
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error('Error creating topic:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;

@@ -20,6 +20,9 @@ import type {
   UserDebateStats,
   InsertUserDebateStats
 } from '../../shared/schema.js';
+import { checkDebateParticipation } from '../utils/authorization.js';
+import { logDataAccess, logDatabaseOperation, logSecurityEvent } from '../utils/securityLogger.js';
+import type { Request } from 'express';
 
 export class DebateRepository {
   async createDebateRoom(room: InsertDebateRoom): Promise<DebateRoom> {
@@ -109,20 +112,118 @@ export class DebateRepository {
     return created;
   }
 
-  async getDebateRoom(id: string): Promise<DebateRoom | undefined> {
-    const [room] = await db.select().from(debateRooms).where(eq(debateRooms.id, id)).limit(1);
-    return room;
+  async getDebateRoom(id: string, requestingUserId?: string, requestingUserRole?: string, req?: Request): Promise<DebateRoom | undefined> {
+    const startTime = Date.now();
+
+    try {
+      const [room] = await db.select().from(debateRooms).where(eq(debateRooms.id, id)).limit(1);
+
+      if (!room) {
+        return undefined;
+      }
+
+      // Authorization check - only participants can access debate rooms (unless moderator/admin)
+      if (requestingUserId && requestingUserRole !== 'admin' && requestingUserRole !== 'moderator') {
+        checkDebateParticipation(requestingUserId, room, req);
+      }
+
+      logDataAccess({
+        userId: requestingUserId,
+        userRole: requestingUserRole,
+        action: 'read_debate_room',
+        resourceType: 'debate_room',
+        resourceId: id,
+        accessLevel: 'read',
+        ipAddress: req ? (req.ip || req.connection?.remoteAddress) : undefined,
+        userAgent: req?.headers['user-agent'],
+      });
+
+      const queryTime = Date.now() - startTime;
+      logDatabaseOperation({
+        userId: requestingUserId,
+        action: 'read_debate_room',
+        resourceType: 'debate_room',
+        resourceId: id,
+        tableName: 'debate_rooms',
+        operation: 'select',
+        queryTimeMs: queryTime,
+        rowsAffected: room ? 1 : 0,
+      });
+
+      return room;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId,
+        action: 'read_debate_room',
+        resourceType: 'debate_room',
+        resourceId: id,
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'DATABASE_ERROR',
+      });
+      throw error;
+    }
   }
 
-  async getUserDebateRooms(userId: string): Promise<DebateRoom[]> {
-    return await db
-      .select()
-      .from(debateRooms)
-      .where(or(
-        eq(debateRooms.participant1Id, userId),
-        eq(debateRooms.participant2Id, userId)
-      ))
-      .orderBy(desc(debateRooms.startedAt));
+  async getUserDebateRooms(userId: string, requestingUserId?: string, requestingUserRole?: string, req?: Request): Promise<DebateRoom[]> {
+    // Authorization check - users can only see their own debate rooms
+    if (requestingUserId && userId !== requestingUserId && requestingUserRole !== 'admin' && requestingUserRole !== 'moderator') {
+      logSecurityEvent('warn', 'unauthorized_access', {
+        userId: requestingUserId,
+        action: 'read_user_debate_rooms',
+        resourceType: 'debate_room',
+        error: 'Attempted to access another user\'s debate rooms',
+        errorCode: 'UNAUTHORIZED_ACCESS',
+      });
+      throw new Error('Cannot access another user\'s debate rooms');
+    }
+
+    const startTime = Date.now();
+
+    try {
+      logDataAccess({
+        userId: requestingUserId || userId,
+        userRole: requestingUserRole,
+        action: 'read_user_debate_rooms',
+        resourceType: 'debate_room',
+        resourceId: userId,
+        accessLevel: 'read',
+        ipAddress: req ? (req.ip || req.connection?.remoteAddress) : undefined,
+        userAgent: req?.headers['user-agent'],
+      });
+
+      const rooms = await db
+        .select()
+        .from(debateRooms)
+        .where(or(
+          eq(debateRooms.participant1Id, userId),
+          eq(debateRooms.participant2Id, userId)
+        ))
+        .orderBy(desc(debateRooms.startedAt));
+
+      const queryTime = Date.now() - startTime;
+      logDatabaseOperation({
+        userId: requestingUserId || userId,
+        action: 'read_user_debate_rooms',
+        resourceType: 'debate_room',
+        resourceId: userId,
+        tableName: 'debate_rooms',
+        operation: 'select',
+        queryTimeMs: queryTime,
+        rowsAffected: rooms.length,
+      });
+
+      return rooms;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId || userId,
+        action: 'read_user_debate_rooms',
+        resourceType: 'debate_room',
+        resourceId: userId,
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'DATABASE_ERROR',
+      });
+      throw error;
+    }
   }
 
   async endDebateRoom(id: string): Promise<void> {
@@ -231,75 +332,176 @@ export class DebateRepository {
     return enrichedRooms;
   }
 
-  async addDebateMessage(roomId: string, userId: string, content: string, status: string = 'approved'): Promise<DebateMessage> {
-    // Verify user is participant
-    const [room] = await db.select().from(debateRooms).where(eq(debateRooms.id, roomId)).limit(1);
-    if (!room) {
-      throw new Error("Debate room not found");
+  async addDebateMessage(roomId: string, userId: string, content: string, status: string = 'approved', requestingUserId?: string, requestingUserRole?: string, req?: Request): Promise<DebateMessage> {
+    const startTime = Date.now();
+
+    // Ensure user is creating message for themselves
+    if (requestingUserId && userId !== requestingUserId) {
+      logSecurityEvent('warn', 'unauthorized_access', {
+        userId: requestingUserId,
+        action: 'create_debate_message',
+        resourceType: 'debate_message',
+        resourceId: roomId,
+        error: 'User attempted to create message for another user',
+        errorCode: 'UNAUTHORIZED_USER_ID',
+      });
+      throw new Error('Cannot create message for another user');
     }
 
-    if (room.participant1Id !== userId && room.participant2Id !== userId) {
-      throw new Error("User is not a participant in this debate");
+    try {
+      // Verify user is participant
+      const room = await this.getDebateRoom(roomId, requestingUserId || userId, requestingUserRole, req);
+      if (!room) {
+        throw new Error("Debate room not found");
+      }
+
+      // Authorization check - only participants can add messages
+      if (requestingUserId && requestingUserRole !== 'admin' && requestingUserRole !== 'moderator') {
+        checkDebateParticipation(requestingUserId || userId, room, req);
+      }
+
+      if (room.status !== 'active') {
+        throw new Error("Debate room is not active");
+      }
+
+      logDataAccess({
+        userId: requestingUserId || userId,
+        userRole: requestingUserRole,
+        action: 'create_debate_message',
+        resourceType: 'debate_message',
+        resourceId: roomId,
+        accessLevel: 'write',
+        ipAddress: req ? (req.ip || req.connection?.remoteAddress) : undefined,
+        userAgent: req?.headers['user-agent'],
+      });
+
+      const [message] = await db
+        .insert(debateMessages)
+        .values({
+          roomId,
+          userId,
+          content,
+          status,
+        })
+        .returning();
+
+      // Update room's last message timestamp
+      await db
+        .update(debateRooms)
+        .set({ lastMessageAt: sql`now()` })
+        .where(eq(debateRooms.id, roomId));
+
+      const queryTime = Date.now() - startTime;
+      logDatabaseOperation({
+        userId: requestingUserId || userId,
+        action: 'create_debate_message',
+        resourceType: 'debate_message',
+        resourceId: roomId,
+        tableName: 'debate_messages',
+        operation: 'insert',
+        queryTimeMs: queryTime,
+        rowsAffected: 1,
+      });
+
+      return message;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId || userId,
+        action: 'create_debate_message',
+        resourceType: 'debate_message',
+        resourceId: roomId,
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'DATABASE_ERROR',
+      });
+      throw error;
     }
-
-    if (room.status !== 'active') {
-      throw new Error("Debate room is not active");
-    }
-
-    const [message] = await db
-      .insert(debateMessages)
-      .values({
-        roomId,
-        userId,
-        content,
-        status,
-      })
-      .returning();
-
-    // Update room's last message timestamp
-    await db
-      .update(debateRooms)
-      .set({ lastMessageAt: sql`now()` })
-      .where(eq(debateRooms.id, roomId));
-
-    return message;
   }
 
-  async getDebateMessages(roomId: string, viewerId?: string): Promise<DebateMessage[]> {
-    const messages = await db
-      .select()
-      .from(debateMessages)
-      .where(eq(debateMessages.roomId, roomId))
-      .orderBy(debateMessages.createdAt);
+  async getDebateMessages(roomId: string, viewerId?: string, requestingUserId?: string, requestingUserRole?: string, req?: Request): Promise<DebateMessage[]> {
+    const startTime = Date.now();
 
-    // Aggregate fallacy counts for all messages
-    const messageIds = messages.map(m => m.id);
-    const fallacyCounts = messageIds.length > 0
-      ? await db
-          .select({
-            messageId: debateMessageFlags.messageId,
-            fallacyType: debateMessageFlags.fallacyType,
-            count: sql<number>`count(*)::int`,
-          })
-          .from(debateMessageFlags)
-          .where(inArray(debateMessageFlags.messageId, messageIds))
-          .groupBy(debateMessageFlags.messageId, debateMessageFlags.fallacyType)
-      : [];
-
-    // Build fallacy counts map
-    const fallacyMap: Record<string, Record<string, number>> = {};
-    for (const row of fallacyCounts) {
-      if (!fallacyMap[row.messageId]) {
-        fallacyMap[row.messageId] = {};
+    try {
+      // First check if user can access this debate room
+      const room = await this.getDebateRoom(roomId, requestingUserId || viewerId, requestingUserRole, req);
+      if (!room) {
+        throw new Error('Debate room not found');
       }
-      fallacyMap[row.messageId][row.fallacyType] = row.count;
-    }
 
-    // Add fallacy counts to messages
-    return messages.map(message => ({
-      ...message,
-      fallacyCounts: fallacyMap[message.id] || {},
-    }));
+      // Authorization check - only participants can see messages (unless moderator/admin)
+      if (requestingUserId && requestingUserRole !== 'admin' && requestingUserRole !== 'moderator') {
+        checkDebateParticipation(requestingUserId || viewerId || '', room, req);
+      }
+
+      logDataAccess({
+        userId: requestingUserId || viewerId,
+        userRole: requestingUserRole,
+        action: 'read_debate_messages',
+        resourceType: 'debate_message',
+        resourceId: roomId,
+        accessLevel: 'read',
+        ipAddress: req ? (req.ip || req.connection?.remoteAddress) : undefined,
+        userAgent: req?.headers['user-agent'],
+      });
+
+      const messages = await db
+        .select()
+        .from(debateMessages)
+        .where(eq(debateMessages.roomId, roomId))
+        .orderBy(debateMessages.createdAt);
+
+      // Aggregate fallacy counts for all messages
+      const messageIds = messages.map(m => m.id);
+      const fallacyCounts = messageIds.length > 0
+        ? await db
+            .select({
+              messageId: debateMessageFlags.messageId,
+              fallacyType: debateMessageFlags.fallacyType,
+              count: sql<number>`count(*)::int`,
+            })
+            .from(debateMessageFlags)
+            .where(inArray(debateMessageFlags.messageId, messageIds))
+            .groupBy(debateMessageFlags.messageId, debateMessageFlags.fallacyType)
+        : [];
+
+      // Build fallacy counts map
+      const fallacyMap: Record<string, Record<string, number>> = {};
+      for (const row of fallacyCounts) {
+        if (!fallacyMap[row.messageId]) {
+          fallacyMap[row.messageId] = {};
+        }
+        fallacyMap[row.messageId][row.fallacyType] = row.count;
+      }
+
+      // Add fallacy counts to messages
+      const enrichedMessages = messages.map(message => ({
+        ...message,
+        fallacyCounts: fallacyMap[message.id] || {},
+      }));
+
+      const queryTime = Date.now() - startTime;
+      logDatabaseOperation({
+        userId: requestingUserId || viewerId,
+        action: 'read_debate_messages',
+        resourceType: 'debate_message',
+        resourceId: roomId,
+        tableName: 'debate_messages',
+        operation: 'select',
+        queryTimeMs: queryTime,
+        rowsAffected: enrichedMessages.length,
+      });
+
+      return enrichedMessages;
+    } catch (error) {
+      logSecurityEvent('error', 'database_operation', {
+        userId: requestingUserId || viewerId,
+        action: 'read_debate_messages',
+        resourceType: 'debate_message',
+        resourceId: roomId,
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'DATABASE_ERROR',
+      });
+      throw error;
+    }
   }
 
   async updateDebateRoomTurn(roomId: string, userId: string): Promise<DebateRoom> {
