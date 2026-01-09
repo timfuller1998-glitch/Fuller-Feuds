@@ -560,7 +560,7 @@ export default function TopicCard({
           <div 
             className="absolute inset-0 p-3 sm:p-4 md:p-6 flex flex-col h-full"
             style={{
-              transform: "rotateY(180deg) scaleX(-1)",
+              transform: "rotateY(180deg)",
               transformStyle: "preserve-3d",
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
@@ -649,7 +649,7 @@ export default function TopicCard({
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : cumulativeData?.summary ? (
-                  <div className="flex flex-col h-full justify-center min-h-0 max-h-full">
+                  <div className="flex flex-col h-full justify-center min-h-0 max-h-full" style={{ transform: "scaleX(-1)" }}>
                     <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0 mt-8">
                       <Sparkles className="w-4 h-4 text-primary" />
                       <h3 className="font-semibold text-sm">AI Summary</h3>
@@ -661,7 +661,7 @@ export default function TopicCard({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col h-full justify-center min-h-0 max-h-full">
+                  <div className="flex flex-col h-full justify-center min-h-0 max-h-full" style={{ transform: "scaleX(-1)" }}>
                     <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0">
                       <Sparkles className="w-4 h-4 text-muted-foreground" />
                       <h3 className="font-semibold text-sm text-muted-foreground">Description</h3>
