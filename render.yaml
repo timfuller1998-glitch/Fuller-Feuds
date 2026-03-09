@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: fuller-feuds
+    env: node
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        sync: false  # Render sets this automatically
+    healthCheckPath: /health
+    # WebSocket support is enabled by default on Render web services
+

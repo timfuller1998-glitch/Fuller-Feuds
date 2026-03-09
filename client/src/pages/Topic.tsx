@@ -1,0 +1,1092 @@
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ThumbsUp, ThumbsDown, Brain, Flag } from "lucide-react";
+import { ArrowLeft, MessageCircle, Users, TrendingUp, RefreshCw, Video, Calendar, Clock, Eye, Link as LinkIcon, Plus, X } from "lucide-react";
+import { Link } from "wouter";
+import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import OpinionCard from "@/components/OpinionCard";
+import TopicCard from "@/components/TopicCard";
+import { CardContainer } from "@/components/CardContainer";
+import { AdoptOpinionDialog } from "@/components/AdoptOpinionDialog";
+import { DebateOnboardingModal } from "@/components/DebateOnboardingModal";
+import { LoginPromptDialog } from "@/components/LoginPromptDialog";
+import FallacyBadges from "@/components/FallacyBadges";
+import FallacyFlagDialog from "@/components/FallacyFlagDialog";
+import { formatDistanceToNow } from "date-fns";
+import type { FallacyType } from "@shared/fallacies";
+import { getOpinionGradientStyle } from "@/lib/politicalColors";
+import useEmblaCarousel from "embla-carousel-react";
+
+const opinionFormSchema = insertOpinionSchema.omit({
+  topicId: true,
+  userId: true,
+}).extend({
+  content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
+  debateStatus: z.enum(["open", "closed", "private"], { required_error: "Please select debate availability" }),
+  references: z.array(z.string().url("Must be a valid URL")).optional().default([]),
+});
+
+export default function Topic() {
+  const { id } = useParams();
+  const [, navigate] = useLocation();
+  const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [showOpinionForm, setShowOpinionForm] = useState(false);
+  const [showTopicFlagDialog, setShowTopicFlagDialog] = useState(false);
+  const [showAdoptDialog, setShowAdoptDialog] = useState(false);
+  const [opinionToAdopt, setOpinionToAdopt] = useState<any>(null);
+  const [showDebateOnboarding, setShowDebateOnboarding] = useState(false);
+  const [debateOpinionId, setDebateOpinionId] = useState<string | null>(null);
+  const [debateOpponentName, setDebateOpponentName] = useState<string>("");
+  const [isRandomMatch, setIsRandomMatch] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginAction, setLoginAction] = useState<"like" | "opinion" | "debate" | "interact">("interact");
+  
+  // Carousel state for opinion/summary swipe
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "start" });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Update carousel selected index
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setSelectedIndex(emblaApi.selectedScrollSnap());
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    onSelect();
+    emblaApi.on("select", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi, onSelect]);
+
+  // Fetch topic details
+  const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
+    queryKey: ["/api/topics", id],
+    queryFn: async () => {
+      const response = await fetch(`/api/topics/${id}`);
+      if (!response.ok) throw new Error("Failed to fetch topic");
+      return response.json();
+    },
+    enabled: !!id,
+  });
+
+  // Record topic view when user visits
+  useEffect(() => {
+    if (id && user?.id) {
+      apiRequest('POST', `/api/topics/${id}/view`).catch(err => {
+        console.error("Failed to record topic view:", err);
+      });
+    }
+  }, [id, user?.id]);
+
+  // Fetch opinions for the topic
+  const { data: opinions } = useQuery<Opinion[]>({
+    queryKey: ["/api/topics", id, "opinions"],
+    queryFn: async () => {
+      const response = await fetch(`/api/topics/${id}/opinions`);
+      if (!response.ok) throw new Error("Failed to fetch opinions");
+      return response.json();
+    },
+    enabled: !!id,
+  });
+
+  // Fetch cumulative opinion
+  const { data: cumulativeData } = useQuery<CumulativeOpinionType>({
+    queryKey: ["/api/topics", id, "cumulative"],
+    queryFn: async () => {
+      const response = await fetch(`/api/topics/${id}/cumulative`);
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error("Failed to fetch cumulative opinion");
+      }
+      return response.json();
+    },
+    enabled: !!id,
+  });
+
+  // Fetch user's profile for opinion sort preference
+  const { data: userProfile } = useQuery<{ opinionSortPreference?: string }>({
+    queryKey: ["/api/profile", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const response = await fetch(`/api/profile/${user.id}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.profile;
+    },
+    enabled: !!user?.id,
+  });
+
+
+  // Fetch similar topics
+  const { data: similarTopicsRaw } = useQuery<TopicType[]>({
+    queryKey: ["/api/topics/search-similar", topic?.title],
+    queryFn: async () => {
+      if (!topic?.title) return [];
+      const response = await fetch(`/api/topics/search-similar?query=${encodeURIComponent(topic.title)}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!topic?.title,
+  });
+
+  // Filter out the current topic from similar topics
+  const similarTopics = similarTopicsRaw?.filter(t => t.id !== id) || [];
+
+  // Get user's opinion on this topic to determine stance
+  const userOpinion = opinions?.find(o => o.userId === user?.id);
+  
+  // Add SEO metadata
+  useEffect(() => {
+    if (topic) {
+      // Set page title
+      document.title = `${topic.title} - Fuller Feuds`;
+      
+      // Create or update meta description
+      const description = `Join the debate on "${topic.title}". ${opinions?.length || 0} opinions shared. Explore different perspectives and share your thoughts on Fuller Feuds.`;
+      let metaDescription = document.querySelector('meta[name="description"]');
+      if (!metaDescription) {
+        metaDescription = document.createElement('meta');
+        metaDescription.setAttribute('name', 'description');
+        document.head.appendChild(metaDescription);
+      }
+      metaDescription.setAttribute('content', description);
+      
+      // Open Graph tags for social sharing
+      const ogTags = [
+        { property: 'og:title', content: topic.title },
+        { property: 'og:description', content: description },
+        { property: 'og:type', content: 'article' },
+        { property: 'og:url', content: window.location.href },
+      ];
+      
+      ogTags.forEach(({ property, content }) => {
+        let tag = document.querySelector(`meta[property="${property}"]`);
+        if (!tag) {
+          tag = document.createElement('meta');
+          tag.setAttribute('property', property);
+          document.head.appendChild(tag);
+        }
+        tag.setAttribute('content', content);
+      });
+      
+      // Twitter Card tags
+      const twitterTags = [
+        { name: 'twitter:card', content: 'summary' },
+        { name: 'twitter:title', content: topic.title },
+        { name: 'twitter:description', content: description },
+      ];
+      
+      twitterTags.forEach(({ name, content }) => {
+        let tag = document.querySelector(`meta[name="${name}"]`);
+        if (!tag) {
+          tag = document.createElement('meta');
+          tag.setAttribute('name', name);
+          document.head.appendChild(tag);
+        }
+        tag.setAttribute('content', content);
+      });
+    }
+    
+    // Cleanup function to reset to default title when component unmounts
+    return () => {
+      document.title = 'Fuller Feuds';
+    };
+  }, [topic, opinions?.length]);
+
+  // Sort opinions based on user preference
+  const sortOpinions = (opinionList: Opinion[]) => {
+    const sortPref = userProfile?.opinionSortPreference || 'newest';
+    const sorted = [...opinionList];
+    
+    switch (sortPref) {
+      case 'oldest':
+        return sorted.sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return aTime - bTime;
+        });
+      case 'most_liked':
+        return sorted.sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
+      case 'most_controversial':
+        return sorted.sort((a, b) => {
+          const aTotalVotes = (a.likesCount || 0) + (a.dislikesCount || 0);
+          const bTotalVotes = (b.likesCount || 0) + (b.dislikesCount || 0);
+          return bTotalVotes - aTotalVotes;
+        });
+      case 'newest':
+      default:
+        return sorted.sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+    }
+  };
+
+  // Calculate political distance between two opinions/users
+  const calculatePoliticalDistance = (opinion: any) => {
+    if (!userProfile?.economicScore || !userProfile?.authoritarianScore) return 0;
+    if (!opinion.author?.economicScore || !opinion.author?.authoritarianScore) return 0;
+    
+    const economicDiff = Math.abs((userProfile.economicScore || 0) - (opinion.author.economicScore || 0));
+    const authDiff = Math.abs((userProfile.authoritarianScore || 0) - (opinion.author.authoritarianScore || 0));
+    
+    // Calculate Euclidean distance
+    return Math.sqrt(economicDiff * economicDiff + authDiff * authDiff);
+  };
+  
+  // Threshold for opposing opinions (can be tuned between 15-30)
+  const OPPOSING_THRESHOLD = 25;
+  const SIMILAR_THRESHOLD = 15;
+  
+  // Filter opinions by political alignment
+  const otherOpinions = opinions?.filter(o => o.userId !== user?.id) || [];
+  
+  // Highest Rated - sorted by likes
+  const highestRatedOpinions = sortOpinions([...otherOpinions].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0)));
+  
+  // Opposing Opinions - politically different users
+  const opposingOpinions = sortOpinions(otherOpinions.filter(opinion => {
+    const distance = calculatePoliticalDistance(opinion);
+    return distance >= OPPOSING_THRESHOLD;
+  }));
+  
+  // Similar Opinions - politically similar users  
+  const similarOpinions = sortOpinions(otherOpinions.filter(opinion => {
+    const distance = calculatePoliticalDistance(opinion);
+    return distance > 0 && distance < SIMILAR_THRESHOLD;
+  }));
+
+  // Create opinion mutation
+  const createOpinionMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof opinionFormSchema>) => {
+      if (userOpinion) {
+        return apiRequest('PATCH', `/api/opinions/${userOpinion.id}`, data);
+      }
+      return apiRequest('POST', `/api/topics/${id}/opinions`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/topics"] }); // Invalidate topics list for updated counts
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/platform"] });
+      opinionForm.reset();
+      setShowOpinionForm(false);
+      
+      // Poll for summary updates after opinion creation
+      // Start polling after a short delay to give AI time to start processing
+      let pollAttempts = 0;
+      const maxAttempts = 15; // 15 attempts = 45 seconds max
+      const pollInterval = 3000; // 3 seconds
+      
+      const pollForSummary = setInterval(() => {
+        pollAttempts++;
+        queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
+        
+        if (pollAttempts >= maxAttempts) {
+          clearInterval(pollForSummary);
+        }
+      }, pollInterval);
+      
+      // Clear interval when component unmounts or after max time
+      setTimeout(() => clearInterval(pollForSummary), pollInterval * maxAttempts);
+    },
+    onError: (error: any) => {
+      console.error("Failed to save opinion:", error);
+    },
+  });
+
+  // Vote mutation
+  const voteMutation = useMutation({
+    mutationFn: async ({ opinionId, voteType, currentVote }: { opinionId: string; voteType: 'like' | 'dislike'; currentVote?: 'like' | 'dislike' | null }) => {
+      // If clicking the same vote type, remove it. Otherwise, set new vote type
+      const newVoteType = currentVote === voteType ? null : voteType;
+      return apiRequest('POST', `/api/opinions/${opinionId}/vote`, { voteType: newVoteType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
+    },
+    onError: (error: any) => {
+      console.error("Failed to vote:", error);
+    },
+  });
+
+  // Adopt opinion mutation
+  const adoptMutation = useMutation({
+    mutationFn: async ({ opinionId, content, stance }: { opinionId: string, content: string, stance: "for" | "against" | "neutral" }) => {
+      return apiRequest('POST', `/api/opinions/${opinionId}/adopt`, { content, stance });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
+      setShowAdoptDialog(false);
+      setOpinionToAdopt(null);
+      toast({
+        title: "Opinion adopted",
+        description: "Your opinion has been successfully updated.",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Failed to adopt opinion:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to adopt opinion",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Start debate with opinion author
+  const startDebateWithOpinionMutation = useMutation({
+    mutationFn: async ({ opinionId, openingMessage }: { opinionId: string; openingMessage: string }) => {
+      const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, { openingMessage });
+      return response.json();
+    },
+    onSuccess: (room) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
+      toast({
+        title: "Debate started!",
+        description: "Your new debate will appear in the footer. Click their avatar to start chatting!",
+      });
+      setShowDebateOnboarding(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Cannot start debate",
+        description: error.message || "Failed to start debate",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handler to open debate onboarding modal
+  const handleStartDebate = (opinionId: string, opponentName: string) => {
+    setIsRandomMatch(false);
+    setDebateOpinionId(opinionId);
+    setDebateOpponentName(opponentName);
+    setShowDebateOnboarding(true);
+  };
+
+  // Handler to submit debate with opening message
+  const handleSubmitDebate = (openingMessage: string) => {
+    if (isRandomMatch) {
+      // Random match flow
+      startRandomDebateMutation.mutate({ openingMessage });
+    } else if (debateOpinionId) {
+      // Specific opponent flow
+      startDebateWithOpinionMutation.mutate({ opinionId: debateOpinionId, openingMessage });
+    }
+  };
+
+  // Flag topic mutation
+  const flagTopicMutation = useMutation({
+    mutationFn: async (fallacyType: FallacyType) => {
+      const response = await fetch(`/api/topics/${id}/flag`, {
+        method: "POST",
+        body: JSON.stringify({ fallacyType }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Flag submitted",
+        description: "Thank you for helping keep debates productive.",
+      });
+      setShowTopicFlagDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit flag",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Start random debate match mutation
+  const startRandomDebateMutation = useMutation({
+    mutationFn: async ({ openingMessage }: { openingMessage: string }) => {
+      const response = await apiRequest('POST', `/api/topics/${id}/match-debate`, { openingMessage });
+      return response.json();
+    },
+    onSuccess: (room) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
+      toast({
+        title: "Debate matched!",
+        description: "Check the footer to see your new debate. Click your opponent's avatar to start chatting!",
+      });
+      setShowDebateOnboarding(false);
+    },
+    onError: (error: any) => {
+      console.error("Failed to start debate:", error);
+      toast({
+        title: "Cannot start debate",
+        description: error.message || "Failed to start debate",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const opinionForm = useForm<z.infer<typeof opinionFormSchema>>({
+    resolver: zodResolver(opinionFormSchema),
+    defaultValues: {
+      content: "",
+      debateStatus: "open",
+      references: [],
+    },
+  });
+
+  const onSubmitOpinion = (data: z.infer<typeof opinionFormSchema>) => {
+    if (!isAuthenticated) {
+      setLoginAction("opinion");
+      setShowLoginPrompt(true);
+      return;
+    }
+    createOpinionMutation.mutate(data);
+  };
+  
+  const handleShareOpinionClick = () => {
+    if (!isAuthenticated) {
+      setLoginAction("opinion");
+      setShowLoginPrompt(true);
+      return;
+    }
+    setShowOpinionForm(true);
+  };
+  
+  const handleFindDebateClick = () => {
+    if (!isAuthenticated) {
+      setLoginAction("debate");
+      setShowLoginPrompt(true);
+      return;
+    }
+    setIsRandomMatch(true);
+    setDebateOpponentName("a random opponent");
+    setShowDebateOnboarding(true);
+  };
+  
+  const handleFlagTopicClick = () => {
+    if (!isAuthenticated) {
+      setLoginAction("interact");
+      setShowLoginPrompt(true);
+      return;
+    }
+    setShowTopicFlagDialog(true);
+  };
+
+  if (topicLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading topic...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!topic) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold mb-4">Topic not found</h2>
+        <Link href="/">
+          <Button variant="outline">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  // Get opposite opinion users for chat
+  const oppositeOpinions = userOpinion 
+    ? opinions?.filter(o => 
+        o.userId !== user?.id && 
+        ((userOpinion.stance === 'for' && o.stance === 'against') || 
+         (userOpinion.stance === 'against' && o.stance === 'for'))
+      ) || []
+    : [];
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-8">
+      {/* Back Button */}
+      <Link href="/">
+        <Button variant="ghost" size="sm" data-testid="button-back-home">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Topics
+        </Button>
+      </Link>
+
+      {/* Header Section */}
+      <div className="space-y-4">
+        {/* Categories and Active Badge */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {topic.categories.map((cat) => (
+            <Badge 
+              key={cat} 
+              variant="secondary"
+              className="cursor-pointer hover-elevate"
+              onClick={() => navigate(`/category/${encodeURIComponent(cat)}`)}
+              data-testid={`badge-category-${cat.toLowerCase()}`}
+            >
+              {cat}
+            </Badge>
+          ))}
+          {topic.isActive && (
+            <Badge className="bg-chart-1 text-white">
+              <TrendingUp className="w-3 h-3 mr-1" />
+              Active
+            </Badge>
+          )}
+        </div>
+
+        {/* Title - Full Width */}
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight" data-testid="text-topic-title">
+          {topic.title}
+        </h1>
+        
+        {/* Display fallacy badges if any */}
+        {topic.fallacyCounts && Object.keys(topic.fallacyCounts).some(key => (topic.fallacyCounts?.[key] || 0) > 0) && (
+          <div>
+            <FallacyBadges fallacyCounts={topic.fallacyCounts} />
+          </div>
+        )}
+
+        {/* Stats and Flag Button */}
+        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-4 h-4" />
+            <span data-testid="text-opinions-count">{opinions?.length || 0} opinions</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            <span data-testid="text-participants-count">
+              {opinions ? new Set(opinions.map(o => o.userId)).size : 0} participants
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleFlagTopicClick}
+            data-testid="button-flag-topic"
+            className="flex-shrink-0 ml-auto"
+          >
+            <Flag className="w-4 h-4 mr-2" />
+            Flag
+          </Button>
+        </div>
+      </div>
+
+      {/* Swipeable Carousel: Your Opinion & AI Summary */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-semibold">Overview</h2>
+        </div>
+        
+        <div className="overflow-hidden" ref={emblaRef} data-testid="carousel-overview">
+          <div className="flex gap-4">
+            {/* Slide 1: AI Summary */}
+            {cumulativeData && (
+              <div className="flex-[0_0_100%] min-w-0 pl-[calc((100%-280px)/2)] pr-[calc((100%-280px)/2)] md:pl-[calc((100%-300px)/2)] md:pr-[calc((100%-300px)/2)]">
+                <div className="w-[280px] md:w-[300px] mx-auto">
+                  <Card className="h-full" data-testid="card-ai-summary">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-primary" />
+                        AI Summary
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-sm leading-relaxed">{cumulativeData.summary}</p>
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-primary">{cumulativeData.supportingPercentage || 0}%</div>
+                          <div className="text-xs text-muted-foreground">For</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-muted-foreground">{cumulativeData.neutralPercentage || 0}%</div>
+                          <div className="text-xs text-muted-foreground">Neutral</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-destructive">{cumulativeData.opposingPercentage || 0}%</div>
+                          <div className="text-xs text-muted-foreground">Against</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {/* Slide 2: User's Opinion */}
+            <div className="flex-[0_0_100%] min-w-0 pl-[calc((100%-280px)/2)] pr-[calc((100%-280px)/2)] md:pl-[calc((100%-300px)/2)] md:pr-[calc((100%-300px)/2)]">
+              <div className="w-[280px] md:w-[300px] mx-auto">
+                {userOpinion && !showOpinionForm ? (
+                  <Card 
+                    className="h-full flex flex-col" 
+                    style={getOpinionGradientStyle(userOpinion.topicEconomicScore, userOpinion.topicAuthoritarianScore)}
+                    data-testid="card-user-opinion"
+                  >
+                    <CardHeader className="pb-3 flex-shrink-0">
+                      <CardTitle className="text-base">Your Opinion</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
+                      <p className="text-sm leading-relaxed line-clamp-3 mb-3">{userOpinion.content}</p>
+                      <div className="flex gap-2 mt-auto pt-2 border-t">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            opinionForm.setValue('content', userOpinion.content);
+                            opinionForm.setValue('debateStatus', (userOpinion.debateStatus || "open") as "open" | "closed" | "private");
+                            opinionForm.setValue('references', userOpinion.references || []);
+                            setShowOpinionForm(true);
+                          }}
+                          data-testid="button-change-opinion"
+                        >
+                          Update
+                        </Button>
+                        {oppositeOpinions.length > 0 && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={handleFindDebateClick}
+                            data-testid="button-find-random-debate"
+                          >
+                            <MessageCircle className="w-3 h-3 mr-1" />
+                            Find Debate
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="h-full flex items-center justify-center min-h-[200px]">
+                    <CardContent className="text-center">
+                      <Button 
+                        variant="default" 
+                        onClick={handleShareOpinionClick}
+                        data-testid="button-share-opinion"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Share Your Opinion
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Carousel Indicators */}
+        {cumulativeData && (
+          <div className="flex justify-center gap-2 pt-2">
+            <button
+              onClick={() => emblaApi?.scrollTo(0)}
+              className={`w-2 h-2 rounded-full transition-all ${selectedIndex === 0 ? 'bg-primary w-6' : 'bg-muted-foreground/30'}`}
+              aria-label="View AI summary"
+              data-testid="carousel-dot-0"
+            />
+            <button
+              onClick={() => emblaApi?.scrollTo(1)}
+              className={`w-2 h-2 rounded-full transition-all ${selectedIndex === 1 ? 'bg-primary w-6' : 'bg-muted-foreground/30'}`}
+              aria-label="View your opinion"
+              data-testid="carousel-dot-1"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* "Highest Rated" Section */}
+      {highestRatedOpinions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Highest Rated</h2>
+            <Badge variant="default">{highestRatedOpinions.length}</Badge>
+          </div>
+          
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-4 pb-4">
+              {highestRatedOpinions.slice(0, 10).map((opinion: any) => {
+                // Allow debating if users have different political alignment
+                const canDebate = calculatePoliticalDistance(opinion) >= OPPOSING_THRESHOLD;
+                
+                return (
+                  <CardContainer key={opinion.id}>
+                    <OpinionCard
+                      id={opinion.id}
+                      topicId={id!}
+                      userId={opinion.userId}
+                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                      userAvatar={opinion.author?.profileImageUrl}
+                      economicScore={opinion.author?.economicScore}
+                      authoritarianScore={opinion.author?.authoritarianScore}
+                      topicEconomicScore={opinion.topicEconomicScore}
+                      topicAuthoritarianScore={opinion.topicAuthoritarianScore}
+                      content={opinion.content}
+                      debateStatus={opinion.debateStatus}
+                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
+                      likesCount={opinion.likesCount || 0}
+                      dislikesCount={opinion.dislikesCount || 0}
+                      references={opinion.references}
+                      fallacyCounts={opinion.fallacyCounts}
+                      isLiked={opinion.userVote === 'like'}
+                      isDisliked={opinion.userVote === 'dislike'}
+                      onLike={(opinionId) => voteMutation.mutate({ 
+                        opinionId, 
+                        voteType: 'like', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onDislike={(opinionId) => voteMutation.mutate({ 
+                        opinionId, 
+                        voteType: 'dislike', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onAdopt={(opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        setOpinionToAdopt(opinionData);
+                        setShowAdoptDialog(true);
+                      }}
+                      onDebate={canDebate ? (opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        handleStartDebate(
+                          opinionId, 
+                          opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+                        );
+                      } : undefined}
+                    />
+                  </CardContainer>
+                );
+              })}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* "Similar Opinions" Section */}
+      {similarOpinions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Similar Opinions</h2>
+            <Badge variant="secondary">{similarOpinions.length}</Badge>
+          </div>
+          
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-4 pb-4">
+              {similarOpinions.map((opinion: any) => {
+                // Similar opinions typically cannot debate each other
+                const canDebate = false;
+                
+                return (
+                  <CardContainer key={opinion.id}>
+                    <OpinionCard
+                      id={opinion.id}
+                      topicId={id!}
+                      userId={opinion.userId}
+                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                      userAvatar={opinion.author?.profileImageUrl}
+                      economicScore={opinion.author?.economicScore}
+                      authoritarianScore={opinion.author?.authoritarianScore}
+                      topicEconomicScore={opinion.topicEconomicScore}
+                      topicAuthoritarianScore={opinion.topicAuthoritarianScore}
+                      content={opinion.content}
+                      debateStatus={opinion.debateStatus}
+                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
+                      likesCount={opinion.likesCount || 0}
+                      dislikesCount={opinion.dislikesCount || 0}
+                      references={opinion.references}
+                      fallacyCounts={opinion.fallacyCounts}
+                      isLiked={opinion.userVote === 'like'}
+                      isDisliked={opinion.userVote === 'dislike'}
+                      onLike={(opinionId) => voteMutation.mutate({ 
+                        opinionId, 
+                        voteType: 'like', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onDislike={(opinionId) => voteMutation.mutate({ 
+                        opinionId, 
+                        voteType: 'dislike', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onAdopt={(opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        setOpinionToAdopt(opinionData);
+                        setShowAdoptDialog(true);
+                      }}
+                      onDebate={canDebate ? (opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        handleStartDebate(
+                          opinionId, 
+                          opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+                        );
+                      } : undefined}
+                    />
+                  </CardContainer>
+                );
+              })}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* "Opposing Opinions" Section */}
+      {opposingOpinions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Opposing Opinions</h2>
+            <Badge variant="destructive">{opposingOpinions.length}</Badge>
+          </div>
+          
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-4 pb-4">
+              {opposingOpinions.map((opinion: any) => {
+                // Can always debate opposing opinions
+                const canDebate = true;
+                
+                return (
+                  <CardContainer key={opinion.id}>
+                    <OpinionCard
+                      id={opinion.id}
+                      topicId={id!}
+                      userId={opinion.userId}
+                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
+                      userAvatar={opinion.author?.profileImageUrl}
+                      economicScore={opinion.author?.economicScore}
+                      authoritarianScore={opinion.author?.authoritarianScore}
+                      topicEconomicScore={opinion.topicEconomicScore}
+                      topicAuthoritarianScore={opinion.topicAuthoritarianScore}
+                      content={opinion.content}
+                      debateStatus={opinion.debateStatus}
+                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
+                      likesCount={opinion.likesCount || 0}
+                      dislikesCount={opinion.dislikesCount || 0}
+                      references={opinion.references}
+                      fallacyCounts={opinion.fallacyCounts}
+                      isLiked={opinion.userVote === 'like'}
+                      isDisliked={opinion.userVote === 'dislike'}
+                      onLike={(opinionId) => voteMutation.mutate({ 
+                        opinionId, 
+                        voteType: 'like', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onDislike={(opinionId) => voteMutation.mutate({ 
+                        opinionId, 
+                        voteType: 'dislike', 
+                        currentVote: opinion.userVote 
+                      })}
+                      onAdopt={(opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        setOpinionToAdopt(opinionData);
+                        setShowAdoptDialog(true);
+                      }}
+                      onDebate={canDebate ? (opinionId) => {
+                        const opinionData = opinions?.find(o => o.id === opinionId);
+                        handleStartDebate(
+                          opinionId, 
+                          opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+                        );
+                      } : undefined}
+                    />
+                  </CardContainer>
+                );
+              })}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Similar Topics Section */}
+      {similarTopics && similarTopics.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Similar Topics</h2>
+            <Badge variant="outline">{similarTopics.length}</Badge>
+          </div>
+          
+          <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex gap-4 pb-4">
+              {similarTopics.slice(0, 10).map((similarTopic: any) => (
+                <CardContainer key={similarTopic.id}>
+                  <TopicCard
+                    id={similarTopic.id}
+                    title={similarTopic.title}
+                    description={similarTopic.description || ''}
+                    imageUrl={similarTopic.imageUrl || ''}
+                    categories={similarTopic.categories}
+                    participantCount={similarTopic.participantCount || 0}
+                    opinionsCount={similarTopic.opinionsCount || 0}
+                    isActive={similarTopic.isActive || false}
+                    previewContent={similarTopic.previewContent}
+                    previewAuthor={similarTopic.previewAuthor}
+                    previewIsAI={similarTopic.previewIsAI}
+                    diversityScore={similarTopic.diversityScore}
+                    politicalDistribution={similarTopic.politicalDistribution}
+                  />
+                </CardContainer>
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Opinion Form Dialog */}
+      <Dialog open={showOpinionForm} onOpenChange={setShowOpinionForm}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{userOpinion ? 'Update Your Opinion' : 'Share Your Opinion'}</DialogTitle>
+            <DialogDescription>
+              {userOpinion ? 'Modify your existing opinion on this topic.' : 'Share your thoughts on this topic.'}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...opinionForm}>
+            <form onSubmit={opinionForm.handleSubmit(onSubmitOpinion)} className="space-y-4">
+              <FormField
+                control={opinionForm.control}
+                name="debateStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Debate Availability</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-debate-status">
+                          <SelectValue placeholder="Select debate availability" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="open" data-testid="option-debate-open">
+                          Open for Debate - Others can challenge this opinion
+                        </SelectItem>
+                        <SelectItem value="closed" data-testid="option-debate-closed">
+                          Not Debatable - Opinion is public but read-only
+                        </SelectItem>
+                        <SelectItem value="private" data-testid="option-debate-private">
+                          Private - Only visible to you
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={opinionForm.control}
+                name="content"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Opinion</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Share your thoughts..."
+                        className="min-h-[120px]"
+                        data-testid="input-opinion-content"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex gap-2 justify-end pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowOpinionForm(false)}
+                  data-testid="button-cancel-opinion"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createOpinionMutation.isPending}
+                  data-testid="button-submit-opinion"
+                >
+                  {createOpinionMutation.isPending ? 'Saving...' : userOpinion ? 'Update Opinion' : 'Share Opinion'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Topic Flag Dialog */}
+      <FallacyFlagDialog
+        open={showTopicFlagDialog}
+        onOpenChange={setShowTopicFlagDialog}
+        onSubmit={(fallacyType) => flagTopicMutation.mutate(fallacyType)}
+        isPending={flagTopicMutation.isPending}
+        entityType="topic"
+      />
+
+      {/* Adopt Opinion Dialog */}
+      <AdoptOpinionDialog
+        open={showAdoptDialog}
+        onOpenChange={setShowAdoptDialog}
+        currentOpinion={userOpinion ? {
+          content: userOpinion.content,
+          stance: userOpinion.stance as "for" | "against" | "neutral"
+        } : null}
+        opinionToAdopt={opinionToAdopt ? {
+          content: opinionToAdopt.content,
+          stance: opinionToAdopt.stance,
+          authorName: opinionToAdopt.author ? `${opinionToAdopt.author.firstName || ''} ${opinionToAdopt.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
+        } : null}
+        onAdopt={(content, stance) => {
+          if (opinionToAdopt) {
+            adoptMutation.mutate({ 
+              opinionId: opinionToAdopt.id, 
+              content, 
+              stance 
+            });
+          }
+        }}
+        isPending={adoptMutation.isPending}
+      />
+
+      {/* Debate Onboarding Modal */}
+      <DebateOnboardingModal
+        open={showDebateOnboarding}
+        onOpenChange={setShowDebateOnboarding}
+        onSubmit={handleSubmitDebate}
+        isPending={isRandomMatch ? startRandomDebateMutation.isPending : startDebateWithOpinionMutation.isPending}
+        opponentName={debateOpponentName}
+      />
+      
+      {/* Login Prompt Dialog */}
+      <LoginPromptDialog
+        open={showLoginPrompt}
+        onOpenChange={setShowLoginPrompt}
+        action={loginAction}
+      />
+    </div>
+  );
+}

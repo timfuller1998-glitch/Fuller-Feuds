@@ -1,0 +1,921 @@
+import OpenAI from 'openai';
+import type { Opinion, Topic, CumulativeOpinion } from '../shared/schema.js';
+
+// Temporarily disable OpenAI for testing - remove this when you have API key
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+}) : null;
+
+interface OpinionAnalysis {
+  summary: string;
+  keyPoints: string[];
+  supportingPercentage: number;
+  opposingPercentage: number;
+  neutralPercentage: number;
+  totalOpinions: number;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+interface PoliticalLeaningAnalysis {
+  leaning: string; // 'progressive', 'moderate', 'conservative', 'libertarian', etc.
+  score: number; // -100 (very progressive) to +100 (very conservative)
+  confidence: 'high' | 'medium' | 'low';
+  reasoning: string;
+}
+
+interface PoliticalCompass2DAnalysis {
+  economicScore: number; // -100 (socialist) to +100 (capitalist)
+  authoritarianScore: number; // -100 (libertarian) to +100 (authoritarian)
+  confidence: 'high' | 'medium' | 'low';
+  reasoning: string;
+  quadrant: 'authoritarian-capitalist' | 'libertarian-capitalist' | 'libertarian-socialist' | 'authoritarian-socialist' | 'centrist';
+}
+
+export class AIService {
+  static async generateCategories(topicTitle: string): Promise<string[]> {
+    // Return fallback categories if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning fallback categories');
+      return ["Politics", "Society", "General"];
+    }
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a debate categorization expert. Generate exactly 3 relevant category tags for debate topics. Return only a JSON array of strings, nothing else. Categories should be concise (1-2 words), relevant, and commonly understood."
+          },
+          {
+            role: "user",
+            content: `Generate exactly 3 relevant category tags for this debate topic: "${topicTitle}". Return ONLY a JSON array like ["Category1", "Category2", "Category3"]`
+          }
+        ],
+        temperature: 0.5,
+        max_tokens: 100
+      });
+
+      const responseContent = completion.choices[0]?.message?.content?.trim();
+      if (!responseContent) {
+        throw new Error("No response from OpenAI");
+      }
+
+      const categories = JSON.parse(responseContent);
+      if (!Array.isArray(categories) || categories.length !== 3) {
+        throw new Error("Invalid categories format from AI");
+      }
+
+      return categories.slice(0, 3);
+    } catch (error) {
+      console.error("Error generating categories:", error);
+      // Fallback to generic categories
+      return ["Politics", "Society", "General"];
+    }
+  }
+
+  //static async generateTopicImage(topicTitle: string): Promise<string> {
+  //  try {
+  //    const response = await openai.images.generate({
+  //      model: "dall-e-3",
+  //      prompt: `Create a professional, abstract visual representation for a debate topic titled: "${topicTitle}". The image should be thought-provoking, balanced, and suitable for a serious discussion platform. Style: modern, clean, conceptual art with symbolic elements related to the topic.`,
+  //      size: "1024x1024",
+  //      quality: "standard",
+  //      n: 1,
+  //    });
+
+  static async generateCumulativeOpinion(
+    topic: Topic,
+    opinions: Opinion[],
+    distributions?: {
+      averageEconomicScore?: number;
+      averageAuthoritarianScore?: number;
+      averageTasteScore?: number;
+      averagePassionScore?: number;
+      tasteDistribution?: any;
+      passionDistribution?: any;
+      politicalDistribution?: any;
+      tasteDiversity?: number;
+      passionDiversity?: number;
+      diversityScore?: number;
+    }
+  ): Promise<OpinionAnalysis> {
+    // Return mock data if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning mock cumulative opinion');
+      const totalOpinions = opinions.length;
+      // Calculate percentages based on likes/dislikes since opinions don't have stance property
+      const totalLikes = opinions.reduce((sum, o) => sum + (o.likesCount || 0), 0);
+      const totalDislikes = opinions.reduce((sum, o) => sum + (o.dislikesCount || 0), 0);
+      const totalVotes = totalLikes + totalDislikes;
+      const supportingPercentage = totalVotes > 0 ? Math.round((totalLikes / totalVotes) * 100) : 0;
+      const opposingPercentage = totalVotes > 0 ? Math.round((totalDislikes / totalVotes) * 100) : 0;
+      const neutralPercentage = totalVotes === 0 ? 100 : 0;
+
+      return {
+        summary: `Mock AI summary: ${totalOpinions} opinions on "${topic.title}" with ${supportingPercentage}% support, ${opposingPercentage}% opposition.`,
+        keyPoints: [
+          'Mock key point: Community has mixed opinions',
+          'Mock key point: Further discussion needed',
+          'Mock key point: Data shows divided viewpoints'
+        ],
+        supportingPercentage,
+        opposingPercentage,
+        neutralPercentage,
+        totalOpinions,
+        confidence: 'medium' as const
+      };
+    }
+
+    if (opinions.length === 0) {
+      return {
+        summary: "No opinions available yet for this topic.",
+        keyPoints: [],
+        supportingPercentage: 0,
+        opposingPercentage: 0,
+        neutralPercentage: 0,
+        totalOpinions: 0,
+        confidence: 'low'
+      };
+    }
+
+    // Calculate percentages based on likes/dislikes since opinions don't have stance property
+    const totalLikes = opinions.reduce((sum, o) => sum + (o.likesCount || 0), 0);
+    const totalDislikes = opinions.reduce((sum, o) => sum + (o.dislikesCount || 0), 0);
+    const totalVotes = totalLikes + totalDislikes;
+    const totalOpinions = opinions.length;
+    const supportingPercentage = totalVotes > 0 ? Math.round((totalLikes / totalVotes) * 100) : 0;
+    const opposingPercentage = totalVotes > 0 ? Math.round((totalDislikes / totalVotes) * 100) : 0;
+    const neutralPercentage = totalVotes === 0 ? 100 : 0;
+
+    // Determine confidence based on opinion count and diversity
+    let confidence: 'high' | 'medium' | 'low' = 'low';
+    if (totalOpinions >= 20) {
+      confidence = 'high';
+    } else if (totalOpinions >= 5) {
+      confidence = 'medium';
+    }
+
+    // Prepare opinions for AI analysis
+    const opinionTexts = opinions.map(opinion => 
+      `Content: ${opinion.content}`
+    ).join('\n\n');
+
+    // Build distribution context for AI
+    let distributionContext = '';
+    if (distributions) {
+      distributionContext = `
+
+OPINION STATISTICS:
+- Political Distribution: 
+  * Authoritarian Capitalist: ${distributions.politicalDistribution?.authoritarianCapitalist || 0}
+  * Libertarian Capitalist: ${distributions.politicalDistribution?.libertarianCapitalist || 0}
+  * Authoritarian Socialist: ${distributions.politicalDistribution?.authoritarianSocialist || 0}
+  * Libertarian Socialist: ${distributions.politicalDistribution?.libertarianSocialist || 0}
+- Average Political Position: Economic ${distributions.averageEconomicScore || 0} (Socialist -100 to Capitalist +100), Authoritarian ${distributions.averageAuthoritarianScore || 0} (Libertarian -100 to Authoritarian +100)
+- Political Diversity Score: ${distributions.diversityScore || 0}/100
+
+- Taste Distribution (Emotional Response):
+  * Revulsion: ${distributions.tasteDistribution?.revulsion || 0}
+  * Aversion: ${distributions.tasteDistribution?.aversion || 0}
+  * Neutral: ${distributions.tasteDistribution?.neutral || 0}
+  * Preference: ${distributions.tasteDistribution?.preference || 0}
+  * Delight: ${distributions.tasteDistribution?.delight || 0}
+- Average Taste Score: ${distributions.averageTasteScore || 0} (Revulsion -100 to Delight +100)
+- Taste Diversity: ${distributions.tasteDiversity || 0}/100
+
+- Passion Distribution (Intensity):
+  * Academic: ${distributions.passionDistribution?.academic || 0}
+  * Measured: ${distributions.passionDistribution?.measured || 0}
+  * Moderate: ${distributions.passionDistribution?.moderate || 0}
+  * Passionate: ${distributions.passionDistribution?.passionate || 0}
+  * Aggressive: ${distributions.passionDistribution?.aggressive || 0}
+- Average Passion Score: ${distributions.averagePassionScore || 0} (Academic -100 to Aggressive +100)
+- Passion Diversity: ${distributions.passionDiversity || 0}/100`;
+    }
+
+    const prompt = `
+You are analyzing a debate topic titled "${topic.title}".
+
+Topic Description: ${topic.description}
+${distributionContext}
+
+Here are all the opinions expressed by users:
+
+${opinionTexts}
+
+Please provide a comprehensive analysis in the following JSON format:
+{
+  "summary": "A balanced 2-3 paragraph summary of the key themes and arguments",
+  "keyPoints": ["array", "of", "3-5", "most", "important", "points", "from", "all", "sides"]
+}
+
+Focus on:
+1. Identifying common themes and concerns
+2. Highlighting the strongest arguments from each side
+3. Noting areas of consensus or significant disagreement
+4. Maintaining objectivity and balance
+5. Being concise but comprehensive
+6. Incorporating the distribution statistics to provide context about the political, emotional, and intensity dimensions of the debate
+
+Return only valid JSON.`;
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert debate analyst who creates balanced, objective summaries of public discourse. Always respond with valid JSON only."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1500
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      if (!responseContent) {
+        throw new Error("No response from OpenAI");
+      }
+
+      let aiAnalysis;
+      try {
+        aiAnalysis = JSON.parse(responseContent);
+      } catch (parseError) {
+        console.error("Failed to parse AI response:", responseContent);
+        throw new Error("Invalid AI response format");
+      }
+
+      return {
+        summary: aiAnalysis.summary || "Unable to generate summary at this time.",
+        keyPoints: Array.isArray(aiAnalysis.keyPoints) ? aiAnalysis.keyPoints : [],
+        supportingPercentage,
+        opposingPercentage,
+        neutralPercentage,
+        totalOpinions,
+        confidence
+      };
+
+    } catch (error) {
+      console.error("Error generating AI analysis:", error);
+      
+      // Fallback analysis without AI
+      const majorityVote = totalLikes > totalDislikes ? 'supportive' : totalDislikes > totalLikes ? 'opposing' : 'neutral';
+
+      return {
+        summary: `Based on ${totalOpinions} opinion(s), the discussion around "${topic.title}" shows ${supportingPercentage}% support, ${opposingPercentage}% opposition, and ${neutralPercentage}% neutral positions. The majority sentiment appears to be "${majorityVote}".`,
+        keyPoints: [
+          `${totalOpinions} total opinions collected`,
+          `${supportingPercentage}% expressing support`,
+          `${opposingPercentage}% expressing opposition`,
+          `${neutralPercentage}% taking neutral positions`
+        ],
+        supportingPercentage,
+        opposingPercentage,
+        neutralPercentage,
+        totalOpinions,
+        confidence
+      };
+    }
+  }
+
+  static async analyzePoliticalLeaning(opinions: Opinion[]): Promise<PoliticalLeaningAnalysis> {
+    if (opinions.length === 0) {
+      return {
+        leaning: 'unknown',
+        score: 0,
+        confidence: 'low',
+        reasoning: 'No opinions available for analysis'
+      };
+    }
+
+    // Determine confidence based on opinion count
+    let confidence: 'high' | 'medium' | 'low' = 'low';
+    if (opinions.length >= 15) {
+      confidence = 'high';
+    } else if (opinions.length >= 5) {
+      confidence = 'medium';
+    }
+
+    // Prepare opinions for AI analysis
+    const opinionTexts = opinions.map((opinion, index) => 
+      `Opinion ${index + 1}: ${opinion.content}`
+    ).join('\n\n');
+
+    const prompt = `
+Analyze the following user opinions to determine their political leaning on a spectrum from progressive to conservative.
+
+User Opinions:
+${opinionTexts}
+
+Please provide an analysis in the following JSON format:
+{
+  "leaning": "progressive|moderate-progressive|moderate|moderate-conservative|conservative|libertarian|populist",
+  "score": -50,
+  "reasoning": "Brief explanation of the analysis"
+}
+
+Scoring Guide:
+- -100 to -51: Very Progressive (strong support for social change, government intervention in inequality, environmental regulation)
+- -50 to -21: Progressive (supports social progress, some government intervention, climate action)
+- -20 to +20: Moderate (balanced views, pragmatic approach to issues)
+- +21 to +50: Conservative (traditional values, limited government, free market preferences)
+- +51 to +100: Very Conservative (strong traditional values, minimal government, strict social order)
+
+Special categories:
+- Libertarian: Strong individual freedom + minimal government on both social and economic issues
+- Populist: Anti-establishment, pro-common people regardless of left/right spectrum
+
+Consider:
+1. Economic views (taxation, regulation, welfare, free market)
+2. Social issues (equality, diversity, traditional values, personal freedoms)
+3. Government role (size, intervention, individual rights)
+4. Environmental and climate positions
+5. Law and order vs. criminal justice reform attitudes
+
+Return only valid JSON.`;
+
+    // Return mock data if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning fallback political leaning analysis');
+      return {
+        leaning: 'moderate',
+        score: 0,
+        confidence: 'low',
+        reasoning: 'OpenAI not configured - cannot perform analysis'
+      };
+    }
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a political science expert who analyzes ideological leanings objectively. Always respond with valid JSON only."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 500
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      if (!responseContent) {
+        throw new Error("No response from OpenAI");
+      }
+
+      let aiAnalysis;
+      try {
+        aiAnalysis = JSON.parse(responseContent);
+      } catch (parseError) {
+        console.error("Failed to parse AI political analysis:", responseContent);
+        throw new Error("Invalid AI response format");
+      }
+
+      return {
+        leaning: aiAnalysis.leaning || 'moderate',
+        score: Math.max(-100, Math.min(100, aiAnalysis.score || 0)),
+        confidence,
+        reasoning: aiAnalysis.reasoning || 'Analysis based on expressed opinions'
+      };
+
+    } catch (error) {
+      console.error("Error analyzing political leaning:", error);
+      
+      // Fallback analysis without AI - simple heuristic based on likes/dislikes
+      const totalLikes = opinions.reduce((sum, op) => sum + (op.likesCount || 0), 0);
+      const totalDislikes = opinions.reduce((sum, op) => sum + (op.dislikesCount || 0), 0);
+      
+      // Simple heuristic: use average of economic scores if available, otherwise neutral
+      const opinionsWithScores = opinions.filter(op => op.topicEconomicScore != null);
+      let score = 0;
+      if (opinionsWithScores.length > 0) {
+        const avgEconomicScore = opinionsWithScores.reduce((sum, op) => sum + (op.topicEconomicScore || 0), 0) / opinionsWithScores.length;
+        score = Math.max(-100, Math.min(100, avgEconomicScore));
+      }
+      
+      let leaning = 'moderate';
+      if (score < -20) leaning = 'progressive';
+      else if (score > 20) leaning = 'conservative';
+
+      return {
+        leaning,
+        score: Math.round(score),
+        confidence,
+        reasoning: `Fallback analysis based on ${opinions.length} opinions (${opinionsWithScores.length} with political scores)`
+      };
+    }
+  }
+
+  static async analyze2DPoliticalCompass(opinions: Opinion[]): Promise<PoliticalCompass2DAnalysis> {
+    if (opinions.length === 0) {
+      return {
+        economicScore: 0,
+        authoritarianScore: 0,
+        confidence: 'low',
+        reasoning: 'No opinions available for analysis',
+        quadrant: 'centrist'
+      };
+    }
+
+    // Determine confidence based on opinion count
+    let confidence: 'high' | 'medium' | 'low' = 'low';
+    if (opinions.length >= 30) {
+      confidence = 'high';
+    } else if (opinions.length >= 10) {
+      confidence = 'medium';
+    }
+
+    // Prepare opinions for AI analysis (last 50 opinions)
+    const recentOpinions = opinions.slice(-50);
+    const opinionTexts = recentOpinions.map((opinion, index) => 
+      `Opinion ${index + 1}: ${opinion.content}`
+    ).join('\n\n');
+
+    const prompt = `
+Analyze the following user opinions to determine their political position on a 2-dimensional political compass.
+
+User Opinions (${recentOpinions.length} most recent):
+${opinionTexts}
+
+Please provide an analysis in the following JSON format:
+{
+  "economicScore": -50,
+  "authoritarianScore": 25,
+  "reasoning": "Brief explanation of the analysis"
+}
+
+ECONOMIC AXIS (-100 to +100):
+-100 to -51: Very Socialist (strong wealth redistribution, extensive government control of economy, anti-capitalist)
+-50 to -21: Socialist (supports wealth redistribution, market regulation, public ownership of key industries)
+-20 to +20: Mixed Economy (balanced approach, regulated capitalism, some social programs)
++21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
++51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
+
+NOTE: -100 = Socialist, +100 = Capitalist
+
+AUTHORITARIAN AXIS (-100 to +100):
+-100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
+-50 to -21: Libertarian (personal freedom priority, limited government power, strong individual rights)
+-20 to +20: Moderate (balanced authority and freedom, pragmatic governance)
++21 to +50: Authoritarian (strong government control, order over freedom, limited civil liberties)
++51 to +100: Very Authoritarian (total state control, strict social order, minimal individual freedoms)
+
+Consider these aspects:
+ECONOMIC indicators:
+- Views on taxation, welfare, healthcare, education funding
+- Stance on business regulation, labor rights, unions
+- Opinions on wealth inequality and redistribution
+- Free market vs. planned economy preferences
+
+AUTHORITARIAN indicators:
+- Views on government surveillance, law enforcement, military
+- Stance on censorship, free speech, personal privacy
+- Opinions on drug policy, gun rights, personal freedoms
+- Traditional values vs. progressive social policies
+
+Return only valid JSON.`;
+
+    // Return mock data if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning fallback 2D political compass analysis');
+      // Try to calculate from existing scores
+      const opinionsWithScores = opinions.filter(op => op.topicEconomicScore != null && op.topicAuthoritarianScore != null);
+      if (opinionsWithScores.length > 0) {
+        const avgEconomic = opinionsWithScores.reduce((sum, op) => sum + (op.topicEconomicScore || 0), 0) / opinionsWithScores.length;
+        const avgAuthoritarian = opinionsWithScores.reduce((sum, op) => sum + (op.topicAuthoritarianScore || 0), 0) / opinionsWithScores.length;
+        return {
+          economicScore: Math.round(Math.max(-100, Math.min(100, avgEconomic))),
+          authoritarianScore: Math.round(Math.max(-100, Math.min(100, avgAuthoritarian))),
+          confidence: 'low',
+          reasoning: `Fallback analysis based on ${opinionsWithScores.length} opinions with political scores`,
+          quadrant: 'centrist'
+        };
+      }
+      return {
+        economicScore: 0,
+        authoritarianScore: 0,
+        confidence: 'low',
+        reasoning: 'OpenAI not configured and no political scores available',
+        quadrant: 'centrist'
+      };
+    }
+
+    try {
+      console.log(`[AI Analysis] Starting 2D political compass analysis for ${recentOpinions.length} opinions`);
+      
+      // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          {
+            role: "system",
+            content: "You are a political science expert who analyzes ideological positions on a 2D political compass objectively and accurately. Always respond with valid JSON only."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 500
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      console.log(`[AI Analysis] Raw OpenAI response:`, responseContent);
+      
+      if (!responseContent) {
+        console.error("[AI Analysis] ERROR: No response from OpenAI");
+        throw new Error("No response from OpenAI");
+      }
+
+      let aiAnalysis;
+      try {
+        aiAnalysis = JSON.parse(responseContent);
+        console.log(`[AI Analysis] Parsed AI analysis:`, JSON.stringify(aiAnalysis, null, 2));
+      } catch (parseError) {
+        console.error("[AI Analysis] ERROR: Failed to parse AI 2D political analysis:", responseContent);
+        console.error("[AI Analysis] Parse error details:", parseError);
+        throw new Error("Invalid AI response format");
+      }
+
+      const economicScore = Math.max(-100, Math.min(100, aiAnalysis.economicScore || 0));
+      const authoritarianScore = Math.max(-100, Math.min(100, aiAnalysis.authoritarianScore || 0));
+      
+      console.log(`[AI Analysis] Final scores - Economic: ${economicScore}, Authoritarian: ${authoritarianScore}`);
+
+      // Determine quadrant
+      let quadrant: PoliticalCompass2DAnalysis['quadrant'] = 'centrist';
+      if (Math.abs(economicScore) > 20 || Math.abs(authoritarianScore) > 20) {
+        if (economicScore > 20 && authoritarianScore > 20) {
+          quadrant = 'authoritarian-capitalist';
+        } else if (economicScore > 20 && authoritarianScore < -20) {
+          quadrant = 'libertarian-capitalist';
+        } else if (economicScore < -20 && authoritarianScore < -20) {
+          quadrant = 'libertarian-socialist';
+        } else if (economicScore < -20 && authoritarianScore > 20) {
+          quadrant = 'authoritarian-socialist';
+        }
+      }
+      
+      console.log(`[AI Analysis] Determined quadrant: ${quadrant}, confidence: ${confidence}`);
+
+      return {
+        economicScore,
+        authoritarianScore,
+        confidence,
+        reasoning: aiAnalysis.reasoning || 'Analysis based on expressed opinions',
+        quadrant
+      };
+
+    } catch (error) {
+      console.error("Error analyzing 2D political compass:", error);
+      
+      // Fallback analysis without AI - use existing scores if available
+      const opinionsWithScores = opinions.filter(op => op.topicEconomicScore != null && op.topicAuthoritarianScore != null);
+      if (opinionsWithScores.length > 0) {
+        const avgEconomic = opinionsWithScores.reduce((sum, op) => sum + (op.topicEconomicScore || 0), 0) / opinionsWithScores.length;
+        const avgAuthoritarian = opinionsWithScores.reduce((sum, op) => sum + (op.topicAuthoritarianScore || 0), 0) / opinionsWithScores.length;
+        return {
+          economicScore: Math.round(Math.max(-100, Math.min(100, avgEconomic))),
+          authoritarianScore: Math.round(Math.max(-100, Math.min(100, avgAuthoritarian))),
+          confidence,
+          reasoning: `Fallback analysis based on ${opinionsWithScores.length} opinions with political scores`,
+          quadrant: 'centrist'
+        };
+      }
+
+      // No scores available - return neutral
+      return {
+        economicScore: 0,
+        authoritarianScore: 0,
+        confidence,
+        reasoning: `Fallback analysis based on ${opinions.length} opinions (no political scores available)`,
+        quadrant: 'centrist'
+      };
+    }
+  }
+
+  /**
+   * Analyze the political stance of a single opinion
+   * Returns economic and authoritarian scores from -100 to +100
+   * @param opinionContent - The text content of the opinion
+   * @param topicTitle - The title of the topic being discussed
+   * @param model - The OpenAI model to use (default: gpt-4o-mini for cost efficiency)
+   */
+  static async analyzeOpinionPoliticalStance(
+    opinionContent: string,
+    topicTitle: string,
+    model: "gpt-4o-mini" | "gpt-5" = "gpt-4o-mini"
+  ): Promise<{ economicScore: number; authoritarianScore: number }> {
+    const prompt = `
+Analyze this opinion on the topic "${topicTitle}" and determine its political position on a 2-dimensional political compass.
+
+Opinion: "${opinionContent}"
+
+Provide analysis in the following JSON format:
+{
+  "economicScore": -50,
+  "authoritarianScore": 25
+}
+
+ECONOMIC AXIS (-100 to +100):
+-100 to -51: Very Socialist (strong wealth redistribution, extensive government control of economy, anti-capitalist)
+-50 to -21: Socialist (supports wealth redistribution, market regulation, public ownership of key industries)
+-20 to +20: Mixed Economy (balanced approach, regulated capitalism, some social programs)
++21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
++51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
+
+NOTE: -100 = Socialist, +100 = Capitalist
+
+AUTHORITARIAN AXIS (-100 to +100):
+-100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
+-50 to -21: Libertarian (personal freedom priority, limited government power, strong individual rights)
+-20 to +20: Moderate (balanced authority and freedom, pragmatic governance)
++21 to +50: Authoritarian (strong government control, order over freedom, limited civil liberties)
++51 to +100: Very Authoritarian (total state control, strict social order, minimal individual freedoms)
+
+ECONOMIC indicators:
+- Views on taxation, welfare, healthcare, education funding
+- Stance on business regulation, labor rights, unions
+- Opinions on wealth inequality and redistribution
+- Free market vs. planned economy preferences
+
+AUTHORITARIAN indicators:
+- Views on government surveillance, law enforcement, military
+- Stance on censorship, free speech, personal privacy
+- Opinions on drug policy, gun rights, personal freedoms
+- Traditional values vs. progressive social policies
+
+Return only valid JSON with economicScore and authoritarianScore fields.`;
+
+    // Return neutral scores if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning neutral scores for opinion analysis');
+      return { economicScore: 0, authoritarianScore: 0 };
+    }
+
+    try {
+      console.log(`[Opinion Analysis] Analyzing opinion using model: ${model}`);
+      // GPT-5 limitations: only supports temperature=1 (default) and no response_format parameter
+      const completion = await openai.chat.completions.create({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: "You are a political science expert who analyzes ideological positions on a 2D political compass objectively and accurately. Always respond with valid JSON only."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        ...(model !== "gpt-5" ? { response_format: { type: "json_object" } } : {}),
+        max_completion_tokens: 200,
+        ...(model !== "gpt-5" ? { temperature: 0.3 } : {})
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      
+      if (!responseContent) {
+        console.error("[Opinion Analysis] No response from OpenAI");
+        return { economicScore: 0, authoritarianScore: 0 };
+      }
+
+      // Extract JSON from response (GPT-5 might wrap it in markdown code blocks)
+      let jsonText = responseContent.trim();
+      const jsonMatch = jsonText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[1];
+      } else if (!jsonText.startsWith('{')) {
+        // Try to find JSON object in the response
+        const objectMatch = jsonText.match(/\{[\s\S]*?\}/);
+        if (objectMatch) {
+          jsonText = objectMatch[0];
+        }
+      }
+
+      const aiAnalysis = JSON.parse(jsonText);
+      const economicScore = Math.max(-100, Math.min(100, aiAnalysis.economicScore || 0));
+      const authoritarianScore = Math.max(-100, Math.min(100, aiAnalysis.authoritarianScore || 0));
+
+      return {
+        economicScore: Math.round(economicScore),
+        authoritarianScore: Math.round(authoritarianScore)
+      };
+
+    } catch (error) {
+      console.error("[Opinion Analysis] Error analyzing opinion political stance:", error);
+      // Return neutral scores on error
+      return { economicScore: 0, authoritarianScore: 0 };
+    }
+  }
+
+  /**
+   * Batch analyze multiple opinions for political stance
+   * More efficient than analyzing individually - processes up to 50 opinions in a single API call
+   * @param topic - The topic these opinions are about
+   * @param opinions - Array of opinions with id and content
+   * @returns Array of analysis results with opinionId, economicScore, and authoritarianScore
+   */
+  static async batchAnalyzeOpinions(
+    topic: Topic,
+    opinions: Array<{ id: string; content: string }>
+  ): Promise<Array<{ opinionId: string; economicScore: number; authoritarianScore: number }>> {
+    // Return neutral scores if OpenAI is not configured
+    if (!openai) {
+      console.log('OpenAI not configured - returning neutral scores for batch analysis');
+      return opinions.map(o => ({
+        opinionId: o.id,
+        economicScore: 0,
+        authoritarianScore: 0
+      }));
+    }
+
+    if (opinions.length === 0) {
+      return [];
+    }
+
+    try {
+      // Build prompt with all opinions
+      const opinionsList = opinions.map((o, idx) => 
+        `Opinion ${idx + 1} (ID: ${o.id}):\n"${o.content}"`
+      ).join('\n\n');
+
+      const prompt = `
+Analyze the following opinions on the topic "${topic.title}" and determine each opinion's political position on a 2-dimensional political compass.
+
+${opinionsList}
+
+For each opinion, provide analysis in the following JSON format:
+{
+  "opinions": [
+    {"opinionId": "uuid-1", "economicScore": -50, "authoritarianScore": 25},
+    {"opinionId": "uuid-2", "economicScore": 30, "authoritarianScore": -20}
+  ]
+}
+
+ECONOMIC AXIS (-100 to +100):
+-100 to -51: Very Socialist (strong wealth redistribution, extensive government control of economy, anti-capitalist)
+-50 to -21: Socialist (supports wealth redistribution, market regulation, public ownership of key industries)
+-20 to +20: Mixed Economy (balanced approach, regulated capitalism, some social programs)
++21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
++51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
+
+NOTE: -100 = Socialist, +100 = Capitalist
+
+AUTHORITARIAN AXIS (-100 to +100):
+-100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
+-50 to -21: Libertarian (personal freedom priority, limited government power, strong individual rights)
+-20 to +20: Moderate (balanced authority and freedom, pragmatic governance)
++21 to +50: Authoritarian (strong government control, order over freedom, limited civil liberties)
++51 to +100: Very Authoritarian (total state control, strict social order, minimal individual freedoms)
+
+ECONOMIC indicators:
+- Views on taxation, welfare, healthcare, education funding
+- Stance on business regulation, labor rights, unions
+- Opinions on wealth inequality and redistribution
+- Free market vs. planned economy preferences
+
+AUTHORITARIAN indicators:
+- Views on government surveillance, law enforcement, military
+- Stance on censorship, free speech, personal privacy
+- Opinions on drug policy, gun rights, personal freedoms
+- Traditional values vs. progressive social policies
+
+Return only valid JSON with an "opinions" array containing all results.`;
+
+      console.log(`[Batch Opinion Analysis] Analyzing ${opinions.length} opinions using batch API`);
+      
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a political science expert who analyzes ideological positions on a 2D political compass objectively and accurately. Always respond with valid JSON only."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 2000, // More tokens for batch analysis
+        temperature: 0.3
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      
+      if (!responseContent) {
+        console.error("[Batch Opinion Analysis] No response from OpenAI");
+        return opinions.map(o => ({
+          opinionId: o.id,
+          economicScore: 0,
+          authoritarianScore: 0
+        }));
+      }
+
+      // Parse JSON response
+      let jsonText = responseContent.trim();
+      const jsonMatch = jsonText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[1];
+      }
+
+      const aiAnalysis = JSON.parse(jsonText);
+      const results = aiAnalysis.opinions || [];
+
+      // Map results back to opinion IDs and clamp scores
+      const analysisMap = new Map<string, { economicScore: number; authoritarianScore: number }>();
+      
+      for (const result of results) {
+        const economicScore = Math.max(-100, Math.min(100, result.economicScore || 0));
+        const authoritarianScore = Math.max(-100, Math.min(100, result.authoritarianScore || 0));
+        
+        analysisMap.set(result.opinionId, {
+          economicScore: Math.round(economicScore),
+          authoritarianScore: Math.round(authoritarianScore)
+        });
+      }
+
+      // Return results for all opinions (use neutral scores if not in response)
+      return opinions.map(opinion => {
+        const analysis = analysisMap.get(opinion.id) || { economicScore: 0, authoritarianScore: 0 };
+        return {
+          opinionId: opinion.id,
+          ...analysis
+        };
+      });
+
+    } catch (error) {
+      console.error("[Batch Opinion Analysis] Error analyzing opinions:", error);
+      // Return neutral scores on error
+      return opinions.map(o => ({
+        opinionId: o.id,
+        economicScore: 0,
+        authoritarianScore: 0
+      }));
+    }
+  }
+
+  /**
+   * Generate embedding vector for text using OpenAI's text-embedding-3-small model
+   * Returns a 1536-dimension vector for semantic similarity search
+   */
+  static async generateEmbedding(text: string): Promise<number[]> {
+    if (!openai) {
+      throw new Error("OpenAI API key not configured. Set OPENAI_API_KEY environment variable.");
+    }
+
+    try {
+      const response = await openai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: text.trim(),
+        encoding_format: "float"
+      });
+
+      return response.data[0].embedding;
+    } catch (error) {
+      console.error("Error generating embedding:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to generate embedding: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Calculate cosine similarity between two embedding vectors
+   * Returns a value between -1 and 1, where 1 means identical, 0 means orthogonal, -1 means opposite
+   */
+  static cosineSimilarity(vecA: number[], vecB: number[]): number {
+    if (vecA.length !== vecB.length) {
+      throw new Error("Vectors must have the same length");
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
+    }
+
+    normA = Math.sqrt(normA);
+    normB = Math.sqrt(normB);
+
+    if (normA === 0 || normB === 0) {
+      return 0;
+    }
+
+    return dotProduct / (normA * normB);
+  }
+}
