@@ -231,3 +231,23 @@ export class DataAccessError extends SecurityError {
   }
 }
 
+/**
+ * True if error is (or behaves like) SecurityError. Use where serverless bundling
+ * can duplicate class constructors so `instanceof SecurityError` fails.
+ */
+export function isSecurityError(error: unknown): error is SecurityError {
+  if (error instanceof SecurityError) {
+    return true;
+  }
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+  const e = error as Record<string, unknown>;
+  return (
+    typeof e.statusCode === 'number' &&
+    e.statusCode >= 400 &&
+    e.statusCode < 600 &&
+    typeof e.code === 'string' &&
+    typeof e.message === 'string'
+  );
+}

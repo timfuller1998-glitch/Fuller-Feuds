@@ -208,9 +208,24 @@ export class UserRepository {
         userAgent: req?.headers['user-agent'],
       });
 
+      const patch: {
+        firstName?: string;
+        lastName?: string;
+        bio?: string;
+        location?: string;
+        profileImageUrl?: string;
+        followedCategories?: string[];
+      } = {};
+      if (data.firstName !== undefined) patch.firstName = data.firstName;
+      if (data.lastName !== undefined) patch.lastName = data.lastName;
+      if (data.bio !== undefined) patch.bio = data.bio;
+      if (data.location !== undefined) patch.location = data.location;
+      if (data.profileImageUrl !== undefined) patch.profileImageUrl = data.profileImageUrl;
+      if (data.followedCategories !== undefined) patch.followedCategories = data.followedCategories;
+
       await db
         .update(users)
-        .set({ ...data, updatedAt: sql`now()` })
+        .set({ ...patch, updatedAt: sql`now()` })
         .where(eq(users.id, userId));
 
       const queryTime = Date.now() - startTime;

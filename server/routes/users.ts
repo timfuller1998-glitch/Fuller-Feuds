@@ -7,7 +7,7 @@ import { isAuthenticated, requireAdmin } from '../middleware/auth.js';
 import type { UpsertUser } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
 import { invalidateUserCache, invalidateUserBadgesCache, invalidateUserDebateStatsCache } from '../services/cacheInvalidation.js';
-import { UnauthorizedError, ForbiddenError, AuthorizationError, DataAccessError } from '../utils/securityErrors.js';
+import { isSecurityError } from '../utils/securityErrors.js';
 
 const router = Router();
 const userRepository = new UserRepository();
@@ -56,7 +56,7 @@ router.get('/me', isAuthenticated, async (req, res) => {
 
     res.json(responseUser);
   } catch (error) {
-    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+    if (isSecurityError(error)) {
       return res.status(error.statusCode).json({ error: error.message, code: error.code });
     }
     console.error("Error fetching current user:", error);
@@ -94,7 +94,7 @@ router.patch('/me', isAuthenticated, async (req, res) => {
     const userData = await userRepository.findById(userId);
     res.json(userData);
   } catch (error) {
-    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+    if (isSecurityError(error)) {
       return res.status(error.statusCode).json({ message: error.message, code: error.code });
     }
     console.error("Error updating current user:", error);
@@ -308,7 +308,7 @@ router.get('/me/debate-rooms', isAuthenticated, async (req, res) => {
     
     res.json({ active: rooms, ended: [], archived: [] });
   } catch (error) {
-    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+    if (isSecurityError(error)) {
       return res.status(error.statusCode).json({ error: error.message, code: error.code });
     }
     console.error("Error fetching debate rooms:", error);
@@ -412,19 +412,35 @@ router.put('/onboarding/profile', isAuthenticated, async (req, res) => {
     if (!user || !user.id) {
       return res.status(401).json({ message: "User not authenticated" });
     }
-    const userId = user.id;
-    await userRepository.updateProfile(userId, req.body, userId, req.userRole, req);
+    const userId = String(user.id);
+    const body = req.body ?? {};
+    const payload: {
+      firstName?: string;
+      lastName?: string;
+      bio?: string;
+      location?: string;
+      profileImageUrl?: string;
+    } = {};
+    if (body.firstName !== undefined) payload.firstName = String(body.firstName);
+    if (body.lastName !== undefined) payload.lastName = String(body.lastName);
+    if (body.bio !== undefined) payload.bio = String(body.bio);
+    if (body.location !== undefined) payload.location = String(body.location);
+    if (body.profileImageUrl !== undefined) payload.profileImageUrl = String(body.profileImageUrl);
+
+    await userRepository.updateProfile(userId, payload, userId, req.userRole, req);
     
     // Invalidate user cache after update
     await invalidateUserCache(userId);
     
     res.status(200).json({ success: true });
   } catch (error) {
-    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+    if (isSecurityError(error)) {
       return res.status(error.statusCode).json({ error: error.message, code: error.code });
     }
     console.error("Error updating profile:", error);
-    res.status(500).json({ error: "Failed to update profile" });
+    const detail =
+      process.env.EXPOSE_ERROR_DETAILS === 'true' && error instanceof Error ? error.message : undefined;
+    res.status(500).json({ error: "Failed to update profile", ...(detail ? { detail } : {}) });
   }
 });
 
@@ -448,7 +464,7 @@ router.put('/onboarding/categories', isAuthenticated, async (req, res) => {
     
     res.status(200).json({ success: true });
   } catch (error) {
-    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+    if (isSecurityError(error)) {
       return res.status(error.statusCode).json({ error: error.message, code: error.code });
     }
     console.error("Error updating categories:", error);
@@ -496,7 +512,7 @@ router.put('/onboarding/progress', isAuthenticated, async (req, res) => {
       onboardingComplete: updatedUser.onboardingComplete
     });
   } catch (error) {
-    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+    if (isSecurityError(error)) {
       return res.status(error.statusCode).json({ error: error.message, code: error.code });
     }
     console.error("Error updating onboarding progress:", error);
