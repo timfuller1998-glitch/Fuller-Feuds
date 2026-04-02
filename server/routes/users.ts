@@ -79,7 +79,13 @@ router.patch('/me', isAuthenticated, async (req, res) => {
     }
 
     if (followedCategories) {
-      await userRepository.updateProfile(userId, { followedCategories });
+      await userRepository.updateProfile(
+        userId,
+        { followedCategories },
+        userId,
+        req.userRole,
+        req
+      );
     }
 
     // Invalidate user cache after update
@@ -88,6 +94,9 @@ router.patch('/me', isAuthenticated, async (req, res) => {
     const userData = await userRepository.findById(userId);
     res.json(userData);
   } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ message: error.message, code: error.code });
+    }
     console.error("Error updating current user:", error);
     res.status(500).json({ message: "Failed to update user" });
   }
@@ -404,13 +413,16 @@ router.put('/onboarding/profile', isAuthenticated, async (req, res) => {
       return res.status(401).json({ message: "User not authenticated" });
     }
     const userId = user.id;
-    await userRepository.updateProfile(userId, req.body);
+    await userRepository.updateProfile(userId, req.body, userId, req.userRole, req);
     
     // Invalidate user cache after update
     await invalidateUserCache(userId);
     
     res.status(200).json({ success: true });
   } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error updating profile:", error);
     res.status(500).json({ error: "Failed to update profile" });
   }
@@ -429,13 +441,16 @@ router.put('/onboarding/categories', isAuthenticated, async (req, res) => {
       return res.status(400).json({ error: "categories must be an array" });
     }
 
-    await userRepository.updateProfile(userId, { followedCategories: categories });
+    await userRepository.updateProfile(userId, { followedCategories: categories }, userId, req.userRole, req);
     
     // Invalidate user cache and recommended topics cache
     await invalidateUserCache(userId);
     
     res.status(200).json({ success: true });
   } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error updating categories:", error);
     res.status(500).json({ error: "Failed to update categories" });
   }
@@ -457,7 +472,14 @@ router.put('/onboarding/progress', isAuthenticated, async (req, res) => {
     console.log(`[Onboarding Progress] Updating user ${userId}: step=${step}, complete=${complete}`);
     
     // Update onboarding progress in the database
-    const updatedUser = await userRepository.updateOnboardingProgress(userId, step, complete);
+    const updatedUser = await userRepository.updateOnboardingProgress(
+      userId,
+      step,
+      complete,
+      userId,
+      req.userRole,
+      req
+    );
     
     // Invalidate user cache after update
     await invalidateUserCache(userId);
@@ -474,6 +496,9 @@ router.put('/onboarding/progress', isAuthenticated, async (req, res) => {
       onboardingComplete: updatedUser.onboardingComplete
     });
   } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
     console.error("Error updating onboarding progress:", error);
     res.status(500).json({ error: "Failed to update onboarding progress" });
   }
