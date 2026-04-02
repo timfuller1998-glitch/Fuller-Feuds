@@ -213,6 +213,9 @@ function MainApp() {
     if (!hasCompletedOnboarding && !isOnOnboardingPage && !hasCheckedOnboardingRef.current) {
       hasCheckedOnboardingRef.current = true;
       redirectLockRef.current = true;
+      // #region agent log
+      fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'pre-fix',hypothesisId:'C',location:'App.tsx:onboarding-redirect',message:'redirecting to /onboarding',data:{fromPath:location,onboardingComplete:user.onboardingComplete},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setLocation("/onboarding");
       setTimeout(() => {
         redirectLockRef.current = false;

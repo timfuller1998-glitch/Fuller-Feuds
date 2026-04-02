@@ -168,6 +168,12 @@ export default function Onboarding() {
     }
   }, [currentStep, firstName, lastName, selectedCategories, createdOpinions]);
 
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'pre-fix',hypothesisId:'D',location:'Onboarding.tsx:canProceed-sync',message:'currentStep and canProceed inputs',data:{currentStep,canProceed,fnLen:firstName.trim().length,lnLen:lastName.trim().length,catCount:selectedCategories.length},timestamp:Date.now()})}).catch(()=>{});
+  }, [currentStep, canProceed, firstName, lastName, selectedCategories.length]);
+  // #endregion
+
   const redirectLockRef = useRef(false); // Prevent redirect loops
   
   // Redirect users who have already completed onboarding
@@ -214,7 +220,15 @@ export default function Onboarding() {
       }
       // Restore onboarding step progress (only once, only if not completed)
       // Explicitly check for !== true to handle null/undefined cases properly
-      if (!stepRestoredRef.current && user.onboardingStep && user.onboardingStep > 0 && user.onboardingComplete !== true) {
+      const willRestore =
+        !stepRestoredRef.current &&
+        user.onboardingStep &&
+        user.onboardingStep > 0 &&
+        user.onboardingComplete !== true;
+      // #region agent log
+      fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'pre-fix',hypothesisId:'A',location:'Onboarding.tsx:prefill-effect',message:'user refetch / prefill',data:{userId:user.id,onboardingStep:user.onboardingStep,onboardingComplete:user.onboardingComplete,stepRestoredBefore:stepRestoredRef.current,willRestore,restoreTargetStep:willRestore?user.onboardingStep:null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      if (willRestore) {
         setCurrentStep(user.onboardingStep);
         stepRestoredRef.current = true; // Mark as restored
       }
@@ -222,26 +236,43 @@ export default function Onboarding() {
   }, [user]);
 
   const handleNext = async () => {
-    // Save progress for current step
-    if (currentStep === 1) {
-      await updateProfileMutation.mutateAsync({
-        firstName,
-        lastName,
-        bio,
-        location,
-        profileImageUrl
+    // #region agent log
+    fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'pre-fix',hypothesisId:'B',location:'Onboarding.tsx:handleNext:entry',message:'handleNext start',data:{currentStep},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    try {
+      // Save progress for current step
+      if (currentStep === 1) {
+        await updateProfileMutation.mutateAsync({
+          firstName,
+          lastName,
+          bio,
+          location,
+          profileImageUrl
+        });
+      } else if (currentStep === 2) {
+        await updateCategoriesMutation.mutateAsync(selectedCategories);
+      }
+
+      const progressRes = await updateProgressMutation.mutateAsync({
+        step: currentStep,
+        complete: false
       });
-    } else if (currentStep === 2) {
-      await updateCategoriesMutation.mutateAsync(selectedCategories);
-    }
+      // #region agent log
+      fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'pre-fix',hypothesisId:'B',location:'Onboarding.tsx:handleNext:after-progress',message:'after progress mutation',data:{currentStep,savedStep:currentStep,responseOnboardingStep:(progressRes as { onboardingStep?: number })?.onboardingStep},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
 
-    await updateProgressMutation.mutateAsync({
-      step: currentStep,
-      complete: false
-    });
-
-    if (currentStep < 4) {
-      setCurrentStep(currentStep + 1);
+      if (currentStep < 4) {
+        const next = currentStep + 1;
+        setCurrentStep(next);
+        // #region agent log
+        fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'pre-fix',hypothesisId:'A',location:'Onboarding.tsx:handleNext:setStep',message:'setCurrentStep called',data:{from:currentStep,to:next},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+      }
+    } catch (e) {
+      // #region agent log
+      fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'pre-fix',hypothesisId:'B',location:'Onboarding.tsx:handleNext:error',message:'handleNext threw',data:{err:String(e)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      throw e;
     }
   };
 
