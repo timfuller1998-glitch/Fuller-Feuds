@@ -6,3 +6,6 @@ server/static
 vite.config.ts.*
 *.tar.gz
 .env
+
+# Cursor IDE debug logs
+.cursor/*.log
