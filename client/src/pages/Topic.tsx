@@ -103,20 +103,6 @@ export default function Topic() {
     enabled: !!id,
   });
 
-  // Fetch user's profile for opinion sort preference
-  const { data: userProfile } = useQuery<{ opinionSortPreference?: string }>({
-    queryKey: ["/api/profile", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const response = await fetch(`/api/profile/${user.id}`);
-      if (!response.ok) return null;
-      const data = await response.json();
-      return data.profile;
-    },
-    enabled: !!user?.id,
-  });
-
-
   // Get user's opinion on this topic to determine stance
   const userOpinion = opinions?.find(o => o.userId === user?.id);
 
@@ -279,70 +265,6 @@ export default function Topic() {
       document.title = 'Fuller Feuds';
     };
   }, [topic, opinions?.length]);
-
-  // Sort opinions based on user preference
-  const sortOpinions = (opinionList: Opinion[]) => {
-    const sortPref = userProfile?.opinionSortPreference || 'newest';
-    const sorted = [...opinionList];
-    
-    switch (sortPref) {
-      case 'oldest':
-        return sorted.sort((a, b) => {
-          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return aTime - bTime;
-        });
-      case 'most_liked':
-        return sorted.sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
-      case 'most_controversial':
-        return sorted.sort((a, b) => {
-          const aTotalVotes = (a.likesCount || 0) + (a.dislikesCount || 0);
-          const bTotalVotes = (b.likesCount || 0) + (b.dislikesCount || 0);
-          return bTotalVotes - aTotalVotes;
-        });
-      case 'newest':
-      default:
-        return sorted.sort((a, b) => {
-          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return bTime - aTime;
-        });
-    }
-  };
-
-  // Calculate political distance between two opinions/users
-  const calculatePoliticalDistance = (opinion: any) => {
-    if (!userProfile?.economicScore || !userProfile?.authoritarianScore) return 0;
-    if (!opinion.author?.economicScore || !opinion.author?.authoritarianScore) return 0;
-    
-    const economicDiff = Math.abs((userProfile.economicScore || 0) - (opinion.author.economicScore || 0));
-    const authDiff = Math.abs((userProfile.authoritarianScore || 0) - (opinion.author.authoritarianScore || 0));
-    
-    // Calculate Euclidean distance
-    return Math.sqrt(economicDiff * economicDiff + authDiff * authDiff);
-  };
-  
-  // Threshold for opposing opinions (can be tuned between 15-30)
-  const OPPOSING_THRESHOLD = 25;
-  const SIMILAR_THRESHOLD = 15;
-  
-  // Filter opinions by political alignment
-  const otherOpinions = opinions?.filter(o => o.userId !== user?.id) || [];
-  
-  // Highest Rated - sorted by likes
-  const highestRatedOpinions = sortOpinions([...otherOpinions].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0)));
-  
-  // Opposing Opinions - politically different users
-  const opposingOpinions = sortOpinions(otherOpinions.filter(opinion => {
-    const distance = calculatePoliticalDistance(opinion);
-    return distance >= OPPOSING_THRESHOLD;
-  }));
-  
-  // Similar Opinions - politically similar users  
-  const similarOpinions = sortOpinions(otherOpinions.filter(opinion => {
-    const distance = calculatePoliticalDistance(opinion);
-    return distance > 0 && distance < SIMILAR_THRESHOLD;
-  }));
 
   // Create opinion mutation
   const createOpinionMutation = useMutation({
