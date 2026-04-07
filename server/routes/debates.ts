@@ -5,6 +5,27 @@ import { isAuthenticated } from '../middleware/auth.js';
 const router = Router();
 const debateService = new DebateService();
 
+// GET /api/debates/grouped - Get grouped debate rooms for current user
+router.get('/grouped', isAuthenticated, async (req, res) => {
+  try {
+    const requestingUserId = (req.user as Express.User)?.id;
+    if (!requestingUserId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    const requestingUserRole = req.userRole;
+    const grouped = await debateService.getGroupedDebateRooms(
+      requestingUserId,
+      requestingUserId,
+      requestingUserRole,
+      req
+    );
+    res.json(grouped);
+  } catch (error: any) {
+    console.error('Error fetching grouped debates:', error);
+    res.status(500).json({ message: error.message || 'Failed to fetch debates' });
+  }
+});
+
 // POST /api/debate-messages/:messageId/flag - Flag a debate message
 router.post('/messages/:messageId/flag', isAuthenticated, async (req, res) => {
   try {

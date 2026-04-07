@@ -7,7 +7,7 @@ import { AvatarWithBadge } from "./AvatarWithBadge";
 import FallacyBadges from "./FallacyBadges";
 import FallacyFlagDialog from "./FallacyFlagDialog";
 import { LoginPromptDialog } from "./LoginPromptDialog";
-import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag, Link as LinkIcon, ExternalLink, MessageCircle, Maximize2 } from "lucide-react";
+import { ThumbsUp, ThumbsDown, UserPlus, Clock, Flag, Link as LinkIcon, ExternalLink, Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
@@ -41,9 +41,6 @@ interface OpinionCardProps {
   onDislike?: (id: string) => void;
   onAdopt?: (id: string) => void;
   onFlag?: (id: string) => void;
-  onDebate?: (id: string) => void;
-  onRandomMatch?: () => void;
-  isRandomMatchPending?: boolean;
 }
 
 export default function OpinionCard({
@@ -70,9 +67,6 @@ export default function OpinionCard({
   onDislike,
   onAdopt,
   onFlag,
-  onDebate,
-  onRandomMatch,
-  isRandomMatchPending = false
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
@@ -146,26 +140,6 @@ export default function OpinionCard({
       return;
     }
     setShowFlagDialog(true);
-  };
-  
-  const handleDebate = () => {
-    if (!isAuthenticated) {
-      setLoginAction("debate");
-      setShowLoginPrompt(true);
-      return;
-    }
-    onDebate?.(id);
-    setShowDetailsDialog(false);
-  };
-  
-  const handleRandomMatch = () => {
-    if (!isAuthenticated) {
-      setLoginAction("debate");
-      setShowLoginPrompt(true);
-      return;
-    }
-    onRandomMatch?.();
-    setShowDetailsDialog(false);
   };
   
   const handleAdopt = () => {
@@ -458,37 +432,6 @@ export default function OpinionCard({
                     <UserPlus className="w-4 h-4 mr-2" />
                     Adopt This Opinion
                   </Button>
-
-                  {onDebate && debateStatus === "open" && (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDebate();
-                      }}
-                      data-testid={`button-debate-dialog-${id}`}
-                    >
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      Change My Mind
-                    </Button>
-                  )}
-
-                  {onRandomMatch && (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRandomMatch();
-                      }}
-                      disabled={isRandomMatchPending}
-                      data-testid={`button-random-match-dialog-${id}`}
-                    >
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      {isRandomMatchPending ? "Matching..." : "Find Random Debate"}
-                    </Button>
-                  )}
                   
                   <Button
                     variant="outline"

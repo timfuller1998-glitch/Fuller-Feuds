@@ -17,6 +17,14 @@ export class DebateService {
     return await this.debateRepository.createDebateRoomWithOpinionAuthor(opinionId, userId);
   }
 
+  async createDebateRoomBetweenUsersForTopic(params: {
+    topicId: string;
+    participant1Id: string;
+    participant2Id: string;
+  }): Promise<DebateRoom> {
+    return await this.debateRepository.createDebateRoomBetweenUsersForTopic(params);
+  }
+
   async getDebateRoom(
     roomId: string,
     requestingUserId?: string,

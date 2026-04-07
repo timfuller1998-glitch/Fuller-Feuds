@@ -304,6 +304,12 @@ export class OpinionService {
     await this.repository.updateCounts(id, likesCount, dislikesCount);
   }
 
+  async voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike' | null): Promise<void> {
+    await this.repository.voteOnOpinion(opinionId, userId, voteType);
+    // Invalidate cached topic opinions lists and the opinion itself (vote counts are computed server-side)
+    await invalidateOpinionCache(opinionId);
+  }
+
   async deleteOpinion(
     id: string,
     requestingUserId?: string,

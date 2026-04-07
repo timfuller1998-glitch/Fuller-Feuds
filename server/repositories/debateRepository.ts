@@ -112,6 +112,42 @@ export class DebateRepository {
     return created;
   }
 
+  async createDebateRoomBetweenUsersForTopic(params: {
+    topicId: string;
+    participant1Id: string;
+    participant2Id: string;
+  }): Promise<DebateRoom> {
+    const { topicId, participant1Id, participant2Id } = params;
+
+    if (participant1Id === participant2Id) {
+      throw new Error('You cannot debate yourself');
+    }
+
+    // Require each participant to have an opinion on this topic
+    const opinionsForUsers = await db
+      .select({ userId: opinions.userId })
+      .from(opinions)
+      .where(and(eq(opinions.topicId, topicId), inArray(opinions.userId, [participant1Id, participant2Id])))
+      .limit(10);
+
+    const userSet = new Set(opinionsForUsers.map(r => r.userId));
+    if (!userSet.has(participant1Id) || !userSet.has(participant2Id)) {
+      throw new Error('Both users must have an opinion on this topic before starting a debate');
+    }
+
+    const debateRoomData: InsertDebateRoom = {
+      topicId,
+      participant1Id,
+      participant2Id,
+      participant1Privacy: 'public',
+      participant2Privacy: 'public',
+      currentTurn: participant1Id,
+    };
+
+    const [created] = await db.insert(debateRooms).values(debateRoomData).returning();
+    return created;
+  }
+
   async getDebateRoom(id: string, requestingUserId?: string, requestingUserRole?: string, req?: Request): Promise<DebateRoom | undefined> {
     const startTime = Date.now();
 

@@ -17,6 +17,8 @@ interface WebSocketMessage {
 const clientsByUserId = new Map<string, Set<AuthenticatedWebSocket>>();
 // Store clients by WebSocket instance for quick lookup
 const userIdBySocket = new Map<WebSocket, string>();
+// Presence tracking (in-memory)
+const lastActiveAtByUserId = new Map<string, number>();
 
 export function setupWebSocketServer(server: any) {
   const wss = new WebSocketServer({ 
@@ -62,6 +64,7 @@ export function setupWebSocketServer(server: any) {
           }
           clientsByUserId.get(userId)!.add(ws);
           userIdBySocket.set(ws, userId);
+          lastActiveAtByUserId.set(userId, Date.now());
 
           log(`[WebSocket] User ${userId} authenticated`);
 
@@ -82,6 +85,9 @@ export function setupWebSocketServer(server: any) {
           }));
           return;
         }
+
+        // Mark user as active on any authenticated message
+        lastActiveAtByUserId.set(ws.userId, Date.now());
 
         // Handle different message types
         switch (message.type) {
@@ -152,6 +158,7 @@ export function setupWebSocketServer(server: any) {
           }
         }
         userIdBySocket.delete(ws);
+        lastActiveAtByUserId.set(userId, Date.now());
         log(`[WebSocket] User ${userId} disconnected`);
       }
     });
@@ -173,12 +180,23 @@ export function setupWebSocketServer(server: any) {
 
     ws.on('pong', () => {
       ws.isAlive = true;
+      if (ws.userId) {
+        lastActiveAtByUserId.set(ws.userId, Date.now());
+      }
     });
   });
 
   log('[WebSocket] Server initialized on /ws');
 
   return wss;
+}
+
+export function getPresenceForUserIds(userIds: string[]) {
+  return userIds.map((userId) => {
+    const isOnline = (clientsByUserId.get(userId)?.size || 0) > 0;
+    const lastActiveAt = lastActiveAtByUserId.get(userId) || null;
+    return { userId, isOnline, lastActiveAt };
+  });
 }
 
 // Helper function to broadcast to opponent in a debate room

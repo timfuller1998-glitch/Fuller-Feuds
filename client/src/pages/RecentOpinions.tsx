@@ -160,31 +160,6 @@ export default function RecentOpinionsPage() {
     },
   };
 
-  // Start debate mutation
-  const startDebateWithOpinionMutation = {
-    mutate: async (opinionId: string) => {
-      try {
-        const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, {});
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to start debate");
-        }
-        const room = await response.json();
-        queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
-        toast({
-          title: "Debate started!",
-          description: "Check the footer to see your new debate. Click your opponent's avatar to start chatting!",
-        });
-      } catch (error: any) {
-        toast({
-          title: "Cannot start debate",
-          description: error.message || "Failed to start debate",
-          variant: "destructive",
-        });
-      }
-    },
-  };
-
   const handleVote = (opinionId: string, currentVote: 'like' | 'dislike' | null, newVote: 'like' | 'dislike') => {
     const voteType = currentVote === newVote ? null : newVote;
     voteMutation.mutate({ opinionId, voteType });
@@ -301,7 +276,6 @@ export default function RecentOpinionsPage() {
                     onLike={() => handleVote(opinion.id, opinion.userVote?.voteType || null, 'like')}
                     onDislike={() => handleVote(opinion.id, opinion.userVote?.voteType || null, 'dislike')}
                     onAdopt={() => adoptMutation.mutate(opinion.id)}
-                    onDebate={() => startDebateWithOpinionMutation.mutate(opinion.id)}
                   />
                 </div>
               ))}

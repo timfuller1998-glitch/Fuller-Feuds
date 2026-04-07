@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { OpinionService } from '../services/opinionService.js';
 import { DebateService } from '../services/debateService.js';
 import { ModerationService } from '../services/moderationService.js';
+import { CounterpointService } from '../services/counterpointService.js';
 import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertOpinionSchema } from '../../shared/schema.js';
 import { z } from 'zod';
@@ -12,6 +13,7 @@ const router = Router();
 const opinionService = new OpinionService();
 const debateService = new DebateService();
 const moderationService = new ModerationService();
+const counterpointService = new CounterpointService();
 
 // GET /api/opinions/recent - Get recent opinions
 router.get('/recent', async (req, res) => {
@@ -165,8 +167,7 @@ router.post('/:opinionId/vote', isAuthenticated, async (req, res) => {
       return res.status(400).json({ message: "Invalid vote type" });
     }
 
-    // TODO: Implement voting in OpinionService
-    // await opinionService.voteOnOpinion(req.params.opinionId, userId, voteType);
+    await opinionService.voteOnOpinion(req.params.opinionId, userId, voteType);
     
     // Invalidate vote cache
     await invalidateVoteCache(req.params.opinionId, userId);
@@ -304,6 +305,44 @@ router.get('/profile/:userId', async (req, res) => {
   } catch (error) {
     console.error("Error fetching user opinions:", error);
     res.status(500).json({ message: "Failed to fetch user opinions" });
+  }
+});
+
+// GET /api/opinions/:opinionId/counterpoints?sentenceIndex=n - List counterpoints for a sentence
+router.get('/:opinionId/counterpoints', async (req, res) => {
+  try {
+    const sentenceIndexRaw = req.query.sentenceIndex;
+    const sentenceIndex = typeof sentenceIndexRaw === 'string' ? parseInt(sentenceIndexRaw, 10) : NaN;
+    if (!Number.isInteger(sentenceIndex) || sentenceIndex < 0) {
+      return res.status(400).json({ error: 'sentenceIndex is required and must be a non-negative integer' });
+    }
+    const currentUserId = (req.user as Express.User | undefined)?.id;
+    const counterpoints = await counterpointService.listCounterpoints({
+      opinionId: req.params.opinionId,
+      sentenceIndex,
+      currentUserId,
+    });
+    res.json(counterpoints);
+  } catch (error: any) {
+    console.error('Error listing counterpoints:', error);
+    res.status(500).json({ message: 'Failed to list counterpoints' });
+  }
+});
+
+// POST /api/opinions/:opinionId/counterpoints - Create a counterpoint for a sentence
+router.post('/:opinionId/counterpoints', isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { sentenceIndex, content } = req.body || {};
+    const created = await counterpointService.createCounterpoint({
+      opinionId: req.params.opinionId,
+      sentenceIndex: Number(sentenceIndex),
+      authorUserId: userId,
+      content: String(content ?? ''),
+    });
+    res.status(201).json(created);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message || 'Failed to create counterpoint' });
   }
 });
 

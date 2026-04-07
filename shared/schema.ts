@@ -115,6 +115,9 @@ export const cumulativeOpinions = pgTable("cumulative_opinions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   topicId: uuid("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
   summary: text("summary").notNull(),
+  // Structured sentence-level summary with citations to opinionIds.
+  // Keeps `summary` as a backward-compatible plain string.
+  summarySentences: jsonb("summary_sentences"),
   keyPoints: text("key_points").array().default([]),
   totalOpinions: integer("total_opinions").default(0),
   confidence: varchar("confidence", { length: 20 }).default("medium"), // 'high', 'medium', 'low'
@@ -131,6 +134,11 @@ export const cumulativeOpinions = pgTable("cumulative_opinions", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export type SummarySentence = {
+  text: string;
+  referencedOpinionIds: string[];
+};
 
 // One-on-one debate rooms
 export const debateRooms = pgTable("debate_rooms", {
@@ -276,6 +284,26 @@ export const opinionVotes = pgTable("opinion_votes", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   uniqueIndex("unique_opinion_user_vote").on(table.opinionId, table.userId)
+]);
+
+// Sentence-level counterpoints attached to an opinion
+export const opinionSentenceCounterpoints = pgTable("opinion_sentence_counterpoints", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  opinionId: uuid("opinion_id").notNull().references(() => opinions.id, { onDelete: "cascade" }),
+  sentenceIndex: integer("sentence_index").notNull(),
+  authorUserId: varchar("author_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  status: varchar("status", { length: 20 }).default("approved"), // 'approved', 'flagged', 'hidden'
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const counterpointLikes = pgTable("counterpoint_likes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  counterpointId: uuid("counterpoint_id").notNull().references(() => opinionSentenceCounterpoints.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_counterpoint_user_like").on(table.counterpointId, table.userId)
 ]);
 
 // Opinion flags - for reporting logical fallacies
@@ -517,6 +545,8 @@ export type Opinion = typeof opinions.$inferSelect & {
   } | null;
 };
 export type CumulativeOpinion = typeof cumulativeOpinions.$inferSelect;
+export type OpinionSentenceCounterpoint = typeof opinionSentenceCounterpoints.$inferSelect;
+export type CounterpointLike = typeof counterpointLikes.$inferSelect;
 export type DebateRoom = typeof debateRooms.$inferSelect;
 export type InsertDebateRoom = z.infer<typeof insertDebateRoomSchema>;
 export type DebateMessage = typeof debateMessages.$inferSelect & {

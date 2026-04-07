@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -11,27 +11,24 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { ThumbsUp, ThumbsDown, Brain, Flag } from "lucide-react";
-import { ArrowLeft, MessageCircle, Users, TrendingUp, RefreshCw, Video, Calendar, Clock, Eye, Link as LinkIcon, Plus, X } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ArrowLeft, Brain, Flag, MessageCircle, Plus, Users, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
-import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType } from "@shared/schema";
+import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType, type SummarySentence } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import OpinionCard from "@/components/OpinionCard";
-import TopicCard from "@/components/TopicCard";
-import { CardContainer } from "@/components/CardContainer";
 import { AdoptOpinionDialog } from "@/components/AdoptOpinionDialog";
-import { DebateOnboardingModal } from "@/components/DebateOnboardingModal";
 import { LoginPromptDialog } from "@/components/LoginPromptDialog";
 import FallacyBadges from "@/components/FallacyBadges";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
-import { formatDistanceToNow } from "date-fns";
 import type { FallacyType } from "@shared/fallacies";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
-import useEmblaCarousel from "embla-carousel-react";
+import { InteractiveSentenceText } from "@/components/InteractiveSentenceText";
 
 const opinionFormSchema = insertOpinionSchema.omit({
   topicId: true,
@@ -51,31 +48,15 @@ export default function Topic() {
   const [showTopicFlagDialog, setShowTopicFlagDialog] = useState(false);
   const [showAdoptDialog, setShowAdoptDialog] = useState(false);
   const [opinionToAdopt, setOpinionToAdopt] = useState<any>(null);
-  const [showDebateOnboarding, setShowDebateOnboarding] = useState(false);
-  const [debateOpinionId, setDebateOpinionId] = useState<string | null>(null);
-  const [debateOpponentName, setDebateOpponentName] = useState<string>("");
-  const [isRandomMatch, setIsRandomMatch] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [loginAction, setLoginAction] = useState<"like" | "opinion" | "debate" | "interact">("interact");
-  
-  // Carousel state for opinion/summary swipe
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "start" });
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState<"ai" | "yours" | "others">("ai");
 
-  // Update carousel selected index
-  const onSelect = useCallback(() => {
-    if (!emblaApi) return;
-    setSelectedIndex(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
-
-  useEffect(() => {
-    if (!emblaApi) return;
-    onSelect();
-    emblaApi.on("select", onSelect);
-    return () => {
-      emblaApi.off("select", onSelect);
-    };
-  }, [emblaApi, onSelect]);
+  const [selectedSentenceIndex, setSelectedSentenceIndex] = useState<number | null>(null);
+  const [selectedOtherSentenceIndex, setSelectedOtherSentenceIndex] = useState<number | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [rankMode, setRankMode] = useState<"rank" | "active">("rank");
+  const [selectedCounterpointId, setSelectedCounterpointId] = useState<string | null>(null);
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -136,23 +117,110 @@ export default function Topic() {
   });
 
 
-  // Fetch similar topics
-  const { data: similarTopicsRaw } = useQuery<TopicType[]>({
-    queryKey: ["/api/topics/search-similar", topic?.title],
-    queryFn: async () => {
-      if (!topic?.title) return [];
-      const response = await fetch(`/api/topics/search-similar?query=${encodeURIComponent(topic.title)}`);
-      if (!response.ok) return [];
-      return response.json();
-    },
-    enabled: !!topic?.title,
-  });
-
-  // Filter out the current topic from similar topics
-  const similarTopics = similarTopicsRaw?.filter(t => t.id !== id) || [];
-
   // Get user's opinion on this topic to determine stance
   const userOpinion = opinions?.find(o => o.userId === user?.id);
+
+  const otherOpinions = useMemo(() => (opinions || []).filter(o => o.userId !== user?.id), [opinions, user?.id]);
+  const [otherOpinionIndex, setOtherOpinionIndex] = useState(0);
+  const currentOtherOpinion = otherOpinions[otherOpinionIndex] || null;
+
+  const topOpinionsByLikes = useMemo(() => {
+    const list = [...(opinions || [])].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
+    return list.slice(0, 10);
+  }, [opinions]);
+
+  const summarySentences: SummarySentence[] = useMemo(() => {
+    const raw = (cumulativeData as any)?.summarySentences;
+    if (Array.isArray(raw)) return raw as SummarySentence[];
+    const summary = (cumulativeData as any)?.summary as string | undefined;
+    if (!summary) return [];
+    // fallback: single sentence block with top opinions
+    return summary
+      .split(/(?<=[.!?])\s+/g)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map((text) => ({
+        text,
+        referencedOpinionIds: topOpinionsByLikes.slice(0, 3).map(o => o.id),
+      }));
+  }, [cumulativeData, topOpinionsByLikes]);
+
+  const referencedOpinionsForSelectedSummarySentence = useMemo(() => {
+    if (selectedSentenceIndex == null) return [];
+    const ids = summarySentences[selectedSentenceIndex]?.referencedOpinionIds || [];
+    const map = new Map((opinions || []).map(o => [o.id, o]));
+    return ids.map(id => map.get(id)).filter(Boolean) as Opinion[];
+  }, [opinions, selectedSentenceIndex, summarySentences]);
+
+  const counterpointsQueryKey = useMemo(() => {
+    if (!userOpinion?.id || selectedSentenceIndex == null) return null;
+    return ["/api/opinions", userOpinion.id, "counterpoints", selectedSentenceIndex] as const;
+  }, [selectedSentenceIndex, userOpinion?.id]);
+
+  const { data: counterpoints } = useQuery<any[]>({
+    queryKey: counterpointsQueryKey as any,
+    queryFn: async () => {
+      if (!userOpinion?.id || selectedSentenceIndex == null) return [];
+      const response = await fetch(`/api/opinions/${userOpinion.id}/counterpoints?sentenceIndex=${selectedSentenceIndex}`);
+      if (!response.ok) throw new Error("Failed to fetch counterpoints");
+      return response.json();
+    },
+    enabled: !!userOpinion?.id && selectedSentenceIndex != null && sheetOpen && activeTab === "yours",
+  });
+
+  const otherCounterpointsQueryKey = useMemo(() => {
+    if (!currentOtherOpinion?.id || selectedOtherSentenceIndex == null) return null;
+    return ["/api/opinions", currentOtherOpinion.id, "counterpoints", selectedOtherSentenceIndex] as const;
+  }, [currentOtherOpinion?.id, selectedOtherSentenceIndex]);
+
+  const { data: otherCounterpoints } = useQuery<any[]>({
+    queryKey: otherCounterpointsQueryKey as any,
+    queryFn: async () => {
+      if (!currentOtherOpinion?.id || selectedOtherSentenceIndex == null) return [];
+      const response = await fetch(`/api/opinions/${currentOtherOpinion.id}/counterpoints?sentenceIndex=${selectedOtherSentenceIndex}`);
+      if (!response.ok) throw new Error("Failed to fetch counterpoints");
+      return response.json();
+    },
+    enabled: !!currentOtherOpinion?.id && selectedOtherSentenceIndex != null && sheetOpen && activeTab === "others",
+  });
+
+  const { data: likers } = useQuery<{ likerIds: string[] } | null>({
+    queryKey: ["/api/counterpoints", selectedCounterpointId, "likers"],
+    queryFn: async () => {
+      if (!selectedCounterpointId) return null;
+      const res = await fetch(`/api/counterpoints/${selectedCounterpointId}/likers`);
+      if (!res.ok) throw new Error("Failed to fetch likers");
+      return res.json();
+    },
+    enabled: !!selectedCounterpointId && sheetOpen && activeTab === "yours",
+  });
+
+  const likerIds = likers?.likerIds || [];
+
+  const { data: presence } = useQuery<any[]>({
+    queryKey: ["/api/presence/online-users", likerIds.join(",")],
+    queryFn: async () => {
+      if (likerIds.length === 0) return [];
+      const res = await fetch(`/api/presence/online-users?userIds=${encodeURIComponent(likerIds.join(","))}`);
+      if (!res.ok) throw new Error("Failed to fetch presence");
+      return res.json();
+    },
+    enabled: likerIds.length > 0 && sheetOpen && activeTab === "yours",
+  });
+
+  const rankedPresence = useMemo(() => {
+    const list = [...(presence || [])];
+    if (rankMode === "rank") {
+      list.sort((a, b) => (b.debaterRank || 0) - (a.debaterRank || 0));
+    } else {
+      list.sort((a, b) => {
+        const onlineDiff = (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0);
+        if (onlineDiff !== 0) return onlineDiff;
+        return (b.lastActiveAt || 0) - (a.lastActiveAt || 0);
+      });
+    }
+    return list;
+  }, [presence, rankMode]);
   
   // Add SEO metadata
   useEffect(() => {
@@ -354,47 +422,51 @@ export default function Topic() {
     },
   });
 
-  // Start debate with opinion author
-  const startDebateWithOpinionMutation = useMutation({
-    mutationFn: async ({ opinionId, openingMessage }: { opinionId: string; openingMessage: string }) => {
-      const response = await apiRequest('POST', `/api/opinions/${opinionId}/start-debate`, { openingMessage });
-      return response.json();
+  const likeCounterpointMutation = useMutation({
+    mutationFn: async ({ counterpointId, like }: { counterpointId: string; like: boolean }) => {
+      return apiRequest("POST", `/api/counterpoints/${counterpointId}/like`, { like });
     },
-    onSuccess: (room) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
-      toast({
-        title: "Debate started!",
-        description: "Your new debate will appear in the footer. Click their avatar to start chatting!",
-      });
-      setShowDebateOnboarding(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Cannot start debate",
-        description: error.message || "Failed to start debate",
-        variant: "destructive",
-      });
+    onSuccess: () => {
+      if (userOpinion?.id && selectedSentenceIndex != null) {
+        queryClient.invalidateQueries({ queryKey: ["/api/opinions", userOpinion.id, "counterpoints", selectedSentenceIndex] as any });
+      }
+      if (currentOtherOpinion?.id && selectedOtherSentenceIndex != null) {
+        queryClient.invalidateQueries({ queryKey: ["/api/opinions", currentOtherOpinion.id, "counterpoints", selectedOtherSentenceIndex] as any });
+      }
+      if (selectedCounterpointId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/counterpoints", selectedCounterpointId, "likers"] });
+      }
     },
   });
 
-  // Handler to open debate onboarding modal
-  const handleStartDebate = (opinionId: string, opponentName: string) => {
-    setIsRandomMatch(false);
-    setDebateOpinionId(opinionId);
-    setDebateOpponentName(opponentName);
-    setShowDebateOnboarding(true);
-  };
+  const createCounterpointMutation = useMutation({
+    mutationFn: async ({ opinionId, sentenceIndex, content }: { opinionId: string; sentenceIndex: number; content: string }) => {
+      return apiRequest("POST", `/api/opinions/${opinionId}/counterpoints`, { sentenceIndex, content });
+    },
+    onSuccess: () => {
+      if (userOpinion?.id && selectedSentenceIndex != null) {
+        queryClient.invalidateQueries({ queryKey: ["/api/opinions", userOpinion.id, "counterpoints", selectedSentenceIndex] as any });
+      }
+      if (currentOtherOpinion?.id && selectedOtherSentenceIndex != null) {
+        queryClient.invalidateQueries({ queryKey: ["/api/opinions", currentOtherOpinion.id, "counterpoints", selectedOtherSentenceIndex] as any });
+      }
+      toast({ title: "Counterpoint added" });
+    },
+  });
 
-  // Handler to submit debate with opening message
-  const handleSubmitDebate = (openingMessage: string) => {
-    if (isRandomMatch) {
-      // Random match flow
-      startRandomDebateMutation.mutate({ openingMessage });
-    } else if (debateOpinionId) {
-      // Specific opponent flow
-      startDebateWithOpinionMutation.mutate({ opinionId: debateOpinionId, openingMessage });
-    }
-  };
+  const startDebateFromCounterpointMutation = useMutation({
+    mutationFn: async ({ counterpointId, opponentUserId }: { counterpointId: string; opponentUserId: string }) => {
+      const res = await apiRequest("POST", `/api/counterpoints/${counterpointId}/start-debate`, { opponentUserId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
+      toast({ title: "Debate started", description: "Your debate should appear in the footer." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Cannot start debate", description: error.message || "Failed to start debate", variant: "destructive" });
+    },
+  });
 
   // Flag topic mutation
   const flagTopicMutation = useMutation({
@@ -426,30 +498,6 @@ export default function Topic() {
     },
   });
 
-  // Start random debate match mutation
-  const startRandomDebateMutation = useMutation({
-    mutationFn: async ({ openingMessage }: { openingMessage: string }) => {
-      const response = await apiRequest('POST', `/api/topics/${id}/match-debate`, { openingMessage });
-      return response.json();
-    },
-    onSuccess: (room) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
-      toast({
-        title: "Debate matched!",
-        description: "Check the footer to see your new debate. Click your opponent's avatar to start chatting!",
-      });
-      setShowDebateOnboarding(false);
-    },
-    onError: (error: any) => {
-      console.error("Failed to start debate:", error);
-      toast({
-        title: "Cannot start debate",
-        description: error.message || "Failed to start debate",
-        variant: "destructive",
-      });
-    },
-  });
-
   const opinionForm = useForm<z.infer<typeof opinionFormSchema>>({
     resolver: zodResolver(opinionFormSchema),
     defaultValues: {
@@ -475,17 +523,6 @@ export default function Topic() {
       return;
     }
     setShowOpinionForm(true);
-  };
-  
-  const handleFindDebateClick = () => {
-    if (!isAuthenticated) {
-      setLoginAction("debate");
-      setShowLoginPrompt(true);
-      return;
-    }
-    setIsRandomMatch(true);
-    setDebateOpponentName("a random opponent");
-    setShowDebateOnboarding(true);
   };
   
   const handleFlagTopicClick = () => {
@@ -522,17 +559,8 @@ export default function Topic() {
     );
   }
 
-  // Get opposite opinion users for chat
-  const oppositeOpinions = userOpinion 
-    ? opinions?.filter(o => 
-        o.userId !== user?.id && 
-        ((userOpinion.stance === 'for' && o.stance === 'against') || 
-         (userOpinion.stance === 'against' && o.stance === 'for'))
-      ) || []
-    : [];
-
   return (
-    <div className="space-y-6 animate-fade-in pb-8">
+    <div className="space-y-6 animate-fade-in pb-10">
       {/* Back Button */}
       <Link href="/">
         <Button variant="ghost" size="sm" data-testid="button-back-home">
@@ -601,362 +629,417 @@ export default function Topic() {
         </div>
       </div>
 
-      {/* Swipeable Carousel: Your Opinion & AI Summary */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold">Overview</h2>
-        </div>
-        
-        <div className="overflow-hidden" ref={emblaRef} data-testid="carousel-overview">
-          <div className="flex gap-4">
-            {/* Slide 1: AI Summary */}
-            {cumulativeData && (
-              <div className="flex-[0_0_100%] min-w-0 pl-[calc((100%-280px)/2)] pr-[calc((100%-280px)/2)] md:pl-[calc((100%-300px)/2)] md:pr-[calc((100%-300px)/2)]">
-                <div className="w-[280px] md:w-[300px] mx-auto">
-                  <Card className="h-full" data-testid="card-ai-summary">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Brain className="w-4 h-4 text-primary" />
-                        AI Summary
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <p className="text-sm leading-relaxed">{cumulativeData.summary}</p>
-                      <div className="grid grid-cols-3 gap-2 pt-2 border-t">
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-primary">{cumulativeData.supportingPercentage || 0}%</div>
-                          <div className="text-xs text-muted-foreground">For</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-muted-foreground">{cumulativeData.neutralPercentage || 0}%</div>
-                          <div className="text-xs text-muted-foreground">Neutral</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-destructive">{cumulativeData.opposingPercentage || 0}%</div>
-                          <div className="text-xs text-muted-foreground">Against</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <TabsList className="w-full grid grid-cols-3">
+          <TabsTrigger value="ai" className="text-sm md:text-base">AI Summary</TabsTrigger>
+          <TabsTrigger value="yours" className="text-sm md:text-base">Your Opinion</TabsTrigger>
+          <TabsTrigger value="others" className="text-sm md:text-base">Other Opinions</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ai" className="mt-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="w-5 h-5 text-primary" />
+                AI Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {cumulativeData ? (
+                <InteractiveSentenceText
+                  text={summarySentences.map(s => s.text).join(" ")}
+                  selectedSentenceIndex={selectedSentenceIndex}
+                  onSelectSentence={(idx) => {
+                    setSelectedSentenceIndex(idx);
+                    setSheetOpen(true);
+                  }}
+                />
+              ) : (
+                <p className="text-muted-foreground">No AI summary yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="yours" className="mt-4">
+          {userOpinion ? (
+            <Card style={getOpinionGradientStyle(userOpinion.topicEconomicScore, userOpinion.topicAuthoritarianScore)}>
+              <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
+                <CardTitle>Your Opinion</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    opinionForm.setValue("content", userOpinion.content);
+                    opinionForm.setValue("debateStatus", (userOpinion.debateStatus || "open") as any);
+                    opinionForm.setValue("references", userOpinion.references || []);
+                    setShowOpinionForm(true);
+                  }}
+                >
+                  Update
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <InteractiveSentenceText
+                  text={userOpinion.content}
+                  selectedSentenceIndex={selectedSentenceIndex}
+                  onSelectSentence={(idx) => {
+                    setSelectedSentenceIndex(idx);
+                    setSelectedCounterpointId(null);
+                    setSheetOpen(true);
+                  }}
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <Button variant="default" onClick={handleShareOpinionClick}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Share Your Opinion
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="others" className="mt-4">
+          {currentOtherOpinion ? (
+            <Card style={getOpinionGradientStyle(currentOtherOpinion.topicEconomicScore, currentOtherOpinion.topicAuthoritarianScore)}>
+              <CardHeader className="pb-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle>Other Opinions</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={otherOpinionIndex <= 0}
+                      onClick={() => {
+                        setOtherOpinionIndex(i => Math.max(0, i - 1));
+                        setSelectedOtherSentenceIndex(null);
+                      }}
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={otherOpinionIndex >= otherOpinions.length - 1}
+                      onClick={() => {
+                        setOtherOpinionIndex(i => Math.min(otherOpinions.length - 1, i + 1));
+                        setSelectedOtherSentenceIndex(null);
+                      }}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
-              </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={(currentOtherOpinion.userVote?.voteType === "like") ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        setLoginAction("like");
+                        setShowLoginPrompt(true);
+                        return;
+                      }
+                      voteMutation.mutate({
+                        opinionId: currentOtherOpinion.id,
+                        voteType: "like",
+                        currentVote: currentOtherOpinion.userVote?.voteType || null
+                      });
+                    }}
+                  >
+                    Like ({currentOtherOpinion.likesCount || 0})
+                  </Button>
+                  <Button
+                    variant={(currentOtherOpinion.userVote?.voteType === "dislike") ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        setLoginAction("like");
+                        setShowLoginPrompt(true);
+                        return;
+                      }
+                      voteMutation.mutate({
+                        opinionId: currentOtherOpinion.id,
+                        voteType: "dislike",
+                        currentVote: currentOtherOpinion.userVote?.voteType || null
+                      });
+                    }}
+                  >
+                    Dislike ({currentOtherOpinion.dislikesCount || 0})
+                  </Button>
+                  <div className="text-sm text-muted-foreground ml-auto">
+                    {otherOpinionIndex + 1} / {otherOpinions.length}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <InteractiveSentenceText
+                  text={currentOtherOpinion.content}
+                  selectedSentenceIndex={selectedOtherSentenceIndex}
+                  onSelectSentence={(idx) => {
+                    setSelectedOtherSentenceIndex(idx);
+                    setSheetOpen(true);
+                  }}
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-10 text-center text-muted-foreground">
+                No other opinions yet.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Right-side sheet for sentence interactions */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>
+              {activeTab === "ai" && "Referenced Opinions"}
+              {activeTab === "yours" && "Counterpoints"}
+              {activeTab === "others" && "Counterpoints"}
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="mt-4 space-y-4">
+            {activeTab === "ai" && (
+              <>
+                {referencedOpinionsForSelectedSummarySentence.length > 0 ? (
+                  <ScrollArea className="h-[calc(100vh-140px)] pr-4">
+                    <div className="space-y-3">
+                      {referencedOpinionsForSelectedSummarySentence.map((op) => (
+                        <OpinionCard
+                          key={op.id}
+                          id={op.id}
+                          topicId={id!}
+                          userId={op.userId}
+                          userName={op.author ? `${op.author.firstName || ""} ${op.author.lastName || ""}`.trim() || "Anonymous" : "Anonymous"}
+                          userAvatar={op.author?.profileImageUrl || undefined}
+                          economicScore={op.author?.economicScore}
+                          authoritarianScore={op.author?.authoritarianScore}
+                          topicEconomicScore={op.topicEconomicScore}
+                          topicAuthoritarianScore={op.topicAuthoritarianScore}
+                          content={op.content}
+                          debateStatus={op.debateStatus}
+                          timestamp={"—"}
+                          likesCount={op.likesCount || 0}
+                          dislikesCount={op.dislikesCount || 0}
+                          references={op.references || []}
+                          fallacyCounts={op.fallacyCounts}
+                          isLiked={op.userVote?.voteType === "like"}
+                          isDisliked={op.userVote?.voteType === "dislike"}
+                          onLike={(opinionId) =>
+                            voteMutation.mutate({
+                              opinionId,
+                              voteType: "like",
+                              currentVote: op.userVote?.voteType || null,
+                            })
+                          }
+                          onDislike={(opinionId) =>
+                            voteMutation.mutate({
+                              opinionId,
+                              voteType: "dislike",
+                              currentVote: op.userVote?.voteType || null,
+                            })
+                          }
+                          onAdopt={(opinionId) => {
+                            const opinionData = opinions?.find(o => o.id === opinionId);
+                            setOpinionToAdopt(opinionData);
+                            setShowAdoptDialog(true);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <p className="text-muted-foreground">Select a sentence to see referenced opinions.</p>
+                )}
+              </>
             )}
 
-            {/* Slide 2: User's Opinion */}
-            <div className="flex-[0_0_100%] min-w-0 pl-[calc((100%-280px)/2)] pr-[calc((100%-280px)/2)] md:pl-[calc((100%-300px)/2)] md:pr-[calc((100%-300px)/2)]">
-              <div className="w-[280px] md:w-[300px] mx-auto">
-                {userOpinion && !showOpinionForm ? (
-                  <Card 
-                    className="h-full flex flex-col" 
-                    style={getOpinionGradientStyle(userOpinion.topicEconomicScore, userOpinion.topicAuthoritarianScore)}
-                    data-testid="card-user-opinion"
-                  >
-                    <CardHeader className="pb-3 flex-shrink-0">
-                      <CardTitle className="text-base">Your Opinion</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
-                      <p className="text-sm leading-relaxed line-clamp-3 mb-3">{userOpinion.content}</p>
-                      <div className="flex gap-2 mt-auto pt-2 border-t">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            opinionForm.setValue('content', userOpinion.content);
-                            opinionForm.setValue('debateStatus', (userOpinion.debateStatus || "open") as "open" | "closed" | "private");
-                            opinionForm.setValue('references', userOpinion.references || []);
-                            setShowOpinionForm(true);
-                          }}
-                          data-testid="button-change-opinion"
-                        >
-                          Update
-                        </Button>
-                        {oppositeOpinions.length > 0 && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={handleFindDebateClick}
-                            data-testid="button-find-random-debate"
-                          >
-                            <MessageCircle className="w-3 h-3 mr-1" />
-                            Find Debate
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+            {activeTab === "yours" && (
+              <>
+                {selectedSentenceIndex == null ? (
+                  <p className="text-muted-foreground">Select a sentence to see counterpoints.</p>
                 ) : (
-                  <Card className="h-full flex items-center justify-center min-h-[200px]">
-                    <CardContent className="text-center">
-                      <Button 
-                        variant="default" 
-                        onClick={handleShareOpinionClick}
-                        data-testid="button-share-opinion"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Share Your Opinion
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  <>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Add a counterpoint</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <Textarea
+                          placeholder="Write a counterpoint…"
+                          className="min-h-[90px]"
+                          onBlur={(e) => {
+                            const content = e.currentTarget.value;
+                            if (!content.trim()) return;
+                            if (!isAuthenticated) {
+                              setLoginAction("interact");
+                              setShowLoginPrompt(true);
+                              return;
+                            }
+                            createCounterpointMutation.mutate({ opinionId: userOpinion!.id, sentenceIndex: selectedSentenceIndex, content });
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                        <p className="text-xs text-muted-foreground">Tip: click away to submit.</p>
+                      </CardContent>
+                    </Card>
+
+                    <div className="space-y-2">
+                      {(counterpoints || []).length === 0 ? (
+                        <p className="text-muted-foreground">No counterpoints yet.</p>
+                      ) : (
+                        (counterpoints || []).map((cp: any) => (
+                          <Card key={cp.id}>
+                            <CardContent className="pt-4 space-y-3">
+                              <div className="text-sm whitespace-pre-wrap">{cp.content}</div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant={cp.likedByMe ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => {
+                                    if (!isAuthenticated) {
+                                      setLoginAction("like");
+                                      setShowLoginPrompt(true);
+                                      return;
+                                    }
+                                    likeCounterpointMutation.mutate({ counterpointId: cp.id, like: !cp.likedByMe });
+                                  }}
+                                >
+                                  Like ({cp.likeCount || 0})
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedCounterpointId(cp.id)}
+                                >
+                                  Choose debater
+                                </Button>
+                              </div>
+
+                              {selectedCounterpointId === cp.id && (
+                                <div className="pt-2 border-t space-y-2">
+                                  <ToggleGroup
+                                    type="single"
+                                    value={rankMode}
+                                    onValueChange={(v) => v && setRankMode(v as any)}
+                                    className="justify-start"
+                                  >
+                                    <ToggleGroupItem value="rank">Highest ranked</ToggleGroupItem>
+                                    <ToggleGroupItem value="active">Most active</ToggleGroupItem>
+                                  </ToggleGroup>
+
+                                  {rankedPresence.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No likers yet.</p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {rankedPresence.map((p: any) => (
+                                        <Button
+                                          key={p.userId}
+                                          variant={p.isOnline ? "default" : "outline"}
+                                          size="sm"
+                                          className="w-full justify-between"
+                                          onClick={() => {
+                                            startDebateFromCounterpointMutation.mutate({ counterpointId: cp.id, opponentUserId: p.userId });
+                                          }}
+                                        >
+                                          <span className="truncate">{p.userId}</span>
+                                          <span className="text-xs opacity-80">
+                                            {p.isOnline ? "Online" : "Offline"} · Rank {p.debaterRank || 0}
+                                          </span>
+                                        </Button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </div>
+                  </>
                 )}
-              </div>
-            </div>
-          </div>
-        </div>
+              </>
+            )}
 
-        {/* Carousel Indicators */}
-        {cumulativeData && (
-          <div className="flex justify-center gap-2 pt-2">
-            <button
-              onClick={() => emblaApi?.scrollTo(0)}
-              className={`w-2 h-2 rounded-full transition-all ${selectedIndex === 0 ? 'bg-primary w-6' : 'bg-muted-foreground/30'}`}
-              aria-label="View AI summary"
-              data-testid="carousel-dot-0"
-            />
-            <button
-              onClick={() => emblaApi?.scrollTo(1)}
-              className={`w-2 h-2 rounded-full transition-all ${selectedIndex === 1 ? 'bg-primary w-6' : 'bg-muted-foreground/30'}`}
-              aria-label="View your opinion"
-              data-testid="carousel-dot-1"
-            />
-          </div>
-        )}
-      </div>
+            {activeTab === "others" && (
+              <>
+                {selectedOtherSentenceIndex == null || !currentOtherOpinion ? (
+                  <p className="text-muted-foreground">Select a sentence to see counterpoints.</p>
+                ) : (
+                  <>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Add a counterpoint</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <Textarea
+                          placeholder="Write a counterpoint…"
+                          className="min-h-[90px]"
+                          onBlur={(e) => {
+                            const content = e.currentTarget.value;
+                            if (!content.trim()) return;
+                            if (!isAuthenticated) {
+                              setLoginAction("interact");
+                              setShowLoginPrompt(true);
+                              return;
+                            }
+                            createCounterpointMutation.mutate({ opinionId: currentOtherOpinion.id, sentenceIndex: selectedOtherSentenceIndex, content });
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                        <p className="text-xs text-muted-foreground">Tip: click away to submit.</p>
+                      </CardContent>
+                    </Card>
 
-      {/* "Highest Rated" Section */}
-      {highestRatedOpinions.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold">Highest Rated</h2>
-            <Badge variant="default">{highestRatedOpinions.length}</Badge>
+                    <div className="space-y-2">
+                      {(otherCounterpoints || []).length === 0 ? (
+                        <p className="text-muted-foreground">No counterpoints yet.</p>
+                      ) : (
+                        (otherCounterpoints || []).map((cp: any) => (
+                          <Card key={cp.id}>
+                            <CardContent className="pt-4 space-y-3">
+                              <div className="text-sm whitespace-pre-wrap">{cp.content}</div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant={cp.likedByMe ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => {
+                                    if (!isAuthenticated) {
+                                      setLoginAction("like");
+                                      setShowLoginPrompt(true);
+                                      return;
+                                    }
+                                    likeCounterpointMutation.mutate({ counterpointId: cp.id, like: !cp.likedByMe });
+                                  }}
+                                >
+                                  Like ({cp.likeCount || 0})
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
-          
-          <ScrollArea className="w-full whitespace-nowrap">
-            <div className="flex gap-4 pb-4">
-              {highestRatedOpinions.slice(0, 10).map((opinion: any) => {
-                // Allow debating if users have different political alignment
-                const canDebate = calculatePoliticalDistance(opinion) >= OPPOSING_THRESHOLD;
-                
-                return (
-                  <CardContainer key={opinion.id}>
-                    <OpinionCard
-                      id={opinion.id}
-                      topicId={id!}
-                      userId={opinion.userId}
-                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                      userAvatar={opinion.author?.profileImageUrl}
-                      economicScore={opinion.author?.economicScore}
-                      authoritarianScore={opinion.author?.authoritarianScore}
-                      topicEconomicScore={opinion.topicEconomicScore}
-                      topicAuthoritarianScore={opinion.topicAuthoritarianScore}
-                      content={opinion.content}
-                      debateStatus={opinion.debateStatus}
-                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
-                      likesCount={opinion.likesCount || 0}
-                      dislikesCount={opinion.dislikesCount || 0}
-                      references={opinion.references}
-                      fallacyCounts={opinion.fallacyCounts}
-                      isLiked={opinion.userVote === 'like'}
-                      isDisliked={opinion.userVote === 'dislike'}
-                      onLike={(opinionId) => voteMutation.mutate({ 
-                        opinionId, 
-                        voteType: 'like', 
-                        currentVote: opinion.userVote 
-                      })}
-                      onDislike={(opinionId) => voteMutation.mutate({ 
-                        opinionId, 
-                        voteType: 'dislike', 
-                        currentVote: opinion.userVote 
-                      })}
-                      onAdopt={(opinionId) => {
-                        const opinionData = opinions?.find(o => o.id === opinionId);
-                        setOpinionToAdopt(opinionData);
-                        setShowAdoptDialog(true);
-                      }}
-                      onDebate={canDebate ? (opinionId) => {
-                        const opinionData = opinions?.find(o => o.id === opinionId);
-                        handleStartDebate(
-                          opinionId, 
-                          opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
-                        );
-                      } : undefined}
-                    />
-                  </CardContainer>
-                );
-              })}
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </div>
-      )}
-
-      {/* "Similar Opinions" Section */}
-      {similarOpinions.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold">Similar Opinions</h2>
-            <Badge variant="secondary">{similarOpinions.length}</Badge>
-          </div>
-          
-          <ScrollArea className="w-full whitespace-nowrap">
-            <div className="flex gap-4 pb-4">
-              {similarOpinions.map((opinion: any) => {
-                // Similar opinions typically cannot debate each other
-                const canDebate = false;
-                
-                return (
-                  <CardContainer key={opinion.id}>
-                    <OpinionCard
-                      id={opinion.id}
-                      topicId={id!}
-                      userId={opinion.userId}
-                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                      userAvatar={opinion.author?.profileImageUrl}
-                      economicScore={opinion.author?.economicScore}
-                      authoritarianScore={opinion.author?.authoritarianScore}
-                      topicEconomicScore={opinion.topicEconomicScore}
-                      topicAuthoritarianScore={opinion.topicAuthoritarianScore}
-                      content={opinion.content}
-                      debateStatus={opinion.debateStatus}
-                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
-                      likesCount={opinion.likesCount || 0}
-                      dislikesCount={opinion.dislikesCount || 0}
-                      references={opinion.references}
-                      fallacyCounts={opinion.fallacyCounts}
-                      isLiked={opinion.userVote === 'like'}
-                      isDisliked={opinion.userVote === 'dislike'}
-                      onLike={(opinionId) => voteMutation.mutate({ 
-                        opinionId, 
-                        voteType: 'like', 
-                        currentVote: opinion.userVote 
-                      })}
-                      onDislike={(opinionId) => voteMutation.mutate({ 
-                        opinionId, 
-                        voteType: 'dislike', 
-                        currentVote: opinion.userVote 
-                      })}
-                      onAdopt={(opinionId) => {
-                        const opinionData = opinions?.find(o => o.id === opinionId);
-                        setOpinionToAdopt(opinionData);
-                        setShowAdoptDialog(true);
-                      }}
-                      onDebate={canDebate ? (opinionId) => {
-                        const opinionData = opinions?.find(o => o.id === opinionId);
-                        handleStartDebate(
-                          opinionId, 
-                          opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
-                        );
-                      } : undefined}
-                    />
-                  </CardContainer>
-                );
-              })}
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </div>
-      )}
-
-      {/* "Opposing Opinions" Section */}
-      {opposingOpinions.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold">Opposing Opinions</h2>
-            <Badge variant="destructive">{opposingOpinions.length}</Badge>
-          </div>
-          
-          <ScrollArea className="w-full whitespace-nowrap">
-            <div className="flex gap-4 pb-4">
-              {opposingOpinions.map((opinion: any) => {
-                // Can always debate opposing opinions
-                const canDebate = true;
-                
-                return (
-                  <CardContainer key={opinion.id}>
-                    <OpinionCard
-                      id={opinion.id}
-                      topicId={id!}
-                      userId={opinion.userId}
-                      userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                      userAvatar={opinion.author?.profileImageUrl}
-                      economicScore={opinion.author?.economicScore}
-                      authoritarianScore={opinion.author?.authoritarianScore}
-                      topicEconomicScore={opinion.topicEconomicScore}
-                      topicAuthoritarianScore={opinion.topicAuthoritarianScore}
-                      content={opinion.content}
-                      debateStatus={opinion.debateStatus}
-                      timestamp={opinion.createdAt ? formatDistanceToNow(new Date(opinion.createdAt), { addSuffix: true }) : 'unknown'}
-                      likesCount={opinion.likesCount || 0}
-                      dislikesCount={opinion.dislikesCount || 0}
-                      references={opinion.references}
-                      fallacyCounts={opinion.fallacyCounts}
-                      isLiked={opinion.userVote === 'like'}
-                      isDisliked={opinion.userVote === 'dislike'}
-                      onLike={(opinionId) => voteMutation.mutate({ 
-                        opinionId, 
-                        voteType: 'like', 
-                        currentVote: opinion.userVote 
-                      })}
-                      onDislike={(opinionId) => voteMutation.mutate({ 
-                        opinionId, 
-                        voteType: 'dislike', 
-                        currentVote: opinion.userVote 
-                      })}
-                      onAdopt={(opinionId) => {
-                        const opinionData = opinions?.find(o => o.id === opinionId);
-                        setOpinionToAdopt(opinionData);
-                        setShowAdoptDialog(true);
-                      }}
-                      onDebate={canDebate ? (opinionId) => {
-                        const opinionData = opinions?.find(o => o.id === opinionId);
-                        handleStartDebate(
-                          opinionId, 
-                          opinionData?.author ? `${opinionData.author.firstName || ''} ${opinionData.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'
-                        );
-                      } : undefined}
-                    />
-                  </CardContainer>
-                );
-              })}
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </div>
-      )}
-
-      {/* Similar Topics Section */}
-      {similarTopics && similarTopics.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold">Similar Topics</h2>
-            <Badge variant="outline">{similarTopics.length}</Badge>
-          </div>
-          
-          <ScrollArea className="w-full whitespace-nowrap">
-            <div className="flex gap-4 pb-4">
-              {similarTopics.slice(0, 10).map((similarTopic: any) => (
-                <CardContainer key={similarTopic.id}>
-                  <TopicCard
-                    id={similarTopic.id}
-                    title={similarTopic.title}
-                    description={similarTopic.description || ''}
-                    imageUrl={similarTopic.imageUrl || ''}
-                    categories={similarTopic.categories}
-                    participantCount={similarTopic.participantCount || 0}
-                    opinionsCount={similarTopic.opinionsCount || 0}
-                    isActive={similarTopic.isActive || false}
-                    previewContent={similarTopic.previewContent}
-                    previewAuthor={similarTopic.previewAuthor}
-                    previewIsAI={similarTopic.previewIsAI}
-                    diversityScore={similarTopic.diversityScore}
-                    politicalDistribution={similarTopic.politicalDistribution}
-                  />
-                </CardContainer>
-              ))}
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </div>
-      )}
+        </SheetContent>
+      </Sheet>
 
       {/* Opinion Form Dialog */}
       <Dialog open={showOpinionForm} onOpenChange={setShowOpinionForm}>
@@ -1070,15 +1153,6 @@ export default function Topic() {
           }
         }}
         isPending={adoptMutation.isPending}
-      />
-
-      {/* Debate Onboarding Modal */}
-      <DebateOnboardingModal
-        open={showDebateOnboarding}
-        onOpenChange={setShowDebateOnboarding}
-        onSubmit={handleSubmitDebate}
-        isPending={isRandomMatch ? startRandomDebateMutation.isPending : startDebateWithOpinionMutation.isPending}
-        opponentName={debateOpponentName}
       />
       
       {/* Login Prompt Dialog */}
