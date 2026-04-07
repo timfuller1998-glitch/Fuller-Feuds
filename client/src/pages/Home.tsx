@@ -60,12 +60,16 @@ export default function Home() {
     queryKey: ["/api/opinions/recent"],
   });
 
+  const topicsSource = Array.isArray(apiTopics) ? apiTopics : [];
+  const recentOpinionsList = Array.isArray(recentOpinions) ? recentOpinions : [];
+  const activeDebateRoomsList = Array.isArray(activeDebateRooms) ? activeDebateRooms : [];
+
   // Use real API topics with default image fallback
-  const topics = apiTopics?.map(topic => ({
+  const topics = topicsSource.map(topic => ({
     ...topic,
     imageUrl: topic.imageUrl || climateImage,
     isActive: topic.isActive || false
-  })) || [];
+  }));
 
   // Create sections data
   const sections: AnySectionData[] = [];
@@ -88,8 +92,8 @@ export default function Home() {
   if (topics.length > 0) {
     // Group opinions by topic to find topics with recent activity
     const topicActivity = new Map<string, Date>();
-    if (recentOpinions && recentOpinions.length > 0) {
-      recentOpinions.forEach(opinion => {
+    if (recentOpinionsList.length > 0) {
+      recentOpinionsList.forEach(opinion => {
         const currentDate = topicActivity.get(opinion.topicId);
         const opinionDate = new Date(opinion.createdAt || 0);
         if (!currentDate || opinionDate > currentDate) {
@@ -190,9 +194,9 @@ export default function Home() {
   }
 
   // 6. My Topics - Topics where user has participated
-  if (user && recentOpinions && topics.length > 0) {
+  if (user && recentOpinionsList.length > 0 && topics.length > 0) {
     const myTopicIds = new Set(
-      recentOpinions
+      recentOpinionsList
         .filter(opinion => opinion.userId === user.id)
         .map(opinion => opinion.topicId)
     );
@@ -211,8 +215,8 @@ export default function Home() {
   }
 
   // 7. My Current Debates - Active debate rooms as topic previews
-  if (user && activeDebateRooms && activeDebateRooms.length > 0 && topics.length > 0) {
-    const debateTopicIds = new Set(activeDebateRooms.map(room => room.topicId).filter(Boolean));
+  if (user && activeDebateRoomsList.length > 0 && topics.length > 0) {
+    const debateTopicIds = new Set(activeDebateRoomsList.map(room => room.topicId).filter(Boolean));
     const debateTopics = topics
       .filter(topic => debateTopicIds.has(topic.id))
       .slice(0, 5);
@@ -228,12 +232,12 @@ export default function Home() {
   }
 
   // 5. Recent Opinions - Display recent opinions directly
-  if (recentOpinions && recentOpinions.length > 0) {
+  if (recentOpinionsList.length > 0) {
     sections.push({
       title: "Recent Opinions",
       icon: Clock,
-      opinions: recentOpinions.slice(0, 5),
-      totalCount: recentOpinions.length,
+      opinions: recentOpinionsList.slice(0, 5),
+      totalCount: recentOpinionsList.length,
       linkPath: "/recent-opinions",
       type: 'opinions'
     });
