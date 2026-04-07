@@ -8,19 +8,18 @@ const userRepository = new UserRepository();
 // GET /api/auth/user - Get current user info
 router.get('/user', isAuthenticated, async (req, res) => {
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.ts:12',message:'Auth route handler started',data:{hasUser:!!req.user,userId:req.user?.id,hasSession:!!req.session,sessionId:req.session?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-
     const user = req.user as Express.User;
     
     if (!user || !user.id) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    const userId = String(user.id);
+    const requesterRole = user.role ?? req.userRole ?? undefined;
+
     // Fetch fresh user data from database to ensure we have the latest onboarding status
-    // This prevents race conditions where the session might have stale data
-    const freshUser = await userRepository.findById(user.id);
+    // Pass requester id + role so sanitizeUserData treats this as "own profile" and does not strip onboarding fields
+    const freshUser = await userRepository.findById(userId, userId, requesterRole, req);
     
     if (!freshUser) {
       return res.status(404).json({ error: 'User not found' });

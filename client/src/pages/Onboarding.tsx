@@ -73,14 +73,16 @@ export default function Onboarding() {
   // Use useAuth hook to get user data consistently with the rest of the app
   const { user, isLoading: isUserLoading } = useAuth();
 
-  const { data: topics = [] } = useQuery<Topic[]>({
+  const { data: topicsData } = useQuery<Topic[]>({
     queryKey: ['/api/topics'],
   });
+
+  const topics = Array.isArray(topicsData) ? topicsData : [];
 
   // Derive unique categories from topics
   const categories = Array.from(
     new Set(
-      topics.flatMap(topic => topic.categories || [])
+      topics.flatMap(topic => (Array.isArray(topic.categories) ? topic.categories : []))
     )
   ).sort();
 
@@ -168,12 +170,6 @@ export default function Onboarding() {
     }
   }, [currentStep, firstName, lastName, selectedCategories, createdOpinions]);
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'post-fix',hypothesisId:'D',location:'Onboarding.tsx:canProceed-sync',message:'currentStep and canProceed inputs',data:{currentStep,canProceed,fnLen:firstName.trim().length,lnLen:lastName.trim().length,catCount:selectedCategories.length},timestamp:Date.now()})}).catch(()=>{});
-  }, [currentStep, canProceed, firstName, lastName, selectedCategories.length]);
-  // #endregion
-
   const redirectLockRef = useRef(false); // Prevent redirect loops
   
   // Redirect users who have already completed onboarding
@@ -215,7 +211,7 @@ export default function Onboarding() {
       setBio(user.bio || "");
       setLocation(user.location || "");
       setProfileImageUrl(user.profileImageUrl || "");
-      if (user.followedCategories && user.followedCategories.length > 0) {
+      if (Array.isArray(user.followedCategories) && user.followedCategories.length > 0) {
         setSelectedCategories(user.followedCategories);
       }
       // Restore onboarding step progress (only once, only if not completed)
@@ -225,9 +221,6 @@ export default function Onboarding() {
         user.onboardingStep &&
         user.onboardingStep > 0 &&
         user.onboardingComplete !== true;
-      // #region agent log
-      fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'post-fix',hypothesisId:'A',location:'Onboarding.tsx:prefill-effect',message:'user refetch / prefill',data:{userId:user.id,onboardingStep:user.onboardingStep,onboardingComplete:user.onboardingComplete,stepRestoredBefore:stepRestoredRef.current,willRestore,restoreDbStep:willRestore?user.onboardingStep:null,restoreUiStep:willRestore?Math.min(Number(user.onboardingStep)+1,4):null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       if (willRestore) {
         // DB stores the step # we just persisted (completed screen), not the next UI step
         const uiStep = Math.min(Number(user.onboardingStep) + 1, 4);
@@ -238,43 +231,26 @@ export default function Onboarding() {
   }, [user]);
 
   const handleNext = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'post-fix',hypothesisId:'B',location:'Onboarding.tsx:handleNext:entry',message:'handleNext start',data:{currentStep},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    try {
-      // Save progress for current step
-      if (currentStep === 1) {
-        await updateProfileMutation.mutateAsync({
-          firstName,
-          lastName,
-          bio,
-          location,
-          profileImageUrl
-        });
-      } else if (currentStep === 2) {
-        await updateCategoriesMutation.mutateAsync(selectedCategories);
-      }
-
-      const progressRes = await updateProgressMutation.mutateAsync({
-        step: currentStep,
-        complete: false
+    // Save progress for current step
+    if (currentStep === 1) {
+      await updateProfileMutation.mutateAsync({
+        firstName,
+        lastName,
+        bio,
+        location,
+        profileImageUrl
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'post-fix',hypothesisId:'B',location:'Onboarding.tsx:handleNext:after-progress',message:'after progress mutation',data:{currentStep,savedStep:currentStep,responseOnboardingStep:(progressRes as { onboardingStep?: number })?.onboardingStep},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
+    } else if (currentStep === 2) {
+      await updateCategoriesMutation.mutateAsync(selectedCategories);
+    }
 
-      if (currentStep < 4) {
-        const next = currentStep + 1;
-        setCurrentStep(next);
-        // #region agent log
-        fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'post-fix',hypothesisId:'A',location:'Onboarding.tsx:handleNext:setStep',message:'setCurrentStep called',data:{from:currentStep,to:next},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-      }
-    } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7264/ingest/505fdfb4-29e0-48d1-9ce7-a9bba5295e17',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'83e9a1'},body:JSON.stringify({sessionId:'83e9a1',runId:'post-fix',hypothesisId:'B',location:'Onboarding.tsx:handleNext:error',message:'handleNext threw',data:{err:String(e)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      throw e;
+    await updateProgressMutation.mutateAsync({
+      step: currentStep,
+      complete: false
+    });
+
+    if (currentStep < 4) {
+      setCurrentStep(currentStep + 1);
     }
   };
 
@@ -481,8 +457,8 @@ export default function Onboarding() {
 
   // Get topics for selected categories
   const topicsByCategory = selectedCategories.reduce((acc, category) => {
-    const categoryTopics = topics.filter(t => 
-      t.categories?.includes(category)
+    const categoryTopics = topics.filter(t =>
+      Array.isArray(t.categories) && t.categories.includes(category)
     ).slice(0, 8);
     if (categoryTopics.length > 0) {
       acc[category] = categoryTopics;
