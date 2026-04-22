@@ -128,16 +128,6 @@ export default function RecentOpinionsPage() {
       })()
     : [];
 
-  // Vote mutation
-  const voteMutation = {
-    mutate: async ({ opinionId, voteType }: { opinionId: string; voteType: 'like' | 'dislike' | null }) => {
-      return apiRequest('POST', `/api/opinions/${opinionId}/vote`, { voteType });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/opinions/recent"] });
-    },
-  };
-
   // Flag mutation
   const flagMutation = {
     mutate: async ({ opinionId, reason }: { opinionId: string; reason: string }) => {
@@ -148,21 +138,6 @@ export default function RecentOpinionsPage() {
       setFlagReason("");
       queryClient.invalidateQueries({ queryKey: ["/api/opinions/recent"] });
     },
-  };
-
-  // Adopt mutation
-  const adoptMutation = {
-    mutate: async (opinionId: string) => {
-      return apiRequest('POST', `/api/opinions/${opinionId}/adopt`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/opinions/recent"] });
-    },
-  };
-
-  const handleVote = (opinionId: string, currentVote: 'like' | 'dislike' | null, newVote: 'like' | 'dislike') => {
-    const voteType = currentVote === newVote ? null : newVote;
-    voteMutation.mutate({ opinionId, voteType });
   };
 
   if (opinionsLoading) {
@@ -219,7 +194,7 @@ export default function RecentOpinionsPage() {
           <div key={group.topic.id} className="space-y-4">
             {/* Topic Header */}
             <div>
-              <Link href={`/topic/${group.topic.id}`}>
+              <Link href={`/topic/${group.topic.id}?tab=others`}>
                 <h2 className="text-2xl font-bold hover-elevate active-elevate-2 inline-block rounded px-2 py-1 -mx-2" data-testid={`link-topic-${group.topic.id}`}>
                   {group.topic.title}
                 </h2>
@@ -273,15 +248,12 @@ export default function RecentOpinionsPage() {
                     fallacyCounts={opinion.fallacyCounts || {}}
                     isLiked={opinion.userVote?.voteType === 'like'}
                     isDisliked={opinion.userVote?.voteType === 'dislike'}
-                    onLike={() => handleVote(opinion.id, opinion.userVote?.voteType || null, 'like')}
-                    onDislike={() => handleVote(opinion.id, opinion.userVote?.voteType || null, 'dislike')}
-                    onAdopt={() => adoptMutation.mutate(opinion.id)}
                   />
                 </div>
               ))}
               {group.opinions.length > 5 && (
                 <CardContainer style={{ scrollSnapAlign: 'start' }}>
-                  <Card className="h-full flex items-center justify-center hover-elevate active-elevate-2 cursor-pointer" onClick={() => setLocation(`/topic/${group.topic.id}`)}>
+                  <Card className="h-full flex items-center justify-center hover-elevate active-elevate-2 cursor-pointer" onClick={() => setLocation(`/topic/${group.topic.id}?tab=others`)}>
                     <CardContent className="text-center py-12">
                       <MessageCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
                       <p className="font-medium">View {group.opinions.length - 5} More</p>

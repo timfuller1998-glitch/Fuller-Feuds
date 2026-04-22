@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
-import { useParams, useLocation } from "wouter";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ArrowLeft, Brain, Flag, MessageCircle, Plus, Users, TrendingUp } from "lucide-react";
+import { ArrowLeft, Brain, Flag, MessageCircle, Plus, UserPlus, Users, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType, type SummarySentence } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -41,6 +41,7 @@ const opinionFormSchema = insertOpinionSchema.omit({
 
 export default function Topic() {
   const { id } = useParams();
+  const search = useSearch();
   const [, navigate] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -51,6 +52,9 @@ export default function Topic() {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [loginAction, setLoginAction] = useState<"like" | "opinion" | "debate" | "interact">("interact");
   const [activeTab, setActiveTab] = useState<"ai" | "yours" | "others">("ai");
+  const urlApplyRef = useRef<string | null>(null);
+  const [otherOpinionFlagOpen, setOtherOpinionFlagOpen] = useState(false);
+  const [otherOpinionFlagTargetId, setOtherOpinionFlagTargetId] = useState<string | null>(null);
 
   const [selectedSentenceIndex, setSelectedSentenceIndex] = useState<number | null>(null);
   const [selectedOtherSentenceIndex, setSelectedOtherSentenceIndex] = useState<number | null>(null);
@@ -79,7 +83,7 @@ export default function Topic() {
   }, [id, user?.id]);
 
   // Fetch opinions for the topic
-  const { data: opinions } = useQuery<Opinion[]>({
+  const { data: opinions, isSuccess: opinionsLoaded } = useQuery<Opinion[]>({
     queryKey: ["/api/topics", id, "opinions"],
     queryFn: async () => {
       const response = await fetch(`/api/topics/${id}/opinions`);
@@ -109,6 +113,61 @@ export default function Topic() {
   const otherOpinions = useMemo(() => (opinions || []).filter(o => o.userId !== user?.id), [opinions, user?.id]);
   const [otherOpinionIndex, setOtherOpinionIndex] = useState(0);
   const currentOtherOpinion = otherOpinions[otherOpinionIndex] || null;
+
+  useEffect(() => {
+    urlApplyRef.current = null;
+    setOtherOpinionIndex(0);
+    setSelectedSentenceIndex(null);
+    setSelectedOtherSentenceIndex(null);
+    setSelectedCounterpointId(null);
+    setSheetOpen(false);
+    setActiveTab("ai");
+  }, [id]);
+
+  useEffect(() => {
+    if (!id || !opinionsLoaded) return;
+    const params = new URLSearchParams(search);
+    const tabParam = params.get("tab");
+    const opinionParam = params.get("opinion");
+    const hasTab = tabParam === "ai" || tabParam === "yours" || tabParam === "others";
+    if (!opinionParam && !hasTab) return;
+
+    const list = opinions ?? [];
+    const key = `${id}|${search}`;
+    if (urlApplyRef.current === key) return;
+
+    if (opinionParam) {
+      const op = list.find((o) => o.id === opinionParam);
+      if (!op) {
+        if (list.length > 0) {
+          toast({
+            title: "Opinion not found",
+            description: "It may have been removed or is no longer visible.",
+            variant: "destructive",
+          });
+          urlApplyRef.current = key;
+        }
+        return;
+      }
+      if (user?.id && op.userId === user.id) {
+        setActiveTab("yours");
+        setOtherOpinionIndex(0);
+      } else {
+        setActiveTab("others");
+        const others = list.filter((o) => o.userId !== user?.id);
+        const idx = others.findIndex((o) => o.id === opinionParam);
+        if (idx >= 0) setOtherOpinionIndex(idx);
+      }
+    } else if (hasTab) {
+      setActiveTab(tabParam);
+    }
+
+    setSelectedSentenceIndex(null);
+    setSelectedOtherSentenceIndex(null);
+    setSelectedCounterpointId(null);
+    setSheetOpen(false);
+    urlApplyRef.current = key;
+  }, [id, search, opinions, opinionsLoaded, user?.id, toast]);
 
   const topOpinionsByLikes = useMemo(() => {
     const list = [...(opinions || [])].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
@@ -439,6 +498,37 @@ export default function Topic() {
     },
   });
 
+  const flagOtherOpinionMutation = useMutation({
+    mutationFn: async ({ opinionId, fallacyType }: { opinionId: string; fallacyType: FallacyType }) => {
+      const response = await fetch(`/api/opinions/${opinionId}/flag`, {
+        method: "POST",
+        body: JSON.stringify({ fallacyType }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Flag submitted",
+        description: "Thank you for helping keep debates productive.",
+      });
+      setOtherOpinionFlagOpen(false);
+      setOtherOpinionFlagTargetId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/opinions/recent"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit flag",
+        variant: "destructive",
+      });
+    },
+  });
+
   const opinionForm = useForm<z.infer<typeof opinionFormSchema>>({
     resolver: zodResolver(opinionFormSchema),
     defaultValues: {
@@ -718,6 +808,40 @@ export default function Topic() {
                     {otherOpinionIndex + 1} / {otherOpinions.length}
                   </div>
                 </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        setLoginAction("opinion");
+                        setShowLoginPrompt(true);
+                        return;
+                      }
+                      setOpinionToAdopt(currentOtherOpinion);
+                      setShowAdoptDialog(true);
+                    }}
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Adopt this opinion
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        setLoginAction("interact");
+                        setShowLoginPrompt(true);
+                        return;
+                      }
+                      setOtherOpinionFlagTargetId(currentOtherOpinion.id);
+                      setOtherOpinionFlagOpen(true);
+                    }}
+                  >
+                    <Flag className="w-4 h-4 mr-2" />
+                    Flag for fallacy
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <InteractiveSentenceText
@@ -778,25 +902,6 @@ export default function Topic() {
                           fallacyCounts={op.fallacyCounts}
                           isLiked={op.userVote?.voteType === "like"}
                           isDisliked={op.userVote?.voteType === "dislike"}
-                          onLike={(opinionId) =>
-                            voteMutation.mutate({
-                              opinionId,
-                              voteType: "like",
-                              currentVote: op.userVote?.voteType || null,
-                            })
-                          }
-                          onDislike={(opinionId) =>
-                            voteMutation.mutate({
-                              opinionId,
-                              voteType: "dislike",
-                              currentVote: op.userVote?.voteType || null,
-                            })
-                          }
-                          onAdopt={(opinionId) => {
-                            const opinionData = opinions?.find(o => o.id === opinionId);
-                            setOpinionToAdopt(opinionData);
-                            setShowAdoptDialog(true);
-                          }}
                         />
                       ))}
                     </div>
@@ -1069,6 +1174,21 @@ export default function Topic() {
         onSubmit={(fallacyType) => flagTopicMutation.mutate(fallacyType)}
         isPending={flagTopicMutation.isPending}
         entityType="topic"
+      />
+
+      <FallacyFlagDialog
+        open={otherOpinionFlagOpen}
+        onOpenChange={(open) => {
+          setOtherOpinionFlagOpen(open);
+          if (!open) setOtherOpinionFlagTargetId(null);
+        }}
+        onSubmit={(fallacyType) => {
+          if (otherOpinionFlagTargetId) {
+            flagOtherOpinionMutation.mutate({ opinionId: otherOpinionFlagTargetId, fallacyType });
+          }
+        }}
+        isPending={flagOtherOpinionMutation.isPending}
+        entityType="opinion"
       />
 
       {/* Adopt Opinion Dialog */}
