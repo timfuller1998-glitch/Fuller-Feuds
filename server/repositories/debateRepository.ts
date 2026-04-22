@@ -10,7 +10,7 @@ import {
   debateMessageFlags,
   userProfiles
 } from '../../shared/schema.js';
-import { eq, and, or, desc, sql, inArray, lt } from 'drizzle-orm';
+import { eq, and, or, desc, sql, inArray, lt, gt } from 'drizzle-orm';
 import type {
   InsertDebateRoom,
   DebateRoom,
@@ -677,25 +677,164 @@ export class DebateRepository {
     return updated;
   }
 
-  async getGroupedDebateRooms(userId: string): Promise<{
-    active: DebateRoom[];
-    ended: DebateRoom[];
-    archived: DebateRoom[];
-  }> {
-    const allRooms = await db
-      .select()
-      .from(debateRooms)
-      .where(or(
-        eq(debateRooms.participant1Id, userId),
-        eq(debateRooms.participant2Id, userId)
-      ))
-      .orderBy(desc(debateRooms.startedAt));
-
-    return {
-      active: allRooms.filter(room => room.status === 'active'),
-      ended: allRooms.filter(room => room.status === 'ended'),
-      archived: allRooms.filter(room => room.status === 'archived'),
+  /**
+   * Returns one entry per opponent (shape expected by DebateFooter / AllActiveDebatesPanel).
+   * Previously this returned { active, ended, archived }, which made the client call .filter on a non-array.
+   */
+  async getGroupedDebateRooms(userId: string): Promise<
+    Array<{
+      opponentId: string;
+      opponentName: string;
+      opponentAvatar?: string | null;
+      opponentEconomicScore?: number;
+      opponentAuthoritarianScore?: number;
+      debates: Array<{
+        id: string;
+        topicTitle: string;
+        lastMessageAt?: string | null;
+        unreadCount?: number;
+      }>;
+      totalUnread: number;
+      mostRecentActivity?: string | null;
+    }>
+  > {
+    type Side = {
+      id: string;
+      firstName: string | null;
+      lastName: string | null;
+      profileImageUrl: string | null;
     };
+
+    const toIso = (d: Date | string | null | undefined): string | null => {
+      if (d == null) return null;
+      if (d instanceof Date) return d.toISOString();
+      return String(d);
+    };
+
+    const rows = await db
+      .select({
+        room: debateRooms,
+        topicTitle: topics.title,
+        participant1: {
+          id: sql<string>`p1.id`,
+          firstName: sql<string | null>`p1.first_name`,
+          lastName: sql<string | null>`p1.last_name`,
+          profileImageUrl: sql<string | null>`p1.profile_image_url`,
+        },
+        participant2: {
+          id: sql<string>`p2.id`,
+          firstName: sql<string | null>`p2.first_name`,
+          lastName: sql<string | null>`p2.last_name`,
+          profileImageUrl: sql<string | null>`p2.profile_image_url`,
+        },
+      })
+      .from(debateRooms)
+      .leftJoin(topics, eq(debateRooms.topicId, topics.id))
+      .leftJoin(sql`users as p1`, eq(debateRooms.participant1Id, sql`p1.id`))
+      .leftJoin(sql`users as p2`, eq(debateRooms.participant2Id, sql`p2.id`))
+      .where(or(eq(debateRooms.participant1Id, userId), eq(debateRooms.participant2Id, userId)))
+      .orderBy(desc(debateRooms.lastMessageAt), desc(debateRooms.startedAt));
+
+    const formatName = (p: Side) => {
+      const n = [p.firstName, p.lastName].filter(Boolean).join(' ').trim();
+      return n || p.id;
+    };
+
+    const enriched = await Promise.all(
+      rows.map(async (row) => {
+        const room = row.room;
+        const isP1 = room.participant1Id === userId;
+        const opponent: Side = isP1 ? row.participant2 : row.participant1;
+        const lastReadAt = isP1 ? room.participant1LastReadAt : room.participant2LastReadAt;
+
+        const unreadWhere = lastReadAt
+          ? and(
+              eq(debateMessages.roomId, room.id),
+              eq(debateMessages.status, 'approved'),
+              gt(debateMessages.createdAt, lastReadAt)
+            )
+          : and(eq(debateMessages.roomId, room.id), eq(debateMessages.status, 'approved'));
+
+        const [unreadResult] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(debateMessages)
+          .where(unreadWhere);
+
+        const unreadCount = unreadResult?.count ?? 0;
+        const activity = room.lastMessageAt ?? room.startedAt ?? null;
+
+        return {
+          room,
+          opponent,
+          topicTitle: row.topicTitle ?? 'Debate',
+          unreadCount,
+          activity,
+        };
+      })
+    );
+
+    const map = new Map<
+      string,
+      {
+        opponentId: string;
+        opponentName: string;
+        opponentAvatar?: string | null;
+        opponentEconomicScore?: number;
+        opponentAuthoritarianScore?: number;
+        debates: Array<{
+          id: string;
+          topicTitle: string;
+          lastMessageAt?: string | null;
+          unreadCount?: number;
+        }>;
+        totalUnread: number;
+        mostRecentActivity?: string | null;
+      }
+    >();
+
+    for (const e of enriched) {
+      const oid = e.opponent?.id;
+      if (!oid) continue;
+
+      const debateEntry = {
+        id: e.room.id,
+        topicTitle: e.topicTitle,
+        lastMessageAt: toIso(e.room.lastMessageAt as Date | string | null | undefined),
+        unreadCount: e.unreadCount,
+      };
+
+      const activityStr = toIso(e.activity as Date | string | null | undefined);
+
+      const existing = map.get(oid);
+      if (!existing) {
+        map.set(oid, {
+          opponentId: oid,
+          opponentName: formatName(e.opponent),
+          opponentAvatar: e.opponent.profileImageUrl,
+          opponentEconomicScore: 0,
+          opponentAuthoritarianScore: 0,
+          debates: [debateEntry],
+          totalUnread: e.unreadCount,
+          mostRecentActivity: activityStr ?? undefined,
+        });
+        continue;
+      }
+
+      existing.debates.push(debateEntry);
+      existing.totalUnread += e.unreadCount;
+      if (activityStr) {
+        const prev = existing.mostRecentActivity;
+        if (!prev || new Date(activityStr).getTime() > new Date(prev).getTime()) {
+          existing.mostRecentActivity = activityStr;
+        }
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      const ta = a.mostRecentActivity ? new Date(a.mostRecentActivity).getTime() : 0;
+      const tb = b.mostRecentActivity ? new Date(b.mostRecentActivity).getTime() : 0;
+      return tb - ta;
+    });
   }
 
   async getArchivedDebateRooms(userId: string): Promise<DebateRoom[]> {
