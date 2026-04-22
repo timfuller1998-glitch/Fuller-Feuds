@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-export function DataSeeding() {
+export function DataSeeding({ queriesEnabled = false }: { queriesEnabled?: boolean }) {
   const { toast } = useToast();
   const [source, setSource] = useState('reddit');
   const [subreddit, setSubreddit] = useState('changemyview');
@@ -29,11 +29,13 @@ export function DataSeeding() {
   // Fetch available sources
   const { data: sources } = useQuery({
     queryKey: ['/api/admin/seeding/sources'],
+    enabled: queriesEnabled,
   });
 
   // Fetch job history
   const { data: jobs, refetch: refetchJobs } = useQuery({
     queryKey: ['/api/admin/seeding/jobs'],
+    enabled: queriesEnabled,
   });
 
   // Preview mutation

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAdmin, requireModerator } from '../middleware/auth.js';
 import { ScrapingService } from '../services/scrapingService.js';
 import { RedditScraper } from '../scrapers/redditScraper.js';
 import { ContentTransformer } from '../services/contentTransformer.js';
@@ -11,7 +11,7 @@ const scrapingService = new ScrapingService();
 const topicRepository = new TopicRepository();
 
 // Get available sources
-router.get('/sources', requireAdmin, async (req, res) => {
+router.get('/sources', requireModerator, async (req, res) => {
   try {
     res.json({
       sources: [
@@ -178,7 +178,7 @@ router.post('/generate', requireAdmin, async (req, res) => {
 });
 
 // Get seeding jobs history
-router.get('/jobs', requireAdmin, async (req, res) => {
+router.get('/jobs', requireModerator, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const jobs = await scrapingService.getSeedingJobs(limit);

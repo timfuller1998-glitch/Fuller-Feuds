@@ -7,12 +7,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { FileText, Shield, Eye, EyeOff, Ban, CheckCircle, XCircle, Archive, ArchiveRestore } from "lucide-react";
 
-export function AuditLog() {
+export function AuditLog({ queriesEnabled = false }: { queriesEnabled?: boolean }) {
   const [actionTypeFilter, setActionTypeFilter] = useState<string>("");
 
   // Fetch audit log
   const { data: auditLog, isLoading } = useQuery({
     queryKey: ['/api/admin/audit-log', { actionType: actionTypeFilter }],
+    enabled: queriesEnabled,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (actionTypeFilter && actionTypeFilter.trim()) params.append('actionType', actionTypeFilter);

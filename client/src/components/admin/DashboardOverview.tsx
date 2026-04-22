@@ -2,22 +2,26 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FileText, Flag, Shield } from "lucide-react";
 
-export function DashboardOverview() {
+export function DashboardOverview({ queriesEnabled = false }: { queriesEnabled?: boolean }) {
   // Fetch platform stats
   const { data: users } = useQuery({
     queryKey: ['/api/admin/users'],
+    enabled: queriesEnabled,
   });
 
   const { data: topics } = useQuery({
     queryKey: ['/api/admin/topics'],
+    enabled: queriesEnabled,
   });
 
   const { data: opinions } = useQuery({
     queryKey: ['/api/admin/opinions'],
+    enabled: queriesEnabled,
   });
 
   const { data: flaggedOpinions } = useQuery({
     queryKey: ['/api/admin/flagged-opinions'],
+    enabled: queriesEnabled,
   });
 
   const stats = [

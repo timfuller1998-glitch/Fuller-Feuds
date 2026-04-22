@@ -27,7 +27,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
-export function UserManagement() {
+export function UserManagement({ queriesEnabled = false }: { queriesEnabled?: boolean }) {
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,6 +40,7 @@ export function UserManagement() {
   // Fetch users with filters
   const { data: users, isLoading } = useQuery({
     queryKey: ['/api/admin/users', { role: roleFilter, status: statusFilter, search: searchQuery }],
+    enabled: queriesEnabled,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (roleFilter && roleFilter.trim()) params.append('role', roleFilter);

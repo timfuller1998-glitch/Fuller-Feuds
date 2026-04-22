@@ -30,7 +30,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-export function ContentFilters() {
+export function ContentFilters({ queriesEnabled = false }: { queriesEnabled?: boolean }) {
   const [newPhrase, setNewPhrase] = useState("");
   const [newSeverity, setNewSeverity] = useState<"block" | "flag">("block");
   const [newCategory, setNewCategory] = useState("");
@@ -39,6 +39,7 @@ export function ContentFilters() {
   // Fetch banned phrases
   const { data: bannedPhrases, isLoading } = useQuery({
     queryKey: ['/api/admin/banned-phrases'],
+    enabled: queriesEnabled,
   });
 
   // Add banned phrase mutation

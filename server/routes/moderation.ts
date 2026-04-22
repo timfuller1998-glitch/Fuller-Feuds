@@ -82,7 +82,7 @@ router.post('/topics/:topicId/restore', requireModerator, async (req, res) => {
 });
 
 // Banned phrases management
-router.get('/banned-phrases', requireAdmin, async (req, res) => {
+router.get('/banned-phrases', requireModerator, async (req, res) => {
   try {
     const phrases = await moderationService.getBannedPhrases();
     res.json(phrases);
@@ -116,8 +116,8 @@ router.delete('/banned-phrases/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// Admin user management
-router.get('/users', requireAdmin, async (req, res) => {
+// Admin user management (read: moderators; writes remain admin-only below)
+router.get('/users', requireModerator, async (req, res) => {
   try {
     const users = await moderationService.getUsersForAdmin();
     res.json(users);
@@ -168,7 +168,7 @@ router.delete('/users/:userId', requireAdmin, async (req, res) => {
 });
 
 // Admin topic management
-router.get('/topics', requireAdmin, async (req, res) => {
+router.get('/topics', requireModerator, async (req, res) => {
   try {
     const topics = await moderationService.getTopicsForAdmin();
     res.json(topics);
@@ -179,7 +179,7 @@ router.get('/topics', requireAdmin, async (req, res) => {
 });
 
 // Admin opinion management
-router.get('/opinions', requireAdmin, async (req, res) => {
+router.get('/opinions', requireModerator, async (req, res) => {
   try {
     const opinions = await moderationService.getOpinionsForAdmin();
     res.json(opinions);
@@ -197,6 +197,16 @@ router.get('/flagged-opinions', requireModerator, async (req, res) => {
     console.error("Error fetching flagged opinions:", error);
     res.status(500).json({ message: "Failed to fetch flagged opinions" });
   }
+});
+
+// Challenges UI — not wired to storage yet; return empty list so the admin dashboard does not 404
+router.get('/pending-challenges', requireModerator, async (_req, res) => {
+  res.json([]);
+});
+
+// Client calls `/api/admin/audit-log`; keep a lightweight list endpoint for moderators (empty until backed by DB)
+router.get('/audit-log', requireModerator, async (_req, res) => {
+  res.json([]);
 });
 
 router.post('/opinions/:opinionId/approve', requireModerator, async (req, res) => {

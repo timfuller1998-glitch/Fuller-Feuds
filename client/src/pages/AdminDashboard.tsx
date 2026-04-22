@@ -33,6 +33,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 import { DashboardOverview } from "@/components/admin/DashboardOverview";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { ContentFilters } from "@/components/admin/ContentFilters";
@@ -51,6 +53,10 @@ import {
 
 export default function AdminDashboard() {
   const { toast } = useToast();
+  const { user, isLoading: authLoading } = useAuth();
+  const canAccessAdmin = user?.role === "admin" || user?.role === "moderator";
+  const adminQueriesEnabled = !authLoading && !!user && canAccessAdmin;
+
   const [selectedOpinion, setSelectedOpinion] = useState<string | null>(null);
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
   const [opinionModerationReason, setOpinionModerationReason] = useState("");
@@ -58,24 +64,28 @@ export default function AdminDashboard() {
   const [deleteTopicId, setDeleteTopicId] = useState<string | null>(null);
   const [deleteOpinionId, setDeleteOpinionId] = useState<string | null>(null);
 
-  // Fetch all topics
+  // Fetch all topics (only for admin/moderator — avoids 403 spam for normal users)
   const { data: allTopics, isLoading: loadingTopics } = useQuery({
     queryKey: ['/api/admin/topics'],
+    enabled: adminQueriesEnabled,
   });
 
   // Fetch all opinions
   const { data: allOpinions, isLoading: loadingOpinions } = useQuery({
     queryKey: ['/api/admin/opinions'],
+    enabled: adminQueriesEnabled,
   });
 
   // Fetch flagged opinions
   const { data: flaggedOpinions, isLoading: loadingFlagged } = useQuery({
     queryKey: ['/api/admin/flagged-opinions'],
+    enabled: adminQueriesEnabled,
   });
 
   // Fetch pending challenges
   const { data: pendingChallenges, isLoading: loadingChallenges } = useQuery({
     queryKey: ['/api/admin/pending-challenges'],
+    enabled: adminQueriesEnabled,
   });
 
   // Opinion moderation mutations
@@ -222,6 +232,29 @@ export default function AdminDashboard() {
     },
   });
 
+  if (authLoading) {
+    return (
+      <div className="container mx-auto py-16 px-4 text-center text-muted-foreground">
+        <p>Loading…</p>
+      </div>
+    );
+  }
+
+  if (!user || !canAccessAdmin) {
+    return (
+      <div className="container mx-auto py-16 px-4 max-w-lg text-center space-y-4">
+        <Shield className="h-12 w-12 mx-auto text-muted-foreground" />
+        <h1 className="text-2xl font-bold">Access denied</h1>
+        <p className="text-muted-foreground">
+          You need a moderator or admin account to use this page.
+        </p>
+        <Button asChild variant="outline">
+          <Link href="/">Back to home</Link>
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="flex items-center gap-3 mb-6">
@@ -280,12 +313,12 @@ export default function AdminDashboard() {
 
         {/* Overview Tab */}
         <TabsContent value="overview">
-          <DashboardOverview />
+          <DashboardOverview queriesEnabled={adminQueriesEnabled} />
         </TabsContent>
 
         {/* Users Tab */}
         <TabsContent value="users">
-          <UserManagement />
+          <UserManagement queriesEnabled={adminQueriesEnabled} />
         </TabsContent>
 
         {/* Topics Tab */}
@@ -667,17 +700,17 @@ export default function AdminDashboard() {
 
         {/* Content Filters Tab */}
         <TabsContent value="filters">
-          <ContentFilters />
+          <ContentFilters queriesEnabled={adminQueriesEnabled} />
         </TabsContent>
 
         {/* Data Seeding Tab */}
         <TabsContent value="seeding">
-          <DataSeeding />
+          <DataSeeding queriesEnabled={adminQueriesEnabled} />
         </TabsContent>
 
         {/* Audit Log Tab */}
         <TabsContent value="audit">
-          <AuditLog />
+          <AuditLog queriesEnabled={adminQueriesEnabled} />
         </TabsContent>
       </Tabs>
 
