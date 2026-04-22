@@ -12,9 +12,11 @@ function splitIntoSentences(text: string): Sentence[] {
 
   // Simple sentence split: . ! ? followed by space and a capital/number/quote.
   // This is intentionally heuristic; we can refine later.
+  // Use a non-capturing group inside the lookahead so split() does not inject
+  // capture values (undefined) into the result array — those caused .trim() crashes.
   const parts = normalized
-    .split(/(?<=[.!?])\s+(?=(["'(\[])?[A-Z0-9])/g)
-    .map(s => s.trim())
+    .split(/(?<=[.!?])\s+(?=(?:["'(\[])?[A-Z0-9])/g)
+    .map((s) => (typeof s === "string" ? s.trim() : ""))
     .filter(Boolean);
 
   return parts.map((p, idx) => ({ index: idx, text: p }));

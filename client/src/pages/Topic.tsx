@@ -117,17 +117,36 @@ export default function Topic() {
 
   const summarySentences: SummarySentence[] = useMemo(() => {
     const raw = (cumulativeData as any)?.summarySentences;
-    if (Array.isArray(raw)) return raw as SummarySentence[];
+    if (Array.isArray(raw)) {
+      return raw
+        .map((item: unknown) => {
+          if (item == null) return null;
+          if (typeof item === "string") {
+            const t = item.trim();
+            return t ? { text: t, referencedOpinionIds: [] as string[] } : null;
+          }
+          if (typeof item === "object" && item !== null && "text" in item) {
+            const text = String((item as { text?: unknown }).text ?? "").trim();
+            const ids = (item as { referencedOpinionIds?: unknown }).referencedOpinionIds;
+            const referencedOpinionIds = Array.isArray(ids)
+              ? ids.filter((id): id is string => typeof id === "string")
+              : [];
+            return text ? { text, referencedOpinionIds } : null;
+          }
+          return null;
+        })
+        .filter(Boolean) as SummarySentence[];
+    }
     const summary = (cumulativeData as any)?.summary as string | undefined;
-    if (!summary) return [];
+    if (!summary || typeof summary !== "string") return [];
     // fallback: single sentence block with top opinions
     return summary
       .split(/(?<=[.!?])\s+/g)
-      .map(s => s.trim())
+      .map((s) => (typeof s === "string" ? s.trim() : ""))
       .filter(Boolean)
       .map((text) => ({
         text,
-        referencedOpinionIds: topOpinionsByLikes.slice(0, 3).map(o => o.id),
+        referencedOpinionIds: topOpinionsByLikes.slice(0, 3).map((o) => o.id),
       }));
   }, [cumulativeData, topOpinionsByLikes]);
 
@@ -495,13 +514,13 @@ export default function Topic() {
       <div className="space-y-4">
         {/* Categories and Active Badge */}
         <div className="flex items-center gap-2 flex-wrap">
-          {topic.categories.map((cat) => (
+          {(Array.isArray(topic.categories) ? topic.categories : []).map((cat) => (
             <Badge 
-              key={cat} 
+              key={String(cat)} 
               variant="secondary"
               className="cursor-pointer hover-elevate"
-              onClick={() => navigate(`/category/${encodeURIComponent(cat)}`)}
-              data-testid={`badge-category-${cat.toLowerCase()}`}
+              onClick={() => navigate(`/category/${encodeURIComponent(String(cat))}`)}
+              data-testid={`badge-category-${String(cat).toLowerCase()}`}
             >
               {cat}
             </Badge>
@@ -570,7 +589,7 @@ export default function Topic() {
             <CardContent>
               {cumulativeData ? (
                 <InteractiveSentenceText
-                  text={summarySentences.map(s => s.text).join(" ")}
+                  text={summarySentences.map((s) => s?.text ?? "").join(" ").trim()}
                   selectedSentenceIndex={selectedSentenceIndex}
                   onSelectSentence={(idx) => {
                     setSelectedSentenceIndex(idx);
