@@ -100,7 +100,8 @@ export async function setupAuth(app: Express) {
   // Deserialize user from session
   passport.deserializeUser(async (id: string, done) => {
     try {
-      const user = await userRepository.findById(id);
+      // Pass requestingUserId so sanitizeUserData treats this as self-access and keeps role/status
+      const user = await userRepository.findById(id, id);
       done(null, user);
     } catch (error) {
       done(error);
