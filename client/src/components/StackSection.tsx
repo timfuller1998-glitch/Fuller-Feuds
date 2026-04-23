@@ -12,15 +12,10 @@ interface StackSectionProps {
   icon: LucideIcon;
   sectionKey: string;
   topics: TopicWithCounts[];
-  onSwipe: (topic: TopicWithCounts, direction: 'left' | 'right' | 'up', cardState: { isFlipped: boolean; timeOnBackMs: number }) => void;
   nextSection?: NextSection;
 }
 
-export default function StackSection({ title, icon: Icon, sectionKey, topics, onSwipe, nextSection }: StackSectionProps) {
-  const handleSwipe = (topic: TopicWithCounts, direction: 'left' | 'right' | 'up', cardState: { isFlipped: boolean; timeOnBackMs: number }) => {
-    onSwipe(topic, direction, cardState);
-  };
-
+export default function StackSection({ title, icon: Icon, sectionKey, topics, nextSection }: StackSectionProps) {
   const handleEmpty = () => {
     // Handle empty stack - could trigger refresh or show message
     console.log(`Stack ${sectionKey} is empty`);
@@ -53,7 +48,6 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, on
         {topics.length > 0 ? (
           <SwipeableCardStack
             topics={topics}
-            onSwipe={handleSwipe}
             onEmpty={handleEmpty}
           />
         ) : (

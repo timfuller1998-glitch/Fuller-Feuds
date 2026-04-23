@@ -1,11 +1,8 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import StackSection from "@/components/StackSection";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import type { TopicWithCounts } from "@shared/schema";
 import { 
   TrendingUp,
@@ -41,8 +38,7 @@ interface OpinionSectionData {
 type AnySectionData = SectionData | OpinionSectionData;
 
 export default function Home() {
-  const { user, isAuthenticated } = useAuth();
-  const { toast } = useToast();
+  const { user } = useAuth();
 
   // Fetch all topics
   const { data: apiTopics, isLoading: topicsLoading } = useQuery<TopicWithCounts[]>({
@@ -243,41 +239,6 @@ export default function Home() {
     });
   }
 
-  // Swipe mutation
-  const swipeMutation = useMutation({
-    mutationFn: async ({ topicId, direction }: { topicId: string; direction: 'left' | 'right' }) => {
-      return apiRequest('POST', `/api/topics/${topicId}/swipe`, { direction });
-    },
-  });
-
-  // Handle swipe
-  const handleSwipe = async (
-    topic: TopicWithCounts,
-    direction: 'left' | 'right' | 'up',
-    cardState: { isFlipped: boolean; timeOnBackMs: number }
-  ) => {
-    // If swiped up, we need to trigger the opinion form
-    // This will be handled by exposing a way to open it from the card
-    // For now, we'll handle it by tracking that they want to add an opinion
-    if (direction === 'up') {
-      // The opinion dialog opening will be handled by modifying TopicCard
-      // to accept a prop that triggers the form
-      return;
-    }
-
-    // For left/right swipes, track the preference
-    if (isAuthenticated && (direction === 'left' || direction === 'right')) {
-      try {
-        await swipeMutation.mutateAsync({
-          topicId: topic.id,
-          direction,
-        });
-      } catch (error) {
-        console.error('Error recording swipe:', error);
-      }
-    }
-  };
-
   // Show loading only while initial data is loading
   const isLoading = topicsLoading || opinionsLoading;
   
@@ -318,7 +279,6 @@ export default function Home() {
             icon={section.icon}
             sectionKey={section.title.toLowerCase().replace(/\s+/g, '-')}
             topics={section.topics}
-            onSwipe={handleSwipe}
             nextSection={
               index < topicSections.length - 1
                 ? {
