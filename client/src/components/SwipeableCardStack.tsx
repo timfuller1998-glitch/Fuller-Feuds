@@ -8,7 +8,8 @@ const FLIP_DURATION_MS = 600;
 // Calculate card dimensions based on viewport
 const getCardDimensions = () => {
   const maxWidth = 400;
-  const width = Math.min(window.innerWidth - 34, maxWidth);
+  const raw = window.innerWidth - 34;
+  const width = Math.max(1, Math.min(Math.max(raw, 0), maxWidth));
   const height = (width * 7) / 5;
   return { width, height };
 };
@@ -87,8 +88,12 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   const [dimensions, setDimensions] = useState(getCardDimensions());
   const [isCommitting, setIsCommitting] = useState(false);
   const advanceAfterUnflipRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** When true, skip x.set(0) on currentIndex change — float handoff controls x. */
+  const suppressIndexXResetRef = useRef(false);
   const cardWRef = useRef(dimensions.width);
   const currentHingeRef = useRef<HTMLDivElement | null>(null);
+  /** Drives useTransform recompute when width changes; refs alone are not reactive. */
+  const stackWidth = useMotionValue(Math.max(1, dimensions.width));
 
   const x = useMotionValue(0);
   /** After index change: brief vertical spring so the new top card settles to center */
@@ -144,7 +149,9 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   const tiltPrevIdle = (v: number) => (v > 0 ? tiltT(v) : 0);
   const tiltNextIdle = (v: number) => (v < 0 ? -tiltT(v) : 0);
 
-  const slotPrevX = useTransform([x, floatU], (xv, u) => {
+  // Peeks: use stackWidth in useTransform so idle offsets update when width changes (not only on x).
+  // The draggable CENTER must use raw `x` in style (see return) so Framer drag works.
+  const slotPrevX = useTransform([x, floatU, stackWidth], (xv, u, w) => {
     const s = floatStateRef.current;
     if (s.mode === "toPrev") {
       return bL(s.cw);
@@ -152,19 +159,9 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     if (s.mode === "toNext") {
       return lerp(s.fromX, bL(s.cw), easeOutCubic(u));
     }
-    return prevXIdle(xv, cardWRef.current);
+    return prevXIdle(xv, w);
   });
-  const slotCurrX = useTransform([x, floatU], (xv, u) => {
-    const s = floatStateRef.current;
-    if (s.mode === "toPrev") {
-      return lerp(bL(s.cw) + s.fromX * FOLLOW, 0, easeOutCubic(u));
-    }
-    if (s.mode === "toNext") {
-      return lerp(bR(s.cw) + s.fromX * FOLLOW, 0, easeOutCubic(u));
-    }
-    return xv;
-  });
-  const slotNextX = useTransform([x, floatU], (xv, u) => {
+  const slotNextX = useTransform([x, floatU, stackWidth], (xv, u, w) => {
     const s = floatStateRef.current;
     if (s.mode === "toPrev") {
       return lerp(s.fromX, bR(s.cw), easeOutCubic(u));
@@ -172,7 +169,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     if (s.mode === "toNext") {
       return bR(s.cw);
     }
-    return nextXIdle(xv, cardWRef.current);
+    return nextXIdle(xv, w);
   });
 
   const slotPrevScale = useTransform([x, floatU], (xv, u) => {
@@ -296,6 +293,13 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useLayoutEffect(() => {
+    const w = Math.max(1, dimensions.width);
+    stackWidth.set(w);
+    cardWRef.current = w;
+    maxDragForNorm.current = Math.min(220, w * 0.55);
+  }, [dimensions.width]);
+
   useEffect(() => {
     return () => {
       if (advanceAfterUnflipRef.current) {
@@ -304,9 +308,9 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     };
   }, []);
 
-  // Reset drag when the active card index changes. Do not reset `revealY` here — `finishCommit`
-  // sets revealY for the post-advance spring; resetting here would race and cancel that animation.
+  // Reset drag when the active card index changes (unless a float handoff is driving `x`).
   useEffect(() => {
+    if (suppressIndexXResetRef.current) return;
     x.set(0);
   }, [currentIndex, x]);
 
@@ -376,9 +380,11 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
         return;
       }
       const fromX = x.get();
-      const cw = cardWRef.current;
+      const cw = Math.max(1, cardWRef.current);
       const rots = rotationTripletAt(fromX, m);
+      const floatOpts = { duration: FLOAT_TO_REST_S, ease: FLOAT_EASE };
       setIsCommitting(true);
+      suppressIndexXResetRef.current = true;
       if (dir === "prev") {
         goToPrev();
         floatStateRef.current = {
@@ -402,15 +408,19 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
           rNext0: 0,
         };
       }
+      const startCenterX = dir === "prev" ? bL(cw) + fromX * FOLLOW : bR(cw) + fromX * FOLLOW;
+      x.set(startCenterX);
       floatU.set(0);
       try {
-        // Index updates immediately (new peek content); u 0→1 eases all layers into place.
-        await animate(floatU, 1, { duration: FLOAT_TO_REST_S, ease: FLOAT_EASE });
+        // Index updates immediately; center `x` and `floatU` run in lockstep (raw `x` keeps drag working).
+        await Promise.all([animate(x, 0, floatOpts), animate(floatU, 1, floatOpts)]);
         floatStateRef.current = { mode: "none" };
         floatU.set(0);
+        x.set(0);
         revealY.set(10);
         await animate(revealY, 0, { type: "spring", stiffness: 300, damping: 26, mass: 0.55 });
       } finally {
+        suppressIndexXResetRef.current = false;
         setIsCommitting(false);
       }
     },
@@ -577,7 +587,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
             dragConstraints={{ left: -maxDragX, right: maxDragX }}
             onDragEnd={handleDragEnd}
             style={{
-              x: slotCurrX,
+              x,
               y: revealY,
               scale: slotCurrScale,
               opacity: slotCurrOpacity,
