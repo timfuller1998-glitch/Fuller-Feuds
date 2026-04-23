@@ -60,11 +60,8 @@ function EndCountChip({
   title: string;
 }) {
   return (
-    <span
-      className="pointer-events-none absolute bottom-full left-1/2 z-[1] mb-0.5 -translate-x-1/2 whitespace-nowrap"
-      title={title}
-    >
-      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-semibold tabular-nums text-secondary-foreground shadow-sm ring-1 ring-border">
+    <span className="pointer-events-none inline-flex align-baseline" title={title}>
+      <span className="ml-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-semibold tabular-nums text-secondary-foreground ring-1 ring-border">
         {n > 99 ? "99+" : n}
       </span>
     </span>
@@ -103,7 +100,7 @@ export function InteractiveSentenceText(props: {
       className={cn(
         "text-base leading-relaxed",
         !stacked && "whitespace-pre-wrap",
-        stacked && "max-w-none space-y-0 text-pretty",
+        stacked && "max-w-none text-pretty",
         props.className
       )}
     >
@@ -123,15 +120,21 @@ export function InteractiveSentenceText(props: {
 
           return (
             <span key={s.index} className="block">
-              <button
-                type="button"
+              <p
+                role="button"
+                tabIndex={0}
                 onClick={() => props.onSelectSentence(s.index)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") props.onSelectSentence(s.index);
+                }}
                 title={hasInteraction ? badgeTitle : undefined}
                 className={cn(
-                  "mb-5 block w-full max-w-none cursor-pointer rounded-lg border border-transparent px-2 py-2 text-left text-base leading-relaxed transition-colors last:mb-0 hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  "whitespace-pre-wrap",
-                  hasInteraction && "border-primary/20 bg-primary/[0.07] shadow-sm hover:bg-primary/[0.09]",
-                  isSelected && "bg-muted/90 ring-2 ring-ring ring-offset-2 ring-offset-background",
+                  "mb-5 cursor-pointer whitespace-pre-wrap rounded-md transition-colors last:mb-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  // looks like normal prose by default (no \"button\" chrome)
+                  "px-0 py-0",
+                  // highlight only when it has interactions or is selected
+                  hasInteraction && "bg-primary/[0.08] px-1 py-0.5",
+                  isSelected && "bg-muted/70 px-1 py-0.5",
                   props.sentenceClassName,
                   isSelected && props.selectedSentenceClassName
                 )}
@@ -139,24 +142,19 @@ export function InteractiveSentenceText(props: {
                 {punct ? (
                   <>
                     <span>{before}</span>
-                    <span className="relative inline">
-                      {punct}
-                      {hasInteraction ? <EndCountChip n={n} title={badgeTitle} /> : null}
-                    </span>
+                    <span>{punct}</span>
+                    {hasInteraction ? <EndCountChip n={n} title={badgeTitle} /> : null}
                     <span>{tail}</span>
                   </>
                 ) : (
                   <>
                     <span>{before}</span>
                     {hasInteraction ? (
-                      <span className="relative inline align-baseline">
-                        {"\u200b"}
-                        <EndCountChip n={n} title={badgeTitle} />
-                      </span>
+                      <EndCountChip n={n} title={badgeTitle} />
                     ) : null}
                   </>
                 )}
-              </button>
+              </p>
               {props.renderAfterSentence?.(s)}
             </span>
           );
