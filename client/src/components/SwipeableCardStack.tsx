@@ -36,10 +36,12 @@ const BACK_SCALE = 0.88;
 /** Back cards at rest: 90% opacity → 100% as they move toward center with the drag */
 const BACK_OPACITY_REST = 0.9;
 const BACK_OPACITY_FULL = 1;
-/** Stacking: equal z used DOM order (right on top). Elevate active follower; at rest left peek above right */
+/** At rest: current on top, left peek above right */
 const Z_BACK = 2;
-const Z_BACK_FOLLOW = 4;
 const Z_BACK_REST_LEAD = 3;
+const Z_PASS_OVER = 6;
+const Z_CURRENT = 5;
+const Z_CURRENT_WHILE_DRAG = 3;
 
 const SWIPE_OFFSET_THRESHOLD = 100;
 const SWIPE_VELOCITY_THRESHOLD = 500;
@@ -60,11 +62,11 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   const x = useMotionValue(0);
   /** After index change: brief vertical spring so the new top card settles to center */
   const revealY = useMotionValue(0);
-  /** Light in-plane wobble; keep small so the hinge (rotateY) reads as the main motion. */
-  const rotate = useTransform(x, [-220, 220], [-4, 4]);
 
-  // Swipe right (v>0): left (prev) card follows. Swipe left (v<0): right (next) card follows.
+  // Drag +x (to the right): only the left peek is visible/animated; the right peek is hidden. -x: mirror.
   const maxDragForNorm = useRef(200);
+  const mNow = () => maxDragForNorm.current;
+
   const prevX = useTransform(x, (v) => {
     const cw = cardWRef.current;
     const b = -cw * SIDE_OFFSET_FRAC;
@@ -78,40 +80,49 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     return b;
   });
   const prevScale = useTransform(x, (v) => {
-    if (v <= 0) return BACK_SCALE;
-    const t = Math.min(1, v / maxDragForNorm.current);
+    if (v < 0) return BACK_SCALE;
+    const t = Math.min(1, v / mNow());
     return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
   });
   const nextScale = useTransform(x, (v) => {
-    if (v >= 0) return BACK_SCALE;
-    const t = Math.min(1, -v / maxDragForNorm.current);
+    if (v > 0) return BACK_SCALE;
+    const t = Math.min(1, -v / mNow());
     return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
   });
+  /** v<0: hide left peek. v>0: show and bring toward full opacity. v=0: resting peek. */
   const prevOpacity = useTransform(x, (v) => {
-    if (v <= 0) return BACK_OPACITY_REST;
-    const t = Math.min(1, v / maxDragForNorm.current);
+    if (v < 0) return 0;
+    if (v === 0) return BACK_OPACITY_REST;
+    const t = Math.min(1, v / mNow());
     return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
   });
   const nextOpacity = useTransform(x, (v) => {
-    if (v >= 0) return BACK_OPACITY_REST;
-    const t = Math.min(1, -v / maxDragForNorm.current);
+    if (v > 0) return 0;
+    if (v === 0) return BACK_OPACITY_REST;
+    const t = Math.min(1, -v / mNow());
     return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
   });
-  const prevZ = useTransform(x, (v) => (v > 0 ? Z_BACK_FOLLOW : v < 0 ? Z_BACK : Z_BACK_REST_LEAD));
-  const nextZ = useTransform(x, (v) => (v < 0 ? Z_BACK_FOLLOW : v > 0 ? Z_BACK : Z_BACK));
+  const prevPointerEvents = useTransform(x, (v) => (v < 0 ? "none" : "auto"));
+  const nextPointerEvents = useTransform(x, (v) => (v > 0 ? "none" : "auto"));
+  const prevZ = useTransform(x, (v) => (v < 0 ? 0 : v > 0 ? Z_PASS_OVER : Z_BACK_REST_LEAD));
+  const nextZ = useTransform(x, (v) => (v > 0 ? 0 : v < 0 ? Z_PASS_OVER : Z_BACK));
+  const currentZ = useTransform(x, (v) => (Math.abs(v) < 0.5 ? Z_CURRENT : Z_CURRENT_WHILE_DRAG));
 
   const tiltT = (v: number) => {
-    const m = maxDragForNorm.current;
+    const m = mNow();
     if (m < 1) return 0;
     return Math.min(1, Math.abs(v) / m) * COMMIT_TWIST_DEG;
   };
+  /** Top card: v>0 → twist only toward the left; v<0 → only toward the right. */
   const tiltFront = useTransform(x, (v) => {
     if (v > 0) return tiltT(v);
     if (v < 0) return -tiltT(v);
     return 0;
   });
-  const tiltPrev = useTransform(x, (v) => (v < 0 ? tiltT(v) : 0));
-  const tiltNext = useTransform(x, (v) => (v > 0 ? -tiltT(v) : 0));
+  /** Left peek (v>0 only): hinges on its inner (right) edge, swings right over the current. */
+  const tiltPrev = useTransform(x, (v) => (v > 0 ? -tiltT(v) : 0));
+  /** Right peek (v<0 only): hinges on its inner (left) edge, swings left over the current. */
+  const tiltNext = useTransform(x, (v) => (v < 0 ? tiltT(v) : 0));
 
   useEffect(() => {
     const handleResize = () => {
@@ -313,9 +324,10 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
                 x: prevX,
                 scale: prevScale,
                 opacity: prevOpacity,
+                pointerEvents: prevPointerEvents,
                 rotateY: tiltPrev,
                 transformOrigin: "100% 50%",
-                /* inner vertical edge: card swings from the side toward center */
+                /* inner edge to center: swings over the current while dragging right */
                 WebkitTransformOrigin: "100% 50%",
                 z: 1,
                 left: "50%",
@@ -344,6 +356,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
                 x: nextX,
                 scale: nextScale,
                 opacity: nextOpacity,
+                pointerEvents: nextPointerEvents,
                 rotateY: tiltNext,
                 transformOrigin: "0% 50%",
                 WebkitTransformOrigin: "0% 50%",
@@ -377,11 +390,10 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
             style={{
               x,
               y: revealY,
-              rotate,
               z: 2,
               left: "50%",
               marginLeft: `-${cardWidth / 2}px`,
-              zIndex: 5,
+              zIndex: currentZ,
               transformStyle: "preserve-3d",
             }}
           >
