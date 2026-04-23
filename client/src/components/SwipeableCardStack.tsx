@@ -33,7 +33,9 @@ const getCardAtOffset = (topics: TopicWithCounts[], currentIndex: number, offset
 const SIDE_OFFSET_FRAC = 0.25;
 const FOLLOW = 0.5;
 const BACK_SCALE = 0.88;
-const BACK_OPACITY = 0.6;
+/** Back cards at rest: 90% opacity → 100% as they move toward center with the drag */
+const BACK_OPACITY_REST = 0.9;
+const BACK_OPACITY_FULL = 1;
 
 const SWIPE_OFFSET_THRESHOLD = 100;
 const SWIPE_VELOCITY_THRESHOLD = 500;
@@ -49,39 +51,39 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-220, 220], [-10, 10]);
 
-  // Follow transforms: back cards move toward center as you drag the top card
+  // Swipe right (v>0): left (prev) card follows. Swipe left (v<0): right (next) card follows.
+  const maxDragForNorm = useRef(200);
   const prevX = useTransform(x, (v) => {
     const cw = cardWRef.current;
     const b = -cw * SIDE_OFFSET_FRAC;
-    if (v <= 0) return b - v * FOLLOW;
+    if (v > 0) return b + v * FOLLOW;
     return b;
   });
   const nextX = useTransform(x, (v) => {
     const cw = cardWRef.current;
     const b = cw * SIDE_OFFSET_FRAC;
-    if (v >= 0) return b - v * FOLLOW;
+    if (v < 0) return b + v * FOLLOW;
     return b;
   });
-  const maxDragForNorm = useRef(200);
   const prevScale = useTransform(x, (v) => {
-    if (v >= 0) return BACK_SCALE;
-    const t = Math.min(1, -v / maxDragForNorm.current);
-    return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
-  });
-  const nextScale = useTransform(x, (v) => {
     if (v <= 0) return BACK_SCALE;
     const t = Math.min(1, v / maxDragForNorm.current);
     return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
   });
-  const prevOpacity = useTransform(x, (v) => {
-    if (v >= 0) return BACK_OPACITY;
+  const nextScale = useTransform(x, (v) => {
+    if (v >= 0) return BACK_SCALE;
     const t = Math.min(1, -v / maxDragForNorm.current);
-    return BACK_OPACITY + (1 - BACK_OPACITY) * 0.5 * t;
+    return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
+  });
+  const prevOpacity = useTransform(x, (v) => {
+    if (v <= 0) return BACK_OPACITY_REST;
+    const t = Math.min(1, v / maxDragForNorm.current);
+    return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
   });
   const nextOpacity = useTransform(x, (v) => {
-    if (v <= 0) return BACK_OPACITY;
-    const t = Math.min(1, v / maxDragForNorm.current);
-    return BACK_OPACITY + (1 - BACK_OPACITY) * 0.5 * t;
+    if (v >= 0) return BACK_OPACITY_REST;
+    const t = Math.min(1, -v / maxDragForNorm.current);
+    return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
   });
 
   useEffect(() => {
