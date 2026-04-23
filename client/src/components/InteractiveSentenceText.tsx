@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 
 export type Sentence = {
   index: number;
@@ -11,10 +10,6 @@ function splitIntoSentences(text: string): Sentence[] {
   const normalized = (text || "").replace(/\s+/g, " ").trim();
   if (!normalized) return [];
 
-  // Simple sentence split: . ! ? followed by space and a capital/number/quote.
-  // This is intentionally heuristic; we can refine later.
-  // Use a non-capturing group inside the lookahead so split() does not inject
-  // capture values (undefined) into the result array — those caused .trim() crashes.
   const parts = normalized
     .split(/(?<=[.!?])\s+(?=(?:["'(\[])?[A-Z0-9])/g)
     .map((s) => (typeof s === "string" ? s.trim() : ""))
@@ -37,15 +32,50 @@ function splitIntoParagraphs(text: string): Sentence[] {
   return parts.map((p, idx) => ({ index: idx, text: p }));
 }
 
+/** Last sentence-ending punctuation in the paragraph (for anchoring the count chip). */
+function splitAtLastSentencePunct(text: string): { before: string; punct: string; tail: string } {
+  let best = -1;
+  let punctChar = "";
+  for (let i = text.length - 1; i >= 0; i--) {
+    const c = text[i];
+    if (c === "." || c === "!" || c === "?") {
+      best = i;
+      punctChar = c;
+      break;
+    }
+  }
+  if (best < 0) return { before: text, punct: "", tail: "" };
+  return {
+    before: text.slice(0, best),
+    punct: punctChar,
+    tail: text.slice(best + 1),
+  };
+}
+
+function EndCountChip({
+  n,
+  title,
+}: {
+  n: number;
+  title: string;
+}) {
+  return (
+    <span
+      className="pointer-events-none absolute bottom-full left-1/2 z-[1] mb-0.5 -translate-x-1/2 whitespace-nowrap"
+      title={title}
+    >
+      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-semibold tabular-nums text-secondary-foreground shadow-sm ring-1 ring-border">
+        {n > 99 ? "99+" : n}
+      </span>
+    </span>
+  );
+}
+
 export function InteractiveSentenceText(props: {
-  /** Full text to split when `chunks` is not provided. */
   text?: string;
-  /** One interactive segment per entry (index matches API, e.g. cumulative summary sentences). */
   chunks?: string[];
   segmentMode?: "sentence" | "paragraph";
-  /** When set, stacked segments with count &gt; 0 get a light highlight and a numeric badge. */
   interactionCount?: (segmentIndex: number) => number;
-  /** Affects the hover title on the count badge (counterpoints vs referenced opinions). */
   interactionKind?: "counterpoints" | "references";
   selectedSentenceIndex: number | null;
   onSelectSentence: (sentenceIndex: number) => void;
@@ -71,8 +101,9 @@ export function InteractiveSentenceText(props: {
   return (
     <div
       className={cn(
-        "text-base leading-relaxed whitespace-pre-wrap",
-        stacked && "flex flex-col gap-2",
+        "text-base leading-relaxed",
+        !stacked && "whitespace-pre-wrap",
+        stacked && "max-w-none space-y-0 text-pretty",
         props.className
       )}
     >
@@ -88,6 +119,8 @@ export function InteractiveSentenceText(props: {
             kind === "references"
               ? `${n} referenced opinion${n === 1 ? "" : "s"}`
               : `${n} counterpoint${n === 1 ? "" : "s"}`;
+          const { before, punct, tail } = splitAtLastSentencePunct(s.text);
+
           return (
             <span key={s.index} className="block">
               <button
@@ -95,24 +128,34 @@ export function InteractiveSentenceText(props: {
                 onClick={() => props.onSelectSentence(s.index)}
                 title={hasInteraction ? badgeTitle : undefined}
                 className={cn(
-                  "flex w-full gap-2 items-stretch rounded-lg border border-transparent px-2 py-1.5 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  hasInteraction && "border-primary/25 bg-primary/[0.06] shadow-sm hover:bg-primary/[0.08]",
-                  isSelected && "bg-muted ring-2 ring-ring",
+                  "mb-5 block w-full max-w-none cursor-pointer rounded-lg border border-transparent px-2 py-2 text-left text-base leading-relaxed transition-colors last:mb-0 hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "whitespace-pre-wrap",
+                  hasInteraction && "border-primary/20 bg-primary/[0.07] shadow-sm hover:bg-primary/[0.09]",
+                  isSelected && "bg-muted/90 ring-2 ring-ring ring-offset-2 ring-offset-background",
                   props.sentenceClassName,
                   isSelected && props.selectedSentenceClassName
                 )}
               >
-                <span className="flex-1 min-w-0 whitespace-pre-wrap">{s.text}</span>
-                {hasInteraction ? (
-                  <span className="flex shrink-0 items-start pt-0.5">
-                    <Badge
-                      variant="secondary"
-                      className="h-5 min-w-[1.25rem] justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums"
-                    >
-                      {n > 99 ? "99+" : n}
-                    </Badge>
-                  </span>
-                ) : null}
+                {punct ? (
+                  <>
+                    <span>{before}</span>
+                    <span className="relative inline">
+                      {punct}
+                      {hasInteraction ? <EndCountChip n={n} title={badgeTitle} /> : null}
+                    </span>
+                    <span>{tail}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{before}</span>
+                    {hasInteraction ? (
+                      <span className="relative inline align-baseline">
+                        {"\u200b"}
+                        <EndCountChip n={n} title={badgeTitle} />
+                      </span>
+                    ) : null}
+                  </>
+                )}
               </button>
               {props.renderAfterSentence?.(s)}
             </span>
@@ -144,4 +187,3 @@ export function InteractiveSentenceText(props: {
     </div>
   );
 }
-
