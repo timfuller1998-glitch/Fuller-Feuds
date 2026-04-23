@@ -1,5 +1,5 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import { motion, useMotionValue, useTransform, animate, PanInfo, useMotionValueEvent } from "framer-motion";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
 import TopicCard from "./TopicCard";
 import type { TopicWithCounts } from "@shared/schema";
 
@@ -8,8 +8,8 @@ const FLIP_DURATION_MS = 600;
 // Calculate card dimensions based on viewport
 const getCardDimensions = () => {
   const maxWidth = 400;
-  const width = Math.min(window.innerWidth - 34, maxWidth);
-  const height = (width * 7) / 5;
+  const width = Math.min(window.innerWidth - 34, maxWidth); // 17px padding each side (34px total)
+  const height = (width * 7) / 5; // 5:7 aspect ratio
   return { width, height };
 };
 
@@ -23,136 +23,40 @@ interface CardState {
   timeOnBackMs: number;
 }
 
+// Helper function to get card at offset using circular array
 const getCardAtOffset = (topics: TopicWithCounts[], currentIndex: number, offset: number): TopicWithCounts | null => {
   if (topics.length === 0) return null;
   const index = (currentIndex + offset + topics.length) % topics.length;
   return topics[index];
 };
 
-// Resting translate for side cards (fraction of width)
-const SIDE_OFFSET_FRAC = 0.25;
-/** Back card horizontal motion relative to the top: half as far, opposite direction. */
-const FOLLOW = 0.5;
-/** translateZ in px: large gap so 3D tilts do not z-fight past z-index. */
-const FRONT_TZ = 32;
-const BACK_TZ = 0;
-const BACK_SCALE = 0.88;
-/** Back cards at rest: 90% opacity → 100% as they move toward center with the drag */
-const BACK_OPACITY_REST = 0.9;
-const BACK_OPACITY_FULL = 1;
-/** Peeks stay below Z_CURRENT so the front card stays on top until index changes after release. */
-const Z_BACK = 2;
-const Z_BACK_REST_LEAD = 3;
-const Z_CURRENT = 5;
+// Calculate card properties based on position
+const getCardStyle = (offset: number, cardWidth: number) => {
+  const distance = Math.abs(offset);
+  const scale = distance === 0 ? 1.0 : 0.88; // Slightly smaller for side cards
+  const opacity = distance === 0 ? 1.0 : 0.6; // More transparent for side cards
+  const zIndex = distance === 0 ? 5 : 2;
+  const translateX = offset * cardWidth * 0.25;
+
+  return {
+    translateX,
+    scale,
+    opacity,
+    zIndex,
+  };
+};
 
 const SWIPE_OFFSET_THRESHOLD = 100;
 const SWIPE_VELOCITY_THRESHOLD = 500;
-/**
- * "Opposite twist" progress uses |x|/max. At t=0: top flat, peeks turned slightly away. At t=1:
- * peek face is flat (0°) and the top card has rotated away for the handoff.
- */
-const PEEK_AWAY_DEG = 20;
-const SWEEP_DEG = 50;
-const FINISH_SWEEP_S = 0.22;
 
 export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardStackProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [cardStates, setCardStates] = useState<Map<string, CardState>>(new Map());
   const [forceUnflipSignal, setForceUnflipSignal] = useState(0);
   const [dimensions, setDimensions] = useState(getCardDimensions());
-  const [isCommitting, setIsCommitting] = useState(false);
   const advanceAfterUnflipRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cardWRef = useRef(dimensions.width);
-  const currentHingeRef = useRef<HTMLDivElement | null>(null);
 
-  const x = useMotionValue(0);
-  /** After index change: brief vertical spring so the new top card settles to center */
-  const revealY = useMotionValue(0);
-
-  // Drag +x (to the right): only the left peek is visible/animated; the right peek is hidden. -x: mirror.
-  const maxDragForNorm = useRef(200);
-  const mNow = () => maxDragForNorm.current;
-
-  const prevX = useTransform(x, (v) => {
-    const cw = cardWRef.current;
-    const b = -cw * SIDE_OFFSET_FRAC;
-    if (v > 0) return b - v * FOLLOW;
-    return b;
-  });
-  const nextX = useTransform(x, (v) => {
-    const cw = cardWRef.current;
-    const b = cw * SIDE_OFFSET_FRAC;
-    if (v < 0) return b - v * FOLLOW;
-    return b;
-  });
-  const prevScale = useTransform(x, (v) => {
-    if (v < 0) return BACK_SCALE;
-    const t = Math.min(1, v / mNow());
-    return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
-  });
-  const nextScale = useTransform(x, (v) => {
-    if (v > 0) return BACK_SCALE;
-    const t = Math.min(1, -v / mNow());
-    return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
-  });
-  /** v<0: hide left peek. v>0: show and bring toward full opacity. v=0: resting peek. */
-  const prevOpacity = useTransform(x, (v) => {
-    if (v < 0) return 0;
-    if (v === 0) return BACK_OPACITY_REST;
-    const t = Math.min(1, v / mNow());
-    return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
-  });
-  const nextOpacity = useTransform(x, (v) => {
-    if (v > 0) return 0;
-    if (v === 0) return BACK_OPACITY_REST;
-    const t = Math.min(1, -v / mNow());
-    return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
-  });
-  const prevPointerEvents = useTransform(x, (v) => (v < 0 ? "none" : "auto"));
-  const nextPointerEvents = useTransform(x, (v) => (v > 0 ? "none" : "auto"));
-  const prevZ = useTransform(x, (v) => (v < 0 ? 0 : Z_BACK_REST_LEAD));
-  const nextZ = useTransform(x, (v) => (v > 0 ? 0 : Z_BACK));
-
-  /** Top: 0 at rest → full “away” at max drag, opposite the peek coming flat. */
-  const tiltFront = useTransform(x, (v) => {
-    const m = mNow();
-    if (m < 1) return 0;
-    if (v > 0) {
-      const t = Math.min(1, v / m);
-      return -SWEEP_DEG * t;
-    }
-    if (v < 0) {
-      const t = Math.min(1, -v / m);
-      return SWEEP_DEG * t;
-    }
-    return 0;
-  });
-  /**
-   * Left peek: at rest, face slightly “away” (hinge 100% 50%). Unwinds to flat as t→1 when v>0.
-   * (Hidden for v<0 — opacity 0; rotation 0 to avoid pop when reappearing in another drag.)
-   */
-  const tiltPrev = useTransform(x, (v) => {
-    if (v < 0) return 0;
-    const m = mNow();
-    if (m < 1) return PEEK_AWAY_DEG;
-    const t = Math.min(1, v / m);
-    return PEEK_AWAY_DEG * (1 - t);
-  });
-  /** Right peek: mirror; rest “away” with hinge 0% 50%, flat at full left drag. */
-  const tiltNext = useTransform(x, (v) => {
-    if (v > 0) return 0;
-    const m = mNow();
-    if (m < 1) {
-      if (v === 0) return -PEEK_AWAY_DEG;
-      return 0;
-    }
-    if (v < 0) {
-      const t = Math.min(1, -v / m);
-      return -PEEK_AWAY_DEG * (1 - t);
-    }
-    return -PEEK_AWAY_DEG;
-  });
-
+  // Update dimensions on window resize
   useEffect(() => {
     const handleResize = () => {
       setDimensions(getCardDimensions());
@@ -169,29 +73,13 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     };
   }, []);
 
-  // Reset drag when the active card index changes. Do not reset `revealY` here — `finishCommit`
-  // sets revealY for the post-advance spring; resetting here would race and cancel that animation.
-  useEffect(() => {
-    x.set(0);
-  }, [currentIndex, x]);
-
-  // Hinge the front card from the edge toward the neighbor (door past the other card)
-  useMotionValueEvent(x, "change", (v) => {
-    const el = currentHingeRef.current;
-    if (!el) return;
-    el.style.transformOrigin = v >= 0 ? "100% 50%" : "0% 50%";
-  });
-
-  useLayoutEffect(() => {
-    const el = currentHingeRef.current;
-    if (!el) return;
-    // After a commit, `x` is 0: hinge from the right edge (positive drag direction) by default
-    el.style.transformOrigin = "100% 50%";
-  }, [currentIndex]);
-
+  // Get cards at different offsets
   const prev1Card = getCardAtOffset(topics, currentIndex, -1);
   const currentCard = getCardAtOffset(topics, currentIndex, 0);
   const next1Card = getCardAtOffset(topics, currentIndex, 1);
+
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-300, 300], [-12, 12]);
 
   const handleFlipChange = (topicId: string, isFlipped: boolean) => {
     setCardStates((prev) => {
@@ -226,52 +114,14 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     setCurrentIndex((prev) => (prev + 1) % topics.length);
   }, [topics.length]);
 
-  const finishCommit = useCallback(
-    async (dir: "next" | "prev") => {
-      const ease = [0.45, 0, 0.2, 1] as [number, number, number, number];
-      if (topics.length < 2) {
-        if (dir === "next") goToNext();
-        else goToPrev();
-        return;
-      }
-      const m = maxDragForNorm.current;
-      if (m < 1) {
-        if (dir === "next") goToNext();
-        else goToPrev();
-        return;
-      }
-      setIsCommitting(true);
-      // goToNext = user dragged left (x<0): finish to -m. goToPrev = dragged right (x>0): finish to +m.
-      const targetX = dir === "next" ? -m : m;
-      try {
-        // Complete sweep: tilt follows x via useTransform, then take new top card
-        await animate(x, targetX, { duration: FINISH_SWEEP_S, type: "tween", ease: ease });
-        if (dir === "next") goToNext();
-        else goToPrev();
-        x.set(0);
-        revealY.set(10);
-        await animate(revealY, 0, { type: "spring", stiffness: 300, damping: 26, mass: 0.55 });
-      } finally {
-        setIsCommitting(false);
-      }
-    },
-    [goToNext, goToPrev, x, topics.length, revealY]
-  );
-
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     clearAdvanceTimer();
-    if (isCommitting) {
-      return;
-    }
-    const { velocity } = info;
-    // Use live motion value — at drag constraints, `offset` in PanInfo can disagree with the visible x
-    const dragX = x.get();
+    const { offset, velocity } = info;
+    x.set(0);
 
-    if (!currentCard || topics.length === 0) {
-      void animate(x, 0, { type: "spring", stiffness: 400, damping: 35 });
-      return;
-    }
+    if (!currentCard || topics.length === 0) return;
 
+    // Decide intent: high horizontal velocity wins; else use offset
     let wantPrev = false;
     let wantNext = false;
 
@@ -282,33 +132,37 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
         wantNext = true;
       }
     } else {
-      if (dragX <= -SWIPE_OFFSET_THRESHOLD) {
+      if (offset.x <= -SWIPE_OFFSET_THRESHOLD) {
         wantPrev = true;
-      } else if (dragX >= SWIPE_OFFSET_THRESHOLD) {
+      } else if (offset.x >= SWIPE_OFFSET_THRESHOLD) {
         wantNext = true;
       }
     }
 
     if (!wantPrev && !wantNext) {
-      void animate(x, 0, { type: "spring", stiffness: 400, damping: 35 });
       return;
     }
     if (wantPrev && wantNext) {
-      void animate(x, 0, { type: "spring", stiffness: 400, damping: 35 });
       return;
     }
 
     const cardState = cardStates.get(currentCard.id) || { isFlipped: false, timeOnBackMs: 0 };
-    // Positive drag → bring left peek to top (goToPrev). Negative drag → bring right peek to top (goToNext).
-    const commitDir: "next" | "prev" = wantNext ? "prev" : "next";
+    const run = () => {
+      if (wantPrev) {
+        goToPrev();
+      } else {
+        goToNext();
+      }
+    };
+
     if (cardState.isFlipped) {
       setForceUnflipSignal(Date.now());
       advanceAfterUnflipRef.current = setTimeout(() => {
-        void finishCommit(commitDir);
+        run();
         advanceAfterUnflipRef.current = null;
       }, FLIP_DURATION_MS);
     } else {
-      void finishCommit(commitDir);
+      run();
     }
   };
 
@@ -321,9 +175,6 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   }
 
   const cardWidth = dimensions.width;
-  const maxDragX = Math.min(220, cardWidth * 0.55);
-  cardWRef.current = cardWidth;
-  maxDragForNorm.current = maxDragX;
 
   return (
     <div
@@ -333,70 +184,30 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
         height: `${dimensions.height}px`,
         margin: "0 auto",
         overflow: "visible",
-        perspective: 1400,
-        WebkitPerspective: 1400,
-        transformStyle: "preserve-3d",
-        WebkitTransformStyle: "preserve-3d",
       }}
     >
-      {/* prev → next → current: paint current last in DOM to avoid 3D edge cases covering the front. */}
       {[
-        { card: prev1Card, role: "prev" as const },
-        { card: next1Card, role: "next" as const },
-        { card: currentCard, role: "current" as const },
-      ].map(({ card, role }) => {
+        { card: prev1Card, offset: -1, key: "prev1" },
+        { card: currentCard, offset: 0, key: "current" },
+        { card: next1Card, offset: 1, key: "next1" },
+      ].map(({ card, offset }) => {
         if (!card) return null;
 
-        if (role === "prev") {
-          return (
-            <motion.div
-              key={`${card.id}-prev-${currentIndex}`}
-              className="absolute w-full h-full"
-              style={{
-                x: prevX,
-                scale: prevScale,
-                opacity: prevOpacity,
-                pointerEvents: prevPointerEvents,
-                rotateY: tiltPrev,
-                transformOrigin: "100% 50%",
-                /* inner edge to center: swings over the current while dragging right */
-                WebkitTransformOrigin: "100% 50%",
-                z: BACK_TZ,
-                left: "50%",
-                marginLeft: `-${cardWidth / 2}px`,
-                zIndex: prevZ,
-                transformStyle: "preserve-3d",
-              }}
-            >
-              <TopicCard
-                {...card}
-                imageUrl={card.imageUrl ?? ""}
-                isActive={card.isActive ?? false}
-                onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
-                onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
-              />
-            </motion.div>
-          );
-        }
+        const isCurrent = offset === 0;
+        const style = getCardStyle(offset, cardWidth);
 
-        if (role === "next") {
+        if (!isCurrent) {
           return (
-            <motion.div
-              key={`${card.id}-next-${currentIndex}`}
+            <div
+              key={`${card.id}-${offset}-${currentIndex}`}
               className="absolute w-full h-full"
               style={{
-                x: nextX,
-                scale: nextScale,
-                opacity: nextOpacity,
-                pointerEvents: nextPointerEvents,
-                rotateY: tiltNext,
-                transformOrigin: "0% 50%",
-                WebkitTransformOrigin: "0% 50%",
-                z: BACK_TZ,
                 left: "50%",
                 marginLeft: `-${cardWidth / 2}px`,
-                zIndex: nextZ,
-                transformStyle: "preserve-3d",
+                zIndex: style.zIndex,
+                transform: `translateX(${style.translateX}px) scale(${style.scale})`,
+                opacity: style.opacity,
+                transition: "transform 0.3s ease-out, opacity 0.3s ease-out",
               }}
             >
               <TopicCard
@@ -406,55 +217,43 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
                 onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
                 onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
               />
-            </motion.div>
+            </div>
           );
         }
 
         return (
           <motion.div
             key={`${card.id}-current-${currentIndex}`}
-            className="absolute w-full h-full [touch-action:pan-x]"
-            drag={isCommitting ? false : "x"}
-            dragMomentum={false}
-            dragElastic={0.02}
-            dragConstraints={{ left: -maxDragX, right: maxDragX }}
+            className="absolute w-full h-full"
+            drag="x"
+            dragElastic={0.12}
             onDragEnd={handleDragEnd}
             style={{
               x,
-              y: revealY,
-              z: FRONT_TZ,
+              rotate,
               left: "50%",
               marginLeft: `-${cardWidth / 2}px`,
-              zIndex: Z_CURRENT,
+              zIndex: 5,
               transformStyle: "preserve-3d",
             }}
           >
-            <motion.div
-              ref={currentHingeRef}
-              className="h-full w-full"
+            <div
               style={{
-                rotateY: tiltFront,
+                width: "100%",
+                height: "100%",
                 transformStyle: "preserve-3d",
-                transformOrigin: "100% 50%",
-                WebkitTransformOrigin: "100% 50%",
+                perspective: "1000px",
               }}
             >
-              <div
-                className="h-full w-full"
-                style={{
-                  transformStyle: "preserve-3d",
-                }}
-              >
-                <TopicCard
-                  {...card}
-                  imageUrl={card.imageUrl ?? ""}
-                  isActive={card.isActive ?? false}
-                  onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
-                  onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
-                  forceUnflipSignal={forceUnflipSignal}
-                />
-              </div>
-            </motion.div>
+              <TopicCard
+                {...card}
+                imageUrl={card.imageUrl ?? ""}
+                isActive={card.isActive ?? false}
+                onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
+                onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
+                forceUnflipSignal={forceUnflipSignal}
+              />
+            </div>
           </motion.div>
         );
       })}
