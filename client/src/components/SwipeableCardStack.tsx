@@ -36,17 +36,15 @@ const BACK_SCALE = 0.88;
 /** Back cards at rest: 90% opacity → 100% as they move toward center with the drag */
 const BACK_OPACITY_REST = 0.9;
 const BACK_OPACITY_FULL = 1;
-/** At rest: current on top, left peek above right */
+/** Peeks stay below Z_CURRENT so the front card stays on top until index changes after release. */
 const Z_BACK = 2;
 const Z_BACK_REST_LEAD = 3;
-const Z_PASS_OVER = 6;
 const Z_CURRENT = 5;
-const Z_CURRENT_WHILE_DRAG = 3;
 
 const SWIPE_OFFSET_THRESHOLD = 100;
 const SWIPE_VELOCITY_THRESHOLD = 500;
 /** 3D hinge at full drag (|x| = max). Tilts while sliding; useTransform from x. */
-const COMMIT_TWIST_DEG = 28;
+const COMMIT_TWIST_DEG = 44;
 const FINISH_SWEEP_S = 0.22;
 
 export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardStackProps) {
@@ -104,9 +102,8 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   });
   const prevPointerEvents = useTransform(x, (v) => (v < 0 ? "none" : "auto"));
   const nextPointerEvents = useTransform(x, (v) => (v > 0 ? "none" : "auto"));
-  const prevZ = useTransform(x, (v) => (v < 0 ? 0 : v > 0 ? Z_PASS_OVER : Z_BACK_REST_LEAD));
-  const nextZ = useTransform(x, (v) => (v > 0 ? 0 : v < 0 ? Z_PASS_OVER : Z_BACK));
-  const currentZ = useTransform(x, (v) => (Math.abs(v) < 0.5 ? Z_CURRENT : Z_CURRENT_WHILE_DRAG));
+  const prevZ = useTransform(x, (v) => (v < 0 ? 0 : Z_BACK_REST_LEAD));
+  const nextZ = useTransform(x, (v) => (v > 0 ? 0 : Z_BACK));
 
   const tiltT = (v: number) => {
     const m = mNow();
@@ -395,7 +392,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
               z: 2,
               left: "50%",
               marginLeft: `-${cardWidth / 2}px`,
-              zIndex: currentZ,
+              zIndex: Z_CURRENT,
               transformStyle: "preserve-3d",
             }}
           >
