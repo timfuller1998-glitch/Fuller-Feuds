@@ -31,7 +31,11 @@ const getCardAtOffset = (topics: TopicWithCounts[], currentIndex: number, offset
 
 // Resting translate for side cards (fraction of width)
 const SIDE_OFFSET_FRAC = 0.25;
+/** Back card horizontal motion relative to the top: half as far, opposite direction. */
 const FOLLOW = 0.5;
+/** translateZ in px: large gap so 3D tilts do not z-fight past z-index. */
+const FRONT_TZ = 32;
+const BACK_TZ = 0;
 const BACK_SCALE = 0.88;
 /** Back cards at rest: 90% opacity → 100% as they move toward center with the drag */
 const BACK_OPACITY_REST = 0.9;
@@ -68,13 +72,13 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   const prevX = useTransform(x, (v) => {
     const cw = cardWRef.current;
     const b = -cw * SIDE_OFFSET_FRAC;
-    if (v > 0) return b + v * FOLLOW;
+    if (v > 0) return b - v * FOLLOW;
     return b;
   });
   const nextX = useTransform(x, (v) => {
     const cw = cardWRef.current;
     const b = cw * SIDE_OFFSET_FRAC;
-    if (v < 0) return b + v * FOLLOW;
+    if (v < 0) return b - v * FOLLOW;
     return b;
   });
   const prevScale = useTransform(x, (v) => {
@@ -307,10 +311,11 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
         WebkitTransformStyle: "preserve-3d",
       }}
     >
+      {/* prev → next → current: paint current last in DOM to avoid 3D edge cases covering the front. */}
       {[
         { card: prev1Card, role: "prev" as const },
-        { card: currentCard, role: "current" as const },
         { card: next1Card, role: "next" as const },
+        { card: currentCard, role: "current" as const },
       ].map(({ card, role }) => {
         if (!card) return null;
 
@@ -328,7 +333,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
                 transformOrigin: "100% 50%",
                 /* inner edge to center: swings over the current while dragging right */
                 WebkitTransformOrigin: "100% 50%",
-                z: 1,
+                z: BACK_TZ,
                 left: "50%",
                 marginLeft: `-${cardWidth / 2}px`,
                 zIndex: prevZ,
@@ -359,7 +364,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
                 rotateY: tiltNext,
                 transformOrigin: "0% 50%",
                 WebkitTransformOrigin: "0% 50%",
-                z: 1,
+                z: BACK_TZ,
                 left: "50%",
                 marginLeft: `-${cardWidth / 2}px`,
                 zIndex: nextZ,
@@ -389,7 +394,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
             style={{
               x,
               y: revealY,
-              z: 2,
+              z: FRONT_TZ,
               left: "50%",
               marginLeft: `-${cardWidth / 2}px`,
               zIndex: Z_CURRENT,
