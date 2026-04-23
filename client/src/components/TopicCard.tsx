@@ -54,9 +54,8 @@ interface TopicCardProps {
   };
   onFlipChange?: (isFlipped: boolean) => void;
   onBackTimeUpdate?: (timeMs: number) => void;
-  showSwipeOverlay?: 'like' | 'dislike' | 'opinion' | null;
-  overlayOpacity?: number;
-  triggerOpinionForm?: number; // Timestamp to trigger opinion form opening
+  /** When this value changes, the card flips back to the front if currently flipped (e.g. before stack advances). */
+  forceUnflipSignal?: number;
 }
 
 export default function TopicCard({
@@ -77,9 +76,7 @@ export default function TopicCard({
   politicalDistribution,
   onFlipChange,
   onBackTimeUpdate,
-  showSwipeOverlay,
-  overlayOpacity = 0,
-  triggerOpinionForm,
+  forceUnflipSignal,
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
@@ -93,6 +90,7 @@ export default function TopicCard({
   const [currentOpinionIndex, setCurrentOpinionIndex] = useState(0);
   const backSideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const lastForceUnflipRef = useRef(0);
 
   // Get glow style based on political distribution
   const glowStyle = politicalDistribution && opinionsCount > 0
@@ -225,17 +223,14 @@ export default function TopicCard({
     };
   }, [isFlipped, onBackTimeUpdate]);
 
-  // Trigger opinion form when triggerOpinionForm prop changes
+  // Parent (e.g. stack) can force flip back to front before changing the top card
   useEffect(() => {
-    if (triggerOpinionForm && triggerOpinionForm > 0) {
-      if (!isAuthenticated) {
-        setLoginAction("opinion");
-        setShowLoginPrompt(true);
-      } else {
-        setShowOpinionForm(true);
-      }
-    }
-  }, [triggerOpinionForm, isAuthenticated]);
+    if (!forceUnflipSignal || forceUnflipSignal <= lastForceUnflipRef.current) return;
+    lastForceUnflipRef.current = forceUnflipSignal;
+    if (!isFlipped) return;
+    setIsFlipped(false);
+    onFlipChange?.(false);
+  }, [forceUnflipSignal, isFlipped, onFlipChange]);
 
   // Reset opinion index when topOpinions change
   useEffect(() => {
@@ -348,26 +343,6 @@ export default function TopicCard({
         style={{ perspective: "1000px", ...glowStyle }}
         data-testid={`card-topic-${id}`}
       >
-        {/* Swipe overlays */}
-        {showSwipeOverlay === 'like' && (
-          <div
-            className="absolute inset-0 bg-green-500/30 rounded-lg z-50 pointer-events-none"
-            style={{ opacity: overlayOpacity }}
-          />
-        )}
-        {showSwipeOverlay === 'dislike' && (
-          <div
-            className="absolute inset-0 bg-red-500/30 rounded-lg z-50 pointer-events-none"
-            style={{ opacity: overlayOpacity }}
-          />
-        )}
-        {showSwipeOverlay === 'opinion' && (
-          <div
-            className="absolute inset-0 bg-purple-500/30 rounded-lg z-50 pointer-events-none"
-            style={{ opacity: overlayOpacity }}
-          />
-        )}
-        
         {/* Transform wrapper - handles the flip animation */}
         <div
           style={{
