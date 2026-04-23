@@ -8,6 +8,7 @@ export class CounterpointRepository {
     sentenceIndex: number;
     authorUserId: string;
     content: string;
+    paragraphText?: string | null;
   }) {
     const [created] = await db
       .insert(opinionSentenceCounterpoints)
@@ -16,6 +17,7 @@ export class CounterpointRepository {
         sentenceIndex: params.sentenceIndex,
         authorUserId: params.authorUserId,
         content: params.content,
+        paragraphText: params.paragraphText ?? null,
         status: 'approved',
       })
       .returning();

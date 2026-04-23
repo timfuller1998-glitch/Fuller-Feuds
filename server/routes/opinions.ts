@@ -344,12 +344,13 @@ router.get('/:opinionId/counterpoints', async (req, res) => {
 router.post('/:opinionId/counterpoints', isAuthenticated, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const { sentenceIndex, content } = req.body || {};
+    const { sentenceIndex, content, paragraphText } = req.body || {};
     const created = await counterpointService.createCounterpoint({
       opinionId: req.params.opinionId,
       sentenceIndex: Number(sentenceIndex),
       authorUserId: userId,
       content: String(content ?? ''),
+      paragraphText: paragraphText != null ? String(paragraphText) : undefined,
     });
     res.status(201).json(created);
   } catch (error: any) {

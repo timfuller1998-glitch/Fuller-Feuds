@@ -293,6 +293,8 @@ export const opinionSentenceCounterpoints = pgTable("opinion_sentence_counterpoi
   sentenceIndex: integer("sentence_index").notNull(),
   authorUserId: varchar("author_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   content: text("content").notNull(),
+  /** Snapshot of the opinion paragraph text at create time (paragraph mode index = sentenceIndex). */
+  paragraphText: text("paragraph_text"),
   status: varchar("status", { length: 20 }).default("approved"), // 'approved', 'flagged', 'hidden'
   createdAt: timestamp("created_at").defaultNow(),
 });

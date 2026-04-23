@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { splitIntoParagraphs } from "@/lib/textSegments";
 
 export type Sentence = {
   index: number;
@@ -13,20 +14,6 @@ function splitIntoSentences(text: string): Sentence[] {
   const parts = normalized
     .split(/(?<=[.!?])\s+(?=(?:["'(\[])?[A-Z0-9])/g)
     .map((s) => (typeof s === "string" ? s.trim() : ""))
-    .filter(Boolean);
-
-  return parts.map((p, idx) => ({ index: idx, text: p }));
-}
-
-/** Paragraphs = blocks separated by a blank line (one or more newlines with optional spaces). */
-function splitIntoParagraphs(text: string): Sentence[] {
-  const normalized = (text || "").replace(/\r\n/g, "\n");
-  const trimmed = normalized.trim();
-  if (!trimmed) return [];
-
-  const parts = trimmed
-    .split(/\n(?:\s*\n)+/)
-    .map((p) => (typeof p === "string" ? p.trim() : ""))
     .filter(Boolean);
 
   return parts.map((p, idx) => ({ index: idx, text: p }));

@@ -7,18 +7,29 @@ export class CounterpointService {
     this.repo = new CounterpointRepository();
   }
 
-  async createCounterpoint(params: { opinionId: string; sentenceIndex: number; authorUserId: string; content: string }) {
+  async createCounterpoint(params: {
+    opinionId: string;
+    sentenceIndex: number;
+    authorUserId: string;
+    content: string;
+    paragraphText?: string | null;
+  }) {
     if (!params.content || params.content.trim().length < 1) {
       throw new Error('Counterpoint content is required');
     }
     if (!Number.isInteger(params.sentenceIndex) || params.sentenceIndex < 0) {
       throw new Error('Invalid sentenceIndex');
     }
+    const paragraphText =
+      params.paragraphText != null && String(params.paragraphText).trim().length > 0
+        ? String(params.paragraphText).trim()
+        : null;
     return this.repo.createCounterpoint({
       opinionId: params.opinionId,
       sentenceIndex: params.sentenceIndex,
       authorUserId: params.authorUserId,
       content: params.content.trim(),
+      paragraphText,
     });
   }
 

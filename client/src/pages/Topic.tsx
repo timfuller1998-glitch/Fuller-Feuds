@@ -29,6 +29,7 @@ import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import type { FallacyType } from "@shared/fallacies";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
 import { InteractiveSentenceText } from "@/components/InteractiveSentenceText";
+import { getParagraphTextAtIndex } from "@/lib/textSegments";
 
 const opinionFormSchema = insertOpinionSchema.omit({
   topicId: true,
@@ -76,6 +77,8 @@ export default function Topic() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [rankMode, setRankMode] = useState<"rank" | "active">("rank");
   const [selectedCounterpointId, setSelectedCounterpointId] = useState<string | null>(null);
+  const [counterpointDraftYours, setCounterpointDraftYours] = useState("");
+  const [counterpointDraftOthers, setCounterpointDraftOthers] = useState("");
 
   // Fetch topic details
   const { data: topic, isLoading: topicLoading } = useQuery<TopicType>({
@@ -135,6 +138,8 @@ export default function Topic() {
     setSelectedSentenceIndex(null);
     setSelectedOtherSentenceIndex(null);
     setSelectedCounterpointId(null);
+    setCounterpointDraftYours("");
+    setCounterpointDraftOthers("");
     setSheetOpen(false);
     setActiveTab("ai");
   }, [id]);
@@ -230,6 +235,24 @@ export default function Topic() {
     const map = new Map((opinions || []).map(o => [o.id, o]));
     return ids.map(id => map.get(id)).filter(Boolean) as Opinion[];
   }, [opinions, selectedSentenceIndex, summarySentences]);
+
+  const userCounterParagraphText = useMemo(() => {
+    if (selectedSentenceIndex == null || !userOpinion?.content) return "";
+    return getParagraphTextAtIndex(userOpinion.content, selectedSentenceIndex);
+  }, [userOpinion?.content, selectedSentenceIndex]);
+
+  const otherCounterParagraphText = useMemo(() => {
+    if (selectedOtherSentenceIndex == null || !currentOtherOpinion?.content) return "";
+    return getParagraphTextAtIndex(currentOtherOpinion.content, selectedOtherSentenceIndex);
+  }, [currentOtherOpinion?.content, selectedOtherSentenceIndex]);
+
+  useEffect(() => {
+    setCounterpointDraftYours("");
+  }, [selectedSentenceIndex, userOpinion?.id]);
+
+  useEffect(() => {
+    setCounterpointDraftOthers("");
+  }, [selectedOtherSentenceIndex, currentOtherOpinion?.id]);
 
   const counterpointsQueryKey = useMemo(() => {
     if (!userOpinion?.id || selectedSentenceIndex == null) return null;
@@ -506,10 +529,30 @@ export default function Topic() {
   });
 
   const createCounterpointMutation = useMutation({
-    mutationFn: async ({ opinionId, sentenceIndex, content }: { opinionId: string; sentenceIndex: number; content: string }) => {
-      return apiRequest("POST", `/api/opinions/${opinionId}/counterpoints`, { sentenceIndex, content });
+    mutationFn: async ({
+      opinionId,
+      sentenceIndex,
+      content,
+      paragraphText,
+    }: {
+      opinionId: string;
+      sentenceIndex: number;
+      content: string;
+      paragraphText: string;
+    }) => {
+      return apiRequest("POST", `/api/opinions/${opinionId}/counterpoints`, {
+        sentenceIndex,
+        content,
+        paragraphText,
+      });
     },
     onSuccess: (_data, variables) => {
+      if (variables.opinionId === userOpinion?.id) {
+        setCounterpointDraftYours("");
+      }
+      if (variables.opinionId === currentOtherOpinion?.id) {
+        setCounterpointDraftOthers("");
+      }
       if (userOpinion?.id && selectedSentenceIndex != null) {
         queryClient.invalidateQueries({ queryKey: ["/api/opinions", userOpinion.id, "counterpoints", selectedSentenceIndex] as any });
       }
@@ -991,6 +1034,19 @@ export default function Topic() {
                   <p className="text-muted-foreground">Select a paragraph to see counterpoints.</p>
                 ) : (
                   <>
+                    {userCounterParagraphText ? (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base text-muted-foreground">Selected paragraph</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <blockquote className="border-l-2 border-muted-foreground/30 pl-3 text-sm whitespace-pre-wrap text-muted-foreground">
+                            {userCounterParagraphText}
+                          </blockquote>
+                        </CardContent>
+                      </Card>
+                    ) : null}
+
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-base">Add a counterpoint</CardTitle>
@@ -999,19 +1055,30 @@ export default function Topic() {
                         <Textarea
                           placeholder="Write a counterpoint…"
                           className="min-h-[90px]"
-                          onBlur={(e) => {
-                            const content = e.currentTarget.value;
-                            if (!content.trim()) return;
+                          value={counterpointDraftYours}
+                          onChange={(e) => setCounterpointDraftYours(e.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          disabled={!counterpointDraftYours.trim() || createCounterpointMutation.isPending}
+                          onClick={() => {
+                            const content = counterpointDraftYours.trim();
+                            if (!content) return;
                             if (!isAuthenticated) {
                               setLoginAction("interact");
                               setShowLoginPrompt(true);
                               return;
                             }
-                            createCounterpointMutation.mutate({ opinionId: userOpinion!.id, sentenceIndex: selectedSentenceIndex, content });
-                            e.currentTarget.value = "";
+                            createCounterpointMutation.mutate({
+                              opinionId: userOpinion!.id,
+                              sentenceIndex: selectedSentenceIndex,
+                              content,
+                              paragraphText: userCounterParagraphText,
+                            });
                           }}
-                        />
-                        <p className="text-xs text-muted-foreground">Tip: click away to submit.</p>
+                        >
+                          {createCounterpointMutation.isPending ? "Submitting…" : "Submit"}
+                        </Button>
                       </CardContent>
                     </Card>
 
@@ -1022,6 +1089,12 @@ export default function Topic() {
                         (counterpoints || []).map((cp: any) => (
                           <Card key={cp.id}>
                             <CardContent className="pt-4 space-y-3">
+                              {cp.paragraphText ? (
+                                <div className="text-xs text-muted-foreground border-l-2 border-muted-foreground/20 pl-2 whitespace-pre-wrap">
+                                  <span className="font-medium text-foreground/80">Paragraph: </span>
+                                  {cp.paragraphText}
+                                </div>
+                              ) : null}
                               <div className="text-sm whitespace-pre-wrap">{cp.content}</div>
                               <div className="flex items-center gap-2">
                                 <Button
@@ -1099,6 +1172,19 @@ export default function Topic() {
                   <p className="text-muted-foreground">Select a paragraph to see counterpoints.</p>
                 ) : (
                   <>
+                    {otherCounterParagraphText ? (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base text-muted-foreground">Selected paragraph</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <blockquote className="border-l-2 border-muted-foreground/30 pl-3 text-sm whitespace-pre-wrap text-muted-foreground">
+                            {otherCounterParagraphText}
+                          </blockquote>
+                        </CardContent>
+                      </Card>
+                    ) : null}
+
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-base">Add a counterpoint</CardTitle>
@@ -1107,19 +1193,30 @@ export default function Topic() {
                         <Textarea
                           placeholder="Write a counterpoint…"
                           className="min-h-[90px]"
-                          onBlur={(e) => {
-                            const content = e.currentTarget.value;
-                            if (!content.trim()) return;
+                          value={counterpointDraftOthers}
+                          onChange={(e) => setCounterpointDraftOthers(e.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          disabled={!counterpointDraftOthers.trim() || createCounterpointMutation.isPending}
+                          onClick={() => {
+                            const content = counterpointDraftOthers.trim();
+                            if (!content) return;
                             if (!isAuthenticated) {
                               setLoginAction("interact");
                               setShowLoginPrompt(true);
                               return;
                             }
-                            createCounterpointMutation.mutate({ opinionId: currentOtherOpinion.id, sentenceIndex: selectedOtherSentenceIndex, content });
-                            e.currentTarget.value = "";
+                            createCounterpointMutation.mutate({
+                              opinionId: currentOtherOpinion.id,
+                              sentenceIndex: selectedOtherSentenceIndex,
+                              content,
+                              paragraphText: otherCounterParagraphText,
+                            });
                           }}
-                        />
-                        <p className="text-xs text-muted-foreground">Tip: click away to submit.</p>
+                        >
+                          {createCounterpointMutation.isPending ? "Submitting…" : "Submit"}
+                        </Button>
                       </CardContent>
                     </Card>
 
@@ -1130,6 +1227,12 @@ export default function Topic() {
                         (otherCounterpoints || []).map((cp: any) => (
                           <Card key={cp.id}>
                             <CardContent className="pt-4 space-y-3">
+                              {cp.paragraphText ? (
+                                <div className="text-xs text-muted-foreground border-l-2 border-muted-foreground/20 pl-2 whitespace-pre-wrap">
+                                  <span className="font-medium text-foreground/80">Paragraph: </span>
+                                  {cp.paragraphText}
+                                </div>
+                              ) : null}
                               <div className="text-sm whitespace-pre-wrap">{cp.content}</div>
                               <div className="flex items-center gap-2">
                                 <Button
