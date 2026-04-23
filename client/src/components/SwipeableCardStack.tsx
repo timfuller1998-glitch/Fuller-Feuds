@@ -47,7 +47,38 @@ const SWIPE_OFFSET_THRESHOLD = 100;
 const SWIPE_VELOCITY_THRESHOLD = 500;
 /** 3D hinge at full drag (|x| = max). Tilts while sliding; useTransform from x. */
 const COMMIT_TWIST_DEG = 28;
-const FINISH_SWEEP_S = 0.22;
+/** Post-release: peek floats to center, old front tucks to the side; new peek fades in. */
+const FLOAT_TO_REST_S = 0.5;
+const FLOAT_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const NEW_PEEK_FADE_IN_END = 0.14;
+
+const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+const tiltTAt = (v: number, m: number) => {
+  if (m < 1) return 0;
+  return Math.min(1, Math.abs(v) / m) * COMMIT_TWIST_DEG;
+};
+
+/** Matches tiltPrev / tiltFront / tiltNext at release position `v`. */
+function rotationTripletAt(v: number, m: number) {
+  const c = tiltTAt(v, m);
+  if (v > 0) return { p: c, f: -c, n: 0 } as const;
+  if (v < 0) return { p: 0, f: c, n: -c } as const;
+  return { p: 0, f: 0, n: 0 } as const;
+}
+
+type FloatState =
+  | { mode: "none" }
+  | {
+      mode: "toPrev" | "toNext";
+      fromX: number;
+      cw: number;
+      m: number;
+      rPrev0: number;
+      rCurr0: number;
+      rNext0: number;
+    };
 
 export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardStackProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -62,67 +93,200 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   const x = useMotionValue(0);
   /** After index change: brief vertical spring so the new top card settles to center */
   const revealY = useMotionValue(0);
+  /** 0→1 while cards float to their resting roles after a commit */
+  const floatU = useMotionValue(0);
+  const floatStateRef = useRef<FloatState>({ mode: "none" });
 
-  // Drag +x (to the right): only the left peek is visible/animated; the right peek is hidden. -x: mirror.
+  // Drag +x: left peek; -x: right peek. During float, positions come from [floatU, floatStateRef] only.
   const maxDragForNorm = useRef(200);
   const mNow = () => maxDragForNorm.current;
 
-  const prevX = useTransform(x, (v) => {
-    const cw = cardWRef.current;
-    const b = -cw * SIDE_OFFSET_FRAC;
-    if (v > 0) return b + v * FOLLOW;
+  const bL = (cw: number) => -cw * SIDE_OFFSET_FRAC;
+  const bR = (cw: number) => cw * SIDE_OFFSET_FRAC;
+  const prevXIdle = (xv: number, cw: number) => {
+    const b = bL(cw);
+    if (xv > 0) return b + xv * FOLLOW;
     return b;
-  });
-  const nextX = useTransform(x, (v) => {
-    const cw = cardWRef.current;
-    const b = cw * SIDE_OFFSET_FRAC;
-    if (v < 0) return b + v * FOLLOW;
-    return b;
-  });
-  const prevScale = useTransform(x, (v) => {
-    if (v < 0) return BACK_SCALE;
-    const t = Math.min(1, v / mNow());
-    return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
-  });
-  const nextScale = useTransform(x, (v) => {
-    if (v > 0) return BACK_SCALE;
-    const t = Math.min(1, -v / mNow());
-    return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
-  });
-  /** v<0: hide left peek. v>0: show and bring toward full opacity. v=0: resting peek. */
-  const prevOpacity = useTransform(x, (v) => {
-    if (v < 0) return 0;
-    if (v === 0) return BACK_OPACITY_REST;
-    const t = Math.min(1, v / mNow());
-    return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
-  });
-  const nextOpacity = useTransform(x, (v) => {
-    if (v > 0) return 0;
-    if (v === 0) return BACK_OPACITY_REST;
-    const t = Math.min(1, -v / mNow());
-    return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
-  });
-  const prevPointerEvents = useTransform(x, (v) => (v < 0 ? "none" : "auto"));
-  const nextPointerEvents = useTransform(x, (v) => (v > 0 ? "none" : "auto"));
-  const prevZ = useTransform(x, (v) => (v < 0 ? 0 : v > 0 ? Z_PASS_OVER : Z_BACK_REST_LEAD));
-  const nextZ = useTransform(x, (v) => (v > 0 ? 0 : v < 0 ? Z_PASS_OVER : Z_BACK));
-  const currentZ = useTransform(x, (v) => (Math.abs(v) < 0.5 ? Z_CURRENT : Z_CURRENT_WHILE_DRAG));
-
-  const tiltT = (v: number) => {
-    const m = mNow();
-    if (m < 1) return 0;
-    return Math.min(1, Math.abs(v) / m) * COMMIT_TWIST_DEG;
   };
-  /** Top card: v>0 → twist only toward the left; v<0 → only toward the right. */
-  const tiltFront = useTransform(x, (v) => {
-    if (v > 0) return tiltT(v);
-    if (v < 0) return -tiltT(v);
+  const nextXIdle = (xv: number, cw: number) => {
+    const b = bR(cw);
+    if (xv < 0) return b + xv * FOLLOW;
+    return b;
+  };
+  const prevScaleIdle = (xv: number) => {
+    if (xv < 0) return BACK_SCALE;
+    const t = Math.min(1, xv / mNow());
+    return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
+  };
+  const nextScaleIdle = (xv: number) => {
+    if (xv > 0) return BACK_SCALE;
+    const t = Math.min(1, -xv / mNow());
+    return BACK_SCALE + (1 - BACK_SCALE) * 0.65 * t;
+  };
+  const prevOpacityIdle = (xv: number) => {
+    if (xv < 0) return 0;
+    if (xv === 0) return BACK_OPACITY_REST;
+    const t = Math.min(1, xv / mNow());
+    return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
+  };
+  const nextOpacityIdle = (xv: number) => {
+    if (xv > 0) return 0;
+    if (xv === 0) return BACK_OPACITY_REST;
+    const t = Math.min(1, -xv / mNow());
+    return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
+  };
+  const tiltT = (v: number) => tiltTAt(v, mNow());
+  const tiltFrontIdle = (v: number) => {
+    if (v > 0) return -tiltT(v);
+    if (v < 0) return tiltT(v);
     return 0;
+  };
+  const tiltPrevIdle = (v: number) => (v > 0 ? tiltT(v) : 0);
+  const tiltNextIdle = (v: number) => (v < 0 ? -tiltT(v) : 0);
+
+  const slotPrevX = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return bL(s.cw);
+    }
+    if (s.mode === "toNext") {
+      return lerp(s.fromX, bL(s.cw), easeOutCubic(u));
+    }
+    return prevXIdle(xv, cardWRef.current);
   });
-  /** Left peek (v>0 only): hinges on its inner (right) edge, swings right over the current. */
-  const tiltPrev = useTransform(x, (v) => (v > 0 ? -tiltT(v) : 0));
-  /** Right peek (v<0 only): hinges on its inner (left) edge, swings left over the current. */
-  const tiltNext = useTransform(x, (v) => (v < 0 ? tiltT(v) : 0));
+  const slotCurrX = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return lerp(bL(s.cw) + s.fromX * FOLLOW, 0, easeOutCubic(u));
+    }
+    if (s.mode === "toNext") {
+      return lerp(bR(s.cw) + s.fromX * FOLLOW, 0, easeOutCubic(u));
+    }
+    return xv;
+  });
+  const slotNextX = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return lerp(s.fromX, bR(s.cw), easeOutCubic(u));
+    }
+    if (s.mode === "toNext") {
+      return bR(s.cw);
+    }
+    return nextXIdle(xv, cardWRef.current);
+  });
+
+  const slotPrevScale = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return BACK_SCALE;
+    }
+    if (s.mode === "toNext") {
+      return lerp(1, BACK_SCALE, easeOutCubic(u));
+    }
+    return prevScaleIdle(xv);
+  });
+  const slotCurrScale = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return lerp(prevScaleIdle(s.fromX), 1, easeOutCubic(u));
+    }
+    if (s.mode === "toNext") {
+      return lerp(nextScaleIdle(s.fromX), 1, easeOutCubic(u));
+    }
+    return 1;
+  });
+  const slotNextScale = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return lerp(1, BACK_SCALE, easeOutCubic(u));
+    }
+    if (s.mode === "toNext") {
+      return BACK_SCALE;
+    }
+    return nextScaleIdle(xv);
+  });
+
+  const newPeekOpacity = (u: number) => (u < 1e-6 ? 0 : Math.min(1, u / NEW_PEEK_FADE_IN_END) * BACK_OPACITY_REST);
+  const slotPrevOpacity = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return newPeekOpacity(u);
+    }
+    if (s.mode === "toNext") {
+      return lerp(1, BACK_OPACITY_REST, easeOutCubic(u));
+    }
+    return prevOpacityIdle(xv);
+  });
+  const slotCurrOpacity = useTransform([x, floatU], () => 1);
+  const slotNextOpacity = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return lerp(1, BACK_OPACITY_REST, easeOutCubic(u));
+    }
+    if (s.mode === "toNext") {
+      return newPeekOpacity(u);
+    }
+    return nextOpacityIdle(xv);
+  });
+
+  const slotPrevRY = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return 0;
+    }
+    if (s.mode === "toNext") {
+      return lerp(s.rPrev0, 0, easeOutCubic(u));
+    }
+    return tiltPrevIdle(xv);
+  });
+  const slotCurrRY = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev" || s.mode === "toNext") {
+      return lerp(s.rCurr0, 0, easeOutCubic(u));
+    }
+    return tiltFrontIdle(xv);
+  });
+  const slotNextRY = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return lerp(s.rNext0, 0, easeOutCubic(u));
+    }
+    if (s.mode === "toNext") {
+      return 0;
+    }
+    return tiltNextIdle(xv);
+  });
+
+  const slotPrevPointer = useTransform([x, floatU], (xv) => (floatStateRef.current.mode !== "none" ? "auto" : xv < 0 ? "none" : "auto"));
+  const slotNextPointer = useTransform([x, floatU], (xv) => (floatStateRef.current.mode !== "none" ? "auto" : xv > 0 ? "none" : "auto"));
+
+  const slotPrevZ = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return u < 0.01 ? 0 : Z_BACK;
+    }
+    if (s.mode === "toNext") {
+      return Z_CURRENT_WHILE_DRAG;
+    }
+    return xv < 0 ? 0 : xv > 0 ? Z_PASS_OVER : Z_BACK_REST_LEAD;
+  });
+  const slotCurrZ = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev" || s.mode === "toNext") {
+      return 8;
+    }
+    return Math.abs(xv) < 0.5 ? Z_CURRENT : Z_CURRENT_WHILE_DRAG;
+  });
+  const slotNextZ = useTransform([x, floatU], (xv, u) => {
+    const s = floatStateRef.current;
+    if (s.mode === "toPrev") {
+      return Z_CURRENT_WHILE_DRAG;
+    }
+    if (s.mode === "toNext") {
+      return u < 0.01 ? 0 : Z_BACK;
+    }
+    return xv > 0 ? 0 : xv < 0 ? Z_PASS_OVER : Z_BACK;
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -148,6 +312,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
 
   // Hinge the front card from the edge toward the neighbor (door past the other card)
   useMotionValueEvent(x, "change", (v) => {
+    if (floatStateRef.current.mode !== "none") return;
     const el = currentHingeRef.current;
     if (!el) return;
     el.style.transformOrigin = v >= 0 ? "100% 50%" : "0% 50%";
@@ -199,7 +364,6 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
 
   const finishCommit = useCallback(
     async (dir: "next" | "prev") => {
-      const ease = [0.45, 0, 0.2, 1] as [number, number, number, number];
       if (topics.length < 2) {
         if (dir === "next") goToNext();
         else goToPrev();
@@ -211,21 +375,46 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
         else goToPrev();
         return;
       }
+      const fromX = x.get();
+      const cw = cardWRef.current;
+      const rots = rotationTripletAt(fromX, m);
       setIsCommitting(true);
-      const targetX = dir === "next" ? m : -m;
+      if (dir === "prev") {
+        goToPrev();
+        floatStateRef.current = {
+          mode: "toPrev",
+          fromX,
+          cw,
+          m,
+          rPrev0: 0,
+          rCurr0: rots.p,
+          rNext0: rots.f,
+        };
+      } else {
+        goToNext();
+        floatStateRef.current = {
+          mode: "toNext",
+          fromX,
+          cw,
+          m,
+          rPrev0: rots.f,
+          rCurr0: rots.n,
+          rNext0: 0,
+        };
+      }
+      floatU.set(0);
       try {
-        // Complete sweep: tilt follows x via useTransform, then take new top card
-        await animate(x, targetX, { duration: FINISH_SWEEP_S, type: "tween", ease: ease });
-        if (dir === "next") goToNext();
-        else goToPrev();
-        x.set(0);
+        // Index updates immediately (new peek content); u 0→1 eases all layers into place.
+        await animate(floatU, 1, { duration: FLOAT_TO_REST_S, ease: FLOAT_EASE });
+        floatStateRef.current = { mode: "none" };
+        floatU.set(0);
         revealY.set(10);
         await animate(revealY, 0, { type: "spring", stiffness: 300, damping: 26, mass: 0.55 });
       } finally {
         setIsCommitting(false);
       }
     },
-    [goToNext, goToPrev, x, topics.length, revealY]
+    [goToNext, goToPrev, floatU, topics.length, revealY]
   );
 
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -245,17 +434,18 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     let wantPrev = false;
     let wantNext = false;
 
+    // +x = drag right = left peek comes forward → goToPrev. -x = right peek → goToNext.
     if (Math.abs(velocity.x) > SWIPE_VELOCITY_THRESHOLD) {
       if (velocity.x < 0) {
-        wantPrev = true;
-      } else {
         wantNext = true;
+      } else {
+        wantPrev = true;
       }
     } else {
       if (dragX <= -SWIPE_OFFSET_THRESHOLD) {
-        wantPrev = true;
-      } else if (dragX >= SWIPE_OFFSET_THRESHOLD) {
         wantNext = true;
+      } else if (dragX >= SWIPE_OFFSET_THRESHOLD) {
+        wantPrev = true;
       }
     }
 
@@ -321,18 +511,17 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
               key={`${card.id}-prev-${currentIndex}`}
               className="absolute w-full h-full"
               style={{
-                x: prevX,
-                scale: prevScale,
-                opacity: prevOpacity,
-                pointerEvents: prevPointerEvents,
-                rotateY: tiltPrev,
+                x: slotPrevX,
+                scale: slotPrevScale,
+                opacity: slotPrevOpacity,
+                pointerEvents: slotPrevPointer,
+                rotateY: slotPrevRY,
                 transformOrigin: "100% 50%",
-                /* inner edge to center: swings over the current while dragging right */
                 WebkitTransformOrigin: "100% 50%",
                 z: 1,
                 left: "50%",
                 marginLeft: `-${cardWidth / 2}px`,
-                zIndex: prevZ,
+                zIndex: slotPrevZ,
                 transformStyle: "preserve-3d",
               }}
             >
@@ -353,17 +542,17 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
               key={`${card.id}-next-${currentIndex}`}
               className="absolute w-full h-full"
               style={{
-                x: nextX,
-                scale: nextScale,
-                opacity: nextOpacity,
-                pointerEvents: nextPointerEvents,
-                rotateY: tiltNext,
+                x: slotNextX,
+                scale: slotNextScale,
+                opacity: slotNextOpacity,
+                pointerEvents: slotNextPointer,
+                rotateY: slotNextRY,
                 transformOrigin: "0% 50%",
                 WebkitTransformOrigin: "0% 50%",
                 z: 1,
                 left: "50%",
                 marginLeft: `-${cardWidth / 2}px`,
-                zIndex: nextZ,
+                zIndex: slotNextZ,
                 transformStyle: "preserve-3d",
               }}
             >
@@ -388,12 +577,14 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
             dragConstraints={{ left: -maxDragX, right: maxDragX }}
             onDragEnd={handleDragEnd}
             style={{
-              x,
+              x: slotCurrX,
               y: revealY,
+              scale: slotCurrScale,
+              opacity: slotCurrOpacity,
               z: 2,
               left: "50%",
               marginLeft: `-${cardWidth / 2}px`,
-              zIndex: currentZ,
+              zIndex: slotCurrZ,
               transformStyle: "preserve-3d",
             }}
           >
@@ -401,7 +592,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
               ref={currentHingeRef}
               className="h-full w-full"
               style={{
-                rotateY: tiltFront,
+                rotateY: slotCurrRY,
                 transformStyle: "preserve-3d",
                 transformOrigin: "100% 50%",
                 WebkitTransformOrigin: "100% 50%",
