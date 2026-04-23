@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
+import { motion, useMotionValue, useTransform, animate, PanInfo } from "framer-motion";
 import TopicCard from "./TopicCard";
 import type { TopicWithCounts } from "@shared/schema";
 
@@ -73,6 +73,11 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     };
   }, []);
 
+  // New top card should never inherit a stale drag offset from the previous one
+  useEffect(() => {
+    x.set(0);
+  }, [currentIndex]);
+
   // Get cards at different offsets
   const prev1Card = getCardAtOffset(topics, currentIndex, -1);
   const currentCard = getCardAtOffset(topics, currentIndex, 0);
@@ -117,9 +122,11 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     clearAdvanceTimer();
     const { offset, velocity } = info;
-    x.set(0);
 
-    if (!currentCard || topics.length === 0) return;
+    if (!currentCard || topics.length === 0) {
+      void animate(x, 0, { type: "spring", stiffness: 400, damping: 35 });
+      return;
+    }
 
     // Decide intent: high horizontal velocity wins; else use offset
     let wantPrev = false;
@@ -140,9 +147,11 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     }
 
     if (!wantPrev && !wantNext) {
+      void animate(x, 0, { type: "spring", stiffness: 400, damping: 35 });
       return;
     }
     if (wantPrev && wantNext) {
+      void animate(x, 0, { type: "spring", stiffness: 400, damping: 35 });
       return;
     }
 
@@ -155,6 +164,8 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
       }
     };
 
+    // Commit: re-center and advance immediately so the next/prev card becomes the top (no inertial drift)
+    x.set(0);
     if (cardState.isFlipped) {
       setForceUnflipSignal(Date.now());
       advanceAfterUnflipRef.current = setTimeout(() => {
@@ -175,6 +186,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   }
 
   const cardWidth = dimensions.width;
+  const maxDragX = Math.min(200, cardWidth * 0.5);
 
   return (
     <div
@@ -226,7 +238,10 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
             key={`${card.id}-current-${currentIndex}`}
             className="absolute w-full h-full"
             drag="x"
-            dragElastic={0.12}
+            dragMomentum={false}
+            dragElastic={0.08}
+            dragConstraints={{ left: -maxDragX, right: maxDragX }}
+            dragTransition={{ bounceStiffness: 400, bounceDamping: 35 }}
             onDragEnd={handleDragEnd}
             style={{
               x,
