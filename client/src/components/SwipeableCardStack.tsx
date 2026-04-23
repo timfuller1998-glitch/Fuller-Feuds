@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { motion, useMotionValue, useTransform, animate, PanInfo } from "framer-motion";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { motion, useMotionValue, useTransform, animate, PanInfo, useMotionValueEvent } from "framer-motion";
 import TopicCard from "./TopicCard";
 import type { TopicWithCounts } from "@shared/schema";
 
@@ -44,7 +44,7 @@ const Z_BACK_REST_LEAD = 3;
 const SWIPE_OFFSET_THRESHOLD = 100;
 const SWIPE_VELOCITY_THRESHOLD = 500;
 /** 3D hinge at full drag (|x| = max). Tilts while sliding; useTransform from x. */
-const COMMIT_TWIST_DEG = 16;
+const COMMIT_TWIST_DEG = 28;
 const FINISH_SWEEP_S = 0.22;
 
 export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardStackProps) {
@@ -55,11 +55,13 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   const [isCommitting, setIsCommitting] = useState(false);
   const advanceAfterUnflipRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardWRef = useRef(dimensions.width);
+  const currentHingeRef = useRef<HTMLDivElement | null>(null);
 
   const x = useMotionValue(0);
   /** After index change: brief vertical spring so the new top card settles to center */
   const revealY = useMotionValue(0);
-  const rotate = useTransform(x, [-220, 220], [-10, 10]);
+  /** Light in-plane wobble; keep small so the hinge (rotateY) reads as the main motion. */
+  const rotate = useTransform(x, [-220, 220], [-4, 4]);
 
   // Swipe right (v>0): left (prev) card follows. Swipe left (v<0): right (next) card follows.
   const maxDragForNorm = useRef(200);
@@ -127,10 +129,25 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     };
   }, []);
 
+  // Reset drag when the active card index changes. Do not reset `revealY` here — `finishCommit`
+  // sets revealY for the post-advance spring; resetting here would race and cancel that animation.
   useEffect(() => {
     x.set(0);
-    revealY.set(0);
-  }, [currentIndex, x, revealY]);
+  }, [currentIndex, x]);
+
+  // Hinge the front card from the edge toward the neighbor (door past the other card)
+  useMotionValueEvent(x, "change", (v) => {
+    const el = currentHingeRef.current;
+    if (!el) return;
+    el.style.transformOrigin = v >= 0 ? "100% 50%" : "0% 50%";
+  });
+
+  useLayoutEffect(() => {
+    const el = currentHingeRef.current;
+    if (!el) return;
+    // After a commit, `x` is 0: hinge from the right edge (positive drag direction) by default
+    el.style.transformOrigin = "100% 50%";
+  }, [currentIndex]);
 
   const prev1Card = getCardAtOffset(topics, currentIndex, -1);
   const currentCard = getCardAtOffset(topics, currentIndex, 0);
@@ -187,7 +204,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
       const targetX = dir === "next" ? m : -m;
       try {
         // Complete sweep: tilt follows x via useTransform, then take new top card
-        await animate(x, targetX, { duration: FINISH_SWEEP_S, ease });
+        await animate(x, targetX, { duration: FINISH_SWEEP_S, type: "tween", ease: ease });
         if (dir === "next") goToNext();
         else goToPrev();
         x.set(0);
@@ -274,8 +291,10 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
         height: `${dimensions.height}px`,
         margin: "0 auto",
         overflow: "visible",
-        perspective: 1100,
+        perspective: 1400,
+        WebkitPerspective: 1400,
         transformStyle: "preserve-3d",
+        WebkitTransformStyle: "preserve-3d",
       }}
     >
       {[
@@ -292,16 +311,17 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
               className="absolute w-full h-full"
               style={{
                 x: prevX,
-                y: 0,
-                z: 0,
                 scale: prevScale,
                 opacity: prevOpacity,
                 rotateY: tiltPrev,
+                transformOrigin: "100% 50%",
+                /* inner vertical edge: card swings from the side toward center */
+                WebkitTransformOrigin: "100% 50%",
+                z: 1,
                 left: "50%",
                 marginLeft: `-${cardWidth / 2}px`,
                 zIndex: prevZ,
                 transformStyle: "preserve-3d",
-                willChange: "transform, opacity",
               }}
             >
               <TopicCard
@@ -322,16 +342,16 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
               className="absolute w-full h-full"
               style={{
                 x: nextX,
-                y: 0,
-                z: 0,
                 scale: nextScale,
                 opacity: nextOpacity,
-                rotateY: stackNextY,
+                rotateY: tiltNext,
+                transformOrigin: "0% 50%",
+                WebkitTransformOrigin: "0% 50%",
+                z: 1,
                 left: "50%",
                 marginLeft: `-${cardWidth / 2}px`,
                 zIndex: nextZ,
                 transformStyle: "preserve-3d",
-                willChange: "transform, opacity",
               }}
             >
               <TopicCard
@@ -348,7 +368,7 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
         return (
           <motion.div
             key={`${card.id}-current-${currentIndex}`}
-            className="absolute w-full h-full"
+            className="absolute w-full h-full [touch-action:pan-x]"
             drag={isCommitting ? false : "x"}
             dragMomentum={false}
             dragElastic={0.02}
@@ -357,32 +377,40 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
             style={{
               x,
               y: revealY,
-              z: 0,
               rotate,
-              rotateY: tiltFront,
+              z: 2,
               left: "50%",
               marginLeft: `-${cardWidth / 2}px`,
               zIndex: 5,
               transformStyle: "preserve-3d",
             }}
           >
-            <div
+            <motion.div
+              ref={currentHingeRef}
+              className="h-full w-full"
               style={{
-                width: "100%",
-                height: "100%",
+                rotateY: tiltFront,
                 transformStyle: "preserve-3d",
-                perspective: "1000px",
+                transformOrigin: "100% 50%",
+                WebkitTransformOrigin: "100% 50%",
               }}
             >
-              <TopicCard
-                {...card}
-                imageUrl={card.imageUrl ?? ""}
-                isActive={card.isActive ?? false}
-                onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
-                onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
-                forceUnflipSignal={forceUnflipSignal}
-              />
-            </div>
+              <div
+                className="h-full w-full"
+                style={{
+                  transformStyle: "preserve-3d",
+                }}
+              >
+                <TopicCard
+                  {...card}
+                  imageUrl={card.imageUrl ?? ""}
+                  isActive={card.isActive ?? false}
+                  onFlipChange={(isFlipped) => handleFlipChange(card.id, isFlipped)}
+                  onBackTimeUpdate={(timeMs) => handleBackTimeUpdate(card.id, timeMs)}
+                  forceUnflipSignal={forceUnflipSignal}
+                />
+              </div>
+            </motion.div>
           </motion.div>
         );
       })}
