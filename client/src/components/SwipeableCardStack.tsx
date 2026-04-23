@@ -36,19 +36,31 @@ const BACK_SCALE = 0.88;
 /** Back cards at rest: 90% opacity → 100% as they move toward center with the drag */
 const BACK_OPACITY_REST = 0.9;
 const BACK_OPACITY_FULL = 1;
+/** Stacking: equal z used DOM order (right on top). Elevate active follower; at rest left peek above right */
+const Z_BACK = 2;
+const Z_BACK_FOLLOW = 4;
+const Z_BACK_REST_LEAD = 3;
 
 const SWIPE_OFFSET_THRESHOLD = 100;
 const SWIPE_VELOCITY_THRESHOLD = 500;
+/** 3D “hinge” so top + incoming back card’s edges pass (deg), then we swap index */
+const COMMIT_TWIST_DEG = 16;
+const COMMIT_DURATION_S = 0.26;
 
 export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardStackProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [cardStates, setCardStates] = useState<Map<string, CardState>>(new Map());
   const [forceUnflipSignal, setForceUnflipSignal] = useState(0);
   const [dimensions, setDimensions] = useState(getCardDimensions());
+  const [isCommitting, setIsCommitting] = useState(false);
   const advanceAfterUnflipRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardWRef = useRef(dimensions.width);
 
   const x = useMotionValue(0);
+  /** Stack-level rotateY (deg) for commit pass — separate from in-card flip */
+  const stackFrontY = useMotionValue(0);
+  const stackPrevY = useMotionValue(0);
+  const stackNextY = useMotionValue(0);
   const rotate = useTransform(x, [-220, 220], [-10, 10]);
 
   // Swipe right (v>0): left (prev) card follows. Swipe left (v<0): right (next) card follows.
@@ -85,6 +97,8 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     const t = Math.min(1, -v / maxDragForNorm.current);
     return BACK_OPACITY_REST + (BACK_OPACITY_FULL - BACK_OPACITY_REST) * t;
   });
+  const prevZ = useTransform(x, (v) => (v > 0 ? Z_BACK_FOLLOW : v < 0 ? Z_BACK : Z_BACK_REST_LEAD));
+  const nextZ = useTransform(x, (v) => (v < 0 ? Z_BACK_FOLLOW : v > 0 ? Z_BACK : Z_BACK));
 
   useEffect(() => {
     const handleResize = () => {
@@ -104,7 +118,10 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
 
   useEffect(() => {
     x.set(0);
-  }, [currentIndex, x]);
+    stackFrontY.set(0);
+    stackPrevY.set(0);
+    stackNextY.set(0);
+  }, [currentIndex, x, stackFrontY, stackPrevY, stackNextY]);
 
   const prev1Card = getCardAtOffset(topics, currentIndex, -1);
   const currentCard = getCardAtOffset(topics, currentIndex, 0);
@@ -143,8 +160,45 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     setCurrentIndex((prev) => (prev + 1) % topics.length);
   }, [topics.length]);
 
+  const playCommit = useCallback(
+    async (dir: "next" | "prev") => {
+      const a = COMMIT_TWIST_DEG;
+      const ease = [0.45, 0, 0.2, 1] as [number, number, number, number];
+      if (topics.length < 2) {
+        if (dir === "next") goToNext();
+        else goToPrev();
+        return;
+      }
+      setIsCommitting(true);
+      try {
+        if (dir === "next") {
+          await Promise.all([
+            animate(stackFrontY, a, { duration: COMMIT_DURATION_S, ease }),
+            animate(stackNextY, -a, { duration: COMMIT_DURATION_S, ease }),
+          ]);
+          goToNext();
+        } else {
+          await Promise.all([
+            animate(stackFrontY, -a, { duration: COMMIT_DURATION_S, ease }),
+            animate(stackPrevY, a, { duration: COMMIT_DURATION_S, ease }),
+          ]);
+          goToPrev();
+        }
+      } finally {
+        stackFrontY.set(0);
+        stackPrevY.set(0);
+        stackNextY.set(0);
+        setIsCommitting(false);
+      }
+    },
+    [goToNext, goToPrev, stackFrontY, stackPrevY, stackNextY, topics.length]
+  );
+
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     clearAdvanceTimer();
+    if (isCommitting) {
+      return;
+    }
     const { velocity } = info;
     // Use live motion value — at drag constraints, `offset` in PanInfo can disagree with the visible x
     const dragX = x.get();
@@ -181,23 +235,17 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
     }
 
     const cardState = cardStates.get(currentCard.id) || { isFlipped: false, timeOnBackMs: 0 };
-    const run = () => {
-      if (wantPrev) {
-        goToPrev();
-      } else {
-        goToNext();
-      }
-    };
+    const commitDir: "next" | "prev" = wantNext ? "next" : "prev";
 
     x.set(0);
     if (cardState.isFlipped) {
       setForceUnflipSignal(Date.now());
       advanceAfterUnflipRef.current = setTimeout(() => {
-        run();
+        void playCommit(commitDir);
         advanceAfterUnflipRef.current = null;
       }, FLIP_DURATION_MS);
     } else {
-      run();
+      void playCommit(commitDir);
     }
   };
 
@@ -222,6 +270,8 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
         height: `${dimensions.height}px`,
         margin: "0 auto",
         overflow: "visible",
+        perspective: 1100,
+        transformStyle: "preserve-3d",
       }}
     >
       {[
@@ -238,11 +288,14 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
               className="absolute w-full h-full"
               style={{
                 x: prevX,
+                y: 0,
+                z: 0,
                 scale: prevScale,
                 opacity: prevOpacity,
+                rotateY: stackPrevY,
                 left: "50%",
                 marginLeft: `-${cardWidth / 2}px`,
-                zIndex: 2,
+                zIndex: prevZ,
                 transformStyle: "preserve-3d",
                 willChange: "transform, opacity",
               }}
@@ -265,11 +318,14 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
               className="absolute w-full h-full"
               style={{
                 x: nextX,
+                y: 0,
+                z: 0,
                 scale: nextScale,
                 opacity: nextOpacity,
+                rotateY: stackNextY,
                 left: "50%",
                 marginLeft: `-${cardWidth / 2}px`,
-                zIndex: 2,
+                zIndex: nextZ,
                 transformStyle: "preserve-3d",
                 willChange: "transform, opacity",
               }}
@@ -289,14 +345,17 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
           <motion.div
             key={`${card.id}-current-${currentIndex}`}
             className="absolute w-full h-full"
-            drag="x"
+            drag={isCommitting ? false : "x"}
             dragMomentum={false}
             dragElastic={0.02}
             dragConstraints={{ left: -maxDragX, right: maxDragX }}
             onDragEnd={handleDragEnd}
             style={{
               x,
+              y: 0,
+              z: 0,
               rotate,
+              rotateY: stackFrontY,
               left: "50%",
               marginLeft: `-${cardWidth / 2}px`,
               zIndex: 5,
