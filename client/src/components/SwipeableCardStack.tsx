@@ -48,10 +48,11 @@ const Z_CURRENT = 5;
 const SWIPE_OFFSET_THRESHOLD = 100;
 const SWIPE_VELOCITY_THRESHOLD = 500;
 /**
- * Hinge "exchange": p = |x|/max. Back starts at this angle, front at 0; they counter-rotate
- * so at p=1 the angles are swapped (back flat, front at full tilt).
+ * "Opposite twist" progress uses |x|/max. At t=0: top flat, peeks turned slightly away. At t=1:
+ * peek face is flat (0°) and the top card has rotated away for the handoff.
  */
-const TWIST_EXCHANGE_DEG = 70;
+const PEEK_AWAY_DEG = 20;
+const SWEEP_DEG = 50;
 const FINISH_SWEEP_S = 0.22;
 
 export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardStackProps) {
@@ -112,27 +113,44 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   const prevZ = useTransform(x, (v) => (v < 0 ? 0 : Z_BACK_REST_LEAD));
   const nextZ = useTransform(x, (v) => (v > 0 ? 0 : Z_BACK));
 
-  const twistProgress = (v: number) => {
+  /** Top: 0 at rest → full “away” at max drag, opposite the peek coming flat. */
+  const tiltFront = useTransform(x, (v) => {
     const m = mNow();
     if (m < 1) return 0;
-    return Math.min(1, Math.abs(v) / m);
-  };
-  /** Front: 0 → full tilt as p → 1; back on that side: full tilt → 0. Opposite signs = counter-rotate. */
-  const tiltFront = useTransform(x, (v) => {
-    const p = twistProgress(v);
-    if (v > 0) return -p * TWIST_EXCHANGE_DEG;
-    if (v < 0) return p * TWIST_EXCHANGE_DEG;
+    if (v > 0) {
+      const t = Math.min(1, v / m);
+      return -SWEEP_DEG * t;
+    }
+    if (v < 0) {
+      const t = Math.min(1, -v / m);
+      return SWEEP_DEG * t;
+    }
     return 0;
   });
+  /**
+   * Left peek: at rest, face slightly “away” (hinge 100% 50%). Unwinds to flat as t→1 when v>0.
+   * (Hidden for v<0 — opacity 0; rotation 0 to avoid pop when reappearing in another drag.)
+   */
   const tiltPrev = useTransform(x, (v) => {
-    if (v <= 0) return 0;
-    const p = twistProgress(v);
-    return (1 - p) * TWIST_EXCHANGE_DEG;
+    if (v < 0) return 0;
+    const m = mNow();
+    if (m < 1) return PEEK_AWAY_DEG;
+    const t = Math.min(1, v / m);
+    return PEEK_AWAY_DEG * (1 - t);
   });
+  /** Right peek: mirror; rest “away” with hinge 0% 50%, flat at full left drag. */
   const tiltNext = useTransform(x, (v) => {
-    if (v >= 0) return 0;
-    const p = twistProgress(v);
-    return -(1 - p) * TWIST_EXCHANGE_DEG;
+    if (v > 0) return 0;
+    const m = mNow();
+    if (m < 1) {
+      if (v === 0) return -PEEK_AWAY_DEG;
+      return 0;
+    }
+    if (v < 0) {
+      const t = Math.min(1, -v / m);
+      return -PEEK_AWAY_DEG * (1 - t);
+    }
+    return -PEEK_AWAY_DEG;
   });
 
   useEffect(() => {
