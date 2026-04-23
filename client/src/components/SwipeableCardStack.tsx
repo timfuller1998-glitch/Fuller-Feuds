@@ -47,8 +47,11 @@ const Z_CURRENT = 5;
 
 const SWIPE_OFFSET_THRESHOLD = 100;
 const SWIPE_VELOCITY_THRESHOLD = 500;
-/** 3D hinge at full drag (|x| = max). Tilts while sliding; useTransform from x. */
-const COMMIT_TWIST_DEG = 44;
+/**
+ * Hinge "exchange": p = |x|/max. Back starts at this angle, front at 0; they counter-rotate
+ * so at p=1 the angles are swapped (back flat, front at full tilt).
+ */
+const TWIST_EXCHANGE_DEG = 70;
 const FINISH_SWEEP_S = 0.22;
 
 export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardStackProps) {
@@ -109,21 +112,28 @@ export default function SwipeableCardStack({ topics, onEmpty }: SwipeableCardSta
   const prevZ = useTransform(x, (v) => (v < 0 ? 0 : Z_BACK_REST_LEAD));
   const nextZ = useTransform(x, (v) => (v > 0 ? 0 : Z_BACK));
 
-  const tiltT = (v: number) => {
+  const twistProgress = (v: number) => {
     const m = mNow();
     if (m < 1) return 0;
-    return Math.min(1, Math.abs(v) / m) * COMMIT_TWIST_DEG;
+    return Math.min(1, Math.abs(v) / m);
   };
-  /** Top card: v>0 → twist toward the left; v<0 → toward the right. (Signs flipped for correct 3D read.) */
+  /** Front: 0 → full tilt as p → 1; back on that side: full tilt → 0. Opposite signs = counter-rotate. */
   const tiltFront = useTransform(x, (v) => {
-    if (v > 0) return -tiltT(v);
-    if (v < 0) return tiltT(v);
+    const p = twistProgress(v);
+    if (v > 0) return -p * TWIST_EXCHANGE_DEG;
+    if (v < 0) return p * TWIST_EXCHANGE_DEG;
     return 0;
   });
-  /** Left peek (v>0 only): hinges on inner edge, swings over the current. */
-  const tiltPrev = useTransform(x, (v) => (v > 0 ? tiltT(v) : 0));
-  /** Right peek (v<0 only): mirror. */
-  const tiltNext = useTransform(x, (v) => (v < 0 ? -tiltT(v) : 0));
+  const tiltPrev = useTransform(x, (v) => {
+    if (v <= 0) return 0;
+    const p = twistProgress(v);
+    return (1 - p) * TWIST_EXCHANGE_DEG;
+  });
+  const tiltNext = useTransform(x, (v) => {
+    if (v >= 0) return 0;
+    const p = twistProgress(v);
+    return -(1 - p) * TWIST_EXCHANGE_DEG;
+  });
 
   useEffect(() => {
     const handleResize = () => {
