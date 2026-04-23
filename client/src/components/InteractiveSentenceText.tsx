@@ -129,31 +129,33 @@ export function InteractiveSentenceText(props: {
                 }}
                 title={hasInteraction ? badgeTitle : undefined}
                 className={cn(
-                  "mb-5 cursor-pointer whitespace-pre-wrap rounded-md transition-colors last:mb-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  // looks like normal prose by default (no \"button\" chrome)
-                  "px-0 py-0",
-                  // highlight only when it has interactions or is selected
-                  hasInteraction && "bg-primary/[0.08] px-1 py-0.5",
-                  isSelected && "bg-muted/70 px-1 py-0.5",
+                  "mb-5 cursor-pointer whitespace-pre-wrap transition-colors last:mb-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   props.sentenceClassName,
                   isSelected && props.selectedSentenceClassName
                 )}
               >
-                {punct ? (
-                  <>
-                    <span>{before}</span>
-                    <span>{punct}</span>
-                    {hasInteraction ? <EndCountChip n={n} title={badgeTitle} /> : null}
-                    <span>{tail}</span>
-                  </>
-                ) : (
-                  <>
-                    <span>{before}</span>
-                    {hasInteraction ? (
-                      <EndCountChip n={n} title={badgeTitle} />
-                    ) : null}
-                  </>
-                )}
+                <span
+                  className={cn(
+                    // Apply highlight only behind the rendered text, not full width.
+                    (hasInteraction || isSelected) && "box-decoration-clone px-1 py-0.5 rounded-sm",
+                    hasInteraction && "bg-primary/[0.08]",
+                    isSelected && "bg-muted/70"
+                  )}
+                >
+                  {punct ? (
+                    <>
+                      <span>{before}</span>
+                      <span>{punct}</span>
+                      {hasInteraction ? <EndCountChip n={n} title={badgeTitle} /> : null}
+                      <span>{tail}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{before}</span>
+                      {hasInteraction ? <EndCountChip n={n} title={badgeTitle} /> : null}
+                    </>
+                  )}
+                </span>
               </p>
               {props.renderAfterSentence?.(s)}
             </span>
