@@ -26,6 +26,10 @@ export class CounterpointService {
     return this.repo.listCounterpoints(params);
   }
 
+  async countCounterpointsBySentenceIndex(opinionId: string) {
+    return this.repo.countCounterpointsBySentenceIndex(opinionId);
+  }
+
   async setCounterpointLike(params: { counterpointId: string; userId: string; like: boolean }) {
     return this.repo.setCounterpointLike(params);
   }

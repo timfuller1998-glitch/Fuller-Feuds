@@ -23,6 +23,28 @@ export class CounterpointRepository {
     return created;
   }
 
+  /** Approved counterpoints grouped by paragraph/sentence index (for UI badges). */
+  async countCounterpointsBySentenceIndex(opinionId: string) {
+    const rows = await db
+      .select({
+        sentenceIndex: opinionSentenceCounterpoints.sentenceIndex,
+        count: sql<number>`count(${opinionSentenceCounterpoints.id})::int`,
+      })
+      .from(opinionSentenceCounterpoints)
+      .where(
+        and(
+          eq(opinionSentenceCounterpoints.opinionId, opinionId),
+          eq(opinionSentenceCounterpoints.status, 'approved')
+        )
+      )
+      .groupBy(opinionSentenceCounterpoints.sentenceIndex);
+
+    return rows.map((r) => ({
+      sentenceIndex: r.sentenceIndex,
+      count: r.count ?? 0,
+    }));
+  }
+
   async listCounterpoints(params: { opinionId: string; sentenceIndex: number; currentUserId?: string }) {
     const rows = await db
       .select({

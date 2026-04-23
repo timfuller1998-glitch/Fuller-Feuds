@@ -39,6 +39,21 @@ const opinionFormSchema = insertOpinionSchema.omit({
   references: z.array(z.string().url("Must be a valid URL")).optional().default([]),
 });
 
+type CounterpointCountRow = { sentenceIndex: number; count: number };
+
+function parseCounterpointCountRows(data: unknown): CounterpointCountRow[] {
+  if (!Array.isArray(data)) return [];
+  const out: CounterpointCountRow[] = [];
+  for (const r of data) {
+    if (!r || typeof r !== "object") continue;
+    const si = Number((r as { sentenceIndex?: unknown }).sentenceIndex);
+    const c = Number((r as { count?: unknown }).count);
+    if (!Number.isInteger(si) || si < 0 || !Number.isFinite(c) || c < 0) continue;
+    out.push({ sentenceIndex: si, count: c });
+  }
+  return out;
+}
+
 export default function Topic() {
   const { id } = useParams();
   const search = useSearch();
@@ -248,6 +263,57 @@ export default function Topic() {
     enabled: !!currentOtherOpinion?.id && selectedOtherSentenceIndex != null && sheetOpen && activeTab === "others",
   });
 
+  const { data: userCounterpointCountData } = useQuery({
+    queryKey: ["/api/opinions", userOpinion?.id, "counterpoint-counts"] as const,
+    queryFn: async () => {
+      const response = await fetch(`/api/opinions/${userOpinion!.id}/counterpoints/counts`);
+      if (!response.ok) throw new Error("Failed to fetch counterpoint counts");
+      return response.json();
+    },
+    enabled: !!userOpinion?.id,
+  });
+
+  const { data: otherCounterpointCountData } = useQuery({
+    queryKey: ["/api/opinions", currentOtherOpinion?.id, "counterpoint-counts"] as const,
+    queryFn: async () => {
+      const response = await fetch(`/api/opinions/${currentOtherOpinion!.id}/counterpoints/counts`);
+      if (!response.ok) throw new Error("Failed to fetch counterpoint counts");
+      return response.json();
+    },
+    enabled: !!currentOtherOpinion?.id,
+  });
+
+  const userCpCountByIndex = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const row of parseCounterpointCountRows(userCounterpointCountData)) {
+      m.set(row.sentenceIndex, row.count);
+    }
+    return m;
+  }, [userCounterpointCountData]);
+
+  const otherCpCountByIndex = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const row of parseCounterpointCountRows(otherCounterpointCountData)) {
+      m.set(row.sentenceIndex, row.count);
+    }
+    return m;
+  }, [otherCounterpointCountData]);
+
+  const userParagraphInteractionCount = useMemo(
+    () => (i: number) => userCpCountByIndex.get(i) ?? 0,
+    [userCpCountByIndex]
+  );
+
+  const otherParagraphInteractionCount = useMemo(
+    () => (i: number) => otherCpCountByIndex.get(i) ?? 0,
+    [otherCpCountByIndex]
+  );
+
+  const summaryReferenceInteractionCount = useMemo(() => {
+    const counts = summarySentences.map((s) => s.referencedOpinionIds?.length ?? 0);
+    return (i: number) => counts[i] ?? 0;
+  }, [summarySentences]);
+
   const { data: likers } = useQuery<{ likerIds: string[] } | null>({
     queryKey: ["/api/counterpoints", selectedCounterpointId, "likers"],
     queryFn: async () => {
@@ -443,13 +509,14 @@ export default function Topic() {
     mutationFn: async ({ opinionId, sentenceIndex, content }: { opinionId: string; sentenceIndex: number; content: string }) => {
       return apiRequest("POST", `/api/opinions/${opinionId}/counterpoints`, { sentenceIndex, content });
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       if (userOpinion?.id && selectedSentenceIndex != null) {
         queryClient.invalidateQueries({ queryKey: ["/api/opinions", userOpinion.id, "counterpoints", selectedSentenceIndex] as any });
       }
       if (currentOtherOpinion?.id && selectedOtherSentenceIndex != null) {
         queryClient.invalidateQueries({ queryKey: ["/api/opinions", currentOtherOpinion.id, "counterpoints", selectedOtherSentenceIndex] as any });
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/opinions", variables.opinionId, "counterpoint-counts"] as any });
       toast({ title: "Counterpoint added" });
     },
   });
@@ -679,7 +746,9 @@ export default function Topic() {
             <CardContent>
               {cumulativeData ? (
                 <InteractiveSentenceText
-                  text={summarySentences.map((s) => s?.text ?? "").join(" ").trim()}
+                  chunks={summarySentences.map((s) => s?.text ?? "")}
+                  interactionCount={summaryReferenceInteractionCount}
+                  interactionKind="references"
                   selectedSentenceIndex={selectedSentenceIndex}
                   onSelectSentence={(idx) => {
                     setSelectedSentenceIndex(idx);
@@ -714,6 +783,8 @@ export default function Topic() {
               <CardContent>
                 <InteractiveSentenceText
                   text={userOpinion.content}
+                  segmentMode="paragraph"
+                  interactionCount={userParagraphInteractionCount}
                   selectedSentenceIndex={selectedSentenceIndex}
                   onSelectSentence={(idx) => {
                     setSelectedSentenceIndex(idx);
@@ -846,6 +917,8 @@ export default function Topic() {
               <CardContent>
                 <InteractiveSentenceText
                   text={currentOtherOpinion.content}
+                  segmentMode="paragraph"
+                  interactionCount={otherParagraphInteractionCount}
                   selectedSentenceIndex={selectedOtherSentenceIndex}
                   onSelectSentence={(idx) => {
                     setSelectedOtherSentenceIndex(idx);
@@ -864,7 +937,7 @@ export default function Topic() {
         </TabsContent>
       </Tabs>
 
-      {/* Right-side sheet for sentence interactions */}
+      {/* Right-side sheet for paragraph / summary-segment interactions */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-lg">
           <SheetHeader>
@@ -907,7 +980,7 @@ export default function Topic() {
                     </div>
                   </ScrollArea>
                 ) : (
-                  <p className="text-muted-foreground">Select a sentence to see referenced opinions.</p>
+                  <p className="text-muted-foreground">Select a paragraph to see referenced opinions.</p>
                 )}
               </>
             )}
@@ -915,7 +988,7 @@ export default function Topic() {
             {activeTab === "yours" && (
               <>
                 {selectedSentenceIndex == null ? (
-                  <p className="text-muted-foreground">Select a sentence to see counterpoints.</p>
+                  <p className="text-muted-foreground">Select a paragraph to see counterpoints.</p>
                 ) : (
                   <>
                     <Card>
@@ -1023,7 +1096,7 @@ export default function Topic() {
             {activeTab === "others" && (
               <>
                 {selectedOtherSentenceIndex == null || !currentOtherOpinion ? (
-                  <p className="text-muted-foreground">Select a sentence to see counterpoints.</p>
+                  <p className="text-muted-foreground">Select a paragraph to see counterpoints.</p>
                 ) : (
                   <>
                     <Card>

@@ -308,6 +308,17 @@ router.get('/profile/:userId', async (req, res) => {
   }
 });
 
+// GET /api/opinions/:opinionId/counterpoints/counts - Counterpoint counts per paragraph index
+router.get('/:opinionId/counterpoints/counts', async (req, res) => {
+  try {
+    const rows = await counterpointService.countCounterpointsBySentenceIndex(req.params.opinionId);
+    res.json(rows);
+  } catch (error: any) {
+    console.error('Error listing counterpoint counts:', error);
+    res.status(500).json({ message: 'Failed to list counterpoint counts' });
+  }
+});
+
 // GET /api/opinions/:opinionId/counterpoints?sentenceIndex=n - List counterpoints for a sentence
 router.get('/:opinionId/counterpoints', async (req, res) => {
   try {
