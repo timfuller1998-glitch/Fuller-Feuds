@@ -381,6 +381,108 @@ export class OpinionRepository {
     return enrichedOpinions;
   }
 
+  /**
+   * Enriched opinions for a user's profile (same shape as findByTopicId: spread opinion + author + fallacyCounts + votes).
+   */
+  async findEnrichedByUserId(
+    userId: string,
+    limit: number,
+    options?: {
+      userRole?: string;
+      currentUserId?: string;
+    }
+  ): Promise<any[]> {
+    const { userRole, currentUserId } = options || {};
+    const isModOrAdmin = userRole === 'admin' || userRole === 'moderator';
+
+    const whereConditions = [eq(opinions.userId, userId)];
+
+    if (!isModOrAdmin) {
+      whereConditions.push(eq(opinions.status, 'approved'));
+    }
+
+    if (currentUserId) {
+      whereConditions.push(
+        or(
+          ne(opinions.debateStatus, 'private'),
+          eq(opinions.userId, currentUserId)
+        )!
+      );
+    } else {
+      whereConditions.push(ne(opinions.debateStatus, 'private'));
+    }
+
+    const baseOpinions = await db
+      .select({
+        opinion: opinions,
+        author: users,
+        profile: userProfiles
+      })
+      .from(opinions)
+      .leftJoin(users, eq(opinions.userId, users.id))
+      .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
+      .where(and(...whereConditions))
+      .orderBy(desc(opinions.createdAt))
+      .limit(limit);
+
+    if (baseOpinions.length === 0) {
+      return [];
+    }
+
+    const fallacyCountsMap = await aggregateFallacyCounts(
+      baseOpinions.map(row => row.opinion),
+      opinionFlags,
+      'opinionId'
+    );
+
+    const enrichedOpinions = await Promise.all(
+      baseOpinions.map(async (row) => {
+        const opinion = row.opinion;
+
+        const [voteCounts] = await db
+          .select({
+            likesCount: sql<number>`COUNT(CASE WHEN ${opinionVotes.voteType} = 'like' THEN 1 END)`,
+            dislikesCount: sql<number>`COUNT(CASE WHEN ${opinionVotes.voteType} = 'dislike' THEN 1 END)`
+          })
+          .from(opinionVotes)
+          .where(eq(opinionVotes.opinionId, opinion.id));
+
+        let userVote = null;
+        if (currentUserId) {
+          const [vote] = await db
+            .select()
+            .from(opinionVotes)
+            .where(and(
+              eq(opinionVotes.opinionId, opinion.id),
+              eq(opinionVotes.userId, currentUserId)
+            ))
+            .limit(1);
+          userVote = vote ? { voteType: vote.voteType as 'like' | 'dislike' } : null;
+        }
+
+        return {
+          ...opinion,
+          likesCount: voteCounts?.likesCount || 0,
+          dislikesCount: voteCounts?.dislikesCount || 0,
+          fallacyCounts: fallacyCountsMap.get(opinion.id) || {},
+          userVote,
+          author: row.author ? {
+            id: row.author.id,
+            firstName: row.author.firstName,
+            lastName: row.author.lastName,
+            profileImageUrl: row.author.profileImageUrl,
+            politicalLeaningScore: row.profile?.economicScore != null && row.profile?.authoritarianScore != null ?
+              (row.profile.economicScore + row.profile.authoritarianScore) / 2 : undefined,
+            economicScore: row.profile?.economicScore ?? undefined,
+            authoritarianScore: row.profile?.authoritarianScore ?? undefined
+          } : null
+        };
+      })
+    );
+
+    return enrichedOpinions;
+  }
+
   async update(id: string, data: Partial<InsertOpinion>, requestingUserId?: string, requestingUserRole?: string, req?: Request): Promise<Opinion> {
     const startTime = Date.now();
 

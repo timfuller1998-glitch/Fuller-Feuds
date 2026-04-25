@@ -13,6 +13,7 @@ import seedingRoutes from './seeding.js';
 import healthRoutes from './health.js';
 import auditRoutes from './admin/audit.js';
 import presenceRoutes from './presence.js';
+import profileRoutes from './profile.js';
 
 const router = express.Router();
 
@@ -31,5 +32,6 @@ router.use('/objects', objectRoutes);
 router.use('/admin/seeding', seedingRoutes);
 router.use('/health', healthRoutes);
 router.use('/presence', presenceRoutes);
+router.use('/profile', profileRoutes);
 
 export default router;

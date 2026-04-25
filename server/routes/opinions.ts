@@ -297,17 +297,6 @@ router.delete('/admin/:opinionId', requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/profile/:userId/opinions - Get user's opinions (profile page)
-router.get('/profile/:userId', async (req, res) => {
-  try {
-    // TODO: Implement user opinions fetching
-    res.json({ opinions: [] });
-  } catch (error) {
-    console.error("Error fetching user opinions:", error);
-    res.status(500).json({ message: "Failed to fetch user opinions" });
-  }
-});
-
 // GET /api/opinions/:opinionId/counterpoints/counts - Counterpoint counts per paragraph index
 router.get('/:opinionId/counterpoints/counts', async (req, res) => {
   try {
