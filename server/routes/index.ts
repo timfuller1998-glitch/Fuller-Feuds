@@ -14,6 +14,7 @@ import healthRoutes from './health.js';
 import auditRoutes from './admin/audit.js';
 import presenceRoutes from './presence.js';
 import profileRoutes from './profile.js';
+import followRoutes from './follow.js';
 
 const router = express.Router();
 
@@ -33,5 +34,6 @@ router.use('/admin/seeding', seedingRoutes);
 router.use('/health', healthRoutes);
 router.use('/presence', presenceRoutes);
 router.use('/profile', profileRoutes);
+router.use('/follow', followRoutes);
 
 export default router;
