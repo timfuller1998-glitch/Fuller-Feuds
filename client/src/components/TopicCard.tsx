@@ -339,7 +339,7 @@ export default function TopicCard({
     <>
       <div
         ref={cardRef}
-        className="relative w-full h-full"
+        className="relative w-full h-full min-h-[20rem]"
         style={{ perspective: "1000px", ...glowStyle }}
         data-testid={`card-topic-${id}`}
       >
