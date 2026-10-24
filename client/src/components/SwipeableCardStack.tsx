@@ -46,7 +46,7 @@ const wrap = (i: number, n: number) => ((i % n) + n) % n;
  * Moving back pulls the bottom card out from under the deck and lands it on top.
  * Background cards are plain card backs, offset downward, and never take pointer events.
  */
-const BACK_LAYERS = [2, 1] as const; // render order: furthest first
+const BACK_LAYERS = [2] as const; // blank backs beyond the second card
 const backStyle = (d: number) => ({ y: 7 * d, scale: 1 - 0.035 * d });
 const SHUFFLE_S = 0.46;
 const SHUFFLE_EASE = [0.22, 1, 0.36, 1] as const;
@@ -82,6 +82,7 @@ export default function SwipeableCardStack({ topics, onEmpty, maxWidth = 400, re
   const [shuffle, setShuffle] = useState<Shuffle | null>(null);
   const shuffleKeyRef = useRef(0);
   const currentCard = n > 0 ? topics[wrap(currentIndex, n)] : null;
+  const nextCard = n > 1 ? topics[wrap(currentIndex + 1, n)] : null;
 
   /** Move through the deck; flips the top card back first if it is showing its back. */
   const step = useCallback((dir: 1 | -1, fromX = 0) => {
@@ -220,37 +221,52 @@ export default function SwipeableCardStack({ topics, onEmpty, maxWidth = 400, re
           </motion.div>
         )}
 
-        <motion.div
-          key={`top-${currentCard.id}-${currentIndex}`}
-          className="absolute inset-0"
-          initial={topInitial as any}
-          animate={topAnimate as any}
-          transition={topTransition as any}
-          style={{ zIndex: 10 }}
-        >
-          <motion.div
-            className="absolute inset-0 cursor-grab active:cursor-grabbing"
-            drag={n > 1 ? "x" : false}
-            dragElastic={0.9}
-            dragConstraints={{ left: 0, right: 0 }}
-            dragTransition={{ bounceStiffness: 400, bounceDamping: 30 }}
-            onDragEnd={handleDragEnd}
-            style={{ x, rotate, touchAction: "pan-y" }}
-          >
-            <div className="w-full h-full shadow-xl rounded-xl">
-              <TopicCard
-                {...cardProps(currentCard)}
-                onFlipChange={(f) => setFlipped((p) => ({ ...p, [currentCard.id]: f }))}
-                forceUnflipSignal={forceUnflipSignal}
-              />
-            </div>
-            {renderBadge && (
-              <div className="absolute left-1/2 -translate-x-1/2 -top-4 z-30 pointer-events-none">
-                {renderBadge(currentCard, wrap(currentIndex, n))}
-              </div>
-            )}
-          </motion.div>
-        </motion.div>
+        {/* Top + next cards, keyed by topic id so React moves the element (and its content)
+            from the second slot to the top instead of swapping content inside a slot. */}
+        {[
+          { card: nextCard, isTop: false },
+          { card: currentCard, isTop: true },
+        ].map(({ card, isTop }) => {
+          if (!card) return null;
+          // The outgoing ghost already shows this card; don't double-render it in the second slot.
+          if (!isTop && sh && sh.card.id === card.id) return null;
+          if (!isTop && card.id === currentCard.id) return null;
+          const s1 = backStyle(1);
+          return (
+            <motion.div
+              key={`card-${card.id}`}
+              className={isTop ? "absolute inset-0" : "absolute inset-0 pointer-events-none select-none"}
+              aria-hidden={isTop ? undefined : true}
+              initial={isTop ? (topInitial as any) : { x: 0, y: s1.y, scale: s1.scale, rotate: 0, zIndex: 5, opacity: 1 }}
+              animate={isTop ? (topAnimate as any) : { x: 0, y: s1.y, scale: s1.scale, rotate: 0, zIndex: 5, opacity: 1 }}
+              transition={isTop ? (topTransition as any) : { duration: 0.2 }}
+              style={{ zIndex: isTop ? 10 : 5 }}
+            >
+              <motion.div
+                className={isTop ? "absolute inset-0 cursor-grab active:cursor-grabbing" : "absolute inset-0"}
+                drag={isTop && n > 1 ? "x" : false}
+                dragElastic={0.9}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragTransition={{ bounceStiffness: 400, bounceDamping: 30 }}
+                onDragEnd={isTop ? handleDragEnd : undefined}
+                style={isTop ? { x, rotate, touchAction: "pan-y" } : { x: 0, rotate: 0 }}
+              >
+                <div className={`w-full h-full rounded-xl ${isTop ? "shadow-xl" : "shadow-md overflow-hidden bg-card"}`}>
+                  <TopicCard
+                    {...cardProps(card)}
+                    onFlipChange={isTop ? (f) => setFlipped((p) => ({ ...p, [card.id]: f })) : undefined}
+                    forceUnflipSignal={isTop ? forceUnflipSignal : undefined}
+                  />
+                </div>
+                {isTop && renderBadge && (
+                  <div className="absolute left-1/2 -translate-x-1/2 -top-4 z-30 pointer-events-none">
+                    {renderBadge(card, wrap(currentIndex, n))}
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
+          );
+        })}
       </div>
 
       {n > 1 && (
