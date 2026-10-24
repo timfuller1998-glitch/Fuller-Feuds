@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
-import { motion, useMotionValue, useTransform, useReducedMotion, PanInfo } from "framer-motion";
+import { motion, animate, useMotionValue, useTransform, useReducedMotion, PanInfo } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TopicCard from "./TopicCard";
@@ -48,10 +48,112 @@ const wrap = (i: number, n: number) => ((i % n) + n) % n;
  */
 const BACK_LAYERS = [2] as const; // blank backs beyond the second card
 const backStyle = (d: number) => ({ y: 7 * d, scale: 1 - 0.035 * d });
-const SHUFFLE_S = 0.46;
-const SHUFFLE_EASE = [0.22, 1, 0.36, 1] as const;
+const EASE = [0.22, 1, 0.36, 1] as const;
 
-type Shuffle = { key: number; card: DeckTopic; dir: 1 | -1; fromX: number; fromRotate: number };
+type Role = "top" | "next" | "out" | "in";
+
+interface DeckCardProps {
+  card: DeckTopic;
+  role: Role;
+  width: number;
+  reduceMotion: boolean;
+  draggable: boolean;
+  onDragEnd?: (info: PanInfo, releaseX: number) => void;
+  onDone?: () => void;
+  children: (isTop: boolean) => ReactNode;
+}
+
+/**
+ * One physical card. Every card owns its own motion values, so a card that leaves the top
+ * keeps its own content and position; it is never re-used for another topic.
+ * Outer values = deck placement/shuffle animation, inner x = finger drag.
+ */
+function DeckCard({ card, role, width, reduceMotion, draggable, onDragEnd, onDone, children }: DeckCardProps) {
+  const first = useRef(true);
+  const s1 = backStyle(1);
+  const s2 = backStyle(2);
+  const start =
+    role === "in" ? { y: s2.y, scale: s2.scale, z: 3 } : role === "next" ? { y: s1.y, scale: s1.scale, z: 5 } : { y: 0, scale: 1, z: 10 };
+  const ox = useMotionValue(0);
+  const oy = useMotionValue(start.y);
+  const os = useMotionValue(start.scale);
+  const orot = useMotionValue(0);
+  const oz = useMotionValue(start.z);
+  const ix = useMotionValue(0);
+  const irot = useTransform(ix, [-300, 300], [-10, 10]);
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
+
+  useEffect(() => {
+    const out = width * 1.12;
+    let cancelled = false;
+    const anims: { stop: () => void }[] = [];
+    const go = (mv: any, to: number, duration: number) => {
+      const a = animate(mv, to, { duration: reduceMotion ? 0 : duration, ease: EASE as any });
+      anims.push(a);
+      return a;
+    };
+    const run = async () => {
+      if (role === "top") {
+        oz.set(10);
+        if (first.current) return;
+        go(ox, 0, 0.3); go(oy, 0, 0.3); go(os, 1, 0.3); go(orot, 0, 0.3);
+      } else if (role === "next") {
+        oz.set(5);
+        go(ox, 0, 0.3); go(oy, s1.y, 0.3); go(os, s1.scale, 0.3); go(orot, 0, 0.3);
+      } else if (role === "out") {
+        // Forward: slide off to the left from wherever the finger released it, then drop behind the deck.
+        // Hand the finger offset over to the outer layer and stop the drag's spring-back, so the card
+        // continues from exactly where it was released.
+        ix.stop();
+        ox.set(ox.get() + ix.get());
+        orot.set(orot.get() + irot.get());
+        ix.set(0);
+        oz.set(20);
+        await Promise.all([go(ox, -out, 0.2), go(orot, -9, 0.2), go(os, 0.98, 0.2)]);
+        if (cancelled) return;
+        oz.set(0); // now strictly behind every other card, including the blank back
+        await Promise.all([go(ox, 0, 0.28), go(orot, 0, 0.28), go(oy, s2.y, 0.28), go(os, s2.scale, 0.28)]);
+        if (!cancelled) doneRef.current?.();
+      } else if (role === "in") {
+        // Backward: pulled out from under the deck to the right, then laid on top.
+        oz.set(3);
+        await Promise.all([go(ox, out * 0.92, 0.22), go(orot, 7, 0.22), go(oy, 4, 0.22), go(os, 0.98, 0.22)]);
+        if (cancelled) return;
+        oz.set(15);
+        await Promise.all([go(ox, 0, 0.26), go(orot, 0, 0.26), go(oy, 0, 0.26), go(os, 1, 0.26)]);
+        if (!cancelled) doneRef.current?.();
+      }
+    };
+    run();
+    first.current = false;
+    return () => { cancelled = true; anims.forEach((a) => a.stop()); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
+
+  const isTop = role === "top";
+  return (
+    <motion.div
+      className={isTop ? "absolute inset-0" : "absolute inset-0 pointer-events-none select-none"}
+      aria-hidden={isTop ? undefined : true}
+      data-deck-card={card.id}
+      data-deck-role={role}
+      style={{ x: ox, y: oy, scale: os, rotate: orot, zIndex: oz }}
+    >
+      <motion.div
+        className={isTop ? "absolute inset-0 cursor-grab active:cursor-grabbing" : "absolute inset-0"}
+        drag={isTop && draggable ? "x" : false}
+        dragElastic={0.9}
+        dragConstraints={{ left: 0, right: 0 }}
+        dragTransition={{ bounceStiffness: 400, bounceDamping: 30 }}
+        onDragEnd={isTop ? (_e, info) => onDragEnd?.(info, ix.get()) : undefined}
+        style={{ x: ix, rotate: irot, touchAction: "pan-y" }}
+      >
+        {children(isTop)}
+      </motion.div>
+    </motion.div>
+  );
+}
 
 export default function SwipeableCardStack({ topics, onEmpty, maxWidth = 400, renderBadge, testId }: SwipeableCardStackProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -75,23 +177,27 @@ export default function SwipeableCardStack({ topics, onEmpty, maxWidth = 400, re
     if (n === 0) onEmpty?.();
   }, [n, currentIndex, onEmpty]);
 
-  const x = useMotionValue(0);
-  const rotate = useTransform(x, [-300, 300], [-10, 10]);
-
-  const reduceMotion = useReducedMotion();
-  const [shuffle, setShuffle] = useState<Shuffle | null>(null);
-  const shuffleKeyRef = useRef(0);
+  const reduceMotion = !!useReducedMotion();
+  /** Cards still animating out of / into the top spot. Each is its own element keyed by topic id. */
+  const [outgoing, setOutgoing] = useState<{ card: DeckTopic; key: number } | null>(null);
+  const [incomingId, setIncomingId] = useState<string | null>(null);
+  const keyRef = useRef(0);
   const currentCard = n > 0 ? topics[wrap(currentIndex, n)] : null;
   const nextCard = n > 1 ? topics[wrap(currentIndex + 1, n)] : null;
+  const busy = !!outgoing || !!incomingId;
 
   /** Move through the deck; flips the top card back first if it is showing its back. */
-  const step = useCallback((dir: 1 | -1, fromX = 0) => {
-    if (n < 2 || !currentCard) return;
+  const step = useCallback((dir: 1 | -1) => {
+    if (n < 2 || !currentCard || busy) return;
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     const leaving = currentCard;
     const run = () => {
-      shuffleKeyRef.current += 1;
-      setShuffle({ key: shuffleKeyRef.current, card: leaving, dir, fromX, fromRotate: (fromX / 300) * 10 });
+      if (dir === 1) {
+        keyRef.current += 1;
+        setOutgoing({ card: leaving, key: keyRef.current });
+      } else {
+        setIncomingId(topics[wrap(currentIndex - 1, n)].id);
+      }
       setCurrentIndex((i) => wrap(i + dir, n));
     };
     if (flipped[currentCard.id]) {
@@ -100,20 +206,17 @@ export default function SwipeableCardStack({ topics, onEmpty, maxWidth = 400, re
     } else {
       run();
     }
-  }, [n, currentCard, flipped]);
+  }, [n, currentCard, flipped, busy, topics, currentIndex]);
 
-  const handleDragEnd = (_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleDragEnd = (info: PanInfo) => {
     const { offset, velocity } = info;
-    const releaseX = x.get();
     // Drag left = tuck top card under (next), drag right = pull bottom card out on top (previous).
     let dir: 1 | -1 | 0 = 0;
     if (Math.abs(velocity.x) > SWIPE_VELOCITY_THRESHOLD) dir = velocity.x < 0 ? 1 : -1;
     else if (offset.x <= -SWIPE_OFFSET_THRESHOLD) dir = 1;
     else if (offset.x >= SWIPE_OFFSET_THRESHOLD) dir = -1;
     if (dir === 0) return; // framer springs the card back to center
-    const willFlipFirst = !!(currentCard && flipped[currentCard.id]);
-    x.set(0);
-    step(dir, dir === 1 && !willFlipFirst ? releaseX : 0);
+    step(dir);
   };
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -151,25 +254,13 @@ export default function SwipeableCardStack({ topics, onEmpty, maxWidth = 400, re
   });
 
   const backs = BACK_LAYERS.filter((d) => d < n);
-  const out = cardWidth * 1.12;
-  const t = { duration: reduceMotion ? 0.2 : SHUFFLE_S, ease: SHUFFLE_EASE as any, times: [0, 0.45, 0.55, 1] };
-  const sh = shuffle && !reduceMotion ? shuffle : null;
-
-  // Incoming top card motion. Forward: rises from the second slot. Back: slides out from under
-  // the deck (behind, z 2) to the right, then lands on top (z 10).
-  const topInitial = reduceMotion
-    ? { opacity: 0.4 }
-    : sh?.dir === -1
-      ? { x: 0, y: 14, scale: 0.93, rotate: 0, zIndex: 2, opacity: 1 }
-      : sh
-        ? { x: 0, y: 7, scale: 0.965, rotate: 0, zIndex: 10, opacity: 1 }
-        : false;
-  const topAnimate = reduceMotion
-    ? { opacity: 1 }
-    : sh?.dir === -1
-      ? { x: [0, out * 0.92, out * 0.85, 0], y: [14, 4, 0, 0], scale: [0.93, 0.98, 1, 1], rotate: [0, 7, 6, 0], zIndex: [2, 2, 10, 10], opacity: 1 }
-      : { x: 0, y: 0, scale: 1, rotate: 0, zIndex: 10, opacity: 1 };
-  const topTransition = sh?.dir === -1 ? t : { type: "spring" as const, stiffness: 300, damping: 28 };
+  type Entry = { card: DeckTopic; role: Role; key: string };
+  const entries: Entry[] = [];
+  if (outgoing) entries.push({ card: outgoing.card, role: "out", key: `card-${outgoing.card.id}` });
+  if (nextCard && nextCard.id !== currentCard.id && !entries.some((e) => e.card.id === nextCard.id)) {
+    entries.push({ card: nextCard, role: "next", key: `card-${nextCard.id}` });
+  }
+  entries.push({ card: currentCard, role: incomingId === currentCard.id ? "in" : "top", key: `card-${currentCard.id}` });
 
   return (
     <div
@@ -200,57 +291,21 @@ export default function SwipeableCardStack({ topics, onEmpty, maxWidth = 400, re
           );
         })}
 
-        {/* Outgoing card: forward = slides out and tucks under the deck; back = sinks to second slot. */}
-        {sh && (
-          <motion.div
-            key={`ghost-${sh.key}`}
-            className="absolute inset-0 pointer-events-none select-none"
-            aria-hidden
-            initial={{ x: sh.fromX, rotate: sh.fromRotate, y: 0, scale: 1, zIndex: sh.dir === 1 ? 20 : 9 }}
-            animate={
-              sh.dir === 1
-                ? { x: [sh.fromX, -out, -out * 0.9, 0], rotate: [sh.fromRotate, -9, -7, 0], rotateY: [0, 14, 10, 0], y: [0, 2, 8, 14], scale: [1, 0.98, 0.95, 0.93], zIndex: [20, 20, 1, 1] }
-                : { x: 0, rotate: 0, y: [0, 4, 7, 7], scale: [1, 0.985, 0.97, 0.965], zIndex: [9, 9, 9, 9] }
+        {entries.map(({ card, role, key }) => (
+          <DeckCard
+            key={key}
+            card={card}
+            role={role}
+            width={cardWidth}
+            reduceMotion={reduceMotion}
+            draggable={n > 1 && !busy}
+            onDragEnd={handleDragEnd}
+            onDone={
+              role === "out" ? () => setOutgoing(null) : role === "in" ? () => setIncomingId(null) : undefined
             }
-            transition={t}
-            onAnimationComplete={() => setShuffle((cur) => (cur?.key === sh.key ? null : cur))}
           >
-            <div className="w-full h-full rounded-xl shadow-lg overflow-hidden bg-card">
-              <TopicCard {...cardProps(sh.card)} />
-            </div>
-          </motion.div>
-        )}
-
-        {/* Top + next cards, keyed by topic id so React moves the element (and its content)
-            from the second slot to the top instead of swapping content inside a slot. */}
-        {[
-          { card: nextCard, isTop: false },
-          { card: currentCard, isTop: true },
-        ].map(({ card, isTop }) => {
-          if (!card) return null;
-          // The outgoing ghost already shows this card; don't double-render it in the second slot.
-          if (!isTop && sh && sh.card.id === card.id) return null;
-          if (!isTop && card.id === currentCard.id) return null;
-          const s1 = backStyle(1);
-          return (
-            <motion.div
-              key={`card-${card.id}`}
-              className={isTop ? "absolute inset-0" : "absolute inset-0 pointer-events-none select-none"}
-              aria-hidden={isTop ? undefined : true}
-              initial={isTop ? (topInitial as any) : { x: 0, y: s1.y, scale: s1.scale, rotate: 0, zIndex: 5, opacity: 1 }}
-              animate={isTop ? (topAnimate as any) : { x: 0, y: s1.y, scale: s1.scale, rotate: 0, zIndex: 5, opacity: 1 }}
-              transition={isTop ? (topTransition as any) : { duration: 0.2 }}
-              style={{ zIndex: isTop ? 10 : 5 }}
-            >
-              <motion.div
-                className={isTop ? "absolute inset-0 cursor-grab active:cursor-grabbing" : "absolute inset-0"}
-                drag={isTop && n > 1 ? "x" : false}
-                dragElastic={0.9}
-                dragConstraints={{ left: 0, right: 0 }}
-                dragTransition={{ bounceStiffness: 400, bounceDamping: 30 }}
-                onDragEnd={isTop ? handleDragEnd : undefined}
-                style={isTop ? { x, rotate, touchAction: "pan-y" } : { x: 0, rotate: 0 }}
-              >
+            {(isTop) => (
+              <>
                 <div className={`w-full h-full rounded-xl ${isTop ? "shadow-xl" : "shadow-md overflow-hidden bg-card"}`}>
                   <TopicCard
                     {...cardProps(card)}
@@ -263,10 +318,10 @@ export default function SwipeableCardStack({ topics, onEmpty, maxWidth = 400, re
                     {renderBadge(card, wrap(currentIndex, n))}
                   </div>
                 )}
-              </motion.div>
-            </motion.div>
-          );
-        })}
+              </>
+            )}
+          </DeckCard>
+        ))}
       </div>
 
       {n > 1 && (
