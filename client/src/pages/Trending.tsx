@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearch } from "wouter/use-browser-location";
-import TopicCard from "@/components/TopicCard";
+import SwipeableCardStack from "@/components/SwipeableCardStack";
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, Flame, Zap } from "lucide-react";
 import { type Topic } from "@shared/schema";
@@ -128,31 +128,22 @@ export default function Trending() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4" data-testid="list-trending-topics">
-          {sortedTopics.map((topic, index) => (
-            <div key={topic.id} className="relative">
-              {index < 3 && (
-                <div className="absolute -left-2 -top-2 z-30">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center text-white font-bold text-sm shadow-lg">
-                    {index + 1}
-                  </div>
+        <div className="py-4" data-testid="list-trending-topics">
+          <SwipeableCardStack
+            topics={sortedTopics.map((topic) => ({
+              ...topic,
+              categories: topic.categories || [],
+              imageUrl: topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800",
+            }))}
+            renderBadge={(_topic, index) =>
+              index < 3 ? (
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center text-white font-bold text-sm shadow-lg ring-2 ring-background" data-testid={`badge-trending-rank-${index + 1}`}>
+                  {index + 1}
                 </div>
-              )}
-              <TopicCard
-                id={topic.id}
-                title={topic.title}
-                description={topic.description}
-                categories={topic.categories || []}
-                opinionsCount={topic.opinionsCount || 0}
-                participantCount={topic.participantCount || 0}
-                isActive={topic.isActive ?? true}
-                imageUrl={topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800"}
-                previewContent={topic.previewContent}
-                previewAuthor={topic.previewAuthor}
-                previewIsAI={topic.previewIsAI}
-              />
-            </div>
-          ))}
+              ) : null
+            }
+            testId="deck-trending"
+          />
         </div>
       )}
     </div>

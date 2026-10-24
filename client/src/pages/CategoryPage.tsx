@@ -1,6 +1,6 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import TopicCard from "@/components/TopicCard";
+import SwipeableCardStack from "@/components/SwipeableCardStack";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -175,10 +175,8 @@ export default function CategoryPage() {
         <h2 className="text-xl font-semibold">Topics</h2>
         {topics && topics.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {topics.map((topic) => (
-                <TopicCard key={topic.id} {...topic} />
-              ))}
+            <div className="py-2">
+              <SwipeableCardStack topics={topics} testId="deck-category" />
             </div>
             
             {/* Show encouraging card when there are fewer than 5 topics */}
