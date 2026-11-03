@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { animate } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -203,10 +202,6 @@ export default function TopicCard({
         setTimeOnBack(elapsed);
         onBackTimeUpdate?.(elapsed);
         
-        // Trigger "jump up" animation after 3 seconds
-        if (elapsed > 3000 && cardRef.current) {
-          animate(cardRef.current, { y: [0, -15, 0] }, { duration: 0.4, ease: "easeOut" });
-        }
       }, 100);
     } else {
       if (backSideTimerRef.current) {
@@ -339,7 +334,7 @@ export default function TopicCard({
     <>
       <div
         ref={cardRef}
-        className="relative w-full h-full"
+        className="relative w-full h-full min-h-[20rem]"
         style={{ perspective: "1000px", ...glowStyle }}
         data-testid={`card-topic-${id}`}
       >
@@ -354,7 +349,7 @@ export default function TopicCard({
           }}
         >
           <Card
-            className="hover-elevate active-elevate-2 overflow-visible cursor-pointer relative w-full h-full"
+            className="hover-elevate active-elevate-2 overflow-visible cursor-pointer relative w-full h-full bg-card"
             onClick={handleFlip}
             style={{
               transformStyle: "preserve-3d",
@@ -637,7 +632,7 @@ export default function TopicCard({
                   </div>
                 ) : (
                   <div className="flex flex-col h-full justify-center min-h-0 max-h-full" style={{ transform: "matrix(1, 0, 0, 1, 0, 0)" }}>
-                    <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0">
+                    <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0 mt-8">
                       <Sparkles className="w-4 h-4 text-muted-foreground" />
                       <h3 className="font-semibold text-sm text-muted-foreground">Description</h3>
                     </div>
@@ -649,6 +644,25 @@ export default function TopicCard({
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="px-4 pb-3 flex flex-col gap-2 flex-shrink-0">
+              <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+                <span>{opinionsCount} {opinionsCount === 1 ? "opinion" : "opinions"}</span>
+                <span>{participantCount} {participantCount === 1 ? "participant" : "participants"}</span>
+                {topOpinions && topOpinions.length > 0 && (
+                  <span>Top: {topOpinions[0].likesCount || 0} likes</span>
+                )}
+              </div>
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={handleNavigate}
+                data-testid={`button-open-full-page-${id}`}
+              >
+                Open full page
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
             </div>
 
             <InteractiveElements />

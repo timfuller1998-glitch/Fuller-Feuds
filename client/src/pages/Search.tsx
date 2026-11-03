@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearch, useLocation } from "wouter";
-import TopicCard from "@/components/TopicCard";
+import SwipeableCardStack from "@/components/SwipeableCardStack";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search as SearchIcon, History, Filter } from "lucide-react";
@@ -161,25 +161,10 @@ export default function Search() {
           </div>
 
           <TabsContent value={activeTab} className="mt-6">
-            <div className="grid grid-cols-1 gap-4" data-testid="list-search-results">
-              {filteredTopics?.map((topic) => (
-                <TopicCard
-                  key={topic.id}
-                  id={topic.id}
-                  title={topic.title}
-                  description={topic.description}
-                  categories={topic.categories}
-                  opinionsCount={topic.opinionsCount || 0}
-                  participantCount={topic.participantCount || 0}
-                  isActive={topic.isActive ?? true}
-                  imageUrl={topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800"}
-                  previewContent={topic.previewContent}
-                  previewAuthor={topic.previewAuthor}
-                  previewIsAI={topic.previewIsAI}
-                  diversityScore={topic.diversityScore}
-                  politicalDistribution={topic.politicalDistribution}
-                />
-              ))}
+            <div className="py-2" data-testid="list-search-results">
+              {filteredTopics && filteredTopics.length > 0 && (
+                <SwipeableCardStack key={activeTab} topics={filteredTopics} testId="deck-search" />
+              )}
             </div>
           </TabsContent>
         </Tabs>

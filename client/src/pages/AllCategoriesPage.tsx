@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import TopicCard from "@/components/TopicCard";
+import SwipeableCardStack from "@/components/SwipeableCardStack";
 import { CardContainer } from "@/components/CardContainer";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -216,63 +216,25 @@ export default function AllCategoriesPage() {
                   </div>
                 </div>
 
-                {/* Horizontal Scrolling Topics */}
+                {/* Topic deck */}
                 {topics.length > 0 && (
-                  <div className="w-full overflow-hidden">
-                    <div 
-                      className="flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden pb-2 sm:pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
-                      style={{ 
-                        scrollbarWidth: 'thin',
-                        scrollSnapType: 'x mandatory'
-                      }}
-                      data-testid={`scroll-topics-${category.name.toLowerCase()}`}
-                    >
-                      {topics.map((topic) => (
-                        <CardContainer 
-                          key={topic.id}
-                          style={{ scrollSnapAlign: 'start' }}
-                        >
-                          <TopicCard
-                            id={topic.id}
-                            title={topic.title}
-                            description={topic.description}
-                            categories={topic.categories}
-                            opinionsCount={topic.opinionsCount}
-                            participantCount={topic.participantCount}
-                            isActive={topic.isActive ?? true}
-                            imageUrl={topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800"}
-                            previewContent={topic.previewContent}
-                            previewAuthor={topic.previewAuthor}
-                            previewIsAI={topic.previewIsAI}
-                            diversityScore={topic.diversityScore}
-                            politicalDistribution={topic.politicalDistribution}
-                          />
-                        </CardContainer>
-                      ))}
-                      {category.totalCount > 5 && (
-                        <CardContainer style={{ scrollSnapAlign: 'start' }}>
-                          <Card className="h-full hover-elevate active-elevate-2 transition-all">
-                            <CardContent className="flex flex-col items-center justify-center h-full min-h-[160px] sm:min-h-[200px] p-4 sm:p-6">
-                              <CategoryIcon className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground mb-2 sm:mb-4" />
-                              <p className="text-center text-sm sm:text-base font-medium mb-2">
-                                {category.totalCount - 5} more {category.totalCount - 5 === 1 ? 'debate' : 'debates'}
-                              </p>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                asChild
-                                data-testid={`button-viewall-card-${category.name.toLowerCase()}`}
-                              >
-                                <Link href={`/category/${category.name}`}>
-                                  View All
-                                  <ChevronRight className="w-4 h-4 ml-1" />
-                                </Link>
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        </CardContainer>
-                      )}
-                    </div>
+                  <div className="flex flex-col items-center gap-2 py-2" data-testid={`scroll-topics-${category.name.toLowerCase()}`}>
+                    <SwipeableCardStack
+                      topics={topics.map((topic) => ({
+                        ...topic,
+                        imageUrl: topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800",
+                      }))}
+                      maxWidth={320}
+                      testId={`deck-category-${category.name.toLowerCase()}`}
+                    />
+                    {category.totalCount > 5 && (
+                      <Button variant="outline" size="sm" asChild data-testid={`button-viewall-card-${category.name.toLowerCase()}`}>
+                        <Link href={`/category/${category.name}`}>
+                          View all {category.totalCount} debates
+                          <ChevronRight className="w-4 h-4 ml-1" />
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
