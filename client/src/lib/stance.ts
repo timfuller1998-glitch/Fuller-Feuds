@@ -1,6 +1,6 @@
 export type Stance = "for" | "against" | "neutral";
 
-/** Reads an opinion's stance if it has one. Opinions currently have no stance column, so this is often null. */
+/** Reads an opinion's stance (opinions.stance column). null = the author didn't pick one. */
 export function getOpinionStance(op: unknown): Stance | null {
   const s = (op as { stance?: unknown } | null)?.stance;
   return s === "for" || s === "against" || s === "neutral" ? s : null;

@@ -80,7 +80,7 @@ function AppWithSidebar({
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full overflow-x-hidden">
+    <div className="flex h-screen h-[100dvh] w-full overflow-x-hidden">
       <AppSidebar
         currentUser={{
           id: user?.id || "",
@@ -123,7 +123,7 @@ function AppWithSidebar({
           )}
           <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} />
         </header>
-        <main className={`flex-1 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-20 ${location === "/" ? "overflow-y-hidden relative" : "overflow-y-auto"}`}>
+        <main className={`flex-1 min-h-0 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-8 ${location === "/" ? "overflow-y-hidden relative" : "overflow-y-auto"}`}>
           <div className={`max-w-7xl mx-auto w-full ${location === "/" ? "h-full relative" : ""}`}>
             <Router />
           </div>

@@ -56,7 +56,7 @@ export function DebateFooter() {
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg z-40"
+      className="relative shrink-0 bg-card border-t border-border shadow-lg z-40 pb-[env(safe-area-inset-bottom)]"
       data-testid="debate-footer"
     >
       <div className="flex items-center gap-2 px-4 py-2 max-w-screen-2xl mx-auto">
