@@ -317,7 +317,7 @@ export class OpinionRepository {
       .leftJoin(users, eq(opinions.userId, users.id))
       .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
       .where(and(...whereConditions))
-      .orderBy(desc(opinions.createdAt));
+      .orderBy(desc(opinions.createdAt), desc(opinions.id));
 
     if (baseOpinions.length === 0) {
       return [];
@@ -335,15 +335,6 @@ export class OpinionRepository {
       baseOpinions.map(async (row) => {
         const opinion = row.opinion;
 
-        // Get vote counts
-        const [voteCounts] = await db
-          .select({
-            likesCount: sql<number>`COUNT(CASE WHEN ${opinionVotes.voteType} = 'like' THEN 1 END)`,
-            dislikesCount: sql<number>`COUNT(CASE WHEN ${opinionVotes.voteType} = 'dislike' THEN 1 END)`
-          })
-          .from(opinionVotes)
-          .where(eq(opinionVotes.opinionId, opinion.id));
-
         // Get user's vote if logged in
         let userVote = null;
         if (currentUserId) {
@@ -360,8 +351,8 @@ export class OpinionRepository {
 
         return {
           ...opinion,
-          likesCount: voteCounts?.likesCount || 0,
-          dislikesCount: voteCounts?.dislikesCount || 0,
+          likesCount: Number(opinion.likesCount) || 0,
+          dislikesCount: Number(opinion.dislikesCount) || 0,
           fallacyCounts: fallacyCountsMap.get(opinion.id) || {},
           userVote,
           author: row.author ? {
@@ -422,7 +413,7 @@ export class OpinionRepository {
       .leftJoin(users, eq(opinions.userId, users.id))
       .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
       .where(and(...whereConditions))
-      .orderBy(desc(opinions.createdAt))
+      .orderBy(desc(opinions.createdAt), desc(opinions.id))
       .limit(limit);
 
     if (baseOpinions.length === 0) {
@@ -439,14 +430,6 @@ export class OpinionRepository {
       baseOpinions.map(async (row) => {
         const opinion = row.opinion;
 
-        const [voteCounts] = await db
-          .select({
-            likesCount: sql<number>`COUNT(CASE WHEN ${opinionVotes.voteType} = 'like' THEN 1 END)`,
-            dislikesCount: sql<number>`COUNT(CASE WHEN ${opinionVotes.voteType} = 'dislike' THEN 1 END)`
-          })
-          .from(opinionVotes)
-          .where(eq(opinionVotes.opinionId, opinion.id));
-
         let userVote = null;
         if (currentUserId) {
           const [vote] = await db
@@ -462,8 +445,8 @@ export class OpinionRepository {
 
         return {
           ...opinion,
-          likesCount: voteCounts?.likesCount || 0,
-          dislikesCount: voteCounts?.dislikesCount || 0,
+          likesCount: Number(opinion.likesCount) || 0,
+          dislikesCount: Number(opinion.dislikesCount) || 0,
           fallacyCounts: fallacyCountsMap.get(opinion.id) || {},
           userVote,
           author: row.author ? {
@@ -596,22 +579,41 @@ export class OpinionRepository {
     }
   }
 
-  async voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike' | null): Promise<void> {
-    if (voteType === null) {
-      // Remove vote
-      await db
-        .delete(opinionVotes)
-        .where(and(eq(opinionVotes.opinionId, opinionId), eq(opinionVotes.userId, userId)));
-    } else {
-      // Add or update vote
-      await db
-        .insert(opinionVotes)
-        .values({ opinionId, userId, voteType })
-        .onConflictDoUpdate({
-          target: [opinionVotes.opinionId, opinionVotes.userId],
-          set: { voteType },
-        });
-    }
+  /**
+   * Record/remove a vote and re-sync the denormalized likes_count/dislikes_count
+   * columns from opinion_votes in the same transaction. Returns fresh counts.
+   */
+  async voteOnOpinion(opinionId: string, userId: string, voteType: 'like' | 'dislike' | null): Promise<{ topicId: string | null; likesCount: number; dislikesCount: number }> {
+    return await db.transaction(async (tx) => {
+      if (voteType === null) {
+        await tx
+          .delete(opinionVotes)
+          .where(and(eq(opinionVotes.opinionId, opinionId), eq(opinionVotes.userId, userId)));
+      } else {
+        await tx
+          .insert(opinionVotes)
+          .values({ opinionId, userId, voteType })
+          .onConflictDoUpdate({
+            target: [opinionVotes.opinionId, opinionVotes.userId],
+            set: { voteType },
+          });
+      }
+      const [counts] = await tx
+        .select({
+          likesCount: sql<number>`COUNT(CASE WHEN ${opinionVotes.voteType} = 'like' THEN 1 END)::int`,
+          dislikesCount: sql<number>`COUNT(CASE WHEN ${opinionVotes.voteType} = 'dislike' THEN 1 END)::int`,
+        })
+        .from(opinionVotes)
+        .where(eq(opinionVotes.opinionId, opinionId));
+      const likesCount = Number(counts?.likesCount) || 0;
+      const dislikesCount = Number(counts?.dislikesCount) || 0;
+      const [updated] = await tx
+        .update(opinions)
+        .set({ likesCount, dislikesCount })
+        .where(eq(opinions.id, opinionId))
+        .returning({ topicId: opinions.topicId });
+      return { topicId: updated?.topicId ?? null, likesCount, dislikesCount };
+    });
   }
 
   async getUserVoteOnOpinion(opinionId: string, userId: string, requestingUserId?: string, req?: Request): Promise<any | undefined> {
@@ -708,7 +710,7 @@ export class OpinionRepository {
         eq(opinions.status, 'approved'),
         sql`(${opinions.topicEconomicScore} IS NULL OR ${opinions.topicAuthoritarianScore} IS NULL)`
       ))
-      .orderBy(desc(opinions.createdAt))
+      .orderBy(desc(opinions.createdAt), desc(opinions.id))
       .limit(limit || 1000);
     
     return opinionsList;
@@ -756,7 +758,7 @@ export class OpinionRepository {
       .from(opinions)
       .leftJoin(users, eq(opinions.userId, users.id))
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
-      .orderBy(desc(opinions.createdAt))
+      .orderBy(desc(opinions.createdAt), desc(opinions.id))
       .limit(limit);
 
     return baseOpinions.map(row => ({

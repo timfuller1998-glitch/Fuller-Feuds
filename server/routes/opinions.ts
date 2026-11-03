@@ -140,15 +140,23 @@ router.patch('/:opinionId', isAuthenticated, async (req, res) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
     const requestingUserRole = req.userRole;
+    // Only user-editable fields; prevents clients from patching likesCount etc.
+    const patch = insertOpinionSchema
+      .pick({ content: true, debateStatus: true, references: true, stance: true })
+      .partial()
+      .parse(req.body ?? {});
     const opinion = await opinionService.updateOpinion(
       req.params.opinionId,
-      req.body,
+      patch,
       requestingUserId,
       requestingUserRole,
       req
     );
     res.json(opinion);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid data', details: error.errors });
+    }
     if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
       return res.status(error.statusCode).json({ error: error.message, code: error.code });
     }
@@ -167,12 +175,12 @@ router.post('/:opinionId/vote', isAuthenticated, async (req, res) => {
       return res.status(400).json({ message: "Invalid vote type" });
     }
 
-    await opinionService.voteOnOpinion(req.params.opinionId, userId, voteType);
+    const counts = await opinionService.voteOnOpinion(req.params.opinionId, userId, voteType);
     
     // Invalidate vote cache
     await invalidateVoteCache(req.params.opinionId, userId);
     
-    res.json({ message: voteType === null ? "Vote removed" : "Vote recorded" });
+    res.json({ message: voteType === null ? "Vote removed" : "Vote recorded", likesCount: counts.likesCount, dislikesCount: counts.dislikesCount, userVote: voteType ? { voteType } : null });
   } catch (error) {
     console.error("Error voting on opinion:", error);
     res.status(500).json({ message: "Failed to vote on opinion" });

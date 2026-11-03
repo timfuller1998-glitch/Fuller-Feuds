@@ -42,6 +42,7 @@ const opinionFormSchema = insertOpinionSchema.omit({
   content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
   debateStatus: z.enum(["open", "closed", "private"], { required_error: "Please select debate availability" }),
   references: z.array(z.string().url("Must be a valid URL")).optional().default([]),
+  stance: z.enum(["for", "against", "neutral"], { required_error: "Pick a stance", invalid_type_error: "Pick a stance" }),
 });
 
 type CounterpointCountRow = { sentenceIndex: number; count: number };
@@ -868,6 +869,7 @@ export default function Topic() {
                     opinionForm.setValue("content", userOpinion.content);
                     opinionForm.setValue("debateStatus", (userOpinion.debateStatus || "open") as any);
                     opinionForm.setValue("references", userOpinion.references || []);
+                    opinionForm.setValue("stance", (userOpinion.stance ?? undefined) as any);
                     setShowOpinionForm(true);
                   }}
                 >
@@ -1266,6 +1268,29 @@ export default function Topic() {
           </DialogHeader>
           <Form {...opinionForm}>
             <form onSubmit={opinionForm.handleSubmit(onSubmitOpinion)} className="space-y-4">
+              <FormField
+                control={opinionForm.control}
+                name="stance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Stance</FormLabel>
+                    <FormControl>
+                      <ToggleGroup
+                        type="single"
+                        value={field.value ?? ""}
+                        onValueChange={(v) => { if (v) field.onChange(v); }}
+                        className="grid grid-cols-3 gap-2"
+                        data-testid="picker-stance"
+                      >
+                        <ToggleGroupItem value="for" variant="outline" className="data-[state=on]:bg-emerald-600 data-[state=on]:text-white" data-testid="option-stance-for">For</ToggleGroupItem>
+                        <ToggleGroupItem value="against" variant="outline" className="data-[state=on]:bg-red-600 data-[state=on]:text-white" data-testid="option-stance-against">Against</ToggleGroupItem>
+                        <ToggleGroupItem value="neutral" variant="outline" className="data-[state=on]:bg-slate-500 data-[state=on]:text-white" data-testid="option-stance-neutral">Neutral</ToggleGroupItem>
+                      </ToggleGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={opinionForm.control}
                 name="debateStatus"

@@ -123,7 +123,7 @@ function AppWithSidebar({
           )}
           <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} />
         </header>
-        <main className={`flex-1 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-20 ${location === "/" ? "overflow-y-hidden relative" : "overflow-y-auto"}`}>
+        <main className={`flex-1 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-[calc(5rem+env(safe-area-inset-bottom))] ${location === "/" ? "overflow-y-hidden relative" : "overflow-y-auto"}`}>
           <div className={`max-w-7xl mx-auto w-full ${location === "/" ? "h-full relative" : ""}`}>
             <Router />
           </div>

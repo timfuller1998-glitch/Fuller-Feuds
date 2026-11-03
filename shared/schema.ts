@@ -96,6 +96,7 @@ export const opinions = pgTable("opinions", {
   content: text("content").notNull(),
   status: varchar("status", { length: 20 }).default("approved"), // 'pending', 'approved', 'flagged', 'hidden'
   debateStatus: debateStatusEnum("debate_status").default("open").notNull(),
+  stance: varchar("stance", { length: 10 }).$type<"for" | "against" | "neutral">(), // nullable = unstated; CHECK in migration 0006
   references: text("references").array().default(sql`ARRAY[]::text[]`), // Reference links/URLs
   topicEconomicScore: integer("topic_economic_score"), // -100 (capitalist) to +100 (socialist) - this opinion's political stance on economic axis
   topicAuthoritarianScore: integer("topic_authoritarian_score"), // -100 (libertarian) to +100 (authoritarian) - this opinion's political stance on authoritarian axis
@@ -439,7 +440,10 @@ export const insertTopicSchema = createInsertSchema(topics).omit({
   stance: z.string().optional(), // Accept but ignore - will be removed in future
 });
 
-export const insertOpinionSchema = createInsertSchema(opinions).omit({
+export const opinionStanceValues = ["for", "against", "neutral"] as const;
+export const insertOpinionSchema = createInsertSchema(opinions, {
+  stance: z.enum(opinionStanceValues).nullable().optional(),
+}).omit({
   id: true,
   likesCount: true,
   dislikesCount: true,
