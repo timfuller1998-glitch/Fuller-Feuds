@@ -1,3 +1,26 @@
+## 2026-11-03 (14:45 CST, America/Chicago) — Badges + Rankings (branch feat/profile-cleanup, PR #4)
+Made by the Fuller Feuds Dev bot (Grok Bot). Not merged.
+- `GET /api/users/:id/badges` is now real. It returns every badge definition with `unlockedAt`, `isSelected` and `progress {current, required}`. Badges are awarded lazily on read (`BadgeRepository.checkAndAwardBadges`), computed from existing tables, so past activity counts with no backfill. Earned badges are permanent (`user_badges`, ON CONFLICT DO NOTHING).
+  - Opinions: count of opinions that aren't hidden or flagged (1/10/50/100).
+  - Debates: debate rooms the user took part in (1/10/50/100).
+  - Topics: topics created (1/10/25).
+  - Quality: 10 or 25 debates, at least one message, and under 5% or 3% of messages flagged for fallacies.
+  - NEW community badges: likes received from others (5/50) and followers (1/10).
+- `POST /api/users/me/selected-badge` is implemented (it was a stub). It only allows badges you've earned, and the chosen badge shows on the avatar.
+- NEW `GET /api/leaderboards?userId=&topicId=&limit=` (server/routes/leaderboards.ts). Categories:
+  - Most Liked: likes received, self-likes excluded.
+  - Most Active: opinions + counterpoints + debate messages.
+  - Most Followers.
+  - Top Topic Creators.
+  - Ranks use RANK(), so ties share a position. Only active users with a value above 0 are ranked. `me` carries the requested user's rank even outside the top N. With `topicId`, only Most Liked and Most Active are returned, scoped to that topic.
+- Profile:
+  - The Badges button (earned/total) and dialog are back, split into Earned and Locked, with progress bars and "Show on avatar".
+  - The Rankings button is back and shows the user's best rank (e.g. "#1 Rank · Liked").
+  - NEW LeaderboardsDialog component: tabs per category, a "You are #N of M" summary, a highlighted own row (appended below the top 10 if outside it), and rows that link to profiles.
+- Migration `migrations/0007_community_badges.sql` (applied to the local DB only): inserts the 4 community badge rows and adds the index `idx_opinion_votes_opinion_type`. Data and index only, no schema change.
+- Local demo data: `scripts/seed-local-gamification.sql` (LOCAL ONLY; adds 6 users, opinions, likes, follows and 1 debate).
+- Media: /workspace/ff-videos/pr4/expanded/ (390 and 1366 screenshots, plus badges-rankings-mobile.mp4)
+
 ## 2026-11-03 (14:15 CST, America/Chicago) — Profile page cleanup (branch feat/profile-cleanup)
 Made by the Fuller Feuds Dev bot (Grok Bot). Not merged.
 - Security: `GET /api/profile/:id` no longer returns `passwordHash` (it was included when you viewed your own profile). The followers and following lists no longer include emails, and the modals don't display them.

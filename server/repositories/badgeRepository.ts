@@ -1,7 +1,17 @@
 import { db } from '../db.js';
-import { badges, userBadges, users, debateRooms, opinions, topics, debateMessages, debateMessageFlags } from '../../shared/schema.js';
-import { eq, and, or, count, asc, inArray } from 'drizzle-orm';
+import { badges, userBadges, users } from '../../shared/schema.js';
+import { eq, and, asc, sql } from 'drizzle-orm';
 import { BADGE_DEFINITIONS } from '../../shared/badgeDefinitions.js';
+
+export interface UserBadgeStats {
+  debateCount: number;
+  opinionCount: number;
+  topicCount: number;
+  likesReceived: number;
+  followerCount: number;
+  messageCount: number;
+  fallacyRate: number;
+}
 
 export class BadgeRepository {
   async initializeBadges(): Promise<void> {
@@ -23,147 +33,100 @@ export class BadgeRepository {
     return await db.select().from(badges).orderBy(asc(badges.category), asc(badges.tier));
   }
 
+  /**
+   * Activity stats used for badge awards, computed live from existing tables so that
+   * historical activity counts without any backfill.
+   */
+  async getUserStats(userId: string): Promise<UserBadgeStats> {
+    const result: any = await db.execute(sql`
+      SELECT
+        (SELECT COUNT(*)::int FROM debate_rooms WHERE participant1_id = ${userId} OR participant2_id = ${userId}) AS debates,
+        (SELECT COUNT(*)::int FROM opinions WHERE user_id = ${userId} AND COALESCE(status, 'approved') NOT IN ('hidden', 'flagged')) AS opinions,
+        (SELECT COUNT(*)::int FROM topics WHERE created_by_id = ${userId}) AS topics,
+        (SELECT COUNT(*)::int FROM opinion_votes v JOIN opinions o ON o.id = v.opinion_id
+           WHERE o.user_id = ${userId} AND v.vote_type = 'like' AND v.user_id <> ${userId}) AS likes,
+        (SELECT COUNT(*)::int FROM user_follows WHERE following_id = ${userId}) AS followers,
+        (SELECT COUNT(*)::int FROM debate_messages WHERE user_id = ${userId}) AS messages,
+        (SELECT COUNT(DISTINCT f.message_id)::int FROM debate_message_flags f
+           JOIN debate_messages m ON m.id = f.message_id WHERE m.user_id = ${userId}) AS flagged
+    `);
+    const r = (result.rows ?? result)[0] ?? {};
+    const messages = Number(r.messages || 0);
+    const flagged = Number(r.flagged || 0);
+    return {
+      debateCount: Number(r.debates || 0),
+      opinionCount: Number(r.opinions || 0),
+      topicCount: Number(r.topics || 0),
+      likesReceived: Number(r.likes || 0),
+      followerCount: Number(r.followers || 0),
+      messageCount: messages,
+      fallacyRate: messages > 0 ? (flagged / messages) * 100 : 0,
+    };
+  }
+
+  /** Progress toward a badge: current value vs. required value (quality badges count debates). */
+  progressFor(badge: { id: string; requirement: number; requirementType: string }, stats: UserBadgeStats) {
+    switch (badge.requirementType) {
+      case 'debate_count': return { current: stats.debateCount, required: badge.requirement };
+      case 'opinion_count': return { current: stats.opinionCount, required: badge.requirement };
+      case 'topic_count': return { current: stats.topicCount, required: badge.requirement };
+      case 'likes_received': return { current: stats.likesReceived, required: badge.requirement };
+      case 'follower_count': return { current: stats.followerCount, required: badge.requirement };
+      case 'low_fallacy_rate': return { current: stats.debateCount, required: badge.requirement };
+      default: return { current: 0, required: badge.requirement };
+    }
+  }
+
+  qualifies(badge: { id: string; requirement: number; requirementType: string }, stats: UserBadgeStats): boolean {
+    const { current, required } = this.progressFor(badge, stats);
+    if (current < required) return false;
+    if (badge.requirementType === 'low_fallacy_rate') {
+      // Quality badges also need real debate messages and a low share of flagged ones.
+      const maxRate = badge.id === 'master_debater' ? 3 : 5;
+      return stats.messageCount > 0 && stats.fallacyRate < maxRate;
+    }
+    return true;
+  }
+
+  /** All badge definitions with this user's unlock state, selection and progress. Awards first. */
   async getUserBadges(userId: string): Promise<any[]> {
-    // Get user's selected badge ID
+    await this.checkAndAwardBadges(userId);
+    const stats = await this.getUserStats(userId);
+
     const [user] = await db
       .select({ selectedBadgeId: users.selectedBadgeId })
       .from(users)
       .where(eq(users.id, userId));
-
     const selectedBadgeId = user?.selectedBadgeId;
 
-    // Get all badge definitions
     const allBadges = await db.select().from(badges).orderBy(asc(badges.category), asc(badges.tier));
-
-    // Get unlocked badges for this user
-    const unlockedBadges = await db
-      .select({
-        badgeId: userBadges.badgeId,
-        unlockedAt: userBadges.unlockedAt,
-      })
+    const unlocked = await db
+      .select({ badgeId: userBadges.badgeId, unlockedAt: userBadges.unlockedAt })
       .from(userBadges)
       .where(eq(userBadges.userId, userId));
+    const unlockedMap = new Map(unlocked.map((ub) => [ub.badgeId, ub.unlockedAt]));
 
-    // Create a map of unlocked badges
-    const unlockedMap = new Map(unlockedBadges.map(ub => [ub.badgeId, ub.unlockedAt]));
-
-    // Return all badges with unlock status and selection status
-    return allBadges.map(badge => ({
+    return allBadges.map((badge) => ({
       ...badge,
       badgeId: badge.id,
-      icon: badge.icon,
-      name: badge.name,
-      description: badge.description,
-      category: badge.category,
       unlockedAt: unlockedMap.get(badge.id) || null,
       isSelected: selectedBadgeId === badge.id,
+      progress: this.progressFor(badge, stats),
     }));
   }
 
+  /** Awards any badges the user now qualifies for. Badges are permanent once earned. */
   async checkAndAwardBadges(userId: string): Promise<string[]> {
-    const newlyAwardedBadges: string[] = [];
-
-    // Get user stats
-    const debateCount = await db
-      .select({ count: count() })
-      .from(debateRooms)
-      .where(
-        or(
-          eq(debateRooms.participant1Id, userId),
-          eq(debateRooms.participant2Id, userId)
-        )
-      );
-
-    const opinionCount = await db
-      .select({ count: count() })
-      .from(opinions)
-      .where(eq(opinions.userId, userId));
-
-    const topicCount = await db
-      .select({ count: count() })
-      .from(topics)
-      .where(eq(topics.createdById, userId));
-
-    // Calculate fallacy rate for quality badges
-    const userMessages = await db
-      .select({ id: debateMessages.id })
-      .from(debateMessages)
-      .where(eq(debateMessages.userId, userId));
-
-    const totalMessages = userMessages.length;
-    let flaggedMessagesCount = 0;
-
-    if (totalMessages > 0) {
-      const flaggedMessages = await db
-        .select({ count: count() })
-        .from(debateMessageFlags)
-        .where(
-          inArray(
-            debateMessageFlags.messageId,
-            userMessages.map((m) => m.id)
-          )
-        );
-      flaggedMessagesCount = Number(flaggedMessages[0]?.count || 0);
-    }
-
-    const fallacyRate = totalMessages > 0 ? (flaggedMessagesCount / totalMessages) * 100 : 0;
-
-    const stats = {
-      debateCount: Number(debateCount[0]?.count || 0),
-      opinionCount: Number(opinionCount[0]?.count || 0),
-      topicCount: Number(topicCount[0]?.count || 0),
-      fallacyRate,
-    };
-
-    // Check each badge
-    for (const badge of BADGE_DEFINITIONS) {
-      let qualifies = false;
-
-      switch (badge.requirementType) {
-        case "debate_count":
-          qualifies = stats.debateCount >= badge.requirement;
-          break;
-        case "opinion_count":
-          qualifies = stats.opinionCount >= badge.requirement;
-          break;
-        case "topic_count":
-          qualifies = stats.topicCount >= badge.requirement;
-          break;
-        case "low_fallacy_rate":
-          // For quality badges, check debate count and fallacy rate
-          if (badge.id === "logical_thinker") {
-            qualifies = stats.debateCount >= 10 && stats.fallacyRate < 5;
-          } else if (badge.id === "master_debater") {
-            qualifies = stats.debateCount >= 25 && stats.fallacyRate < 3;
-          }
-          break;
-      }
-
-      if (qualifies) {
-        // Check if user already has this badge
-        const existingBadge = await db
-          .select()
-          .from(userBadges)
-          .where(
-            and(
-              eq(userBadges.userId, userId),
-              eq(userBadges.badgeId, badge.id)
-            )
-          )
-          .limit(1);
-
-        if (existingBadge.length === 0) {
-          // Award the badge
-          await db.insert(userBadges).values({
-            userId,
-            badgeId: badge.id,
-          });
-          newlyAwardedBadges.push(badge.id);
-        }
-      }
-    }
-
-    return newlyAwardedBadges;
+    const stats = await this.getUserStats(userId);
+    const allBadges = await db.select().from(badges);
+    const earned = allBadges.filter((b) => this.qualifies(b, stats)).map((b) => b.id);
+    if (earned.length === 0) return [];
+    const inserted = await db
+      .insert(userBadges)
+      .values(earned.map((badgeId) => ({ userId, badgeId })))
+      .onConflictDoNothing()
+      .returning({ badgeId: userBadges.badgeId });
+    return inserted.map((r) => r.badgeId);
   }
 
   async setSelectedBadge(userId: string, badgeId: string | null): Promise<void> {

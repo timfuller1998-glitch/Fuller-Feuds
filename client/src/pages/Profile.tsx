@@ -15,6 +15,7 @@ import TopicCard from "@/components/TopicCard";
 import { CardContainer } from "@/components/CardContainer";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import CardDeck from "@/components/CardDeck";
+import LeaderboardsDialog, { useLeaderboards, bestRank } from "@/components/LeaderboardsDialog";
 import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
 import { useAuth } from "@/hooks/useAuth";
 import * as LucideIcons from "lucide-react";
@@ -28,6 +29,7 @@ import {
   Lock,
   Check,
   ChevronRight,
+  BarChart3,
   Star,
   MessageSquare,
   Lightbulb
@@ -79,6 +81,7 @@ export default function Profile() {
   const { user: currentUser } = useAuth();
   const [showBadgesModal, setShowBadgesModal] = useState(false);
   const [opinionIndex, setOpinionIndex] = useState(0);
+  const [showLeaderboardsModal, setShowLeaderboardsModal] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [showFollowingModal, setShowFollowingModal] = useState(false);
 
@@ -162,6 +165,13 @@ export default function Profile() {
     },
     enabled: !!userId,
   });
+
+  const earnedBadges = userBadges.filter((b: any) => b.unlockedAt);
+  const lockedBadges = userBadges.filter((b: any) => !b.unlockedAt);
+
+  // Rankings summary for the profile button (full board loads in the dialog)
+  const { data: leaderboards } = useLeaderboards(userId);
+  const topRank = bestRank(leaderboards);
 
   // Follow/unfollow mutation
   const followMutation = useMutation({
@@ -348,7 +358,6 @@ export default function Profile() {
 
                 {/* Inline Stats - Only 4 Clickable Stats */}
                 <div className="flex flex-wrap gap-2 sm:gap-3 pt-2">
-                  {userBadges.length > 0 && (
                   <button 
                     className="text-center hover-elevate active-elevate-2 rounded-md px-3 py-2 transition-colors border"
                     onClick={() => setShowBadgesModal(true)}
@@ -357,12 +366,24 @@ export default function Profile() {
                     <div className="flex items-center gap-2">
                       <Trophy className="w-4 h-4" />
                       <div>
-                        <div className="text-sm font-bold">{userBadges.filter((b: any) => b.unlockedAt).length}/{userBadges.length}</div>
+                        <div className="text-sm font-bold">{earnedBadges.length}/{userBadges.length}</div>
                         <div className="text-xs text-muted-foreground">Badges</div>
                       </div>
                     </div>
                   </button>
-                  )}
+                  <button
+                    className="text-center hover-elevate active-elevate-2 rounded-md px-3 py-2 transition-colors border"
+                    onClick={() => setShowLeaderboardsModal(true)}
+                    data-testid="button-leaderboards"
+                  >
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4" />
+                      <div>
+                        <div className="text-sm font-bold">{topRank ? `#${topRank.me!.rank}` : "—"}</div>
+                        <div className="text-xs text-muted-foreground">{topRank ? `Rank · ${topRank.title.replace(/^(Most|Top) /, "")}` : "Rankings"}</div>
+                      </div>
+                    </div>
+                  </button>
                   <button 
                     className="text-center hover-elevate active-elevate-2 rounded-md px-3 py-2 transition-colors border"
                     onClick={() => setShowFollowersModal(true)}
@@ -637,89 +658,90 @@ export default function Profile() {
 
       {/* Badges Modal */}
       <Dialog open={showBadgesModal} onOpenChange={setShowBadgesModal}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-3xl max-h-[85dvh] overflow-y-auto p-4 sm:p-6" data-testid="dialog-badges">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Trophy className="w-5 h-5" />
               Badges
             </DialogTitle>
             <DialogDescription>
-              {isOwnProfile 
-                ? `You've unlocked ${userBadges.filter((b: any) => b.unlockedAt).length} of ${userBadges.length} badges`
-                : `${user.firstName} has unlocked ${userBadges.filter((b: any) => b.unlockedAt).length} of ${userBadges.length} badges`}
+              {isOwnProfile
+                ? `You've earned ${earnedBadges.length} of ${userBadges.length} badges`
+                : `${user.firstName} has earned ${earnedBadges.length} of ${userBadges.length} badges`}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-4">
-            {userBadges.map((userBadge: any) => {
-              const isUnlocked = !!userBadge.unlockedAt;
-              const isSelected = userBadge.isSelected;
-              const IconComponent = (LucideIcons as any)[userBadge.icon] || Trophy;
-              
-              return (
-                <div
-                  key={userBadge.badgeId}
-                  className={`relative p-4 border rounded-lg transition-all ${
-                    isUnlocked 
-                      ? 'bg-card hover-elevate active-elevate-2' 
-                      : 'bg-muted/30 opacity-60'
-                  } ${isSelected ? 'ring-2 ring-primary' : ''}`}
-                  data-testid={`badge-${userBadge.badgeId}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                      isUnlocked ? 'bg-primary/10' : 'bg-muted'
-                    }`}>
-                      {isUnlocked ? (
-                        <IconComponent className="w-6 h-6 text-primary" />
-                      ) : (
-                        <Lock className="w-6 h-6 text-muted-foreground" />
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-semibold text-sm">{userBadge.name}</h3>
-                        {isSelected && (
-                          <Badge variant="default" className="text-xs">
-                            <Check className="w-3 h-3 mr-1" />
-                            Selected
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {userBadge.description}
-                      </p>
-                      
-                      {isUnlocked ? (
-                        <div className="mt-2 flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground">
-                            Unlocked {new Date(userBadge.unlockedAt).toLocaleDateString()}
-                          </p>
-                          {isOwnProfile && (
-                            <Button
-                              size="sm"
-                              variant={isSelected ? "outline" : "default"}
-                              onClick={() => selectBadgeMutation.mutate(isSelected ? null : userBadge.badgeId)}
-                              disabled={selectBadgeMutation.isPending}
-                              data-testid={`button-select-badge-${userBadge.badgeId}`}
-                            >
-                              {isSelected ? 'Deselect' : 'Display'}
-                            </Button>
-                          )}
+          {[{ title: "Earned", list: earnedBadges }, { title: "Locked", list: lockedBadges }].map(({ title, list }) =>
+            list.length === 0 ? null : (
+              <div key={title} className="space-y-2" data-testid={`badges-${title.toLowerCase()}`}>
+                <h3 className="text-sm font-semibold text-muted-foreground">{title} ({list.length})</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {list.map((userBadge: any) => {
+                    const isUnlocked = !!userBadge.unlockedAt;
+                    const isSelected = userBadge.isSelected;
+                    const IconComponent = (LucideIcons as any)[userBadge.icon] || Trophy;
+                    const cur = Math.min(userBadge.progress?.current ?? 0, userBadge.progress?.required ?? 1);
+                    const req = userBadge.progress?.required ?? 1;
+                    return (
+                      <div
+                        key={userBadge.badgeId}
+                        className={`relative p-3 border rounded-lg bg-card ${isUnlocked ? "" : "opacity-75"} ${isSelected ? "ring-2 ring-primary" : ""}`}
+                        data-testid={`badge-${userBadge.badgeId}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${isUnlocked ? "bg-primary/10" : "bg-muted"}`}>
+                            {isUnlocked ? <IconComponent className="w-5 h-5 text-primary" /> : <Lock className="w-5 h-5 text-muted-foreground" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="font-semibold text-sm">{userBadge.name}</h4>
+                              {isSelected && (
+                                <Badge variant="default" className="text-xs"><Check className="w-3 h-3 mr-1" />Shown</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{userBadge.description}</p>
+                            {isUnlocked ? (
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <p className="text-xs text-muted-foreground">
+                                  Earned {new Date(userBadge.unlockedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                </p>
+                                {isOwnProfile && (
+                                  <Button
+                                    size="sm"
+                                    variant={isSelected ? "outline" : "secondary"}
+                                    className="h-7 text-xs"
+                                    onClick={() => selectBadgeMutation.mutate(isSelected ? null : userBadge.badgeId)}
+                                    disabled={selectBadgeMutation.isPending}
+                                    data-testid={`button-select-badge-${userBadge.badgeId}`}
+                                  >
+                                    {isSelected ? "Hide" : "Show on avatar"}
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="mt-2 space-y-1">
+                                <Progress value={(cur / req) * 100} className="h-1.5" />
+                                <p className="text-xs text-muted-foreground">{cur} / {req}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          🔒 Locked
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            )
+          )}
         </DialogContent>
       </Dialog>
+
+      <LeaderboardsDialog
+        open={showLeaderboardsModal}
+        onOpenChange={setShowLeaderboardsModal}
+        userId={userId!}
+        displayName={user.firstName}
+        isOwnProfile={isOwnProfile}
+      />
 
       {/* Followers Modal */}
       <Dialog open={showFollowersModal} onOpenChange={setShowFollowersModal}>

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { UserRepository } from '../repositories/userRepository.js';
+import { BadgeRepository } from '../repositories/badgeRepository.js';
 import { AnalyticsService } from '../services/analyticsService.js';
 import { InteractionRepository } from '../repositories/interactionRepository.js';
 import { TopicService } from '../services/topicService.js';
@@ -10,6 +11,7 @@ import { invalidateUserCache, invalidateUserBadgesCache, invalidateUserDebateSta
 import { isSecurityError } from '../utils/securityErrors.js';
 
 const router = Router();
+const badgeRepository = new BadgeRepository();
 const userRepository = new UserRepository();
 const analyticsService = new AnalyticsService();
 const interactionRepository = new InteractionRepository();
@@ -323,33 +325,30 @@ router.get('/:userId/badges', async (req, res) => {
     if (!userId) {
       return res.status(400).json({ message: "User ID is required" });
     }
-
-    const key = cacheKey('user', userId, 'badges');
-    
-    // Try cache first
-    let badges = await getCache(key);
-    if (!badges) {
-      // Get user's badges from the database
-      // For now, return empty array if no badges exist
-      // TODO: Implement proper badges logic using BadgeRepository
-      badges = [];
-      
-      // Cache for 5 minutes
-      await setCache(key, badges, CACHE_TTL.LONG);
-    }
-    
-    res.json(badges);
+    // Not cached: awarding is lazy (checked on read) and stats are cheap COUNTs.
+    const userBadgeList = await badgeRepository.getUserBadges(userId);
+    res.json(userBadgeList);
   } catch (error) {
     console.error("Error fetching user badges:", error);
     res.status(500).json({ message: "Failed to fetch user badges" });
   }
 });
 
-// POST /api/users/me/selected-badge - Set user's selected badge
+// POST /api/users/me/selected-badge - Set (or clear with null) the badge shown on the user's avatar
 router.post('/me/selected-badge', isAuthenticated, async (req, res) => {
   try {
-    // TODO: Implement badge selection logic
-    res.json({ success: true });
+    const userId = (req.user as Express.User).id;
+    const badgeId = req.body?.badgeId ?? null;
+    if (badgeId !== null && typeof badgeId !== 'string') {
+      return res.status(400).json({ message: "badgeId must be a string or null" });
+    }
+    try {
+      await badgeRepository.setSelectedBadge(userId, badgeId);
+    } catch (e: any) {
+      return res.status(400).json({ message: e?.message || "Badge not unlocked" });
+    }
+    await invalidateUserBadgesCache(userId).catch(() => {});
+    res.json({ success: true, selectedBadgeId: badgeId });
   } catch (error) {
     console.error("Error setting selected badge:", error);
     res.status(500).json({ message: "Failed to set selected badge" });
