@@ -39,6 +39,10 @@ export interface CardDeckProps<T> {
   testId?: string;
   emptyLabel?: string;
   ariaLabel?: string;
+  /** Called with the index of the item on top whenever it changes. */
+  onIndexChange?: (index: number, item: T) => void;
+  /** Index of the card shown on top when the deck mounts. */
+  initialIndex?: number;
 }
 
 /** Built-in 3D flip used when the deck owns the flip (renderBack provided). */
@@ -183,10 +187,10 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
 
 export default function CardDeck<T>({
   items, getKey, renderFront, renderBack, onEmpty, maxWidth = 400, renderBadge, testId,
-  emptyLabel = "No more topics", ariaLabel = "Topic deck",
+  emptyLabel = "No more topics", ariaLabel = "Topic deck", onIndexChange, initialIndex = 0,
 }: CardDeckProps<T>) {
   const topics = items;
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const [forceUnflipSignal, setForceUnflipSignal] = useState(0);
   const [dimensions, setDimensions] = useState(() => getCardDimensions(maxWidth));
@@ -206,6 +210,13 @@ export default function CardDeck<T>({
     if (n > 0 && currentIndex >= n) setCurrentIndex(0);
     if (n === 0) onEmpty?.();
   }, [n, currentIndex, onEmpty]);
+
+  const onIndexChangeRef = useRef(onIndexChange);
+  onIndexChangeRef.current = onIndexChange;
+  useEffect(() => {
+    if (n > 0) onIndexChangeRef.current?.(wrap(currentIndex, n), topics[wrap(currentIndex, n)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, n]);
 
   const reduceMotion = !!useReducedMotion();
   /** Cards still animating out of / into the top spot. Each is its own element keyed by topic id. */
