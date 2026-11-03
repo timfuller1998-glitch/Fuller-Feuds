@@ -30,6 +30,10 @@ import type { FallacyType } from "@shared/fallacies";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
 import { InteractiveSentenceText } from "@/components/InteractiveSentenceText";
 import { getParagraphTextAtIndex } from "@/lib/textSegments";
+import CardDeck from "@/components/CardDeck";
+import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
+import { tallyStances } from "@/lib/stance";
+import { useQueries } from "@tanstack/react-query";
 
 const opinionFormSchema = insertOpinionSchema.omit({
   topicId: true,
@@ -332,10 +336,40 @@ export default function Topic() {
     [otherCpCountByIndex]
   );
 
-  const summaryReferenceInteractionCount = useMemo(() => {
-    const counts = summarySentences.map((s) => s.referencedOpinionIds?.length ?? 0);
+  // Counterpoints attached to the opinions each summary paragraph references (drives the "N counterpoints" badge).
+  const summaryRefIds = useMemo(
+    () => Array.from(new Set(summarySentences.flatMap((s) => s.referencedOpinionIds || []))),
+    [summarySentences]
+  );
+  const summaryRefCountQueries = useQueries({
+    queries: summaryRefIds.map((opId) => ({
+      queryKey: ["/api/opinions", opId, "counterpoint-counts"] as const,
+      queryFn: async () => {
+        const response = await fetch(`/api/opinions/${opId}/counterpoints/counts`);
+        if (!response.ok) throw new Error("Failed to fetch counterpoint counts");
+        return response.json();
+      },
+    })),
+  });
+  const summaryCounterpointCount = useMemo(() => {
+    const totals = new Map<string, number>();
+    summaryRefIds.forEach((opId, k) => {
+      const rows = parseCounterpointCountRows(summaryRefCountQueries[k]?.data);
+      totals.set(opId, rows.reduce((a, r) => a + r.count, 0));
+    });
+    const counts = summarySentences.map((s) => (s.referencedOpinionIds || []).reduce((a, opId) => a + (totals.get(opId) ?? 0), 0));
     return (i: number) => counts[i] ?? 0;
-  }, [summarySentences]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summarySentences, summaryRefIds, summaryRefCountQueries.map((q) => q.dataUpdatedAt).join(",")]);
+
+  const stanceTally = useMemo(() => tallyStances(opinions || []), [opinions]);
+  const headerDescription = useMemo(() => {
+    const d = (topic?.description || "").trim();
+    if (d) return d;
+    const summary = String((cumulativeData as any)?.summary || summarySentences.map((x) => x.text).join(" ")).trim();
+    if (!summary) return "";
+    return summary.length > 220 ? summary.slice(0, 217).replace(/\s+\S*$/, "") + "…" : summary;
+  }, [topic?.description, cumulativeData, summarySentences]);
 
   const { data: likers } = useQuery<{ likerIds: string[] } | null>({
     queryKey: ["/api/counterpoints", selectedCounterpointId, "likers"],
@@ -737,6 +771,23 @@ export default function Topic() {
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight" data-testid="text-topic-title">
           {topic.title}
         </h1>
+        {headerDescription && (
+          <p className="text-base text-muted-foreground leading-relaxed max-w-3xl" data-testid="text-topic-description">
+            {headerDescription}
+          </p>
+        )}
+
+        {/* Stance tally */}
+        <div className="flex items-center gap-2 flex-wrap" data-testid="stance-tally">
+          <Badge className="bg-emerald-600 text-white" data-testid="tally-for">For {stanceTally.for}</Badge>
+          <Badge className="bg-red-600 text-white" data-testid="tally-against">Against {stanceTally.against}</Badge>
+          <Badge className="bg-slate-500 text-white" data-testid="tally-neutral">Neutral {stanceTally.neutral}</Badge>
+          {stanceTally.unstated > 0 && (
+            <span className="text-xs text-muted-foreground" data-testid="tally-unstated">
+              {stanceTally.unstated} without a stance
+            </span>
+          )}
+        </div>
         
         {/* Display fallacy badges if any */}
         {topic.fallacyCounts && Object.keys(topic.fallacyCounts).some(key => (topic.fallacyCounts?.[key] || 0) > 0) && (
@@ -790,8 +841,8 @@ export default function Topic() {
               {cumulativeData ? (
                 <InteractiveSentenceText
                   chunks={summarySentences.map((s) => s?.text ?? "")}
-                  interactionCount={summaryReferenceInteractionCount}
-                  interactionKind="references"
+                  interactionCount={summaryCounterpointCount}
+                  badgeLabel={(n) => `${n} counterpoint${n === 1 ? "" : "s"}`}
                   selectedSentenceIndex={selectedSentenceIndex}
                   onSelectSentence={(idx) => {
                     setSelectedSentenceIndex(idx);
@@ -850,126 +901,67 @@ export default function Topic() {
         </TabsContent>
 
         <TabsContent value="others" className="mt-4">
-          {currentOtherOpinion ? (
-            <Card style={getOpinionGradientStyle(currentOtherOpinion.topicEconomicScore, currentOtherOpinion.topicAuthoritarianScore)}>
-              <CardHeader className="pb-3 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle>Other Opinions</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={otherOpinionIndex <= 0}
-                      onClick={() => {
-                        setOtherOpinionIndex(i => Math.max(0, i - 1));
-                        setSelectedOtherSentenceIndex(null);
-                      }}
-                    >
-                      Prev
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={otherOpinionIndex >= otherOpinions.length - 1}
-                      onClick={() => {
-                        setOtherOpinionIndex(i => Math.min(otherOpinions.length - 1, i + 1));
-                        setSelectedOtherSentenceIndex(null);
-                      }}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={(currentOtherOpinion.userVote?.voteType === "like") ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
+          {otherOpinions.length > 0 ? (
+            <div className="flex justify-center py-2" data-testid="opinion-deck-wrapper">
+              <CardDeck<Opinion>
+                key={id}
+                items={otherOpinions}
+                getKey={(op) => op.id}
+                initialIndex={otherOpinionIndex}
+                onIndexChange={(i) => {
+                  setOtherOpinionIndex(i);
+                  setSelectedOtherSentenceIndex(null);
+                }}
+                maxWidth={420}
+                testId="deck-opinions"
+                ariaLabel="Opinion deck"
+                emptyLabel="No other opinions yet."
+                renderFront={(op) => (
+                  <OpinionDeckFront
+                    op={op as any}
+                    onSelectParagraph={(idx) => {
+                      setSelectedOtherSentenceIndex(idx);
+                      setSheetOpen(true);
+                    }}
+                  />
+                )}
+                renderBack={(op) => (
+                  <OpinionDeckBack
+                    op={op as any}
+                    onVote={(voteType) => {
                       if (!isAuthenticated) {
                         setLoginAction("like");
                         setShowLoginPrompt(true);
                         return;
                       }
-                      voteMutation.mutate({
-                        opinionId: currentOtherOpinion.id,
-                        voteType: "like",
-                        currentVote: currentOtherOpinion.userVote?.voteType || null
-                      });
+                      voteMutation.mutate({ opinionId: op.id, voteType, currentVote: (op as any).userVote?.voteType || null });
                     }}
-                  >
-                    Like ({currentOtherOpinion.likesCount || 0})
-                  </Button>
-                  <Button
-                    variant={(currentOtherOpinion.userVote?.voteType === "dislike") ? "destructive" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      if (!isAuthenticated) {
-                        setLoginAction("like");
-                        setShowLoginPrompt(true);
-                        return;
-                      }
-                      voteMutation.mutate({
-                        opinionId: currentOtherOpinion.id,
-                        voteType: "dislike",
-                        currentVote: currentOtherOpinion.userVote?.voteType || null
-                      });
-                    }}
-                  >
-                    Dislike ({currentOtherOpinion.dislikesCount || 0})
-                  </Button>
-                  <div className="text-sm text-muted-foreground ml-auto">
-                    {otherOpinionIndex + 1} / {otherOpinions.length}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
+                    onAdopt={() => {
                       if (!isAuthenticated) {
                         setLoginAction("opinion");
                         setShowLoginPrompt(true);
                         return;
                       }
-                      setOpinionToAdopt(currentOtherOpinion);
+                      setOpinionToAdopt(op);
                       setShowAdoptDialog(true);
                     }}
-                  >
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Adopt this opinion
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
+                    onFlag={() => {
                       if (!isAuthenticated) {
                         setLoginAction("interact");
                         setShowLoginPrompt(true);
                         return;
                       }
-                      setOtherOpinionFlagTargetId(currentOtherOpinion.id);
+                      setOtherOpinionFlagTargetId(op.id);
                       setOtherOpinionFlagOpen(true);
                     }}
-                  >
-                    <Flag className="w-4 h-4 mr-2" />
-                    Flag for fallacy
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <InteractiveSentenceText
-                  text={currentOtherOpinion.content}
-                  segmentMode="paragraph"
-                  interactionCount={otherParagraphInteractionCount}
-                  selectedSentenceIndex={selectedOtherSentenceIndex}
-                  onSelectSentence={(idx) => {
-                    setSelectedOtherSentenceIndex(idx);
-                    setSheetOpen(true);
-                  }}
-                />
-              </CardContent>
-            </Card>
+                    onSeeCounterpoints={(idx) => {
+                      setSelectedOtherSentenceIndex(idx);
+                      setSheetOpen(true);
+                    }}
+                  />
+                )}
+              />
+            </div>
           ) : (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground">
