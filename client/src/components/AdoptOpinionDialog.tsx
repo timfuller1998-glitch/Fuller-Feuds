@@ -101,8 +101,8 @@ export function AdoptOpinionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-4xl max-h-[calc(100dvh-1.5rem)] p-0 gap-0 flex flex-col overflow-hidden" data-testid="dialog-adopt-opinion">
+        <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 pr-10 border-b flex-shrink-0 text-left">
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
             Adopt Opinion
@@ -114,21 +114,21 @@ export function AdoptOpinionDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 space-y-4" data-testid="adopt-dialog-body">
           {/* Opinion to Adopt */}
           <Card className="border-2 border-primary/20">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <CardTitle className="text-base flex items-center gap-2">
                   Opinion by {opinionToAdopt.authorName}
                 </CardTitle>
                 <Badge variant={stanceBadgeVariant[opinionToAdopt.stance]}>
-                  {stanceText[opinionToAdopt.stance]}
+                  {stanceText[opinionToAdopt.stance] ?? "No stance"}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm leading-relaxed" data-testid="text-opinion-to-adopt">
+              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words max-h-48 overflow-y-auto" data-testid="text-opinion-to-adopt">
                 {opinionToAdopt.content}
               </p>
               <Button
@@ -164,7 +164,7 @@ export function AdoptOpinionDialog({
               {currentOpinion && (
                 <div className="bg-muted/30 p-3 rounded-md">
                   <p className="text-sm text-muted-foreground mb-2">Original content:</p>
-                  <p className="text-sm" data-testid="text-current-opinion">
+                  <p className="text-sm whitespace-pre-wrap break-words max-h-32 overflow-y-auto" data-testid="text-current-opinion">
                     {currentOpinion.content}
                   </p>
                 </div>
@@ -173,21 +173,21 @@ export function AdoptOpinionDialog({
               <div className="space-y-2">
                 <Label htmlFor="opinion-content">
                   Opinion Content
-                  <span className="text-muted-foreground text-sm ml-2">(You can manually copy text or use "Fully Adopt" button)</span>
+                  <span className="block sm:inline text-muted-foreground text-sm sm:ml-2 font-normal">(You can manually copy text or use "Fully Adopt" button)</span>
                 </Label>
                 <Textarea
                   id="opinion-content"
                   value={editedContent}
                   onChange={(e) => setEditedContent(e.target.value)}
                   placeholder="Write or edit your opinion here..."
-                  className="min-h-[300px]"
+                  className="min-h-[160px] sm:min-h-[300px]"
                   data-testid="textarea-opinion-content"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="opinion-stance">Stance</Label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     variant={editedStance === "for" ? "default" : "outline"}
                     size="sm"
@@ -218,7 +218,7 @@ export function AdoptOpinionDialog({
           </Card>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-4 py-3 sm:px-6 border-t flex-shrink-0 flex-row justify-end gap-2 bg-background">
           <Button 
             variant="ghost" 
             onClick={() => onOpenChange(false)}
