@@ -51,7 +51,6 @@ async function listFollowUsers(
       id: sanitized.id,
       firstName: sanitized.firstName,
       lastName: sanitized.lastName,
-      email: sanitized.email,
       profileImageUrl: sanitized.profileImageUrl,
     };
   });
@@ -143,9 +142,11 @@ router.get('/:userId', async (req, res) => {
       req
     );
 
-    let responseUser: any = user;
+    // Never send credential fields to the client (the row includes passwordHash).
+    const { passwordHash: _ph, ...safeUser } = user as any;
+    let responseUser: any = safeUser;
     if (!isAdmin) {
-      const { isSynthetic, ...rest } = user as any;
+      const { isSynthetic, ...rest } = safeUser;
       responseUser = rest;
     }
 
