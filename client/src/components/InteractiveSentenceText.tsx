@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { MessageSquareReply } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { splitIntoParagraphs } from "@/lib/textSegments";
 
@@ -19,42 +20,6 @@ function splitIntoSentences(text: string): Sentence[] {
   return parts.map((p, idx) => ({ index: idx, text: p }));
 }
 
-/** Last sentence-ending punctuation in the paragraph (for anchoring the count chip). */
-function splitAtLastSentencePunct(text: string): { before: string; punct: string; tail: string } {
-  let best = -1;
-  let punctChar = "";
-  for (let i = text.length - 1; i >= 0; i--) {
-    const c = text[i];
-    if (c === "." || c === "!" || c === "?") {
-      best = i;
-      punctChar = c;
-      break;
-    }
-  }
-  if (best < 0) return { before: text, punct: "", tail: "" };
-  return {
-    before: text.slice(0, best),
-    punct: punctChar,
-    tail: text.slice(best + 1),
-  };
-}
-
-function EndCountChip({
-  n,
-  title,
-}: {
-  n: number;
-  title: string;
-}) {
-  return (
-    <span className="pointer-events-none inline-flex align-baseline" title={title}>
-      <span className="ml-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-semibold tabular-nums text-secondary-foreground ring-1 ring-border">
-        {n > 99 ? "99+" : n}
-      </span>
-    </span>
-  );
-}
-
 export function InteractiveSentenceText(props: {
   text?: string;
   chunks?: string[];
@@ -67,6 +32,10 @@ export function InteractiveSentenceText(props: {
   sentenceClassName?: string;
   selectedSentenceClassName?: string;
   renderAfterSentence?: (sentence: Sentence) => React.ReactNode;
+  /** Override the badge text for a paragraph with n interactions. */
+  badgeLabel?: (n: number) => string;
+  /** When false, only the badge is tappable (e.g. inside a flippable card). Default true. */
+  paragraphsClickable?: boolean;
 }) {
   const stacked = props.chunks !== undefined || props.segmentMode === "paragraph";
 
@@ -95,57 +64,54 @@ export function InteractiveSentenceText(props: {
         <span className="text-muted-foreground">No text yet.</span>
       ) : stacked ? (
         sentences.map((s) => {
-          const isSelected = props.selectedSentenceIndex === s.index;
           const n = props.interactionCount?.(s.index) ?? 0;
-          const hasInteraction = n > 0;
           const kind = props.interactionKind ?? "counterpoints";
-          const badgeTitle =
-            kind === "references"
+          const label =
+            props.badgeLabel?.(n) ??
+            (kind === "references"
               ? `${n} referenced opinion${n === 1 ? "" : "s"}`
-              : `${n} counterpoint${n === 1 ? "" : "s"}`;
-          const { before, punct, tail } = splitAtLastSentencePunct(s.text);
+              : `${n} counterpoint${n === 1 ? "" : "s"}`);
+          const clickable = props.paragraphsClickable !== false;
+          const select = () => props.onSelectSentence(s.index);
 
           return (
-            <span key={s.index} className="block">
+            <div key={s.index} className="mb-5 last:mb-0" data-paragraph-index={s.index}>
               <p
-                role="button"
-                tabIndex={0}
-                onClick={() => props.onSelectSentence(s.index)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") props.onSelectSentence(s.index);
-                }}
-                title={hasInteraction ? badgeTitle : undefined}
+                {...(clickable
+                  ? {
+                      role: "button",
+                      tabIndex: 0,
+                      onClick: select,
+                      onKeyDown: (e: React.KeyboardEvent) => {
+                        if (e.key === "Enter" || e.key === " ") select();
+                      },
+                    }
+                  : {})}
                 className={cn(
-                  "mb-5 cursor-pointer whitespace-pre-wrap transition-colors last:mb-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  props.sentenceClassName,
-                  isSelected && props.selectedSentenceClassName
+                  "whitespace-pre-wrap break-words focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm",
+                  clickable && "cursor-pointer",
+                  props.sentenceClassName
                 )}
               >
-                <span
-                  className={cn(
-                    // Apply highlight only behind the rendered text, not full width.
-                    (hasInteraction || isSelected) && "box-decoration-clone px-1 py-0.5 rounded-sm",
-                    hasInteraction && "bg-primary/[0.08]",
-                    isSelected && "bg-muted/70"
-                  )}
-                >
-                  {punct ? (
-                    <>
-                      <span>{before}</span>
-                      <span>{punct}</span>
-                      {hasInteraction ? <EndCountChip n={n} title={badgeTitle} /> : null}
-                      <span>{tail}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{before}</span>
-                      {hasInteraction ? <EndCountChip n={n} title={badgeTitle} /> : null}
-                    </>
-                  )}
-                </span>
+                {s.text}
               </p>
+              {n > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    select();
+                  }}
+                  className="mt-1.5 inline-flex min-h-[32px] items-center gap-1.5 rounded-full border bg-secondary/60 px-3 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  data-testid={`badge-paragraph-${s.index}`}
+                  aria-label={label}
+                >
+                  <MessageSquareReply className="h-3.5 w-3.5" aria-hidden />
+                  {label}
+                </button>
+              )}
               {props.renderAfterSentence?.(s)}
-            </span>
+            </div>
           );
         })
       ) : (
