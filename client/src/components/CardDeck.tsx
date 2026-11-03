@@ -63,8 +63,12 @@ function FlipFaces({ flipped, onToggle, front, back }: { flipped: boolean; onTog
 }
 
 const getCardDimensions = (maxWidth: number) => {
-  const width = Math.min(window.innerWidth - 34, maxWidth); // 17px gutter each side
-  const height = (width * 7) / 5; // 5:7 playing-card ratio
+  let width = Math.min(window.innerWidth - 34, maxWidth); // 17px gutter each side
+  let height = (width * 7) / 5; // 5:7 playing-card ratio
+  // On short screens, cap by viewport height (header, page title, deck controls and the
+  // footer take ~290px) so the whole deck fits above the footer instead of being clipped.
+  const maxHeight = Math.max(300, window.innerHeight - 290);
+  if (height > maxHeight) { height = maxHeight; width = (height * 5) / 7; }
   return { width, height };
 };
 
