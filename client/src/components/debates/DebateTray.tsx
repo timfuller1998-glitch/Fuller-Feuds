@@ -1,4 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTypingRooms } from "@/lib/typingStore";
+import { TypingBubble } from "./TypingBubble";
+import { StatusDot } from "./DebateStatus";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { MessageSquare } from "lucide-react";
@@ -13,7 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
  */
 type TrayItem = {
   id: string; topicTitle: string; opponentName: string; opponentHandle?: string | null;
-  state: "your_turn" | "waiting" | "rate" | "rated" | "completed"; isNew: boolean; unread: number; activityAt?: string | null;
+  state: "your_turn" | "waiting" | "rate" | "rated" | "completed"; isNew: boolean; unread: number; finished?: boolean; activityAt?: string | null;
 };
 
 const STATE_LABEL: Record<TrayItem["state"], string> = {
@@ -34,21 +37,26 @@ export function DebateTray() {
   });
   const items = data?.items ?? [];
   const unread = data?.unreadCount ?? 0;
-  const active = items.filter((i) => i.state !== "completed");
-  const done = items.filter((i) => i.state === "completed");
+  // Same split as the footer avatars: finished (both rated, or you rated) → Archive section.
+  const isDone = (i: TrayItem) => i.finished ?? (i.state === "completed" || i.state === "rated");
+  const active = items.filter((i) => !isDone(i));
+  const done = items.filter(isDone);
+  const typingRooms = useTypingRooms();
 
   const openRoom = async (item: TrayItem) => {
     setOpen(false);
     setLocation(`/debate-room/${item.id}`);
-    if (item.unread > 0) {
+    if (item.unread > 0 || item.isNew) {
       await apiRequest("POST", `/api/notifications/read-room/${item.id}`, {}).catch(() => {});
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
     }
   };
 
   const markAll = async () => {
     await apiRequest("POST", "/api/notifications/read-all", {}).catch(() => {});
     queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
   };
 
   const row = (d: TrayItem) => {
@@ -73,6 +81,9 @@ export function DebateTray() {
             </div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
+            {typingRooms.has(d.id) && !isDone(d) ? <TypingBubble size="sm" data-testid={`tray-typing-${d.id}`} />
+              : d.isNew ? <StatusDot kind="new" className="w-2.5 h-2.5" data-testid={`tray-dot-new-${d.id}`} />
+              : (d.state === "your_turn" || d.state === "rate") ? <StatusDot kind="needs_you" className="w-2.5 h-2.5" data-testid={`tray-dot-needs-${d.id}`} /> : null}
             <span className={`font-ui text-[0.6rem] uppercase tracking-[0.08em] px-1.5 py-0.5 ${STATE_CLASS[d.state]}`} data-testid="tray-state">{STATE_LABEL[d.state]}</span>
             {d.unread > 0 && <span className="text-[0.65rem] font-bold text-primary">{d.unread} new</span>}
           </div>
@@ -110,7 +121,7 @@ export function DebateTray() {
           {active.length > 0 && <ul className="divide-y" data-testid="list-tray-active">{active.map(row)}</ul>}
           {done.length > 0 && (
             <>
-              <div className="px-3 pt-3 pb-1 font-ui text-[0.65rem] uppercase tracking-[0.1em] text-muted-foreground border-t">Completed</div>
+              <div className="px-3 pt-3 pb-1 font-ui text-[0.65rem] uppercase tracking-[0.1em] text-muted-foreground border-t">Archive</div>
               <ul className="divide-y" data-testid="list-tray-completed">{done.map(row)}</ul>
             </>
           )}

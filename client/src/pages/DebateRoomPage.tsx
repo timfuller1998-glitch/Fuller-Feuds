@@ -20,6 +20,8 @@ import { VotingModal } from "@/components/VotingModal";
 import { useDebateContext } from "@/contexts/DebateContext";
 import type { FallacyType } from "@shared/fallacies";
 import { useDebateRoom } from "@/hooks/useDebateRoom";
+import { useTypingRooms, useTypingSender } from "@/lib/typingStore";
+import { TypingBubble } from "@/components/debates/TypingBubble";
 
 interface DebateRoom {
   id: string;
@@ -78,10 +80,11 @@ export default function DebateRoomPage() {
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{id: string, content: string, timestamp: string}>>([]);
   const [showVotingModal, setShowVotingModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingRooms = useTypingRooms();
+  const typingSender = useTypingSender(roomId);
 
   // WebSocket real-time messaging
-  const { roomState, connectionState, joinRoom, leaveRoom, sendChatMessage, sendTypingEvent } = useDebateRoom();
+  const { roomState, connectionState, joinRoom, leaveRoom, sendChatMessage } = useDebateRoom();
 
   // Fetch debate room
   const { data: room, isLoading: roomLoading } = useQuery<DebateRoom>({
@@ -330,7 +333,10 @@ export default function DebateRoomPage() {
   useEffect(() => {
     if (!roomId || !currentUser) return;
     apiRequest('POST', `/api/notifications/read-room/${roomId}`, {})
-      .then(() => queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }))
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
+      })
       .catch(() => {});
   }, [roomId, currentUser?.id, messages.length, room?.phase, room?.status]);
 
@@ -419,6 +425,9 @@ export default function DebateRoomPage() {
   const isParticipant1 = currentUser?.id === room.participant1Id;
   const currentUserPrivacy = isParticipant1 ? room.participant1Privacy : room.participant2Privacy;
   const isPrivate = currentUserPrivacy === 'private';
+  const opp = isParticipant1 ? participant2 : participant1;
+  const opponentFirstName = opp?.firstName || (opp?.handle ? '@' + opp.handle : 'Opponent');
+  const opponentTypingHere = !!roomId && typingRooms.has(roomId) && room.status === 'active' && room.phase !== 'voting';
 
   return (
     <div className="max-w-5xl mx-auto space-y-4 p-4">
@@ -704,9 +713,10 @@ export default function DebateRoomPage() {
           {isParticipant && !isEnded && (
             <div className="border-t p-4">
               {/* Typing Indicator */}
-              {roomState.opponentTyping && (
-                <div className="text-sm text-muted-foreground mb-2 px-1">
-                  <span className="italic">Opponent is typing...</span>
+              {opponentTypingHere && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2 px-1" data-testid="room-typing">
+                  <TypingBubble label={`${opponentFirstName} is typing`} />
+                  <span>{opponentFirstName} is typing…</span>
                 </div>
               )}
               {/* Turn restriction notice */}
@@ -728,33 +738,14 @@ export default function DebateRoomPage() {
                   value={messageInput}
                   onChange={(e) => {
                     setMessageInput(e.target.value);
-                    
-                    // Send typing event
-                    if (e.target.value.length > 0) {
-                      sendTypingEvent(true);
-                      
-                      // Clear typing timeout and set new one
-                      if (typingTimeoutRef.current) {
-                        clearTimeout(typingTimeoutRef.current);
-                      }
-                      typingTimeoutRef.current = setTimeout(() => {
-                        sendTypingEvent(false);
-                      }, 2000);
-                    } else {
-                      sendTypingEvent(false);
-                      if (typingTimeoutRef.current) {
-                        clearTimeout(typingTimeoutRef.current);
-                      }
-                    }
+                    if (e.target.value.length > 0) typingSender.onKey(); else typingSender.stop();
                   }}
+                  onBlur={typingSender.stop}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSendMessage();
-                      sendTypingEvent(false); // Stop typing when sending
-                      if (typingTimeoutRef.current) {
-                        clearTimeout(typingTimeoutRef.current);
-                      }
+                      typingSender.stop();
                     }
                   }}
                   disabled={
@@ -765,7 +756,7 @@ export default function DebateRoomPage() {
                   data-testid="input-message"
                 />
                 <Button
-                  onClick={handleSendMessage}
+                  onClick={() => { handleSendMessage(); typingSender.stop(); }}
                   disabled={
                     !messageInput.trim() || 
                     sendMessageMutation.isPending ||

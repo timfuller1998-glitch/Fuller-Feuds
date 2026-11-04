@@ -18,6 +18,7 @@ const clientsByUserId = new Map<string, Set<AuthenticatedWebSocket>>();
 // Store clients by WebSocket instance for quick lookup
 const userIdBySocket = new Map<WebSocket, string>();
 // Presence tracking (in-memory)
+const typingLastSent = new Map<string, number>();
 const lastActiveAtByUserId = new Map<string, number>();
 
 let sessionMw: any = null;
@@ -110,32 +111,26 @@ export function setupWebSocketServer(server: any) {
         // Handle different message types
         switch (message.type) {
           case 'typing': {
-            // Broadcast typing indicator to opponent in the debate room
-            const { debateRoomId, isTyping } = message;
-            if (debateRoomId && ws.userId) {
-              // Get opponent ID from debate room
-              try {
-                const { DebateRepository } = await import('./repositories/debateRepository.js');
-                const debateRepo = new DebateRepository();
-                const room = await debateRepo.getDebateRoom(debateRoomId);
-                
-                if (room) {
-                  const opponentId = room.participant1Id === ws.userId 
-                    ? room.participant2Id 
-                    : room.participant1Id;
-                  
-                  if (opponentId) {
-                    sendToUser(opponentId, {
-                      type: 'opponent_typing',
-                      debateRoomId,
-                      isTyping,
-                      userId: ws.userId
-                    });
-                  }
-                }
-              } catch (error: any) {
-                log(`[WebSocket] Error handling typing indicator: ${error.message}`, 'error');
-              }
+            // Relay a typing start/stop to the opponent. Only a participant of an active
+            // (structured-phase) room may send it; server-side throttle of 1 start per second per room.
+            const { debateRoomId } = message;
+            const isTyping = message.isTyping === true;
+            if (typeof debateRoomId !== 'string' || !ws.userId) break;
+            const key = `${ws.userId}:${debateRoomId}`;
+            const now = Date.now();
+            if (isTyping && now - (typingLastSent.get(key) ?? 0) < 1000) break;
+            try {
+              const { DebateRepository } = await import('./repositories/debateRepository.js');
+              const room = await new DebateRepository().getDebateRoom(debateRoomId);
+              if (!room) break;
+              const isParticipant = room.participant1Id === ws.userId || room.participant2Id === ws.userId;
+              if (!isParticipant || room.status !== 'active' || room.phase === 'voting') break;
+              const opponentId = room.participant1Id === ws.userId ? room.participant2Id : room.participant1Id;
+              if (!opponentId) break;
+              if (isTyping) typingLastSent.set(key, now); else typingLastSent.delete(key);
+              sendToUser(opponentId, { type: 'opponent_typing', debateRoomId, isTyping, userId: ws.userId });
+            } catch (error: any) {
+              log(`[WebSocket] Error handling typing indicator: ${error.message}`, 'error');
             }
             break;
           }

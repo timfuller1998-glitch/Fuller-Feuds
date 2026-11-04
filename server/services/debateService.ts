@@ -1,3 +1,4 @@
+import { groupUserDebates } from '../lib/userDebates.js';
 import { DebateRepository } from '../repositories/debateRepository.js';
 import { OpinionRepository } from '../repositories/opinionRepository.js';
 import type { DebateRoom, DebateMessage, InsertDebateVote } from '../../shared/schema.js';
@@ -342,7 +343,8 @@ export class DebateService {
     }
     
     try {
-      const rooms = await this.debateRepository.getGroupedDebateRooms(userId);
+      // Status-driven grouping (dots + archive); replaces the old per-message unread count
+      const rooms = await groupUserDebates(userId);
       
       // Log slow operations
       const duration = Date.now() - startTime;

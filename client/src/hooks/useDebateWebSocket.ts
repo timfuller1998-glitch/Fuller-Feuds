@@ -1,3 +1,4 @@
+import { setOpponentTyping, registerTypingSender } from '@/lib/typingStore';
 import { useEffect, useRef, useCallback } from 'react';
 import { useDebateContext } from '@/contexts/DebateContext';
 import { useToast } from '@/hooks/use-toast';
@@ -125,6 +126,7 @@ export function useDebateWebSocket(userId?: string) {
             console.log('[WebSocket] Successfully authenticated');
             break;
           case 'new_debate_message':
+            if ((data as any).debateRoomId) setOpponentTyping((data as any).debateRoomId, '', false);
             handleNewMessage(data);
             break;
           case 'user_notification':
@@ -139,6 +141,11 @@ export function useDebateWebSocket(userId?: string) {
           case 'notification': {
             // Persisted bell notification: refresh the bell and the affected room, and show a toast.
             const n = data.notification;
+            // Their turn landed (or the debate ended) → they've stopped typing
+            if (n?.debateRoomId) {
+              const typer = (n as any).fromUserId ?? '';
+              setOpponentTyping(n.debateRoomId, typer, false);
+            }
             queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
             if (n?.debateRoomId) {
               queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms', n.debateRoomId] });
@@ -150,7 +157,10 @@ export function useDebateWebSocket(userId?: string) {
             break;
           }
           case 'opponent_typing':
-            // Handle typing indicator in chat components
+            // Feeds the footer avatar "…" bubble and the in-room typing bubble
+            if ((data as any).debateRoomId && (data as any).userId) {
+              setOpponentTyping((data as any).debateRoomId, (data as any).userId, (data as any).isTyping === true);
+            }
             break;
           case 'auth_error': {
             console.error('[WebSocket] Authentication error:', data.message);
@@ -248,6 +258,10 @@ export function useDebateWebSocket(userId?: string) {
       debateRoomId,
       isTyping
     });
+  }, [sendMessage]);
+
+  useEffect(() => {
+    return registerTypingSender(sendMessage);
   }, [sendMessage]);
 
   useEffect(() => {

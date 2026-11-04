@@ -11,6 +11,8 @@ import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTypingRooms, useTypingSender } from '@/lib/typingStore';
+import { TypingBubble } from './TypingBubble';
 
 interface Message {
   id: string;
@@ -109,6 +111,20 @@ export function PopupDebateWindow({
     },
     onError: (err: any) => setSendError(String(err?.message || 'Could not send').replace(/^\d+:\s*/, '').replace(/^\{"message":"(.*)"\}$/, '$1')),
   });
+
+  const typingRooms = useTypingRooms();
+  const opponentTyping = typingRooms.has(debateRoomId);
+  const typingSender = useTypingSender(debateRoomId);
+
+  // Opening the popup counts as opening the debate: clears its green "new" dot and list badges.
+  useEffect(() => {
+    apiRequest('POST', `/api/notifications/read-room/${debateRoomId}`, {})
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/debates/grouped'] });
+      })
+      .catch(() => {});
+  }, [debateRoomId]);
 
   // Mark as read
   useEffect(() => {
@@ -305,6 +321,11 @@ export function PopupDebateWindow({
           Turns are over. Rate your opponent →
         </button>
       )}
+      {opponentTyping && !isOver && (
+        <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground border-t" data-testid="popup-typing">
+          <TypingBubble size="sm" label={`${opponentName} is typing`} /> {opponentName} is typing…
+        </div>
+      )}
       {sendError && <div className="px-3 py-1 text-xs text-destructive border-t" data-testid="text-popup-send-error">{sendError}</div>}
 
       {/* Input */}
@@ -313,8 +334,9 @@ export function PopupDebateWindow({
           <input
             type="text"
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onChange={(e) => { setMessage(e.target.value); if (e.target.value) typingSender.onKey(); else typingSender.stop(); }}
+            onBlur={typingSender.stop}
+            onKeyPress={(e) => { if (e.key === 'Enter') typingSender.stop(); handleKeyPress(e); }}
             placeholder={canSend ? "Type a message..." : waiting ? "Wait for your turn" : "Debate ended"}
             disabled={!canSend || sendMutation.isPending}
             className="flex-1 min-w-0 px-3 py-2 text-base sm:text-sm rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
@@ -322,7 +344,7 @@ export function PopupDebateWindow({
           />
           <Button
             size="icon"
-            onClick={handleSend}
+            onClick={() => { typingSender.stop(); handleSend(); }}
             disabled={!message.trim() || !canSend || sendMutation.isPending}
             data-testid="button-send"
           >
