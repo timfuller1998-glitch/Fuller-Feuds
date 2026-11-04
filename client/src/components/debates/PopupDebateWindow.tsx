@@ -9,6 +9,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Message {
   id: string;
@@ -49,6 +50,24 @@ export function PopupDebateWindow({
   const { minimizeDebateWindow, closeDebateWindow, updateWindowPosition, clearUnread } = useDebateContext();
   const [message, setMessage] = useState('');
   const [position, setPosition] = useState(initialPosition || { x: 100, y: 100 });
+  // Phones: full-screen sheet sized to the visual viewport so the on-screen keyboard never covers the input.
+  const isMobile = useIsMobile();
+  const [viewport, setViewport] = useState<{ height: number; top: number } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!isMobile || !vv) { setViewport(null); return; }
+    const update = () => setViewport({ height: vv.height, top: vv.offsetTop });
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+  }, [isMobile]);
+  useEffect(() => {
+    if (!isMobile) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isMobile]);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -151,22 +170,23 @@ export function PopupDebateWindow({
   return (
     <div 
       ref={windowRef}
-      className="fixed bg-card border rounded-lg shadow-2xl flex flex-col z-50"
-      style={{ 
-        left: `${position.x}px`, 
-        top: `${position.y}px`,
-        width: '400px',
-        height: '500px'
-      }}
+      className={isMobile
+        ? "fixed inset-x-0 bg-card flex flex-col z-[70] pb-[env(safe-area-inset-bottom)]"
+        : "fixed bg-card border rounded-lg shadow-2xl flex flex-col z-50"}
+      style={isMobile
+        ? { top: `${viewport?.top ?? 0}px`, height: viewport ? `${viewport.height}px` : '100dvh', width: '100%' }
+        : { left: `${position.x}px`, top: `${position.y}px`, width: '400px', height: '500px' }}
+      role={isMobile ? 'dialog' : undefined}
+      aria-label={`Debate with ${opponentName}`}
       data-testid={`popup-${debateRoomId}`}
     >
       {/* Header - Draggable */}
       <div 
-        className="flex items-center justify-between p-3 border-b bg-muted/30 cursor-move"
-        onMouseDown={handleMouseDown}
+        className={`flex items-center justify-between p-3 border-b bg-muted/30 ${isMobile ? 'pt-[max(0.75rem,env(safe-area-inset-top))]' : 'cursor-move'}`}
+        onMouseDown={isMobile ? undefined : handleMouseDown}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
+          {!isMobile && <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />}
           <Avatar className="w-8 h-8 border" style={{ borderColor: avatarColor }}>
             <AvatarFallback 
               style={{ 
@@ -186,7 +206,7 @@ export function PopupDebateWindow({
           <Button
             variant="ghost"
             size="icon"
-            className="w-7 h-7"
+            className={isMobile ? "w-10 h-10" : "w-7 h-7"}
             onClick={() => minimizeDebateWindow(debateRoomId)}
             data-testid="button-minimize"
           >
@@ -195,7 +215,7 @@ export function PopupDebateWindow({
           <Button
             variant="ghost"
             size="icon"
-            className="w-7 h-7"
+            className={isMobile ? "w-10 h-10" : "w-7 h-7"}
             onClick={() => closeDebateWindow(debateRoomId)}
             data-testid="button-close"
           >
@@ -222,7 +242,7 @@ export function PopupDebateWindow({
                 className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
               >
                 <div 
-                  className={`max-w-[70%] rounded-lg px-3 py-2 ${
+                  className={`max-w-[80%] sm:max-w-[70%] rounded-lg px-3 py-2 ${
                     isMe 
                       ? 'bg-primary text-primary-foreground' 
                       : 'bg-muted'
@@ -256,7 +276,7 @@ export function PopupDebateWindow({
             onKeyPress={handleKeyPress}
             placeholder={canSend ? "Type a message..." : "Debate ended"}
             disabled={!canSend || sendMutation.isPending}
-            className="flex-1 px-3 py-2 text-sm rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            className="flex-1 min-w-0 px-3 py-2 text-base sm:text-sm rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             data-testid="input-message"
           />
           <Button
