@@ -21,6 +21,7 @@ import { registerServiceWorker } from "@/utils/registerSW";
 import { LoginDialog } from "@/components/LoginDialog";
 import Home from "@/pages/Home";
 import Profile from "@/pages/Profile";
+import HandleRedirect from "@/pages/HandleRedirect";
 import Settings from "@/pages/Settings";
 import Topic from "@/pages/Topic";
 import Trending from "@/pages/Trending";
@@ -56,6 +57,7 @@ function Router() {
       <Route path="/recent-opinions" component={RecentOpinions} />
       <Route path="/topic/:id" component={Topic} />
       <Route path="/profile/:userId" component={Profile} />
+      <Route path="/u/:handle" component={HandleRedirect} />
       <Route path="/live-stream/:id" component={LiveStreamPage} />
       <Route component={NotFound} />
     </Switch>

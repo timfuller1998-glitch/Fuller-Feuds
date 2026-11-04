@@ -37,6 +37,9 @@ export const users = pgTable("users", {
   passwordHash: varchar("password_hash"), // For local authentication
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  // Unique public @handle (migration 0008: NOT NULL + unique on lower(handle) in the DB). Optional in the
+  // insert type because UserRepository.create/upsertUser assign one when the caller does not.
+  handle: varchar("handle", { length: 20 }),
   profileImageUrl: varchar("profile_image_url"),
   bio: text("bio"),
   location: varchar("location"),

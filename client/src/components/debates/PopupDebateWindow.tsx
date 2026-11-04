@@ -73,6 +73,13 @@ export function PopupDebateWindow({
   const scrollRef = useRef<HTMLDivElement>(null);
   const windowRef = useRef<HTMLDivElement>(null);
 
+  // Opponent's @handle for the header (display names can repeat)
+  const { data: opponentUser } = useQuery<{ handle?: string | null }>({
+    queryKey: ['/api/users', opponentId],
+    enabled: !!opponentId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Fetch debate room details
   const { data: room } = useQuery<DebateRoom>({
     queryKey: ['/api/debate-rooms', debateRoomId],
@@ -198,7 +205,10 @@ export function PopupDebateWindow({
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm truncate">{opponentName}</p>
+            <p className="font-medium text-sm truncate">
+              {opponentName}
+              {opponentUser?.handle && <span className="ml-1.5 text-xs font-normal text-muted-foreground" data-testid="text-debate-opponent-handle">@{opponentUser.handle}</span>}
+            </p>
             <p className="text-xs text-muted-foreground truncate">{topicTitle}</p>
           </div>
         </div>

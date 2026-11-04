@@ -70,7 +70,7 @@ async function rankCategory(cat: Category, limit: number, meId?: string, topicId
   const result: any = await db.execute(sql`
     WITH v AS (${cat.valueSql(topicId)}),
     ranked AS (
-      SELECT u.id AS user_id, coalesce((select nullif(trim(sn.display_first_name), '') from user_profiles sn where sn.user_id = u.id limit 1), u.first_name) AS first_name, (case when exists (select 1 from user_profiles sn where sn.user_id = u.id and nullif(trim(sn.display_first_name), '') is not null) then (select sn.display_last_name from user_profiles sn where sn.user_id = u.id limit 1) else u.last_name end) AS last_name, u.profile_image_url, v.value,
+      SELECT u.id AS user_id, coalesce((select nullif(trim(sn.display_first_name), '') from user_profiles sn where sn.user_id = u.id limit 1), u.first_name) AS first_name, (case when exists (select 1 from user_profiles sn where sn.user_id = u.id and nullif(trim(sn.display_first_name), '') is not null) then (select sn.display_last_name from user_profiles sn where sn.user_id = u.id limit 1) else u.last_name end) AS last_name, u.handle, u.profile_image_url, v.value,
              RANK() OVER (ORDER BY v.value DESC) AS rank,
              ROW_NUMBER() OVER (ORDER BY v.value DESC, u.first_name, u.id) AS rn
       FROM v JOIN users u ON u.id = v.user_id
@@ -83,6 +83,7 @@ async function rankCategory(cat: Category, limit: number, meId?: string, topicId
   const map = (r: any) => ({
     userId: r.user_id,
     firstName: r.first_name,
+    handle: r.handle,
     lastName: r.last_name,
     profileImageUrl: r.profile_image_url,
     value: Number(r.value),

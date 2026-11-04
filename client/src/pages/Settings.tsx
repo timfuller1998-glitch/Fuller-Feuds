@@ -12,7 +12,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { Save, User, Cloudy, Sun, Moon } from "lucide-react";
+import { Save, User, Cloudy, Sun, Moon, AtSign } from "lucide-react";
+import { HandleField, type HandleStatus } from "@/components/HandleField";
+import { useToast } from "@/hooks/use-toast";
 
 const profileFormSchema = z.object({
   displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
@@ -47,6 +49,32 @@ interface ProfileData {
 export default function Settings() {
   const { user: currentUser } = useAuth();
   const [themePreference, setThemePreference] = useState<"light" | "medium" | "dark">("light");
+  const { toast } = useToast();
+  const currentHandle: string | null = (currentUser as any)?.handle ?? null;
+  const [handle, setHandle] = useState("");
+  const [handleStatus, setHandleStatus] = useState<HandleStatus>("idle");
+  useEffect(() => {
+    if (currentHandle) setHandle((h) => h || currentHandle);
+  }, [currentHandle]);
+  const saveHandleMutation = useMutation({
+    mutationFn: async (h: string) => {
+      const res = await fetch('/api/handles/me', {
+        method: 'PUT',
+        body: JSON.stringify({ handle: h }),
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.message || 'Could not save handle');
+      return j as { handle: string };
+    },
+    onSuccess: (j) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/profile', currentUser?.id] });
+      toast({ title: 'Handle updated', description: `You're now @${j.handle}` });
+    },
+    onError: (e: Error) => toast({ title: 'Handle not saved', description: e.message, variant: 'destructive' }),
+  });
 
   // Fetch current user's profile
   const { data: profileData, isLoading } = useQuery<ProfileData>({
@@ -146,6 +174,39 @@ export default function Settings() {
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Manage your account settings and preferences</p>
       </div>
+
+      {/* Handle */}
+      <Card data-testid="card-settings-handle">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AtSign className="w-5 h-5" />
+            Handle
+          </CardTitle>
+          <CardDescription>Your unique @handle, shown under your name. Display names can repeat; handles can't.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="flex flex-col sm:flex-row sm:items-start gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (handleStatus === 'available' && handle !== currentHandle) saveHandleMutation.mutate(handle);
+            }}
+          >
+            <div className="flex-1">
+              <HandleField value={handle} onChange={setHandle} onStatusChange={setHandleStatus} current={currentHandle} id="settings-handle" />
+            </div>
+            <Button
+              type="submit"
+              className="sm:mt-8"
+              disabled={handleStatus !== 'available' || handle === currentHandle || saveHandleMutation.isPending}
+              data-testid="button-save-handle"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {saveHandleMutation.isPending ? 'Saving...' : 'Save handle'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {/* Profile Settings */}
       <Card>

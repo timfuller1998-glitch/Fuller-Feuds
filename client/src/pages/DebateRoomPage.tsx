@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "wouter";
+import { UserHandle } from "@/components/UserHandle";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -438,6 +439,7 @@ export default function DebateRoomPage() {
                     ? `${participant1.firstName} ${participant1.lastName}`
                     : participant1?.email || "Loading..."}
                 </p>
+                <UserHandle handle={(participant1 as any)?.handle} />
                 <Badge variant="outline" className="text-xs">
                   {room.participant1Stance}
                 </Badge>
@@ -457,6 +459,7 @@ export default function DebateRoomPage() {
                     ? `${participant2.firstName} ${participant2.lastName}`
                     : participant2?.email || "Loading..."}
                 </p>
+                <UserHandle handle={(participant2 as any)?.handle} className="text-right" />
                 <Badge variant="outline" className="text-xs">
                   {room.participant2Stance}
                 </Badge>

@@ -302,12 +302,14 @@ export class DebateRepository {
           id: sql<string>`p1.id`,
           firstName: screenFirstNameSql(sql`p1.id`, sql`p1.first_name`),
           lastName: screenLastNameSql(sql`p1.id`, sql`p1.last_name`),
+          handle: sql<string | null>`p1.handle`,
           profileImageUrl: sql<string>`p1.profile_image_url`,
         },
         participant2: {
           id: sql<string>`p2.id`,
           firstName: screenFirstNameSql(sql`p2.id`, sql`p2.first_name`),
           lastName: screenLastNameSql(sql`p2.id`, sql`p2.last_name`),
+          handle: sql<string | null>`p2.handle`,
           profileImageUrl: sql<string>`p2.profile_image_url`,
         },
       })
@@ -703,6 +705,7 @@ export class DebateRepository {
       id: string;
       firstName: string | null;
       lastName: string | null;
+      handle: string | null;
       profileImageUrl: string | null;
     };
 
@@ -720,12 +723,14 @@ export class DebateRepository {
           id: sql<string>`p1.id`,
           firstName: screenFirstNameSql(sql`p1.id`, sql`p1.first_name`),
           lastName: screenLastNameSql(sql`p1.id`, sql`p1.last_name`),
+          handle: sql<string | null>`p1.handle`,
           profileImageUrl: sql<string | null>`p1.profile_image_url`,
         },
         participant2: {
           id: sql<string>`p2.id`,
           firstName: screenFirstNameSql(sql`p2.id`, sql`p2.first_name`),
           lastName: screenLastNameSql(sql`p2.id`, sql`p2.last_name`),
+          handle: sql<string | null>`p2.handle`,
           profileImageUrl: sql<string | null>`p2.profile_image_url`,
         },
       })

@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
+import { UserHandle } from "@/components/UserHandle";
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -40,6 +41,7 @@ import { useQueries } from "@tanstack/react-query";
 
 type DebateCandidate = {
   userId: string;
+  handle?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   profileImageUrl?: string | null;
@@ -48,6 +50,23 @@ type DebateCandidate = {
   activeRank: number | null;
   activeCount: number;
 };
+function CounterpointAuthor({ author }: { author?: { id?: string; firstName?: string | null; lastName?: string | null; handle?: string | null; profileImageUrl?: string | null } | null }) {
+  if (!author) return null;
+  const name = `${author.firstName || ""} ${author.lastName || ""}`.trim() || "Anonymous";
+  return (
+    <div className="flex items-center gap-2 min-w-0" data-testid="counterpoint-author">
+      <Avatar className="h-7 w-7 flex-shrink-0">
+        <AvatarImage src={author.profileImageUrl ?? undefined} />
+        <AvatarFallback className="text-xs">{name.charAt(0).toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-medium leading-tight">{name}</span>
+        <UserHandle handle={author.handle} />
+      </span>
+    </div>
+  );
+}
+
 const candidateName = (p: DebateCandidate) => `${p.firstName || ""} ${p.lastName || ""}`.trim() || "Anonymous";
 
 const opinionFormSchema = insertOpinionSchema.omit({
@@ -1083,6 +1102,7 @@ export default function Topic() {
                         (counterpoints || []).map((cp: any) => (
                           <Card key={cp.id}>
                             <CardContent className="pt-4 space-y-3">
+                              <CounterpointAuthor author={cp.author} />
                               {cp.paragraphText ? (
                                 <div className="text-xs text-muted-foreground border-l-2 border-muted-foreground/20 pl-2 whitespace-pre-wrap">
                                   <span className="font-medium text-foreground/80">Paragraph: </span>
@@ -1141,6 +1161,7 @@ export default function Topic() {
                                           </span>
                                           <span className="flex-1 min-w-0">
                                             <span className="block truncate text-sm font-medium">{candidateName(p)}</span>
+                                            <UserHandle handle={p.handle} />
                                             <span className="block text-xs text-muted-foreground">
                                               {p.relation === "author" ? "Wrote this counterpoint" : "Liked this counterpoint"}
                                             </span>
@@ -1227,6 +1248,7 @@ export default function Topic() {
                         (otherCounterpoints || []).map((cp: any) => (
                           <Card key={cp.id}>
                             <CardContent className="pt-4 space-y-3">
+                              <CounterpointAuthor author={cp.author} />
                               {cp.paragraphText ? (
                                 <div className="text-xs text-muted-foreground border-l-2 border-muted-foreground/20 pl-2 whitespace-pre-wrap">
                                   <span className="font-medium text-foreground/80">Paragraph: </span>

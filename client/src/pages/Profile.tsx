@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { UserHandle } from "@/components/UserHandle";
 import { useParams, useLocation, Link } from "wouter";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -323,6 +324,7 @@ export default function Profile() {
                   <h1 className="text-2xl sm:text-3xl font-bold break-words" data-testid="profile-name">
                     {profile?.displayFirstName != null ? profile.displayFirstName : user.firstName}{profile?.displayFirstName != null ? (profile?.displayLastName ? ` ${profile.displayLastName}` : '') : (user.lastName ? ` ${user.lastName}` : '')}
                   </h1>
+                  <UserHandle handle={(user as any).handle} className="text-sm" testId="profile-handle" />
                   {profile && profile.economicScore != null && profile.authoritarianScore != null && (profile.totalOpinions ?? 0) > 0 && (
                     <Popover>
                       <PopoverTrigger asChild>

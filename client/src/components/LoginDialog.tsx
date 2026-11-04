@@ -6,6 +6,7 @@ import { MessageCircle, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { HandleField, type HandleStatus } from "@/components/HandleField";
 
 interface LoginDialogProps {
   open: boolean;
@@ -18,6 +19,8 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [handle, setHandle] = useState("");
+  const [handleStatus, setHandleStatus] = useState<HandleStatus>("idle");
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -58,7 +61,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string; firstName: string; lastName: string }) => {
+    mutationFn: async (data: { email: string; password: string; firstName: string; lastName: string; handle: string }) => {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,6 +88,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
       setPassword("");
       setFirstName("");
       setLastName("");
+      setHandle("");
     },
     onError: (error: Error) => {
       toast({
@@ -99,7 +103,11 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
     e.preventDefault();
 
     if (isRegister) {
-      registerMutation.mutate({ email, password, firstName, lastName });
+      if (handleStatus !== "available") {
+        toast({ title: "Pick a handle", description: "Choose an available @handle to continue.", variant: "destructive" });
+        return;
+      }
+      registerMutation.mutate({ email, password, firstName, lastName, handle });
     } else {
       loginMutation.mutate({ email, password });
     }
@@ -154,6 +162,17 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
             </div>
           )}
 
+          {isRegister && (
+            <HandleField
+              value={handle}
+              onChange={setHandle}
+              onStatusChange={setHandleStatus}
+              suggestFrom={`${firstName}${lastName.slice(0, 1)}`}
+              disabled={isLoading}
+              id="register-handle"
+            />
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -190,7 +209,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
             type="submit"
             className="w-full"
             size="lg"
-            disabled={isLoading}
+            disabled={isLoading || (isRegister && handleStatus !== "available")}
             data-testid="button-login-dialog"
           >
             {isLoading ? (

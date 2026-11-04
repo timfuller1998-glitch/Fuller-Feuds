@@ -1,15 +1,16 @@
 -- LOCAL DEMO DATA ONLY: never run against production/Supabase.
 -- Seeds users, opinions, likes, follows and a debate so badges and leaderboards have data.
+-- Requires migration 0008 (users.handle NOT NULL).
 -- Idempotent: demo rows use fixed ids / ON CONFLICT DO NOTHING.
 BEGIN;
 
-INSERT INTO users (id, email, first_name, last_name, bio, role, status, onboarding_complete, onboarding_step) VALUES
-  ('u-erin',  'erin@local.test',  'Erin',  'Park',    'Policy nerd',      'user','active',true,3),
-  ('u-frank', 'frank@local.test', 'Frank', 'Ortiz',   'Devil''s advocate','user','active',true,3),
-  ('u-grace', 'grace@local.test', 'Grace', 'Lee',     'Data first',       'user','active',true,3),
-  ('u-hank',  'hank@local.test',  'Hank',  'Miller',  NULL,               'user','active',true,3),
-  ('u-ivy',   'ivy@local.test',   'Ivy',   'Chen',    'Here to learn',    'user','active',true,3),
-  ('u-jack',  'jack@local.test',  'Jack',  'Brown',   NULL,               'user','active',true,3)
+INSERT INTO users (id, email, handle, first_name, last_name, bio, role, status, onboarding_complete, onboarding_step) VALUES
+  ('u-erin',  'erin@local.test',  'ErinP', 'Erin',  'Park',    'Policy nerd',      'user','active',true,3),
+  ('u-frank', 'frank@local.test', 'FrankO', 'Frank', 'Ortiz',   'Devil''s advocate','user','active',true,3),
+  ('u-grace', 'grace@local.test', 'GraceL', 'Grace', 'Lee',     'Data first',       'user','active',true,3),
+  ('u-hank',  'hank@local.test',  'HankM', 'Hank',  'Miller',  NULL,               'user','active',true,3),
+  ('u-ivy',   'ivy@local.test',   'IvyC', 'Ivy',   'Chen',    'Here to learn',    'user','active',true,3),
+  ('u-jack',  'jack@local.test',  'JackB', 'Jack',  'Brown',   NULL,               'user','active',true,3)
 ON CONFLICT (id) DO NOTHING;
 INSERT INTO user_profiles (user_id) SELECT id FROM users WHERE id IN ('u-erin','u-frank','u-grace','u-hank','u-ivy','u-jack')
 ON CONFLICT DO NOTHING;

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { UserHandle } from "@/components/UserHandle";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,6 +9,7 @@ import { BarChart3, Heart, Activity, Users, Lightbulb } from "lucide-react";
 export interface LeaderboardEntry {
   userId: string;
   firstName?: string | null;
+  handle?: string | null;
   lastName?: string | null;
   profileImageUrl?: string | null;
   value: number;
@@ -66,8 +68,9 @@ function Row({ e, unit, highlight, onOpen }: { e: LeaderboardEntry; unit: string
         <AvatarImage src={e.profileImageUrl ?? undefined} />
         <AvatarFallback className="text-xs">{e.firstName?.charAt(0)}{e.lastName?.charAt(0)}</AvatarFallback>
       </Avatar>
-      <span className="flex-1 min-w-0 truncate text-sm font-medium">
-        {e.firstName} {e.lastName}
+      <span className="flex-1 min-w-0">
+        <span className="block truncate text-sm font-medium">{e.firstName} {e.lastName}</span>
+        <UserHandle handle={e.handle} />
       </span>
       <span className="text-sm font-semibold tabular-nums">{e.value}</span>
       <span className="text-xs text-muted-foreground w-[4.5rem] truncate">{unit}</span>
