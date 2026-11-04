@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { openTutorial } from "@/lib/tutorial";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   Sidebar, 
@@ -32,6 +33,7 @@ import {
   Cpu,
   Settings,
   LogOut,
+  HelpCircle,
   Plus,
   User,
   Grid,
@@ -243,6 +245,18 @@ export default function AppSidebar({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => {
+                    handleLinkClick();
+                    openTutorial();
+                  }}
+                  data-testid="button-nav-how-it-works"
+                >
+                  <HelpCircle className="w-4 h-4" />
+                  <span>How it works</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

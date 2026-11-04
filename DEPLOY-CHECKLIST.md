@@ -10,5 +10,7 @@ The dev bot only ever touches the local DB; production Supabase migrations are r
       existing user (screen name or first name + last initial, with a number appended if taken/reserved), then sets NOT NULL,
       a unique index on `lower(handle)` and a format CHECK. Without it, sign-up and every name query fail (`column "handle" does not exist`).
       Safe to re-run. Tip: run it in a transaction and spot-check `select handle, count(*) from users group by 1 having count(*) > 1` (should be empty).
+- [ ] `migrations/0009_tutorial_completed.sql`: **required before deploying the first-run tutorial PR.** Adds `users.tutorial_completed_at`
+      and marks existing users who finished onboarding as done, so only new sign-ups see the tour automatically. Without it, `PUT /api/users/me/tutorial` fails.
 
-All three files are idempotent (`IF NOT EXISTS` / duplicate guards).
+All four files are idempotent (`IF NOT EXISTS` / duplicate guards).

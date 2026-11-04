@@ -12,9 +12,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { Save, User, Cloudy, Sun, Moon, AtSign } from "lucide-react";
+import { Save, User, Cloudy, Sun, Moon, AtSign, HelpCircle } from "lucide-react";
 import { HandleField, type HandleStatus } from "@/components/HandleField";
 import { useToast } from "@/hooks/use-toast";
+import { openTutorial } from "@/lib/tutorial";
 
 const profileFormSchema = z.object({
   displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
@@ -174,6 +175,22 @@ export default function Settings() {
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Manage your account settings and preferences</p>
       </div>
+
+      {/* Tutorial */}
+      <Card data-testid="card-settings-tutorial">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HelpCircle className="w-5 h-5" />
+            How Fuller Feuds works
+          </CardTitle>
+          <CardDescription>Take the one-minute tour again: stances, the card deck, counterpoints, debates and badges.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={() => openTutorial()} data-testid="button-replay-tutorial">
+            Replay tutorial
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Handle */}
       <Card data-testid="card-settings-handle">

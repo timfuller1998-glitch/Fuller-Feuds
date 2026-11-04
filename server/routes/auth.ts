@@ -40,6 +40,8 @@ router.get('/user', isAuthenticated, async (req, res) => {
       location: freshUser.location,
       profileImageUrl: freshUser.profileImageUrl,
       followedCategories: freshUser.followedCategories ?? [],
+      handle: freshUser.handle ?? null,
+      tutorialCompletedAt: freshUser.tutorialCompletedAt ?? null,
     });
   } catch (error) {
     console.error('Error fetching user:', error);
