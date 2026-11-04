@@ -200,15 +200,15 @@ export default function AppSidebar({
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b p-4">
+      <SidebarHeader className="border-b-[3px] border-double border-foreground p-4">
         <Link href="/" onClick={handleLinkClick} data-testid="link-home-logo">
           <div className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2 transition-colors">
             <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary text-primary-foreground overflow-hidden">
               <img src="/logo.png" alt="Fuller Feuds" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h2 className="font-bold text-lg">Fuller Feuds</h2>
-              <p className="text-xs text-muted-foreground">Every opinion. One fair fight.</p>
+              <h2 className="font-display font-normal uppercase leading-none tracking-[0.02em] text-[1.45rem]" data-testid="text-wordmark">Fuller<span className="text-primary"> Feuds</span></h2>
+              <p className="mt-1 text-xs italic text-muted-foreground">Every opinion. One fair fight.</p>
             </div>
           </div>
         </Link>

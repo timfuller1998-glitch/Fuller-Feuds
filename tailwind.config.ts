@@ -5,10 +5,24 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      // Editorial: flat print. Small shadows vanish; large ones become a soft offset "ink" block.
+      boxShadow: {
+        sm: "none",
+        DEFAULT: "none",
+        md: "3px 3px 0 0 hsl(var(--foreground) / 0.08)",
+        lg: "4px 4px 0 0 hsl(var(--foreground) / 0.10)",
+        xl: "6px 6px 0 0 hsl(var(--foreground) / 0.10)",
+        "2xl": "8px 8px 0 0 hsl(var(--foreground) / 0.12)",
+      },
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        // Editorial: square corners everywhere; rounded-full (avatars, dots) is untouched.
+        DEFAULT: "0",
+        sm: "0",
+        md: "0",
+        lg: "0",
+        xl: "0",
+        "2xl": "0",
+        "3xl": "0",
       },
       colors: {
         // Flat / base colors (regular buttons)
@@ -52,6 +66,19 @@ export default {
           border: "var(--destructive-border)",
         },
         ring: "hsl(var(--ring) / <alpha-value>)",
+        stance: {
+          for: "hsl(var(--stance-for) / <alpha-value>)",
+          against: "hsl(var(--stance-against) / <alpha-value>)",
+          neutral: "hsl(var(--stance-neutral) / <alpha-value>)",
+        },
+        success: "hsl(var(--success) / <alpha-value>)",
+        warning: "hsl(var(--warning) / <alpha-value>)",
+        live: "hsl(var(--live) / <alpha-value>)",
+        info: "hsl(var(--info) / <alpha-value>)",
+        ai: "hsl(var(--ai-purple) / <alpha-value>)",
+        gold: "hsl(var(--gold) / <alpha-value>)",
+        silver: "hsl(var(--silver) / <alpha-value>)",
+        bronze: "hsl(var(--bronze) / <alpha-value>)",
         chart: {
           "1": "hsl(var(--chart-1) / <alpha-value>)",
           "2": "hsl(var(--chart-2) / <alpha-value>)",
@@ -86,6 +113,8 @@ export default {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+        display: ["var(--font-display)"],
+        ui: ["var(--font-ui)"],
       },
       keyframes: {
         "accordion-down": {

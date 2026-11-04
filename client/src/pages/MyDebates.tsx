@@ -85,8 +85,8 @@ export default function MyDebates() {
         <Card>
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-blue-500/10">
-                <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+              <div className="p-2 sm:p-3 rounded-lg bg-info/10">
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-info" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-bold" data-testid="stat-created-topics">
@@ -101,8 +101,8 @@ export default function MyDebates() {
         <Card>
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-green-500/10">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
+              <div className="p-2 sm:p-3 rounded-lg bg-success/10">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-success" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-bold" data-testid="stat-participated-topics">
@@ -117,8 +117,8 @@ export default function MyDebates() {
         <Card>
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-purple-500/10">
-                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
+              <div className="p-2 sm:p-3 rounded-lg bg-ai/10">
+                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-ai" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-bold" data-testid="stat-total-opinions">

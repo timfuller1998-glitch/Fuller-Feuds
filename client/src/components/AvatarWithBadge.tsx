@@ -39,11 +39,11 @@ const ringWidthClasses = {
 
 // Helper function to determine color from political leaning score (DEPRECATED)
 const getPoliticalLeaningColorFromScore = (score: number) => {
-  if (score < -50) return '#3b82f6'; // Very Progressive - blue
-  if (score < -20) return '#3b82f6'; // Progressive - blue
-  if (score <= 20) return '#a855f7'; // Moderate - purple
-  if (score <= 50) return '#ef4444'; // Conservative - red
-  return '#ef4444'; // Very Conservative - red
+  if (score < -50) return 'hsl(var(--stance-for))'; // Very Progressive - blue
+  if (score < -20) return 'hsl(var(--stance-for))'; // Progressive - blue
+  if (score <= 20) return 'hsl(var(--stance-neutral))'; // Moderate - purple
+  if (score <= 50) return 'hsl(var(--stance-against))'; // Conservative - red
+  return 'hsl(var(--stance-against))'; // Very Conservative - red
 };
 
 // Helper function to convert HSL to hex color

@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE (DEFAULT) - Softer, warmer light theme */
+/* LIGHT MODE (DEFAULT) - Editorial: cream paper, ink, Playfair Display + Source Serif */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
@@ -15,77 +15,87 @@
   --elevate-2: rgba(0,0,0, .08);
 
   /* Softer light colors - not stark white */
-  --background: 210 20% 96%;
-  --foreground: 220 15% 20%;
+  --background: 42 45% 94%;
+  --foreground: 30 18% 11%;
 
-  --border: 220 10% 85%;
+  --border: 35 14% 70%;
 
-  --card: 0 0% 98%;
-  --card-foreground: 220 15% 20%;
-  --card-border: 220 8% 88%;
+  --card: 44 52% 97%;
+  --card-foreground: 30 18% 11%;
+  --card-border: 30 14% 22%;
 
-  --surface-elevated: 210 15% 94%;
-  --glass-overlay: 210 15% 93%;
+  --surface-elevated: 42 38% 91%;
+  --glass-overlay: 42 38% 91%;
 
-  --sidebar: 210 15% 94%;
-  --sidebar-foreground: 220 15% 20%;
-  --sidebar-border: 220 8% 86%;
-  --sidebar-primary: 220 75% 52%;
-  --sidebar-primary-foreground: 0 0% 98%;
-  --sidebar-accent: 220 12% 88%;
-  --sidebar-accent-foreground: 220 15% 25%;
-  --sidebar-ring: 220 75% 52%;
+  --sidebar: 42 36% 90%;
+  --sidebar-foreground: 30 18% 13%;
+  --sidebar-border: 30 12% 30%;
+  --sidebar-primary: 0 62% 34%;
+  --sidebar-primary-foreground: 44 52% 97%;
+  --sidebar-accent: 40 28% 83%;
+  --sidebar-accent-foreground: 30 18% 11%;
+  --sidebar-ring: 0 62% 34%;
 
-  --popover: 0 0% 97%;
-  --popover-foreground: 220 15% 20%;
-  --popover-border: 220 10% 82%;
+  --popover: 44 52% 97%;
+  --popover-foreground: 30 18% 11%;
+  --popover-border: 30 14% 22%;
 
-  --primary: 220 75% 52%;
-  --primary-foreground: 0 0% 98%;
+  --primary: 0 62% 34%;
+  --primary-foreground: 44 52% 97%;
 
-  --secondary: 220 8% 90%;
-  --secondary-foreground: 220 15% 25%;
+  --secondary: 40 28% 86%;
+  --secondary-foreground: 30 18% 13%;
 
-  --muted: 220 12% 90%;
-  --muted-foreground: 220 10% 48%;
+  --muted: 40 26% 88%;
+  --muted-foreground: 30 10% 34%;
 
-  --accent: 220 15% 88%;
-  --accent-foreground: 220 15% 28%;
+  --accent: 40 30% 84%;
+  --accent-foreground: 30 18% 13%;
 
-  --destructive: 0 75% 55%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive: 0 62% 38%;
+  --destructive-foreground: 44 52% 97%;
 
-  --text-primary: 220 15% 20%;
-  --text-secondary: 220 10% 48%;
-  --text-tertiary: 220 6% 62%;
+  --text-primary: 30 18% 11%;
+  --text-secondary: 30 10% 34%;
+  --text-tertiary: 30 8% 40%;
 
-  --success: 142 70% 45%;
-  --warning: 35 85% 55%;
-  --live: 0 85% 58%;
-  --ai-purple: 270 65% 62%;
+  --success: 150 38% 26%;
+  --warning: 32 70% 34%;
+  --live: 0 62% 38%;
+  --ai-purple: 275 30% 36%;
 
-  --input: 220 15% 80%;
-  --ring: 220 75% 52%;
+  --input: 30 12% 55%;
+  --ring: 0 62% 34%;
 
-  --chart-1: 120 60% 45%;
-  --chart-2: 35 80% 55%;
-  --chart-3: 280 65% 50%;
-  --chart-4: 200 75% 45%;
-  --chart-5: 15 70% 50%;
+  --chart-1: 200 45% 28%;
+  --chart-2: 0 62% 34%;
+  --chart-3: 38 55% 40%;
+  --chart-4: 150 38% 26%;
+  --chart-5: 275 30% 36%;
 
-  --font-sans: Inter, sans-serif;
-  --font-serif: Georgia, serif;
+  /* Editorial semantic tokens */
+  --stance-for: 200 48% 27%;
+  --stance-against: 0 62% 34%;
+  --stance-neutral: 30 8% 40%;
+  --info: 205 45% 30%;
+  --gold: 40 62% 31%;
+  --silver: 30 6% 40%;
+  --bronze: 22 50% 36%;
+  --font-display: "Anton", "Oswald", Impact, sans-serif;
+  --font-ui: Inter, system-ui, sans-serif;
+  --font-sans: "Source Serif 4", Georgia, serif;
+  --font-serif: "Playfair Display", Georgia, serif;
   --font-mono: JetBrains Mono, monospace;
-  --radius: 0.5rem; /* 8px */
+  --radius: 0rem;
 
-  --shadow-2xs: 0px 1px 2px 0px hsl(220 10% 15% / 0.05);
-  --shadow-xs: 0px 1px 3px 0px hsl(220 10% 15% / 0.08);
-  --shadow-sm: 0px 1px 2px 0px hsl(220 10% 15% / 0.05), 0px 2px 4px -1px hsl(220 10% 15% / 0.10);
-  --shadow: 0px 1px 3px 0px hsl(220 10% 15% / 0.08), 0px 4px 6px -1px hsl(220 10% 15% / 0.10);
-  --shadow-md: 0px 4px 6px -1px hsl(220 10% 15% / 0.10), 0px 2px 4px -1px hsl(220 10% 15% / 0.08);
-  --shadow-lg: 0px 10px 15px -3px hsl(220 10% 15% / 0.10), 0px 4px 6px -2px hsl(220 10% 15% / 0.06);
-  --shadow-xl: 0px 20px 25px -5px hsl(220 10% 15% / 0.10), 0px 10px 10px -5px hsl(220 10% 15% / 0.04);
-  --shadow-2xl: 0px 25px 50px -12px hsl(220 10% 15% / 0.15);
+  --shadow-2xs: none;
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+  --shadow-2xl: none;
 
   /* Automatically computed borders */
   --sidebar-primary-border: hsl(var(--sidebar-primary));
@@ -112,6 +122,13 @@
 
 /* MEDIUM MODE - Balanced middle tone for comfortable viewing */
 .medium {
+  --stance-for: 200 48% 24%;
+  --stance-against: 0 62% 32%;
+  --stance-neutral: 30 8% 32%;
+  --info: 205 45% 26%;
+  --gold: 40 62% 32%;
+  --silver: 30 6% 38%;
+  --bronze: 22 50% 32%;
   --button-outline: rgba(0,0,0, .12);
   --badge-outline: rgba(0,0,0, .08);
 
@@ -192,6 +209,13 @@
 
 /* DARK MODE - Softer dark theme, not too extreme */
 .dark {
+  --stance-for: 200 55% 60%;
+  --stance-against: 0 70% 64%;
+  --stance-neutral: 30 8% 62%;
+  --info: 205 55% 62%;
+  --gold: 42 70% 58%;
+  --silver: 30 6% 68%;
+  --bronze: 22 55% 58%;
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .06);
 
@@ -283,20 +307,24 @@
   }
 
   /* Improved typography hierarchy */
+  h1, h2, h3, h4 {
+    font-family: var(--font-serif);
+    letter-spacing: -0.01em;
+  }
   h1 {
-    @apply text-3xl font-bold tracking-tight;
+    @apply text-3xl md:text-4xl font-black leading-tight;
   }
 
   h2 {
-    @apply text-2xl font-semibold tracking-tight;
+    @apply text-2xl font-extrabold leading-snug;
   }
 
   h3 {
-    @apply text-xl font-semibold;
+    @apply text-xl font-bold leading-snug;
   }
 
   h4 {
-    @apply text-lg font-semibold;
+    @apply text-lg font-bold;
   }
 
   h5 {
@@ -305,6 +333,20 @@
 
   h6 {
     @apply text-sm font-semibold;
+  }
+
+  body {
+    line-height: 1.55;
+    font-feature-settings: "kern", "liga", "onum";
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+  }
+  input, textarea, select {
+    font-family: var(--font-sans);
+  }
+  hr {
+    border-color: hsl(var(--foreground) / 0.25);
   }
 
   /* Better link styles */

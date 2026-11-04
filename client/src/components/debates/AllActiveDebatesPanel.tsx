@@ -165,7 +165,7 @@ function OpponentDebateCard({
         <AvatarFallback 
           style={{ 
             background: avatarColor,
-            color: 'white'
+            color: 'hsl(var(--foreground))'
           }}
         >
           {group.opponentName.slice(0, 2).toUpperCase()}

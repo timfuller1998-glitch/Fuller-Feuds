@@ -103,8 +103,11 @@ function AppWithSidebar({
         }}
       />
       <div className="flex flex-col flex-1 min-w-0">
-        <header className="sticky top-0 z-10 flex items-center gap-2 sm:gap-4 p-2 sm:p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-10 flex items-center gap-2 sm:gap-4 px-3 py-2 sm:px-5 sm:py-3 bg-background border-b-[3px] border-double border-foreground">
           <SidebarTrigger data-testid="button-sidebar-toggle" />
+          <a href="/" className="ff-wordmark md:hidden shrink-0 font-display uppercase leading-none tracking-[0.02em] text-[1.35rem] sm:text-[1.6rem] text-foreground" data-testid="link-wordmark" aria-label="Fuller Feuds home">
+            Fuller<span className="text-primary"> Feuds</span>
+          </a>
           <div className="flex flex-1 max-w-2xl mx-auto px-2 sm:px-0">
             <SearchBar 
               value={searchQuery}
@@ -115,7 +118,7 @@ function AppWithSidebar({
           {!isAuthenticated && (
             <button 
               onClick={() => setLoginDialogOpen(true)}
-              className="flex-shrink-0 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 font-medium" 
+              className="flex-shrink-0 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 font-ui text-[0.78rem] font-semibold uppercase tracking-[0.08em]" 
               data-testid="button-sign-in"
             >
               Sign In
@@ -123,7 +126,7 @@ function AppWithSidebar({
           )}
           <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} />
         </header>
-        <main className={`flex-1 min-h-0 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-8 ${location === "/" ? "overflow-y-hidden relative" : "overflow-y-auto"}`}>
+        <main className={`flex-1 min-h-0 overflow-x-hidden px-4 pt-5 sm:px-6 sm:pt-7 md:px-8 pb-10 ${location === "/" ? "overflow-y-hidden relative" : "overflow-y-auto"}`}>
           <div className={`max-w-7xl mx-auto w-full ${location === "/" ? "h-full relative" : ""}`}>
             <Router />
           </div>

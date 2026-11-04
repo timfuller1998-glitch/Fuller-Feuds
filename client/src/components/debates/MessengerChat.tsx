@@ -126,7 +126,7 @@ export function MessengerChat({
             <AvatarFallback 
               style={{ 
                 background: avatarColor,
-                color: 'white'
+                color: 'hsl(var(--foreground))'
               }}
             >
               {opponentName.slice(0, 2).toUpperCase()}

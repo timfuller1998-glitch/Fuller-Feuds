@@ -69,9 +69,10 @@ export function get2DPoliticalCompassColor(economicScore: number, authoritarianS
   
   // Blend colors more - only a little white in the center
   if (distanceFromCenter < 0.15) {
-    // Very center - slight desaturation
-    saturation = saturation * 0.5;
-    lightness = 85; // Very light at center
+    // Editorial: near-centre reads as warm newsprint rather than pink
+    hue = 38;
+    saturation = 22;
+    lightness = 84;
   } else if (distanceFromCenter < 0.3) {
     // Near center - moderate blending
     saturation = saturation * 0.7;

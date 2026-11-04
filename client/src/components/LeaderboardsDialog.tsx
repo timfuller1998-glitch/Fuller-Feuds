@@ -51,7 +51,7 @@ export function bestRank(data?: LeaderboardsResponse) {
 }
 
 const medal = (rank: number) =>
-  rank === 1 ? "bg-yellow-500 text-white" : rank === 2 ? "bg-gray-400 text-white" : rank === 3 ? "bg-orange-600 text-white" : "bg-muted text-muted-foreground";
+  rank === 1 ? "bg-gold text-primary-foreground" : rank === 2 ? "bg-silver text-primary-foreground" : rank === 3 ? "bg-bronze text-primary-foreground" : "bg-muted text-muted-foreground";
 
 function Row({ e, unit, highlight, onOpen }: { e: LeaderboardEntry; unit: string; highlight: boolean; onOpen: () => void }) {
   return (

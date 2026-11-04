@@ -39,7 +39,7 @@ export function useCounterpointCounts(opinionId: string | undefined) {
 function StanceBadge({ op }: { op: Op }) {
   const s = getOpinionStance(op);
   if (!s) return <Badge variant="outline" className="text-muted-foreground" data-testid={`badge-stance-${op.id}`}>No stance</Badge>;
-  const cls = s === "for" ? "bg-emerald-600 text-white" : s === "against" ? "bg-red-600 text-white" : "bg-slate-500 text-white";
+  const cls = s === "for" ? "bg-stance-for text-primary-foreground" : s === "against" ? "bg-stance-against text-primary-foreground" : "bg-stance-neutral text-primary-foreground";
   return <Badge className={cls} data-testid={`badge-stance-${op.id}`}>{stanceLabel[s]}</Badge>;
 }
 

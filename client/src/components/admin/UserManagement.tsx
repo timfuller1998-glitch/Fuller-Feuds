@@ -203,7 +203,7 @@ export function UserManagement({ queriesEnabled = false }: { queriesEnabled?: bo
                           {user.status}
                         </Badge>
                         {user.isSynthetic && (
-                          <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300" data-testid={`badge-synthetic-${user.id}`}>
+                          <Badge variant="outline" className="bg-ai/10 dark:bg-ai/15 text-ai dark:text-ai" data-testid={`badge-synthetic-${user.id}`}>
                             Synthetic
                           </Badge>
                         )}

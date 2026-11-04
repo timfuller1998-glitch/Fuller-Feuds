@@ -120,7 +120,7 @@ export default function CategoryPage() {
       {liveStreams && liveStreams.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Radio className="w-5 h-5 text-red-500" />
+            <Radio className="w-5 h-5 text-destructive-foreground0" />
             <h2 className="text-xl font-semibold">Live Streams</h2>
             <Badge variant="destructive" className="ml-2 animate-pulse">
               {liveStreams.length} LIVE

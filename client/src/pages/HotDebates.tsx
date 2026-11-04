@@ -26,8 +26,8 @@ export default function HotDebates() {
     <div className="space-y-4 sm:space-y-6">
       {/* Page Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 sm:p-3 rounded-lg bg-orange-500/10">
-          <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />
+        <div className="p-2 sm:p-3 rounded-lg bg-warning/10">
+          <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-warning" />
         </div>
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold" data-testid="heading-hot-debates">
@@ -44,8 +44,8 @@ export default function HotDebates() {
         <Card>
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-orange-500/10">
-                <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+              <div className="p-2 sm:p-3 rounded-lg bg-warning/10">
+                <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-warning" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-bold" data-testid="stat-hot-debates">
@@ -60,8 +60,8 @@ export default function HotDebates() {
         <Card>
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-blue-500/10">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+              <div className="p-2 sm:p-3 rounded-lg bg-info/10">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-info" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-bold" data-testid="stat-total-participants">
@@ -76,8 +76,8 @@ export default function HotDebates() {
         <Card>
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-purple-500/10">
-                <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
+              <div className="p-2 sm:p-3 rounded-lg bg-ai/10">
+                <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-ai" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-bold" data-testid="stat-avg-diversity">
@@ -123,7 +123,7 @@ export default function HotDebates() {
               <div key={topic.id} className="relative">
                 {index < 3 && (
                   <div className="absolute -left-2 -top-2 z-10">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-white font-bold text-sm shadow-lg">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary flex items-center justify-center text-white font-bold text-sm shadow-lg">
                       {index + 1}
                     </div>
                   </div>
@@ -150,38 +150,38 @@ export default function HotDebates() {
                   <div className="border-t bg-muted/30 p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-purple-500" />
+                        <Activity className="w-4 h-4 text-ai" />
                         <span className="text-sm font-medium">Political Diversity</span>
                       </div>
-                      <span className="text-sm font-bold text-purple-500">{diversityScore}%</span>
+                      <span className="text-sm font-bold text-ai">{diversityScore}%</span>
                     </div>
                     {hasDistribution && distribution && (
                       <div className="space-y-2">
                         <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-background">
                           {distribution.authoritarianCapitalist > 0 && (
                             <div
-                              className="bg-red-500"
+                              className="bg-destructive"
                               style={{ width: `${distribution.authoritarianCapitalist}%` }}
                               title={`Authoritarian Capitalist: ${distribution.authoritarianCapitalist}%`}
                             />
                           )}
                           {distribution.authoritarianSocialist > 0 && (
                             <div
-                              className="bg-blue-500"
+                              className="bg-info"
                               style={{ width: `${distribution.authoritarianSocialist}%` }}
                               title={`Authoritarian Socialist: ${distribution.authoritarianSocialist}%`}
                             />
                           )}
                           {distribution.libertarianCapitalist > 0 && (
                             <div
-                              className="bg-yellow-500"
+                              className="bg-warning"
                               style={{ width: `${distribution.libertarianCapitalist}%` }}
                               title={`Libertarian Capitalist: ${distribution.libertarianCapitalist}%`}
                             />
                           )}
                           {distribution.libertarianSocialist > 0 && (
                             <div
-                              className="bg-green-500"
+                              className="bg-success"
                               style={{ width: `${distribution.libertarianSocialist}%` }}
                               title={`Libertarian Socialist: ${distribution.libertarianSocialist}%`}
                             />
@@ -189,19 +189,19 @@ export default function HotDebates() {
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                            <div className="w-2 h-2 rounded-full bg-destructive" />
                             <span>Auth. Cap.: {distribution.authoritarianCapitalist}%</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-blue-500" />
+                            <div className="w-2 h-2 rounded-full bg-info" />
                             <span>Auth. Soc.: {distribution.authoritarianSocialist}%</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                            <div className="w-2 h-2 rounded-full bg-warning" />
                             <span>Lib. Cap.: {distribution.libertarianCapitalist}%</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                            <div className="w-2 h-2 rounded-full bg-success" />
                             <span>Lib. Soc.: {distribution.libertarianSocialist}%</span>
                           </div>
                         </div>
