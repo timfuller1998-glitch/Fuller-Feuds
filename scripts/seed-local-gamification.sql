@@ -23,7 +23,7 @@ FROM topics t WHERE NOT EXISTS (SELECT 1 FROM opinions o WHERE o.topic_id = t.id
 
 -- Erin and Grace: a few opinions each
 INSERT INTO opinions (topic_id, user_id, content, stance, debate_status, status)
-SELECT t.id, u.id, u.id || ' thinks: ' || t.title || ' deserves a nuanced answer.',
+SELECT t.id, u.id, (SELECT coalesce(nullif(trim(p.display_first_name), ''), us.first_name) FROM users us LEFT JOIN user_profiles p ON p.user_id = us.id WHERE us.id = u.id) || ' thinks: ' || t.title || ' deserves a nuanced answer.',
        (ARRAY['for','against','neutral'])[1 + (abs(hashtext(u.id || t.id::text)) % 3)], 'open', 'approved'
 FROM topics t CROSS JOIN (VALUES ('u-erin'),('u-grace'),('u-frank')) u(id)
 WHERE abs(hashtext(u.id || t.id::text)) % 2 = 0

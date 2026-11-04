@@ -1,4 +1,5 @@
 import { db } from '../db.js';
+import { screenFirstNameSql, screenLastNameSql } from '../lib/screenName.js';
 import { topics, opinions, opinionVotes, topicFlags, users } from '../../shared/schema.js';
 import { eq, desc, and, sql, count } from 'drizzle-orm';
 
@@ -402,8 +403,8 @@ export class TopicRepository {
     const [mostLiked] = await db
       .select({
         content: opinions.content,
-        firstName: users.firstName,
-        lastName: users.lastName,
+        firstName: screenFirstNameSql(users.id, users.firstName),
+        lastName: screenLastNameSql(users.id, users.lastName),
       })
       .from(opinions)
       .leftJoin(users, eq(opinions.userId, users.id))
