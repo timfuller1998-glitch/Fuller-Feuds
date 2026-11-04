@@ -100,13 +100,16 @@ export function OpinionDeckBack({ op, onVote, onAdopt, onFlag, onSeeCounterpoint
     <div className={shell} data-testid={`opinion-card-back-${op.id}`}>
       <AuthorRow op={op} />
       {/* Opinion text first; every action sits below it. */}
-      <p className="mt-3 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap break-words line-clamp-6 flex-shrink min-h-0 overflow-hidden">{op.content}</p>
-      <div className="mt-auto pt-3 space-y-3 flex-shrink-0">
-        <div className="grid grid-cols-3 text-center text-xs text-muted-foreground border-y py-2">
+      <p className="mt-3 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap break-words line-clamp-4 flex-shrink min-h-0 overflow-hidden">{op.content}</p>
+      <div className="pt-3 space-y-2 flex-shrink-0">
+        <div className="grid grid-cols-3 text-center text-xs text-muted-foreground border-y py-1.5">
           <div><div className="text-lg font-semibold text-foreground tabular-nums">{likes}</div>likes</div>
           <div><div className="text-lg font-semibold text-foreground tabular-nums">{dislikes}</div>dislikes</div>
           <div><div className="text-lg font-semibold text-foreground tabular-nums">{total}</div>counterpoints</div>
         </div>
+        <Button size="sm" className="w-full" onClick={() => onSeeCounterpoints(firstWithCounterpoints)} data-testid={`button-see-counterpoints-${op.id}`}>
+          <MessageSquareReply className="w-4 h-4 mr-1.5" /> See counterpoints{total > 0 ? ` (${total})` : ""}
+        </Button>
         <div className="grid grid-cols-2 gap-2">
           <Button size="sm" variant={vote === "like" ? "default" : "outline"} onClick={() => onVote("like")} data-testid={`button-like-${op.id}`}>
             <ThumbsUp className="w-4 h-4 mr-1.5" /> Like
@@ -121,9 +124,6 @@ export function OpinionDeckBack({ op, onVote, onAdopt, onFlag, onSeeCounterpoint
             <Flag className="w-4 h-4 mr-1.5" /> Flag
           </Button>
         </div>
-        <Button size="sm" className="w-full" onClick={() => onSeeCounterpoints(firstWithCounterpoints)} data-testid={`button-see-counterpoints-${op.id}`}>
-          <MessageSquareReply className="w-4 h-4 mr-1.5" /> See counterpoints{total > 0 ? ` (${total})` : ""}
-        </Button>
         <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><RotateCcw className="w-3 h-3" /> Tap card to flip back</p>
       </div>
     </div>
