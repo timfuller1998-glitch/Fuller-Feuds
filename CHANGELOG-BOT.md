@@ -1,3 +1,11 @@
+## 2026-11-03 (21:44 CST, America/Chicago): Card deck swipe fixes (branch fix/deck-swipe)
+Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
+- Mobile: opinion cards can now be swiped by touching their text. The text area uses `overflow-x-hidden touch-pan-y` so the browser no longer takes over sideways swipes; vertical scrolling still works.
+- Backward swipe now mirrors forward: the previous card enters right away from the swipe direction and settles on top, while the dragged card sinks into the next slot from where you let go (no spring-back first).
+- The position counter now changes at the same moment the animation starts, going forward or back.
+- Dark/dusk: deck cards get a faint light hairline plus a stronger ink shadow. Partly hidden cards are a little brighter, and the plain card backs are neutral instead of red-tinted.
+- Typecheck at 61 errors (no change); `vite build` succeeds. Videos: /workspace/ff-videos/swipe-fixed/.
+
 ## 2026-11-03 (21:05 CST, America/Chicago): Merged PR #7 and PR #8
 Made by the Fuller Feuds Dev bot (Grok Bot), on Timothy's OK ("Looks good, merge both").
 - PR #7 (Editorial redesign) merged into main as 681d325.

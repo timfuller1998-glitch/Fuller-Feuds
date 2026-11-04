@@ -107,11 +107,11 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
   const s1 = backStyle(1);
   const s2 = backStyle(2);
   const start =
-    role === "in" ? { y: s2.y, scale: s2.scale, z: 3 } : role === "next" ? { y: s1.y, scale: s1.scale, z: 5 } : { y: 0, scale: 1, z: 10 };
-  const ox = useMotionValue(0);
+    role === "in" ? { y: 0, scale: 0.98, z: 15 } : role === "next" ? { y: s1.y, scale: s1.scale, z: 5 } : { y: 0, scale: 1, z: 10 };
+  const ox = useMotionValue(role === "in" ? -width * 1.12 : 0);
   const oy = useMotionValue(start.y);
   const os = useMotionValue(start.scale);
-  const orot = useMotionValue(0);
+  const orot = useMotionValue(role === "in" ? -9 : 0);
   const oz = useMotionValue(start.z);
   const ix = useMotionValue(0);
   const irot = useTransform(ix, [-300, 300], [-10, 10]);
@@ -133,6 +133,14 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         if (first.current) return;
         go(ox, 0, 0.3); go(oy, 0, 0.3); go(os, 1, 0.3); go(orot, 0, 0.3);
       } else if (role === "next") {
+        // A card that was just on top (backward swipe) sinks to the next slot from wherever the finger
+        // released it: hand the drag offset to the outer layer so it never springs back first.
+        if (ix.get() !== 0) {
+          ix.stop();
+          ox.set(ox.get() + ix.get());
+          orot.set(orot.get() + irot.get());
+          ix.set(0);
+        }
         oz.set(5);
         go(ox, 0, 0.3); go(oy, s1.y, 0.3); go(os, s1.scale, 0.3); go(orot, 0, 0.3);
       } else if (role === "out") {
@@ -150,12 +158,12 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         await Promise.all([go(ox, 0, 0.28), go(orot, 0, 0.28), go(oy, s2.y, 0.28), go(os, s2.scale, 0.28)]);
         if (!cancelled) doneRef.current?.();
       } else if (role === "in") {
-        // Backward: pulled out from under the deck to the right, then laid on top.
-        oz.set(3);
-        await Promise.all([go(ox, out * 0.92, 0.22), go(orot, 7, 0.22), go(oy, 4, 0.22), go(os, 0.98, 0.22)]);
+        // Backward (mirror of forward): the previous card enters immediately from the left, in the
+        // direction of a rightward swipe, already above the deck, and settles on top while the old
+        // top card sinks into the next slot. No pause, so the counter and the motion stay in sync.
+        ox.set(-out); orot.set(-9); oy.set(0); os.set(0.98); oz.set(15);
+        await Promise.all([go(ox, 0, 0.34), go(orot, 0, 0.34), go(os, 1, 0.34)]);
         if (cancelled) return;
-        oz.set(15);
-        await Promise.all([go(ox, 0, 0.26), go(orot, 0, 0.26), go(oy, 0, 0.26), go(os, 1, 0.26)]);
         if (!cancelled) doneRef.current?.();
       }
     };
@@ -332,8 +340,8 @@ export default function CardDeck<T>({
               aria-hidden
             >
               {/* Plain card back: only the bottom edge shows, no text can bleed through */}
-              <div className="w-full h-full rounded-xl border bg-card shadow-md overflow-hidden">
-                <div className="w-full h-full bg-gradient-to-br from-primary/10 via-muted/40 to-primary/5" />
+              <div className="w-full h-full rounded-xl border bg-card shadow-md overflow-hidden deck-card-surface">
+                <div className="w-full h-full bg-gradient-to-br from-primary/10 via-muted/40 to-primary/5 dark:from-foreground/[0.04] dark:via-transparent dark:to-foreground/[0.02]" />
               </div>
             </div>
           );
@@ -354,7 +362,7 @@ export default function CardDeck<T>({
           >
             {(isTop) => (
               <>
-                <div className={`w-full h-full rounded-xl ${isTop ? "shadow-xl" : "shadow-md overflow-hidden bg-card"}`}>
+                <div className={`w-full h-full rounded-xl deck-card-surface ${isTop ? "shadow-xl" : "shadow-md overflow-hidden bg-card"}`}>
                   {renderFace(card, isTop)}
                 </div>
                 {isTop && renderBadge && (

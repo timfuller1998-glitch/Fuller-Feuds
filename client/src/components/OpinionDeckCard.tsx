@@ -67,7 +67,7 @@ export function OpinionDeckFront({ op, onSelectParagraph }: { op: Op; onSelectPa
       <div className="absolute inset-0 pointer-events-none" style={getOpinionGradientStyle(op.topicEconomicScore, op.topicAuthoritarianScore)} aria-hidden />
       <div className="relative flex flex-col flex-1 min-h-0">
       <AuthorRow op={op} />
-      <div className="mt-3 flex-1 min-h-0 overflow-y-auto pr-1">
+      <div className="mt-3 flex-1 min-h-0 overflow-y-auto overflow-x-hidden touch-pan-y overscroll-contain pr-1">
         <InteractiveSentenceText
           text={op.content}
           segmentMode="paragraph"

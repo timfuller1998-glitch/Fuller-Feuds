@@ -633,3 +633,14 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Card deck depth in dark/dusk: black ink shadows vanish on dark paper, so add a faint light
+   hairline plus a stronger ink block, and lift partly hidden cards out of the murk. */
+.dark .deck-card-surface,
+.medium .deck-card-surface {
+  box-shadow: 0 0 0 1px hsl(40 30% 92% / 0.14), 6px 6px 0 0 hsl(0 0% 0% / 0.75);
+}
+.dark [data-deck-role]:not([data-deck-role="top"]) .deck-card-surface,
+.medium [data-deck-role]:not([data-deck-role="top"]) .deck-card-surface {
+  filter: brightness(1.18) saturate(0.7);
+}
