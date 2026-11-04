@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
+import { FirstRunTutorial } from "@/components/FirstRunTutorial";
 import SearchBar from "@/components/SearchBar";
 import { ActiveBackgroundGradient } from "@/components/ActiveBackgroundGradient";
 import { useAuth } from "@/hooks/useAuth";
@@ -84,12 +85,12 @@ function AppWithSidebar({
   return (
     <div className="flex h-screen h-[100dvh] w-full overflow-x-hidden">
       <AppSidebar
-        currentUser={{
-          id: user?.id || "",
+        currentUser={isAuthenticated && user ? {
+          id: user.id,
           name: displayName,
-          avatar: user?.profileImageUrl,
+          avatar: user.profileImageUrl,
           isOnline: true
-        }}
+        } : undefined}
         onNavigate={(path) => console.log('Navigate to:', path)}
         onLogout={async () => {
           try {
@@ -128,6 +129,7 @@ function AppWithSidebar({
           )}
           <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} />
         </header>
+        <FirstRunTutorial user={user} isAuthenticated={isAuthenticated} suppressed={location === "/onboarding"} />
         <main className={`flex-1 min-h-0 overflow-x-hidden px-4 pt-5 sm:px-6 sm:pt-7 md:px-8 pb-10 ${location === "/" ? "overflow-y-hidden relative" : "overflow-y-auto"}`}>
           <div className={`max-w-7xl mx-auto w-full ${location === "/" ? "h-full relative" : ""}`}>
             <Router />

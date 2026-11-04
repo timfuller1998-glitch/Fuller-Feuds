@@ -9,6 +9,8 @@ import type { UpsertUser } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
 import { invalidateUserCache, invalidateUserBadgesCache, invalidateUserDebateStatsCache } from '../services/cacheInvalidation.js';
 import { isSecurityError } from '../utils/securityErrors.js';
+import { sql } from 'drizzle-orm';
+import { db } from '../db.js';
 
 const router = Router();
 const badgeRepository = new BadgeRepository();
@@ -101,6 +103,20 @@ router.patch('/me', isAuthenticated, async (req, res) => {
     }
     console.error("Error updating current user:", error);
     res.status(500).json({ message: "Failed to update user" });
+  }
+});
+
+// PUT /api/users/me/tutorial { completed: boolean } - mark the first-run tutorial done (true) or reset it to replay (false)
+router.put('/me/tutorial', isAuthenticated, async (req, res) => {
+  try {
+    const me = req.user as Express.User;
+    const completed = req.body?.completed !== false;
+    await db.execute(sql`update users set tutorial_completed_at = ${completed ? sql`now()` : sql`null`} where id = ${me.id}`);
+    await invalidateUserCache(String(me.id));
+    res.json({ tutorialCompleted: completed });
+  } catch (error) {
+    console.error('Error saving tutorial state:', error);
+    res.status(500).json({ message: 'Failed to save tutorial state' });
   }
 });
 

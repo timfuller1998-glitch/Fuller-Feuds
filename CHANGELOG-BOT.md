@@ -1,3 +1,17 @@
+## 2026-11-04 (06:45 CST, America/Chicago): Sign-up audit and first-run tutorial (branch feat/first-run-tutorial)
+Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
+- Audit (fresh sign-ups on desktop and at 390px; videos and screenshots in /workspace/ff-videos/signup-audit/):
+  - Bug, from the handles PR: `/api/auth/user` didn't return `handle`, so the onboarding Handle field was empty and **Next stayed disabled with no explanation** (a dead end). Settings' handle box was empty too. Fixed.
+  - When logged out, the sidebar showed a fake "User · Online" card with settings and logout buttons. It's now hidden.
+  - There was no explanation of the site anywhere. Onboarding step 4 advertised live streaming and AI insights, but not stances, the card deck, flipping cards, counterpoints, debates or badges.
+  - The Location placeholder "San Francisco, CA" looked like a filled-in value. It now reads "City, state or country".
+- New first-run tutorial (`FirstRunTutorial.tsx`), in the Editorial style, 5 steps: what Fuller Feuds is (For/Against/Neutral), sharing an opinion, the deck (swipe left or › for next, tap to flip), counterpoints and one-on-one debates, then badges, leaderboards and your @handle.
+  - Swipe, ‹ › buttons and arrow keys all work. Skippable.
+  - Opens once after onboarding. Finishing or skipping saves `users.tutorial_completed_at` (new migration 0009, added to DEPLOY-CHECKLIST.md).
+  - Replay from Settings ("Replay tutorial") or from "How it works" in the sidebar, which also works when logged out.
+- Onboarding step 4 now lists the real core actions and mentions the tour.
+- Typecheck 61; `vite build` passes. New-flow videos: /workspace/ff-videos/signup-tutorial/{desktop,mobile}.mp4. Audit test accounts deleted from the local DB.
+
 ## 2026-11-04 (06:10 CST, America/Chicago): Unique @handles (branch feat/user-handles)
 Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
 - Every user now has a unique @handle (3–20 letters, numbers or _, must start with a letter, case-insensitive unique, reserved words like admin/moderator/support/fullerfeuds/api blocked). Display names can still repeat.

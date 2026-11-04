@@ -46,6 +46,8 @@ export const users = pgTable("users", {
   followedCategories: text("followed_categories").array().default(sql`ARRAY[]::text[]`),
   onboardingStep: integer("onboarding_step").default(0),
   onboardingComplete: boolean("onboarding_complete").default(false),
+  // First-run tutorial finished/skipped (migration 0009). NULL = show it.
+  tutorialCompletedAt: timestamp("tutorial_completed_at"),
   role: varchar("role", { length: 20 }).default("user"), // 'user', 'moderator', 'admin'
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'suspended', 'banned'
   isSynthetic: boolean("is_synthetic").default(false), // True for users created by data seeding

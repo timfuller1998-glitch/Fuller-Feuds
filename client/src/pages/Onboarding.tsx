@@ -616,7 +616,7 @@ export default function Onboarding() {
                   id="location"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  placeholder="San Francisco, CA"
+                  placeholder="City, state or country"
                   data-testid="input-location"
                 />
               </div>
@@ -773,29 +773,25 @@ export default function Onboarding() {
             <CardContent className="space-y-4">
               <FeatureCard
                 icon={<MessageCircle className="w-5 h-5" />}
-                title="Share Opinions"
-                description="Express your stance on any topic and engage in meaningful discussions"
+                title="Take a side"
+                description="Share your opinion on any topic and mark it For, Against or Neutral"
               />
               <FeatureCard
                 icon={<ThumbsUp className="w-5 h-5" />}
-                title="Vote & Engage"
-                description="Like, dislike, or challenge viewpoints to shape the conversation"
-              />
-              <FeatureCard
-                icon={<Video className="w-5 h-5" />}
-                title="Join Live Debates"
-                description="Watch or participate in real-time streaming debates"
+                title="Swipe the deck"
+                description="Swipe left (or tap ›) through other people's opinions; tap a card to flip it"
               />
               <FeatureCard
                 icon={<Users className="w-5 h-5" />}
-                title="One-on-One Chats"
-                description="Debate directly with people who have different perspectives"
+                title="Push back and debate"
+                description="Add counterpoints to any paragraph, then debate one-on-one"
               />
               <FeatureCard
                 icon={<Sparkles className="w-5 h-5" />}
-                title="AI Insights"
-                description="See cumulative perspectives generated from community opinions"
+                title="Earn badges"
+                description="Climb the leaderboards and build a profile under your @handle"
               />
+              <p className="text-sm text-muted-foreground">Next up: a one-minute tour of how it all works. You can skip it and replay it any time from Settings.</p>
             </CardContent>
           </Card>
         )}
