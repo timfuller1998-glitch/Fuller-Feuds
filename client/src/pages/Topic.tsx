@@ -21,6 +21,9 @@ import { insertOpinionSchema, type Topic as TopicType, type Opinion, type Cumula
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useDebateContext } from "@/contexts/DebateContext";
 import OpinionCard from "@/components/OpinionCard";
 import { AdoptOpinionDialog } from "@/components/AdoptOpinionDialog";
 import { LoginPromptDialog } from "@/components/LoginPromptDialog";
@@ -34,6 +37,18 @@ import CardDeck from "@/components/CardDeck";
 import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
 import { tallyStances } from "@/lib/stance";
 import { useQueries } from "@tanstack/react-query";
+
+type DebateCandidate = {
+  userId: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  profileImageUrl?: string | null;
+  relation: "author" | "liker";
+  isOnline: boolean;
+  activeRank: number | null;
+  activeCount: number;
+};
+const candidateName = (p: DebateCandidate) => `${p.firstName || ""} ${p.lastName || ""}`.trim() || "Anonymous";
 
 const opinionFormSchema = insertOpinionSchema.omit({
   topicId: true,
@@ -66,6 +81,7 @@ export default function Topic() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { openDebateWindow } = useDebateContext();
   const [showOpinionForm, setShowOpinionForm] = useState(false);
   const [showTopicFlagDialog, setShowTopicFlagDialog] = useState(false);
   const [showAdoptDialog, setShowAdoptDialog] = useState(false);
@@ -80,7 +96,6 @@ export default function Topic() {
   const [selectedSentenceIndex, setSelectedSentenceIndex] = useState<number | null>(null);
   const [selectedOtherSentenceIndex, setSelectedOtherSentenceIndex] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [rankMode, setRankMode] = useState<"rank" | "active">("rank");
   const [selectedCounterpointId, setSelectedCounterpointId] = useState<string | null>(null);
   const [counterpointDraftYours, setCounterpointDraftYours] = useState("");
   const [counterpointDraftOthers, setCounterpointDraftOthers] = useState("");
@@ -372,43 +387,16 @@ export default function Topic() {
     return summary.length > 220 ? summary.slice(0, 217).replace(/\s+\S*$/, "") + "…" : summary;
   }, [topic?.description, cumulativeData, summarySentences]);
 
-  const { data: likers } = useQuery<{ likerIds: string[] } | null>({
-    queryKey: ["/api/counterpoints", selectedCounterpointId, "likers"],
+  // Debate candidates for the selected counterpoint: its author first, then likers (server-ordered).
+  const { data: debateCandidates = [], isLoading: candidatesLoading } = useQuery<DebateCandidate[]>({
+    queryKey: ["/api/counterpoints", selectedCounterpointId, "debate-candidates"],
     queryFn: async () => {
-      if (!selectedCounterpointId) return null;
-      const res = await fetch(`/api/counterpoints/${selectedCounterpointId}/likers`);
-      if (!res.ok) throw new Error("Failed to fetch likers");
+      const res = await fetch(`/api/counterpoints/${selectedCounterpointId}/debate-candidates`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch debate candidates");
       return res.json();
     },
-    enabled: !!selectedCounterpointId && sheetOpen && activeTab === "yours",
+    enabled: !!selectedCounterpointId && sheetOpen && activeTab === "yours" && isAuthenticated,
   });
-
-  const likerIds = likers?.likerIds || [];
-
-  const { data: presence } = useQuery<any[]>({
-    queryKey: ["/api/presence/online-users", likerIds.join(",")],
-    queryFn: async () => {
-      if (likerIds.length === 0) return [];
-      const res = await fetch(`/api/presence/online-users?userIds=${encodeURIComponent(likerIds.join(","))}`);
-      if (!res.ok) throw new Error("Failed to fetch presence");
-      return res.json();
-    },
-    enabled: likerIds.length > 0 && sheetOpen && activeTab === "yours",
-  });
-
-  const rankedPresence = useMemo(() => {
-    const list = [...(presence || [])];
-    if (rankMode === "rank") {
-      list.sort((a, b) => (b.debaterRank || 0) - (a.debaterRank || 0));
-    } else {
-      list.sort((a, b) => {
-        const onlineDiff = (b.isOnline ? 1 : 0) - (a.isOnline ? 1 : 0);
-        if (onlineDiff !== 0) return onlineDiff;
-        return (b.lastActiveAt || 0) - (a.lastActiveAt || 0);
-      });
-    }
-    return list;
-  }, [presence, rankMode]);
   
   // Add SEO metadata
   useEffect(() => {
@@ -558,7 +546,7 @@ export default function Topic() {
         queryClient.invalidateQueries({ queryKey: ["/api/opinions", currentOtherOpinion.id, "counterpoints", selectedOtherSentenceIndex] as any });
       }
       if (selectedCounterpointId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/counterpoints", selectedCounterpointId, "likers"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/counterpoints", selectedCounterpointId, "debate-candidates"] });
       }
     },
   });
@@ -600,13 +588,25 @@ export default function Topic() {
   });
 
   const startDebateFromCounterpointMutation = useMutation({
-    mutationFn: async ({ counterpointId, opponentUserId }: { counterpointId: string; opponentUserId: string }) => {
-      const res = await apiRequest("POST", `/api/counterpoints/${counterpointId}/start-debate`, { opponentUserId });
-      return res.json();
+    mutationFn: async ({ counterpointId, opponent }: { counterpointId: string; opponent: DebateCandidate }) => {
+      const res = await apiRequest("POST", `/api/counterpoints/${counterpointId}/start-debate`, { opponentUserId: opponent.userId });
+      return { room: await res.json(), opponent };
     },
-    onSuccess: () => {
+    onSuccess: ({ room, opponent }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
-      toast({ title: "Debate started", description: "Your debate should appear in the footer." });
+      const opponentName = candidateName(opponent);
+      const open = () =>
+        openDebateWindow({ debateRoomId: room.id, topicTitle: topic?.title || "Debate", opponentName, opponentId: opponent.userId });
+      setSelectedCounterpointId(null);
+      setSheetOpen(false);
+      open();
+      toast({
+        title: "Debate started",
+        description: `You're now debating ${opponentName}. It's also in your debates footer.`,
+        action: (
+          <ToastAction altText="Open debate" onClick={open} data-testid="toast-open-debate">Open</ToastAction>
+        ),
+      });
     },
     onError: (error: any) => {
       toast({ title: "Cannot start debate", description: error.message || "Failed to start debate", variant: "destructive" });
@@ -1116,35 +1116,41 @@ export default function Topic() {
 
                               {selectedCounterpointId === cp.id && (
                                 <div className="pt-2 border-t space-y-2">
-                                  <ToggleGroup
-                                    type="single"
-                                    value={rankMode}
-                                    onValueChange={(v) => v && setRankMode(v as any)}
-                                    className="justify-start"
-                                  >
-                                    <ToggleGroupItem value="rank">Highest ranked</ToggleGroupItem>
-                                    <ToggleGroupItem value="active">Most active</ToggleGroupItem>
-                                  </ToggleGroup>
-
-                                  {rankedPresence.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No likers yet.</p>
+                                  <p className="text-xs text-muted-foreground">Pick who to debate about this counterpoint:</p>
+                                  {candidatesLoading ? (
+                                    <p className="text-sm text-muted-foreground">Loading…</p>
+                                  ) : debateCandidates.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No one else to debate here yet.</p>
                                   ) : (
-                                    <div className="space-y-2">
-                                      {rankedPresence.map((p: any) => (
-                                        <Button
+                                    <div className="space-y-2" data-testid={`debate-candidates-${cp.id}`}>
+                                      {debateCandidates.map((p) => (
+                                        <button
                                           key={p.userId}
-                                          variant={p.isOnline ? "default" : "outline"}
-                                          size="sm"
-                                          className="w-full justify-between"
-                                          onClick={() => {
-                                            startDebateFromCounterpointMutation.mutate({ counterpointId: cp.id, opponentUserId: p.userId });
-                                          }}
+                                          type="button"
+                                          disabled={startDebateFromCounterpointMutation.isPending}
+                                          className="w-full flex items-center gap-3 rounded-lg border bg-card p-2.5 text-left hover-elevate disabled:opacity-60"
+                                          onClick={() => startDebateFromCounterpointMutation.mutate({ counterpointId: cp.id, opponent: p })}
+                                          data-testid={`button-debate-candidate-${p.userId}`}
                                         >
-                                          <span className="truncate">{p.userId}</span>
-                                          <span className="text-xs opacity-80">
-                                            {p.isOnline ? "Online" : "Offline"} · Rank {p.debaterRank || 0}
+                                          <span className="relative flex-shrink-0">
+                                            <Avatar className="h-8 w-8">
+                                              <AvatarImage src={p.profileImageUrl ?? undefined} />
+                                              <AvatarFallback className="text-xs">{p.firstName?.charAt(0)}{p.lastName?.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            {p.isOnline && <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card" aria-label="Online" />}
                                           </span>
-                                        </Button>
+                                          <span className="flex-1 min-w-0">
+                                            <span className="block truncate text-sm font-medium">{candidateName(p)}</span>
+                                            <span className="block text-xs text-muted-foreground">
+                                              {p.relation === "author" ? "Wrote this counterpoint" : "Liked this counterpoint"}
+                                            </span>
+                                          </span>
+                                          {p.activeRank != null && (
+                                            <span className="text-xs text-muted-foreground whitespace-nowrap" title={`${p.activeCount} contributions`}>
+                                              #{p.activeRank} active
+                                            </span>
+                                          )}
+                                        </button>
                                       ))}
                                     </div>
                                   )}
