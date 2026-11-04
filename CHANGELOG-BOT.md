@@ -1,3 +1,10 @@
+## 2026-11-03 (18:50 CST, America/Chicago) — Mobile debate window (branch fix/mobile-debate-window, PR #6)
+Made by the Fuller Feuds Dev bot (Grok Bot). Not merged.
+- `PopupDebateWindow` is full-screen on screens narrower than 768px. It sits above the footer and fills the visual viewport, falling back to `100dvh`. When the on-screen keyboard opens, the window shrinks so the input stays visible. It also respects iPhone safe areas, locks page scrolling while open, and turns off dragging.
+- On mobile the close and minimize buttons are 40px tap targets. The input text is 16px so iOS doesn't zoom, and message bubbles can be up to 80% wide.
+- Desktop (768px and wider) is unchanged: a draggable 400x500 popup.
+- Verified with Playwright at 360x640, 390x844, 414x896 and 1366x768: open, send a message, then close.
+
 ## 2026-11-03 (18:30 CST, America/Chicago) — Choose debater fixes (branch fix/choose-debater, PR #5)
 Made by the Fuller Feuds Dev bot (Grok Bot). Not merged.
 - New `GET /api/counterpoints/:id/debate-candidates`: the counterpoint's author first, then the people who liked it. Duplicates and the requester are left out. Each entry has the user's name, avatar, online status and "Most Active" leaderboard rank (null when the user has no activity).
