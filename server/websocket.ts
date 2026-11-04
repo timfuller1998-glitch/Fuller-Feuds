@@ -20,6 +20,22 @@ const userIdBySocket = new Map<WebSocket, string>();
 // Presence tracking (in-memory)
 const lastActiveAtByUserId = new Map<string, number>();
 
+let sessionMw: any = null;
+async function resolveSessionUserId(req: IncomingMessage): Promise<string | null> {
+  try {
+    if (!sessionMw) {
+      const { getSession } = await import('./auth.js');
+      sessionMw = getSession();
+    }
+    await new Promise<void>((resolve) => sessionMw(req as any, {} as any, () => resolve()));
+    const uid = (req as any).session?.passport?.user;
+    return typeof uid === 'string' && uid ? uid : null;
+  } catch (e) {
+    log(`[WebSocket] session lookup failed: ${(e as Error).message}`);
+    return null;
+  }
+}
+
 export function setupWebSocketServer(server: any) {
   const wss = new WebSocketServer({ 
     server,
@@ -43,7 +59,9 @@ export function setupWebSocketServer(server: any) {
 
         // Handle authentication
         if (message.type === 'authenticate') {
-          const userId = message.authToken;
+          // Trust only the signed session cookie sent with the upgrade request, never a client-supplied id
+          // (previously any client could claim any userId and receive that user's notifications).
+          const userId = await resolveSessionUserId(req);
           
           if (!userId || typeof userId !== 'string') {
             ws.send(JSON.stringify({
@@ -269,3 +287,8 @@ export function sendUserNotification(userId: string, notification: { title: stri
   });
 }
 
+
+// Persisted, real-time notification (bell). Stored in `notifications` and pushed as `notification`.
+export function pushNotification(userId: string, notification: any) {
+  sendToUser(userId, { type: 'notification', notification });
+}

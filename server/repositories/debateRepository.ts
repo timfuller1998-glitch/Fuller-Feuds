@@ -340,7 +340,7 @@ export class DebateRepository {
           .where(and(
             eq(debateMessages.roomId, room.id),
             eq(debateMessages.status, 'approved'),
-            lastReadAt ? sql`${debateMessages.createdAt} > ${lastReadAt}` : sql`true`
+            lastReadAt ? sql`${debateMessages.createdAt} > ${new Date(lastReadAt).toISOString()}::timestamp` : sql`true`
           ));
 
         // Get last message

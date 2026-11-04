@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { DebateService } from '../services/debateService.js';
 import { isAuthenticated } from '../middleware/auth.js';
 import { notifyNewDebateMessage, notifyDebateEnded } from '../websocket.js';
+import { postDebateMessage, endDebate, submitRating, getVoteSummary, displayNameOf, FlowError, STRUCTURED_TURNS } from '../lib/debateFlow.js';
 import { UnauthorizedError, ForbiddenError, AuthorizationError, DataAccessError } from '../utils/securityErrors.js';
 
 const router = Router();
@@ -73,44 +74,16 @@ router.post('/:id/messages', isAuthenticated, async (req, res) => {
       return res.status(400).json({ message: 'Message content is required' });
     }
 
-    const message = await debateService.sendMessage(
-      req.params.id,
-      requestingUserId,
-      content.trim(),
-      requestingUserId,
-      requestingUserRole,
-      req
-    );
-    
-    // Get the room to find the opponent
-    const room = await debateService.getDebateRoom(
-      req.params.id,
-      requestingUserId,
-      requestingUserRole,
-      req
-    );
-    if (room) {
-      const opponentId = room.participant1Id === requestingUserId ? room.participant2Id : room.participant1Id;
-      if (opponentId) {
-        // Get user info for the message
-        const { UserRepository } = await import('../repositories/userRepository.js');
-        const userRepo = new UserRepository();
-        const sender = await userRepo.findById(
-          requestingUserId,
-          requestingUserId,
-          requestingUserRole,
-          req
-        );
-        
-        notifyNewDebateMessage(req.params.id, {
-          id: message.id,
-          roomId: message.roomId,
-          userId: message.userId,
-          content: message.content,
-          createdAt: message.createdAt,
-          senderName: sender?.displayName || sender?.email || 'Unknown',
-        }, opponentId);
-      }
+    const { message, opponentId } = await postDebateMessage(req.params.id, requestingUserId, content.trim(), requestingUserRole, req);
+    if (opponentId) {
+      notifyNewDebateMessage(req.params.id, {
+        id: message.id,
+        roomId: message.roomId,
+        userId: message.userId,
+        content: message.content,
+        createdAt: message.createdAt,
+        senderName: await displayNameOf(requestingUserId),
+      }, opponentId);
     }
 
     res.json(message);
@@ -118,6 +91,7 @@ router.post('/:id/messages', isAuthenticated, async (req, res) => {
     if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
       return res.status(error.statusCode).json({ error: error.message, code: error.code });
     }
+    if (error instanceof FlowError) return res.status(error.status).json({ message: error.message });
     console.error('Error sending message:', error);
     res.status(500).json({ message: error.message || 'Failed to send message' });
   }
@@ -132,28 +106,16 @@ router.post('/:id/end', isAuthenticated, async (req, res) => {
     }
     const requestingUserRole = req.userRole;
     
-    // Note: endDebateRoom doesn't have security context parameters yet
-    await debateService.endDebateRoom(req.params.id);
-    
-    // Notify opponent
-    const room = await debateService.getDebateRoom(
-      req.params.id,
-      requestingUserId,
-      requestingUserRole,
-      req
-    );
-    if (room) {
-      const opponentId = room.participant1Id === requestingUserId ? room.participant2Id : room.participant1Id;
-      if (opponentId) {
-        notifyDebateEnded(req.params.id, opponentId);
-      }
-    }
-    
+    const room = await endDebate(req.params.id, requestingUserId);
+    const opponentId = room.participant1Id === requestingUserId ? room.participant2Id : room.participant1Id;
+    if (opponentId) notifyDebateEnded(req.params.id, opponentId);
+
     res.json({ message: 'Debate ended successfully' });
   } catch (error: any) {
     if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
       return res.status(error.statusCode).json({ error: error.message, code: error.code });
     }
+    if (error instanceof FlowError) return res.status(error.status).json({ message: error.message });
     console.error('Error ending debate:', error);
     res.status(500).json({ message: error.message || 'Failed to end debate' });
   }
@@ -175,6 +137,29 @@ router.patch('/:id/mark-read', isAuthenticated, async (req, res) => {
     }
     console.error('Error marking room as read:', error);
     res.status(500).json({ message: error.message || 'Failed to mark as read' });
+  }
+});
+
+// GET /api/debate-rooms/:id/votes - ratings for this debate (hidden from a debater until both have rated)
+router.get('/:id/votes', isAuthenticated, async (req, res) => {
+  try {
+    res.json({ ...(await getVoteSummary(req.params.id, req.user!.id)), structuredTurns: STRUCTURED_TURNS });
+  } catch (error: any) {
+    if (error instanceof FlowError) return res.status(error.status).json({ message: error.message });
+    console.error('Error fetching votes:', error);
+    res.status(500).json({ message: 'Failed to fetch votes' });
+  }
+});
+
+// POST /api/debate-rooms/:id/vote - rate your opponent at the end of the debate
+router.post('/:id/vote', isAuthenticated, async (req, res) => {
+  try {
+    const voteResults = await submitRating(req.params.id, req.user!.id, req.body);
+    res.json({ voteResults });
+  } catch (error: any) {
+    if (error instanceof FlowError) return res.status(error.status).json({ message: error.message });
+    console.error('Error submitting vote:', error);
+    res.status(500).json({ message: 'Failed to submit rating' });
   }
 });
 

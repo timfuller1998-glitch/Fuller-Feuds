@@ -98,6 +98,7 @@ export class OpinionRepository {
       topicId: serialized?.topicId,
       userId: serialized?.userId,
       content: serialized?.content,
+      stance: serialized?.stance ?? null, // was dropped here, so new opinions always saved without a stance
       status: serialized?.status || opinion.status || 'approved',
       debateStatus: serialized?.debateStatus || opinion.debateStatus || 'open',
       references: serialized?.references,
@@ -137,7 +138,7 @@ export class OpinionRepository {
     
     // Explicitly ensure no timestamp fields are included
     const insertData: any = {};
-    const allowedFields = ['topicId', 'userId', 'content', 'status', 'debateStatus', 'references', 
+    const allowedFields = ['topicId', 'userId', 'content', 'stance', 'status', 'debateStatus', 'references', 
                           'topicEconomicScore', 'topicAuthoritarianScore', 'tasteScore', 
                           'passionScore', 'analysisConfidence'];
     for (const field of allowedFields) {
@@ -211,7 +212,7 @@ export class OpinionRepository {
       rowsAffected: 1,
     });
 
-    return created;
+    return created[0]; // was returning the whole array
     } catch (error) {
       logSecurityEvent('error', 'database_operation', {
         userId: requestingUserId || opinion.userId,

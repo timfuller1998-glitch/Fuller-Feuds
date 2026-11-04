@@ -1,3 +1,25 @@
+## 2026-11-04 (08:12 CST, America/Chicago): Full QA pass, debate notifications and end-of-debate ratings (branch fix/full-qa)
+Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
+- Full end-to-end test with Playwright: alice, bob, admin and fresh sign-ups, on desktop and at 390px. Scripts are in /workspace (ff-qa-*.cjs); videos and screenshots are in /workspace/ff-videos/full-qa/.
+- NEW notifications: a header bell with an unread count, live over WebSocket and saved in the `notifications` table. Types: new debate, your turn, debate ended, rate your opponent, ratings in. Clicking one opens the debate room and marks it read; opening the room clears that room's notifications. `/api/notifications` (list, read-all, read-room, mark one read).
+- NEW turn-based flow: 3 turns each, and only the person whose turn it is can post (others get a 409). After 3 turns each, or when someone ends the debate early, it moves to rating.
+- NEW end-of-debate rating: `POST /api/debate-rooms/:id/vote` (Logic, Civility, Openness, 1–5, one rating per person) and `GET /:id/votes`. Scores stay hidden until both sides have rated. A "Final ratings" card shows on the room page, and the opponent's stats update. Added a NEW "Top Rated" leaderboard tab.
+- Bugs fixed:
+  - Security: the WebSocket trusted any userId, so anyone could pose as anyone. It now uses the session.
+  - `/debate-room/:id` had no route (it 404'd).
+  - The rating dialog posted to an endpoint that didn't exist.
+  - "End debate" sent you to a 404.
+  - When sending a message failed, nothing told you.
+  - The turn badge didn't update.
+  - The popup window covered the room page.
+  - The rating dialog showed the wrong side's scores.
+  - Emails showed as name fallbacks.
+  - **Opinions were saved without their stance** (the repository dropped it).
+  - Posting an opinion on a brand-new topic returned a 500 (a Date was bound in raw SQL), even though the opinion had been saved.
+  - A new opinion didn't appear on the topic page for up to 2 minutes (stale cache).
+  - Two other raw-SQL Date bindings were fixed.
+- Typecheck 57; `vite build` passes. No migration (see DEPLOY-CHECKLIST.md about the DB timezone). QA test data deleted from the local DB.
+
 ## 2026-11-04 (06:45 CST, America/Chicago): Sign-up audit and first-run tutorial (branch feat/first-run-tutorial)
 Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
 - Audit (fresh sign-ups on desktop and at 390px; videos and screenshots in /workspace/ff-videos/signup-audit/):

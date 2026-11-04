@@ -11,7 +11,8 @@ type WebSocketMessage =
   | { type: 'user_notification'; notification: { title: string; body: string } }
   | { type: 'debate_ended'; debateRoomId: string }
   | { type: 'opponent_typing'; debateRoomId: string; isTyping: boolean; userId: string }
-  | { type: 'new_debate_created'; debateRoomId: string; opponentName: string };
+  | { type: 'new_debate_created'; debateRoomId: string; opponentName: string }
+  | { type: 'notification'; notification: { id: string; type: string; title: string; message: string; debateRoomId?: string | null } };
 
 export function useDebateWebSocket(userId?: string) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -89,8 +90,8 @@ export function useDebateWebSocket(userId?: string) {
     // Show toast notification
     console.log('[WebSocket] Showing toast notification');
     toast({
-      title: 'New Debate Started!',
-      description: `Your debate with ${data.opponentName} is ready. Check the footer to start chatting!`,
+      title: "New debate",
+      description: `${data.opponentName} challenged you to a debate. Open the bell to reply.`,
       duration: 4000,
     });
   }, []);
@@ -135,6 +136,19 @@ export function useDebateWebSocket(userId?: string) {
           case 'new_debate_created':
             handleNewDebateCreated(data);
             break;
+          case 'notification': {
+            // Persisted bell notification: refresh the bell and the affected room, and show a toast.
+            const n = data.notification;
+            queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+            if (n?.debateRoomId) {
+              queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms', n.debateRoomId] });
+            }
+            queryClient.invalidateQueries({ queryKey: ['/api/debates/grouped'] });
+            if (n && n.type !== 'new_debate') {
+              handlersRef.current.toast({ title: n.title, description: n.message, duration: 4000 });
+            }
+            break;
+          }
           case 'opponent_typing':
             // Handle typing indicator in chat components
             break;

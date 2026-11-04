@@ -1,3 +1,5 @@
+import { notifyNewDebateCreated } from '../websocket.js';
+import { notifyDebateInvite, displayNameOf } from '../lib/debateFlow.js';
 import { Router } from 'express';
 import { OpinionService } from '../services/opinionService.js';
 import { DebateService } from '../services/debateService.js';
@@ -242,11 +244,16 @@ router.post('/:opinionId/start-debate', isAuthenticated, async (req, res) => {
     }
     // Note: createDebateRoom doesn't have security context parameters yet, but we still handle errors
     const debateRoom = await debateService.createDebateRoom(req.params.opinionId, requestingUserId);
+    // Opinion author (participant1) is invited and goes first.
+    notifyNewDebateCreated(debateRoom.id, await displayNameOf(requestingUserId), debateRoom.participant1Id);
+    await notifyDebateInvite(debateRoom.id, requestingUserId, debateRoom.participant1Id, debateRoom.topicId);
     res.json(debateRoom);
   } catch (error) {
     if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
       return res.status(error.statusCode).json({ error: error.message, code: error.code });
     }
+    const msg = (error as Error)?.message || '';
+    if (/cannot debate your own|must have an opinion|not found/i.test(msg)) return res.status(400).json({ message: msg });
     console.error("Error starting debate:", error);
     res.status(500).json({ message: "Failed to start debate" });
   }

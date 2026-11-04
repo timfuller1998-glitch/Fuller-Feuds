@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { BarChart3, Heart, Activity, Users, Lightbulb } from "lucide-react";
+import { BarChart3, Heart, Activity, Users, Lightbulb, Star } from "lucide-react";
 
 export interface LeaderboardEntry {
   userId: string;
@@ -29,8 +29,8 @@ export interface LeaderboardsResponse {
   categories: LeaderboardCategory[];
 }
 
-const ICONS: Record<string, typeof Heart> = { mostLiked: Heart, mostActive: Activity, mostFollowers: Users, topCreators: Lightbulb };
-const SHORT: Record<string, string> = { mostLiked: "Liked", mostActive: "Active", mostFollowers: "Followers", topCreators: "Creators" };
+const ICONS: Record<string, typeof Heart> = { mostLiked: Heart, mostActive: Activity, topRatedDebaters: Star, mostFollowers: Users, topCreators: Lightbulb };
+const SHORT: Record<string, string> = { mostLiked: "Liked", mostActive: "Active", topRatedDebaters: "Rated", mostFollowers: "Followers", topCreators: "Creators" };
 
 export function useLeaderboards(userId: string | undefined, enabled = true) {
   return useQuery<LeaderboardsResponse>({
@@ -96,7 +96,7 @@ export default function LeaderboardsDialog({
         {isError && <p className="py-8 text-center text-sm text-destructive">Couldn't load rankings.</p>}
         {data && (
           <Tabs defaultValue={data.categories[0]?.id}>
-            <TabsList className="grid w-full grid-cols-4 h-auto">
+            <TabsList className={`grid w-full h-auto ${data.categories.length >= 5 ? "grid-cols-5" : data.categories.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
               {data.categories.map((c) => {
                 const Icon = ICONS[c.id] ?? BarChart3;
                 return (

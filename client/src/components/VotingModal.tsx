@@ -15,6 +15,9 @@ interface VotingModalProps {
   opponentName: string;
   opponentId: string;
   currentUserId: string;
+  /** False once the debate has ended: only a plain "Submit rating" is offered. */
+  allowContinue?: boolean;
+  isParticipant1?: boolean;
   onClose: () => void;
 }
 
@@ -33,7 +36,7 @@ interface VoteResults {
   };
 }
 
-export function VotingModal({ isOpen, roomId, opponentName, opponentId, currentUserId, onClose }: VotingModalProps) {
+export function VotingModal({ isOpen, roomId, opponentName, opponentId, currentUserId, allowContinue = true, isParticipant1, onClose }: VotingModalProps) {
   const [logicalReasoning, setLogicalReasoning] = useState([3]);
   const [politeness, setPoliteness] = useState([3]);
   const [opennessToChange, setOpennessToChange] = useState([3]);
@@ -42,7 +45,7 @@ export function VotingModal({ isOpen, roomId, opponentName, opponentId, currentU
   const { toast } = useToast();
 
   const submitVoteMutation = useMutation({
-    mutationFn: async (wantsToContinue: boolean) => {
+    mutationFn: async (wantsToContinue: boolean | undefined) => {
       const response = await apiRequest('POST', `/api/debate-rooms/${roomId}/vote`, {
         votedForUserId: opponentId,
         logicalReasoning: logicalReasoning[0],
@@ -56,22 +59,23 @@ export function VotingModal({ isOpen, roomId, opponentName, opponentId, currentU
       setHasSubmitted(true);
       setVoteResults(data.voteResults);
       queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId, "votes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leaderboards"] });
       toast({
-        title: "Vote Submitted",
-        description: "Waiting for opponent to submit their vote...",
+        title: "Rating sent",
+        description: (data as any)?.voteResults?.bothSubmitted ? "Both sides rated. Scores are in." : "Waiting for your opponent to rate you.",
       });
     },
-    onError: (error) => {
-      console.error("Failed to submit vote:", error);
+    onError: (error: any) => {
       toast({
-        title: "Failed to submit vote",
-        description: "Please try again",
+        title: "Couldn't send rating",
+        description: String(error?.message || "Please try again").replace(/^\d+:\s*/, ""),
         variant: "destructive",
       });
     },
   });
 
-  const handleSubmitVote = (wantsToContinue: boolean) => {
+  const handleSubmitVote = (wantsToContinue: boolean | undefined) => {
     submitVoteMutation.mutate(wantsToContinue);
   };
 
@@ -81,6 +85,8 @@ export function VotingModal({ isOpen, roomId, opponentName, opponentId, currentU
   };
 
   const bothSubmitted = voteResults?.participant1Votes && voteResults?.participant2Votes;
+  // The opponent's rating of me: if I'm participant 1, it's participant 2's vote.
+  const ratingOfMe = isParticipant1 === undefined ? undefined : (isParticipant1 ? voteResults?.participant2Votes : voteResults?.participant1Votes);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -177,25 +183,22 @@ export function VotingModal({ isOpen, roomId, opponentName, opponentId, currentU
             </Card>
 
             {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                onClick={() => handleSubmitVote(true)}
-                disabled={submitVoteMutation.isPending}
-                className="flex-1"
-                data-testid="button-vote-continue"
-              >
-                Submit & Continue Debate
-              </Button>
-              <Button
-                onClick={() => handleSubmitVote(false)}
-                disabled={submitVoteMutation.isPending}
-                variant="outline"
-                className="flex-1"
-                data-testid="button-vote-end"
-              >
-                Submit & End Debate
-              </Button>
-            </div>
+            {allowContinue ? (
+              <div className="flex gap-3 pt-4">
+                <Button onClick={() => handleSubmitVote(true)} disabled={submitVoteMutation.isPending} className="flex-1" data-testid="button-vote-continue">
+                  Submit & keep talking
+                </Button>
+                <Button onClick={() => handleSubmitVote(false)} disabled={submitVoteMutation.isPending} variant="outline" className="flex-1" data-testid="button-vote-end">
+                  Submit & finish
+                </Button>
+              </div>
+            ) : (
+              <div className="pt-4">
+                <Button onClick={() => handleSubmitVote(undefined)} disabled={submitVoteMutation.isPending} className="w-full" data-testid="button-vote-submit">
+                  Submit rating
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -225,7 +228,7 @@ export function VotingModal({ isOpen, roomId, opponentName, opponentId, currentU
                       <span className="text-sm">Logical Reasoning</span>
                     </div>
                     <Badge data-testid="badge-result-logical">
-                      {voteResults.participant1Votes?.logicalReasoning || voteResults.participant2Votes?.logicalReasoning} / 5
+                      {ratingOfMe?.logicalReasoning ?? '–'} / 5
                     </Badge>
                   </div>
                   
@@ -235,7 +238,7 @@ export function VotingModal({ isOpen, roomId, opponentName, opponentId, currentU
                       <span className="text-sm">Politeness</span>
                     </div>
                     <Badge data-testid="badge-result-politeness">
-                      {voteResults.participant1Votes?.politeness || voteResults.participant2Votes?.politeness} / 5
+                      {ratingOfMe?.politeness ?? '–'} / 5
                     </Badge>
                   </div>
                   
@@ -245,7 +248,7 @@ export function VotingModal({ isOpen, roomId, opponentName, opponentId, currentU
                       <span className="text-sm">Openness to Change</span>
                     </div>
                     <Badge data-testid="badge-result-openness">
-                      {voteResults.participant1Votes?.opennessToChange || voteResults.participant2Votes?.opennessToChange} / 5
+                      {ratingOfMe?.opennessToChange ?? '–'} / 5
                     </Badge>
                   </div>
                 </div>
@@ -254,9 +257,7 @@ export function VotingModal({ isOpen, roomId, opponentName, opponentId, currentU
 
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-4">
-                {voteResults.participant1Votes?.wantsToContinue && voteResults.participant2Votes?.wantsToContinue
-                  ? "Both participants voted to continue - the debate will enter free-form discussion"
-                  : "At least one participant voted to end - the debate is now concluded"}
+                Both sides have rated. Scores are on the debate page.
               </p>
               <Button onClick={onClose} data-testid="button-close-results">
                 Close

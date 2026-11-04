@@ -14,3 +14,8 @@ The dev bot only ever touches the local DB; production Supabase migrations are r
       and marks existing users who finished onboarding as done, so only new sign-ups see the tour automatically. Without it, `PUT /api/users/me/tutorial` fails.
 
 All four files are idempotent (`IF NOT EXISTS` / duplicate guards).
+
+## Full QA PR (fix/full-qa): no new migration
+- No schema change. Notifications use the existing `notifications` table; ratings use the existing `debate_votes` / `user_debate_stats` tables.
+- [ ] Confirm the production DB session timezone is UTC (`show timezone;`). Timestamps are stored without a zone and the app reads them as UTC.
+      The local dev DB was set to America/Chicago, which made times show 6 hours off; it's now UTC locally. Supabase defaults to UTC.

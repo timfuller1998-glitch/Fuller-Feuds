@@ -204,6 +204,9 @@ export class OpinionService {
       
       // Pass through security context to repository
       const opinion = await this.repository.create(opinionData, requestingUserId, req);
+      // Clear the topic's cached opinion list now; the distribution update below is debounced,
+      // so without this the author's new opinion stayed hidden from the topic page.
+      await invalidateTopicCache(data.topicId);
       
       // 3. Mark that user has an opinion on this topic
       await this.interactionRepository.markHasOpinion(data.userId, data.topicId);
@@ -566,14 +569,15 @@ export class OpinionService {
     
     // Get last update time from cumulative opinion
     const existing = await this.cumulativeOpinionService.getCumulativeOpinion(topicId);
-    const lastUpdateTime = existing?.updatedAt || new Date(0);
+    // postgres-js can't bind Date objects in raw sql — pass an ISO string
+    const lastUpdateTime = new Date(existing?.updatedAt || 0).toISOString();
     
     // Count opinions created since last summary update
     const [sinceUpdateResult] = await db.execute(sql<{ count: number }>`
       SELECT COUNT(*)::integer as count
       FROM opinions
       WHERE topic_id = ${topicId}
-        AND created_at > ${lastUpdateTime}
+        AND created_at > ${lastUpdateTime}::timestamp
         AND status IN ('approved', 'pending')
     `);
     const opinionsSinceUpdate = (sinceUpdateResult as { count: number }).count;

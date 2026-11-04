@@ -158,7 +158,7 @@ export class AnalyticsRepository {
       topicsLast24h: number;
     };
   }> {
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); // ISO string: postgres-js can't bind Date in raw sql
 
     // Get basic counts
     const [userCount] = await db.select({ count: sql<number>`count(*)::int` }).from(users);
@@ -169,17 +169,17 @@ export class AnalyticsRepository {
     const [recentUsers] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(users)
-      .where(sql`${users.createdAt} >= ${twentyFourHoursAgo}`);
+      .where(sql`${users.createdAt} >= ${twentyFourHoursAgo}::timestamp`);
 
     const [recentOpinions] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(opinions)
-      .where(sql`${opinions.createdAt} >= ${twentyFourHoursAgo}`);
+      .where(sql`${opinions.createdAt} >= ${twentyFourHoursAgo}::timestamp`);
 
     const [recentTopics] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(topics)
-      .where(sql`${topics.createdAt} >= ${twentyFourHoursAgo}`);
+      .where(sql`${topics.createdAt} >= ${twentyFourHoursAgo}::timestamp`);
 
     // This would need to be implemented if we had debate rooms table
     // For now, returning 0
