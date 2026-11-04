@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { MessageSquare, Archive } from 'lucide-react';
 import { useDebateContext } from '@/contexts/DebateContext';
 import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
+import { DebateTray } from './DebateTray';
 
 interface GroupedDebate {
   opponentId: string;
@@ -63,17 +64,8 @@ export function DebateFooter() {
         {/* Show different content based on debate state */}
         {hasRecentDebates ? (
           <>
-            {/* More Debates Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openPanel('all-debates')}
-              className="shrink-0"
-              data-testid="button-more-debates"
-            >
-              <MessageSquare className="w-4 h-4 mr-1" />
-              More
-            </Button>
+            {/* NEW: debates tray (all debates + unread badge) replaces the old More button */}
+            <DebateTray />
 
             {/* Avatar Row - Scrollable */}
             <div 
@@ -152,8 +144,8 @@ export function DebateFooter() {
         ) : hasArchivedDebates ? (
           <>
             {/* Only archived debates - show welcoming message with archived button */}
+            <DebateTray />
             <div className="flex-1 flex items-center justify-center gap-3 text-sm text-muted-foreground">
-              <MessageSquare className="w-4 h-4" />
               <span>No active debates right now</span>
             </div>
             <Button
@@ -170,8 +162,8 @@ export function DebateFooter() {
         ) : (
           <>
             {/* No debates at all - show welcome message */}
+            <DebateTray />
             <div className="flex-1 flex items-center justify-center gap-2 text-sm text-muted-foreground py-1">
-              <MessageSquare className="w-4 h-4 flex-shrink-0" />
               <span className="text-center">
                 Start your first debate! Our community values respectful, thoughtful discussions.
               </span>

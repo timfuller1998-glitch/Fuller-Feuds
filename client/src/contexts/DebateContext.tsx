@@ -40,23 +40,19 @@ const DebateContext = createContext<DebateContextType | undefined>(undefined);
 const STORAGE_KEY = 'opinionfeud_debate_windows';
 
 export function DebateProvider({ children }: { children: ReactNode }) {
-  const [openWindows, setOpenWindows] = useState<OpenDebateWindow[]>([]);
+  // Read persisted windows synchronously. Loading them in an effect ran after child effects, so a
+  // debate room page that closed its own popup on mount got the popup restored right after.
+  const [openWindows, setOpenWindows] = useState<OpenDebateWindow[]>(() => {
+    try {
+      const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [activePanel, setActivePanel] = useState<'none' | 'all-debates' | 'archived' | 'opponent-list'>('none');
   const [opponentPanelData, setOpponentPanelData] = useState<{ opponentId: string; opponentName: string } | null>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-
-  // Load persisted windows on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setOpenWindows(parsed);
-      } catch (e) {
-        console.error('Failed to parse stored windows:', e);
-      }
-    }
-  }, []);
 
   // Persist windows to localStorage
   useEffect(() => {

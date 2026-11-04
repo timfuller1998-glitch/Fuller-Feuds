@@ -1,7 +1,12 @@
-## 2026-11-04 (08:12 CST, America/Chicago): Full QA pass, debate notifications and end-of-debate ratings (branch fix/full-qa)
+## 2026-11-04 (08:12 CST, updated 08:31 CST, America/Chicago): Full QA pass, debate notifications and end-of-debate ratings (branch fix/full-qa)
 Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
 - Full end-to-end test with Playwright: alice, bob, admin and fresh sign-ups, on desktop and at 390px. Scripts are in /workspace (ff-qa-*.cjs); videos and screenshots are in /workspace/ff-videos/full-qa/.
-- NEW notifications: a header bell with an unread count, live over WebSocket and saved in the `notifications` table. Types: new debate, your turn, debate ended, rate your opponent, ratings in. Clicking one opens the debate room and marks it read; opening the room clears that room's notifications. `/api/notifications` (list, read-all, read-room, mark one read).
+- NEW debate notifications, saved in the `notifications` table and pushed live over WebSocket. Types: new debate, your turn, debate ended, rate your opponent, ratings in. API: `/api/notifications` (list, read-all, read-room, mark one read).
+- Update after Timothy's review: **no bell in the header any more**, so the search bar gets its full width back. Everything now lives in the footer: a NEW **Debates** button (replaces "More") with a live unread badge opens "Your debates".
+  - The list includes every debate: new invites (highlighted, marked NEW), your turn, their turn, rate now, waiting for their rating, and a Completed section.
+  - Tapping an item opens the debate room and marks its notifications read.
+  - Backed by a new `GET /api/notifications/debates`. Checked in dark, medium and light themes.
+- Also fixed: a debate popup you'd already closed by opening the room page came back after a reload. Saved popups were restored after child pages had run.
 - NEW turn-based flow: 3 turns each, and only the person whose turn it is can post (others get a 409). After 3 turns each, or when someone ends the debate early, it moves to rating.
 - NEW end-of-debate rating: `POST /api/debate-rooms/:id/vote` (Logic, Civility, Openness, 1–5, one rating per person) and `GET /:id/votes`. Scores stay hidden until both sides have rated. A "Final ratings" card shows on the room page, and the opponent's stats update. Added a NEW "Top Rated" leaderboard tab.
 - Bugs fixed:

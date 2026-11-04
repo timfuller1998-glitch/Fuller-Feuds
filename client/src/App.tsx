@@ -37,7 +37,6 @@ import Onboarding from "@/pages/Onboarding";
 import RecentOpinions from "@/pages/RecentOpinions";
 import NotFound from "@/pages/not-found";
 import DebateRoomPage from "@/pages/DebateRoomPage";
-import { NotificationBell } from "@/components/NotificationBell";
 
 function Router() {
   const { isAuthenticated } = useAuth();
@@ -121,7 +120,6 @@ function AppWithSidebar({
               className="w-full"
             />
           </div>
-          {isAuthenticated && <NotificationBell />}
           {!isAuthenticated && (
             <button 
               onClick={() => setLoginDialogOpen(true)}
