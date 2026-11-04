@@ -321,10 +321,9 @@ export default function CardDeck<T>({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Arrows name the direction the cards move: Left sends the top card left (next, like a left swipe);
-    // Right pulls the bottom card out to the right and onto the top (previous, like a right swipe).
-    if (e.key === "ArrowLeft") { e.preventDefault(); step(1); }
-    else if (e.key === "ArrowRight") { e.preventDefault(); step(-1); }
+    // Conventional keys: → next, ← previous. (Swipes stay physical: swipe left = next, swipe right = previous.)
+    if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
   };
 
   if (!currentCard) {
@@ -424,14 +423,14 @@ export default function CardDeck<T>({
 
       {n > 1 && (
         <div className="flex items-center gap-3 z-20">
-          {/* Each arrow points the way the cards move: ‹ slides the top card off to the left (next), › brings the bottom card in from the right (previous). Same as swipes and arrow keys. */}
-          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(1)} aria-label="Next card (slides left)" data-testid="button-deck-next">
+          {/* Conventional buttons: ‹ previous on the left, › next on the right. */}
+          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(-1)} aria-label="Previous card" title="Previous card" data-testid="button-deck-prev">
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <span className="text-sm text-muted-foreground tabular-nums min-w-[3.5rem] text-center" data-testid="text-deck-position">
             {wrap(currentIndex, n) + 1} / {n}
           </span>
-          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(-1)} aria-label="Previous card (slides in from the right)" data-testid="button-deck-prev">
+          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(1)} aria-label="Next card" title="Next card" data-testid="button-deck-next">
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
