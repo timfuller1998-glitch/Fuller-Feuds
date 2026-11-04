@@ -393,7 +393,7 @@ export default function TopicCard({
 
             <div className="absolute top-2 right-2 flex gap-1 z-20 pointer-events-auto">
               {diversityScore !== undefined && (
-                <Badge className="bg-purple-500/90 text-white backdrop-blur-sm" data-testid={`badge-diversity-${id}`}>
+                <Badge className="bg-ai/90 text-white backdrop-blur-sm" data-testid={`badge-diversity-${id}`}>
                   <Activity className="w-3 h-3 mr-1" />
                   {diversityScore}%
                 </Badge>
@@ -403,8 +403,8 @@ export default function TopicCard({
                 <Badge 
                   className={`backdrop-blur-sm ${
                     avgTasteScore > 0 
-                      ? 'bg-pink-500/90 text-white' 
-                      : 'bg-gray-700/90 text-white'
+                      ? 'bg-primary/90 text-white' 
+                      : 'bg-foreground/90 text-white'
                   }`}
                   style={{ opacity: Math.min(1, Math.abs(avgTasteScore) / 100) }}
                 >
@@ -423,8 +423,8 @@ export default function TopicCard({
                 <Badge 
                   className={`backdrop-blur-sm ${
                     avgPassionScore > 0 
-                      ? 'bg-orange-500/90 text-white' 
-                      : 'bg-blue-500/90 text-white'
+                      ? 'bg-warning/90 text-white' 
+                      : 'bg-info/90 text-white'
                   }`}
                   style={{ opacity: Math.min(1, Math.abs(avgPassionScore) / 100) }}
                 >
@@ -564,7 +564,7 @@ export default function TopicCard({
 
             <div className="absolute top-2 right-2 flex gap-1 z-20 pointer-events-auto">
               {diversityScore !== undefined && (
-                <Badge className="bg-purple-500/90 text-white backdrop-blur-sm" data-testid={`badge-diversity-back-${id}`}>
+                <Badge className="bg-ai/90 text-white backdrop-blur-sm" data-testid={`badge-diversity-back-${id}`}>
                   <Activity className="w-3 h-3 mr-1" />
                   {diversityScore}%
                 </Badge>
@@ -574,8 +574,8 @@ export default function TopicCard({
                 <Badge 
                   className={`backdrop-blur-sm ${
                     avgTasteScore > 0 
-                      ? 'bg-pink-500/90 text-white' 
-                      : 'bg-gray-700/90 text-white'
+                      ? 'bg-primary/90 text-white' 
+                      : 'bg-foreground/90 text-white'
                   }`}
                   style={{ opacity: Math.min(1, Math.abs(avgTasteScore) / 100) }}
                 >
@@ -594,8 +594,8 @@ export default function TopicCard({
                 <Badge 
                   className={`backdrop-blur-sm ${
                     avgPassionScore > 0 
-                      ? 'bg-orange-500/90 text-white' 
-                      : 'bg-blue-500/90 text-white'
+                      ? 'bg-warning/90 text-white' 
+                      : 'bg-info/90 text-white'
                   }`}
                   style={{ opacity: Math.min(1, Math.abs(avgPassionScore) / 100) }}
                 >

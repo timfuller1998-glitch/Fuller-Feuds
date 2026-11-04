@@ -331,18 +331,18 @@ export default function LiveStreamPage() {
           )}
         </div>
         {isLive && (
-          <Badge className="bg-red-500 text-white animate-pulse" data-testid="badge-live">
+          <Badge className="bg-destructive text-white animate-pulse" data-testid="badge-live">
             <Radio className="w-3 h-3 mr-1" />
             LIVE
           </Badge>
         )}
         {isScheduled && (
-          <Badge className="bg-blue-500 text-white" data-testid="badge-scheduled">
+          <Badge className="bg-info text-white" data-testid="badge-scheduled">
             Scheduled: {stream.scheduledTime}
           </Badge>
         )}
         {isEnded && (
-          <Badge className="bg-gray-500 text-white" data-testid="badge-ended">
+          <Badge className="bg-muted0 text-white" data-testid="badge-ended">
             Ended
           </Badge>
         )}
@@ -361,7 +361,7 @@ export default function LiveStreamPage() {
         data-testid="container-video"
       >
         {/* Video placeholder */}
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800">
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-foreground to-foreground/90">
           <div className="text-center">
             <Radio className="w-16 h-16 text-white/50 mx-auto mb-4" />
             <p className="text-white/70">Stream Video Player</p>
@@ -371,7 +371,7 @@ export default function LiveStreamPage() {
         {/* Video overlays */}
         <div className="absolute top-4 left-4 flex items-center gap-3">
           {isLive && (
-            <Badge className="bg-red-500 text-white">
+            <Badge className="bg-destructive text-white">
               <Radio className="w-3 h-3 mr-1" />
               LIVE
             </Badge>
@@ -481,10 +481,10 @@ export default function LiveStreamPage() {
                     <div className="flex gap-1">
                       {participant.isMuted ? 
                         <MicOff className="w-4 h-4 text-muted-foreground" /> : 
-                        <Mic className="w-4 h-4 text-green-500" />
+                        <Mic className="w-4 h-4 text-success" />
                       }
                       {participant.isCameraOn ? 
-                        <Camera className="w-4 h-4 text-green-500" /> : 
+                        <Camera className="w-4 h-4 text-success" /> : 
                         <CameraOff className="w-4 h-4 text-muted-foreground" />
                       }
                     </div>

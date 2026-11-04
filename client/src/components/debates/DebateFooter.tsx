@@ -56,7 +56,7 @@ export function DebateFooter() {
 
   return (
     <div 
-      className="relative shrink-0 bg-card border-t border-border shadow-lg z-40 pb-[env(safe-area-inset-bottom)]"
+      className="relative shrink-0 bg-background border-t-[3px] border-double border-foreground z-40 pb-[env(safe-area-inset-bottom)]"
       data-testid="debate-footer"
     >
       <div className="flex items-center gap-2 px-4 py-2 max-w-screen-2xl mx-auto">
@@ -109,7 +109,7 @@ export function DebateFooter() {
                             className="text-xs"
                             style={{ 
                               background: avatarColor,
-                              color: 'white'
+                              color: 'hsl(var(--foreground))'
                             }}
                           >
                             {group.opponentName.slice(0, 2).toUpperCase()}

@@ -780,9 +780,9 @@ export default function Topic() {
 
         {/* Stance tally */}
         <div className="flex items-center gap-2 flex-wrap" data-testid="stance-tally">
-          <Badge className="bg-emerald-600 text-white" data-testid="tally-for">For {stanceTally.for}</Badge>
-          <Badge className="bg-red-600 text-white" data-testid="tally-against">Against {stanceTally.against}</Badge>
-          <Badge className="bg-slate-500 text-white" data-testid="tally-neutral">Neutral {stanceTally.neutral}</Badge>
+          <Badge className="bg-stance-for text-primary-foreground" data-testid="tally-for">For {stanceTally.for}</Badge>
+          <Badge className="bg-stance-against text-primary-foreground" data-testid="tally-against">Against {stanceTally.against}</Badge>
+          <Badge className="bg-stance-neutral text-primary-foreground" data-testid="tally-neutral">Neutral {stanceTally.neutral}</Badge>
           {stanceTally.unstated > 0 && (
             <span className="text-xs text-muted-foreground" data-testid="tally-unstated">
               {stanceTally.unstated} without a stance
@@ -825,9 +825,9 @@ export default function Topic() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <TabsList className="w-full grid grid-cols-3">
-          <TabsTrigger value="ai" className="text-sm md:text-base">AI Summary</TabsTrigger>
-          <TabsTrigger value="yours" className="text-sm md:text-base">Your Opinion</TabsTrigger>
-          <TabsTrigger value="others" className="text-sm md:text-base">Other Opinions</TabsTrigger>
+          <TabsTrigger value="ai">AI Summary</TabsTrigger>
+          <TabsTrigger value="yours">Your Opinion</TabsTrigger>
+          <TabsTrigger value="others">Other Opinions</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ai" className="mt-4">
@@ -1137,7 +1137,7 @@ export default function Topic() {
                                               <AvatarImage src={p.profileImageUrl ?? undefined} />
                                               <AvatarFallback className="text-xs">{p.firstName?.charAt(0)}{p.lastName?.charAt(0)}</AvatarFallback>
                                             </Avatar>
-                                            {p.isOnline && <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card" aria-label="Online" />}
+                                            {p.isOnline && <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-success ring-2 ring-card" aria-label="Online" />}
                                           </span>
                                           <span className="flex-1 min-w-0">
                                             <span className="block truncate text-sm font-medium">{candidateName(p)}</span>
@@ -1288,9 +1288,9 @@ export default function Topic() {
                         className="grid grid-cols-3 gap-2"
                         data-testid="picker-stance"
                       >
-                        <ToggleGroupItem value="for" variant="outline" className="data-[state=on]:bg-emerald-600 data-[state=on]:text-white" data-testid="option-stance-for">For</ToggleGroupItem>
-                        <ToggleGroupItem value="against" variant="outline" className="data-[state=on]:bg-red-600 data-[state=on]:text-white" data-testid="option-stance-against">Against</ToggleGroupItem>
-                        <ToggleGroupItem value="neutral" variant="outline" className="data-[state=on]:bg-slate-500 data-[state=on]:text-white" data-testid="option-stance-neutral">Neutral</ToggleGroupItem>
+                        <ToggleGroupItem value="for" variant="outline" className="data-[state=on]:bg-stance-for data-[state=on]:text-primary-foreground" data-testid="option-stance-for">For</ToggleGroupItem>
+                        <ToggleGroupItem value="against" variant="outline" className="data-[state=on]:bg-stance-against data-[state=on]:text-primary-foreground" data-testid="option-stance-against">Against</ToggleGroupItem>
+                        <ToggleGroupItem value="neutral" variant="outline" className="data-[state=on]:bg-stance-neutral data-[state=on]:text-primary-foreground" data-testid="option-stance-neutral">Neutral</ToggleGroupItem>
                       </ToggleGroup>
                     </FormControl>
                     <FormMessage />

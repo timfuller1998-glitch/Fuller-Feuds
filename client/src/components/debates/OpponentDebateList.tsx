@@ -78,7 +78,7 @@ export function OpponentDebateList() {
               <AvatarFallback 
                 style={{ 
                   background: avatarColor,
-                  color: 'white'
+                  color: 'hsl(var(--foreground))'
                 }}
               >
                 {opponentGroup.opponentName.slice(0, 2).toUpperCase()}

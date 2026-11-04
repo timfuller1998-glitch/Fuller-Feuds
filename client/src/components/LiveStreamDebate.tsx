@@ -192,7 +192,7 @@ export default function LiveStreamDebate({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {isLive && (
-                  <Badge className="bg-red-500 text-white animate-pulse">
+                  <Badge className="bg-destructive text-white animate-pulse">
                     🔴 LIVE
                   </Badge>
                 )}

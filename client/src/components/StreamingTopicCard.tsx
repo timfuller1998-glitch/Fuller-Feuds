@@ -32,13 +32,13 @@ interface StreamingTopicCardProps {
 
 const statusConfig = {
   live: {
-    badge: { text: "🔴 LIVE", className: "bg-red-500 text-white animate-pulse" }
+    badge: { text: "🔴 LIVE", className: "bg-destructive text-white animate-pulse" }
   },
   scheduled: {
-    badge: { text: "📅 Scheduled", className: "bg-blue-500 text-white" }
+    badge: { text: "📅 Scheduled", className: "bg-info text-white" }
   },
   ended: {
-    badge: { text: "🎬 Ended", className: "bg-gray-500 text-white" }
+    badge: { text: "🎬 Ended", className: "bg-muted0 text-white" }
   }
 };
 

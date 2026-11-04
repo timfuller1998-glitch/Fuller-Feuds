@@ -398,18 +398,18 @@ export default function DebateRoomPage() {
           </Badge>
           {/* Connection Status Indicator */}
           {connectionState === 'connected' && (
-            <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
-              <div className="w-2 h-2 rounded-full bg-green-500 mr-1.5 animate-pulse" />
+            <Badge variant="outline" className="bg-success/10 dark:bg-success/15 text-success dark:text-success border-success/30 dark:border-success/30">
+              <div className="w-2 h-2 rounded-full bg-success mr-1.5 animate-pulse" />
               Live
             </Badge>
           )}
           {connectionState === 'connecting' && (
-            <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800">
+            <Badge variant="outline" className="bg-warning/10 dark:bg-warning/15 text-warning dark:text-warning border-warning/30 dark:border-warning/30">
               Connecting...
             </Badge>
           )}
           {connectionState === 'disconnected' && (
-            <Badge variant="outline" className="bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800">
+            <Badge variant="outline" className="bg-destructive/10 dark:bg-destructive/15 text-destructive dark:text-destructive border-destructive/30 dark:border-destructive/30">
               Offline
             </Badge>
           )}

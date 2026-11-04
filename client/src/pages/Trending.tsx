@@ -63,8 +63,8 @@ export default function Trending() {
         <Card>
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-orange-500/10">
-                <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+              <div className="p-2 sm:p-3 rounded-lg bg-warning/10">
+                <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-warning" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-bold" data-testid="stat-trending-count">
@@ -79,8 +79,8 @@ export default function Trending() {
         <Card>
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-blue-500/10">
-                <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+              <div className="p-2 sm:p-3 rounded-lg bg-info/10">
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-info" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-bold" data-testid="stat-total-opinions">
@@ -95,8 +95,8 @@ export default function Trending() {
         <Card>
           <CardContent className="pt-4 sm:pt-6">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-green-500/10">
-                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
+              <div className="p-2 sm:p-3 rounded-lg bg-success/10">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-success" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-bold" data-testid="stat-active-debates">
@@ -137,7 +137,7 @@ export default function Trending() {
             }))}
             renderBadge={(_topic, index) =>
               index < 3 ? (
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center text-white font-bold text-sm shadow-lg ring-2 ring-background" data-testid={`badge-trending-rank-${index + 1}`}>
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary flex items-center justify-center text-white font-bold text-sm shadow-lg ring-2 ring-background" data-testid={`badge-trending-rank-${index + 1}`}>
                   {index + 1}
                 </div>
               ) : null

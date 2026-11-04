@@ -317,10 +317,10 @@ export function DataSeeding({ queriesEnabled = false }: { queriesEnabled?: boole
           </div>
 
           {(importMutation.isSuccess || generateMutation.isSuccess) && (
-            <div className="bg-green-50 dark:bg-green-950 p-4 rounded-md border border-green-200 dark:border-green-800">
+            <div className="bg-success/10 dark:bg-success/15 p-4 rounded-md border border-success/30 dark:border-success/30">
               <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                <p className="text-green-700 dark:text-green-300 font-medium">
+                <CheckCircle className="h-5 w-5 text-success dark:text-success" />
+                <p className="text-success dark:text-success font-medium">
                   {source === 'ai_generate' ? 'Generation Complete!' : 'Import Complete!'}
                 </p>
               </div>
@@ -343,7 +343,7 @@ export function DataSeeding({ queriesEnabled = false }: { queriesEnabled?: boole
               {(importMutation.data?.errors && importMutation.data.errors.length > 0) || 
                (generateMutation.data?.errors && generateMutation.data.errors.length > 0) ? (
                 <div className="mt-2">
-                  <p className="text-sm text-red-600 dark:text-red-400">
+                  <p className="text-sm text-destructive dark:text-destructive">
                     {((importMutation.data || generateMutation.data)?.errors?.length || 0)} error(s) occurred
                   </p>
                 </div>
@@ -352,10 +352,10 @@ export function DataSeeding({ queriesEnabled = false }: { queriesEnabled?: boole
           )}
 
           {(importMutation.isError || generateMutation.isError) && (
-            <div className="bg-red-50 dark:bg-red-950 p-4 rounded-md border border-red-200 dark:border-red-800">
+            <div className="bg-destructive/10 dark:bg-destructive/15 p-4 rounded-md border border-destructive/30 dark:border-destructive/30">
               <div className="flex items-center gap-2">
-                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-                <p className="text-red-700 dark:text-red-300 font-medium">
+                <XCircle className="h-5 w-5 text-destructive dark:text-destructive" />
+                <p className="text-destructive dark:text-destructive font-medium">
                   {(importMutation.error || generateMutation.error) instanceof Error 
                     ? (importMutation.error || generateMutation.error)?.message 
                     : (source === 'ai_generate' ? 'Generation failed' : 'Import failed')}
