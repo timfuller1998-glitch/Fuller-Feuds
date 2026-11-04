@@ -109,7 +109,7 @@ export function DebateFooter() {
                             className="text-xs"
                             style={{ 
                               background: avatarColor,
-                              color: 'hsl(var(--foreground))'
+                              color: 'hsl(30 18% 11%)'
                             }}
                           >
                             {group.opponentName.slice(0, 2).toUpperCase()}

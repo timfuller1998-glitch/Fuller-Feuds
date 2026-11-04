@@ -761,7 +761,7 @@ export default function Topic() {
             </Badge>
           ))}
           {topic.isActive && (
-            <Badge className="bg-chart-1 text-white">
+            <Badge className="bg-chart-1 text-primary-foreground">
               <TrendingUp className="w-3 h-3 mr-1" />
               Active
             </Badge>

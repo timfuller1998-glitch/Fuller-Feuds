@@ -9,10 +9,10 @@ export default {
       boxShadow: {
         sm: "none",
         DEFAULT: "none",
-        md: "3px 3px 0 0 hsl(var(--foreground) / 0.08)",
-        lg: "4px 4px 0 0 hsl(var(--foreground) / 0.10)",
-        xl: "6px 6px 0 0 hsl(var(--foreground) / 0.10)",
-        "2xl": "8px 8px 0 0 hsl(var(--foreground) / 0.12)",
+        md: "3px 3px 0 0 hsl(var(--shadow-ink) / calc(0.08 * var(--shadow-ink-strength, 1)))",
+        lg: "4px 4px 0 0 hsl(var(--shadow-ink) / calc(0.10 * var(--shadow-ink-strength, 1)))",
+        xl: "6px 6px 0 0 hsl(var(--shadow-ink) / calc(0.10 * var(--shadow-ink-strength, 1)))",
+        "2xl": "8px 8px 0 0 hsl(var(--shadow-ink) / calc(0.12 * var(--shadow-ink-strength, 1)))",
       },
       borderRadius: {
         // Editorial: square corners everywhere; rounded-full (avatars, dots) is untouched.

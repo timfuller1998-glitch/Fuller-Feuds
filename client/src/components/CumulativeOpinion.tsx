@@ -52,7 +52,7 @@ export default function CumulativeOpinion({
               </p>
             </div>
           </div>
-          <Badge className={`${confidenceConfig[confidence].color} text-white`}>
+          <Badge className={`${confidenceConfig[confidence].color} text-primary-foreground`}>
             {confidenceConfig[confidence].text}
           </Badge>
         </div>
