@@ -1,3 +1,8 @@
+## 2026-11-04 (05:59 CST, America/Chicago): Screen names show plainly (PR #11 follow-up)
+Made by the Fuller Feuds Dev bot (Grok Bot). Not merged.
+- Checked: the app never adds a "(screen name)" label anywhere. That text was only part of the temporary test name I gave Erin for the first screenshots. Names show plainly: just the screen name, or first and last name if there isn't one.
+- New screenshot with a realistic screen name ("ErinP"): /workspace/ff-videos/display-names/after-v2-mobile.png. The test name was reset afterwards. No app code changes. Typecheck 61.
+
 ## 2026-11-04 (05:52 CST, America/Chicago): Opinion screen names (branch fix/opinion-display-names)
 Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
 - Root cause of "u-erin thinks…": the local seed script `scripts/seed-local-gamification.sql` wrote the user id into the opinion text itself. The app never showed raw ids. The seed now uses the screen name (or first name), and the 17 affected local opinions were rewritten (local DB only).
