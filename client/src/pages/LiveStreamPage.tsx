@@ -331,18 +331,18 @@ export default function LiveStreamPage() {
           )}
         </div>
         {isLive && (
-          <Badge className="bg-destructive text-white animate-pulse" data-testid="badge-live">
+          <Badge className="bg-destructive text-primary-foreground animate-pulse" data-testid="badge-live">
             <Radio className="w-3 h-3 mr-1" />
             LIVE
           </Badge>
         )}
         {isScheduled && (
-          <Badge className="bg-info text-white" data-testid="badge-scheduled">
+          <Badge className="bg-info text-primary-foreground" data-testid="badge-scheduled">
             Scheduled: {stream.scheduledTime}
           </Badge>
         )}
         {isEnded && (
-          <Badge className="bg-muted0 text-white" data-testid="badge-ended">
+          <Badge className="bg-stance-neutral text-primary-foreground" data-testid="badge-ended">
             Ended
           </Badge>
         )}
@@ -371,7 +371,7 @@ export default function LiveStreamPage() {
         {/* Video overlays */}
         <div className="absolute top-4 left-4 flex items-center gap-3">
           {isLive && (
-            <Badge className="bg-destructive text-white">
+            <Badge className="bg-destructive text-primary-foreground">
               <Radio className="w-3 h-3 mr-1" />
               LIVE
             </Badge>

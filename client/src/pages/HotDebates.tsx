@@ -123,7 +123,7 @@ export default function HotDebates() {
               <div key={topic.id} className="relative">
                 {index < 3 && (
                   <div className="absolute -left-2 -top-2 z-10">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary flex items-center justify-center text-white font-bold text-sm shadow-lg">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary flex items-center justify-center text-primary-foreground font-bold text-sm shadow-lg">
                       {index + 1}
                     </div>
                   </div>

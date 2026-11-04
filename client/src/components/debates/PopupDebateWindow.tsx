@@ -191,7 +191,7 @@ export function PopupDebateWindow({
             <AvatarFallback 
               style={{ 
                 background: avatarColor,
-                color: 'hsl(var(--foreground))'
+                color: 'hsl(30 18% 11%)'
               }}
             >
               {opponentName.slice(0, 2).toUpperCase()}
