@@ -1,4 +1,5 @@
 import { db } from '../db.js';
+import { screenFirstNameSql, screenLastNameSql } from '../lib/screenName.js';
 import {
   debateRooms,
   debateMessages,
@@ -299,14 +300,14 @@ export class DebateRepository {
         topic: topics,
         participant1: {
           id: sql<string>`p1.id`,
-          firstName: sql<string>`p1.first_name`,
-          lastName: sql<string>`p1.last_name`,
+          firstName: screenFirstNameSql(sql`p1.id`, sql`p1.first_name`),
+          lastName: screenLastNameSql(sql`p1.id`, sql`p1.last_name`),
           profileImageUrl: sql<string>`p1.profile_image_url`,
         },
         participant2: {
           id: sql<string>`p2.id`,
-          firstName: sql<string>`p2.first_name`,
-          lastName: sql<string>`p2.last_name`,
+          firstName: screenFirstNameSql(sql`p2.id`, sql`p2.first_name`),
+          lastName: screenLastNameSql(sql`p2.id`, sql`p2.last_name`),
           profileImageUrl: sql<string>`p2.profile_image_url`,
         },
       })
@@ -717,14 +718,14 @@ export class DebateRepository {
         topicTitle: topics.title,
         participant1: {
           id: sql<string>`p1.id`,
-          firstName: sql<string | null>`p1.first_name`,
-          lastName: sql<string | null>`p1.last_name`,
+          firstName: screenFirstNameSql(sql`p1.id`, sql`p1.first_name`),
+          lastName: screenLastNameSql(sql`p1.id`, sql`p1.last_name`),
           profileImageUrl: sql<string | null>`p1.profile_image_url`,
         },
         participant2: {
           id: sql<string>`p2.id`,
-          firstName: sql<string | null>`p2.first_name`,
-          lastName: sql<string | null>`p2.last_name`,
+          firstName: screenFirstNameSql(sql`p2.id`, sql`p2.first_name`),
+          lastName: screenLastNameSql(sql`p2.id`, sql`p2.last_name`),
           profileImageUrl: sql<string | null>`p2.profile_image_url`,
         },
       })

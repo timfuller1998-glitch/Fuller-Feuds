@@ -1,4 +1,5 @@
 import { db } from '../db.js';
+import { screenFirstNameSql, screenLastNameSql } from '../lib/screenName.js';
 import { counterpointLikes, opinionSentenceCounterpoints, opinions, users, userDebateStats } from '../../shared/schema.js';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
@@ -53,8 +54,8 @@ export class CounterpointRepository {
         counterpoint: opinionSentenceCounterpoints,
         author: {
           id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
+          firstName: screenFirstNameSql(users.id, users.firstName),
+          lastName: screenLastNameSql(users.id, users.lastName),
           profileImageUrl: users.profileImageUrl,
         },
         likeCount: sql<number>`count(${counterpointLikes.id})::int`,

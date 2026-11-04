@@ -1,4 +1,5 @@
 import { db } from '../db.js';
+import { screenName, screenFirstNameSql, screenLastNameSql } from '../lib/screenName.js';
 import { pool } from '../db.js';
 import { opinions, users, userProfiles, opinionVotes, opinionFlags } from '../../shared/schema.js';
 import { eq, desc, and, or, ne, sql } from 'drizzle-orm';
@@ -357,8 +358,7 @@ export class OpinionRepository {
           userVote,
           author: row.author ? {
             id: row.author.id,
-            firstName: row.author.firstName,
-            lastName: row.author.lastName,
+            ...screenName(row.author, row.profile as any),
             profileImageUrl: row.author.profileImageUrl,
             politicalLeaningScore: row.profile?.economicScore != null && row.profile?.authoritarianScore != null ?
               (row.profile.economicScore + row.profile.authoritarianScore) / 2 : undefined,
@@ -451,8 +451,7 @@ export class OpinionRepository {
           userVote,
           author: row.author ? {
             id: row.author.id,
-            firstName: row.author.firstName,
-            lastName: row.author.lastName,
+            ...screenName(row.author, row.profile as any),
             profileImageUrl: row.author.profileImageUrl,
             politicalLeaningScore: row.profile?.economicScore != null && row.profile?.authoritarianScore != null ?
               (row.profile.economicScore + row.profile.authoritarianScore) / 2 : undefined,
@@ -754,6 +753,8 @@ export class OpinionRepository {
         opinion: opinions,
         author: users,
         profile: sql`NULL`, // Simplified for now
+        screenFirst: screenFirstNameSql(users.id, users.firstName),
+        screenLast: screenLastNameSql(users.id, users.lastName),
       })
       .from(opinions)
       .leftJoin(users, eq(opinions.userId, users.id))
@@ -765,8 +766,8 @@ export class OpinionRepository {
       ...row.opinion,
       author: row.author ? {
         id: row.author.id,
-        firstName: row.author.firstName,
-        lastName: row.author.lastName,
+        firstName: row.screenFirst,
+        lastName: row.screenLast,
         profileImageUrl: row.author.profileImageUrl,
       } : null
     }));

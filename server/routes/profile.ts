@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db.js';
-import { users, userFollows } from '../../shared/schema.js';
+import { users, userFollows, userProfiles } from '../../shared/schema.js';
+import { isAuthenticated } from '../middleware/auth.js';
+import { invalidatePattern } from '../services/cacheService.js';
 import { UserRepository } from '../repositories/userRepository.js';
 import { OpinionRepository } from '../repositories/opinionRepository.js';
 import { sanitizeUserData } from '../utils/authorization.js';
@@ -165,6 +167,40 @@ router.get('/:userId', async (req, res) => {
     }
     console.error('Error fetching profile:', error);
     res.status(500).json({ message: 'Failed to fetch profile' });
+  }
+});
+
+// PATCH /api/profile/:userId: save your own screen name, bio and sort preferences (Settings page).
+// Before this route existed the Settings form fell through to the SPA, so screen names were never saved.
+router.patch('/:userId', isAuthenticated, async (req, res) => {
+  try {
+    const me = req.user as Express.User;
+    if (!me?.id || me.id !== req.params.userId) return res.status(403).json({ message: 'You can only edit your own profile' });
+    const b = req.body ?? {};
+    const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : undefined);
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    const df = str(b.displayFirstName, 50);
+    if (df !== undefined) {
+      if (!df) return res.status(400).json({ message: 'First name is required' });
+      patch.displayFirstName = df;
+      patch.displayLastName = str(b.displayLastName, 50) ?? '';
+    }
+    const bio = str(b.bio, 500);
+    if (bio !== undefined) patch.bio = bio;
+    if (['newest', 'oldest', 'most_liked', 'most_controversial'].includes(b.opinionSortPreference)) patch.opinionSortPreference = b.opinionSortPreference;
+    if (['popular', 'alphabetical', 'newest', 'oldest'].includes(b.categorySortPreference)) patch.categorySortPreference = b.categorySortPreference;
+    const [row] = await db
+      .insert(userProfiles)
+      .values({ userId: me.id, ...patch } as any)
+      .onConflictDoUpdate({ target: userProfiles.userId, set: patch as any })
+      .returning();
+    // Cached opinion/topic lists embed author names; drop them so the new screen name shows right away.
+    await invalidatePattern('topic*');
+    await invalidatePattern('opinion*');
+    res.json({ profile: row });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ message: 'Failed to update profile' });
   }
 });
 
