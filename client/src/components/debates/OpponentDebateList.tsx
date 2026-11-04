@@ -2,33 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { X, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDebateContext } from '@/contexts/DebateContext';
 import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
 import { formatDistanceToNow } from 'date-fns';
-
-interface GroupedDebate {
-  opponentId: string;
-  opponentName: string;
-  opponentAvatar?: string | null;
-  opponentEconomicScore?: number;
-  opponentAuthoritarianScore?: number;
-  debates: Array<{
-    id: string;
-    topicTitle: string;
-    lastMessageAt?: string | null;
-    unreadCount?: number;
-  }>;
-  totalUnread: number;
-  mostRecentActivity?: string | null;
-}
+import { type OpponentGroup, STATE_LABEL, StatusDot, needsYou } from './DebateStatus';
 
 export function OpponentDebateList() {
-  const { activePanel, closePanel, opponentPanelData, openDebateWindow, unreadCounts } = useDebateContext();
+  const { activePanel, closePanel, opponentPanelData, openDebateWindow } = useDebateContext();
   const isOpen = activePanel === 'opponent-list';
 
-  const { data: groupedDebates = [] } = useQuery<GroupedDebate[]>({
+  const { data: groupedDebates = [] } = useQuery<OpponentGroup[]>({
     queryKey: ['/api/debates/grouped'],
     enabled: isOpen,
   });
@@ -87,7 +71,7 @@ export function OpponentDebateList() {
             <div>
               <h2 className="text-lg font-semibold">{opponentGroup.opponentName}</h2>
               <p className="text-sm text-muted-foreground">
-                {opponentGroup.debates.length} {opponentGroup.debates.length === 1 ? 'debate' : 'debates'}
+                {opponentGroup.activeDebates.length} active {opponentGroup.activeDebates.length === 1 ? 'debate' : 'debates'}
               </p>
             </div>
           </div>
@@ -104,12 +88,13 @@ export function OpponentDebateList() {
         {/* Content */}
         <ScrollArea className="flex-1">
           <div className="p-4 space-y-2">
-            {opponentGroup.debates.map((debate) => {
-              const unreadCount = unreadCounts[debate.id] || 0;
-              const lastActivity = debate.lastMessageAt 
-                ? formatDistanceToNow(new Date(debate.lastMessageAt), { addSuffix: true })
+            {opponentGroup.activeDebates.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">No active debates. Finished ones are in Archive.</p>
+            )}
+            {opponentGroup.activeDebates.map((debate) => {
+              const lastActivity = debate.activityAt
+                ? formatDistanceToNow(new Date(debate.activityAt), { addSuffix: true })
                 : 'No messages yet';
-
               return (
                 <button
                   key={debate.id}
@@ -118,22 +103,12 @@ export function OpponentDebateList() {
                   data-testid={`debate-topic-${debate.id}`}
                 >
                   <MessageSquare className="w-5 h-5 shrink-0 text-muted-foreground" />
-                  
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium truncate">{debate.topicTitle}</p>
-                      {unreadCount > 0 && (
-                        <Badge 
-                          variant="destructive" 
-                          className="shrink-0"
-                          data-testid={`badge-unread-${debate.id}`}
-                        >
-                          {unreadCount}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{lastActivity}</p>
+                    <p className="font-medium truncate">{debate.topicTitle}</p>
+                    <p className="text-xs text-muted-foreground">{debate.isNew ? 'New debate' : STATE_LABEL[debate.state]} · {lastActivity}</p>
                   </div>
+                  {debate.isNew ? <StatusDot kind="new" data-testid={`list-dot-new-${debate.id}`} />
+                    : needsYou(debate) ? <StatusDot kind="needs_you" data-testid={`list-dot-needs-${debate.id}`} /> : null}
                 </button>
               );
             })}

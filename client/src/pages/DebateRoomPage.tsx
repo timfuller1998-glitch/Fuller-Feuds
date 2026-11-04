@@ -17,8 +17,11 @@ import { useToast } from "@/hooks/use-toast";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import FallacyBadges from "@/components/FallacyBadges";
 import { VotingModal } from "@/components/VotingModal";
+import { useDebateContext } from "@/contexts/DebateContext";
 import type { FallacyType } from "@shared/fallacies";
 import { useDebateRoom } from "@/hooks/useDebateRoom";
+import { useTypingRooms, useTypingSender } from "@/lib/typingStore";
+import { TypingBubble } from "@/components/debates/TypingBubble";
 
 interface DebateRoom {
   id: string;
@@ -50,7 +53,8 @@ interface User {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string;
+  handle?: string | null;
   profileImageUrl?: string;
 }
 
@@ -76,15 +80,27 @@ export default function DebateRoomPage() {
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{id: string, content: string, timestamp: string}>>([]);
   const [showVotingModal, setShowVotingModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingRooms = useTypingRooms();
+  const typingSender = useTypingSender(roomId);
 
   // WebSocket real-time messaging
-  const { roomState, connectionState, joinRoom, leaveRoom, sendChatMessage, sendTypingEvent } = useDebateRoom();
+  const { roomState, connectionState, joinRoom, leaveRoom, sendChatMessage } = useDebateRoom();
 
   // Fetch debate room
   const { data: room, isLoading: roomLoading } = useQuery<DebateRoom>({
     queryKey: ["/api/debate-rooms", roomId],
     enabled: !!roomId,
+  });
+
+  // Ratings for this debate (NEW: end-of-debate rating step)
+  const { data: votes } = useQuery<{
+    participant1Votes?: { logicalReasoning: number; politeness: number; opennessToChange: number };
+    participant2Votes?: { logicalReasoning: number; politeness: number; opennessToChange: number };
+    myVoteSubmitted: boolean;
+    bothSubmitted: boolean;
+  }>({
+    queryKey: ["/api/debate-rooms", roomId, "votes"],
+    enabled: !!roomId && !!currentUser && (room?.phase === 'voting' || room?.status === 'ended'),
   });
 
   // Fetch topic
@@ -123,11 +139,14 @@ export default function DebateRoomPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId, "messages"] });
+      // Prefix match: refreshes the room (turn, phase) as well as its messages.
+      queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
       setMessageInput("");
     },
-    onError: (error) => {
-      console.error("Failed to send message:", error);
+    onError: (error: any) => {
+      setOptimisticMessages([]);
+      toast({ title: "Message not sent", description: String(error?.message || "").replace(/^\d+:\s*/, "").replace(/^\{"message":"(.*)"\}$/, "$1"), variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
     },
   });
 
@@ -141,9 +160,8 @@ export default function DebateRoomPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
       toast({
         title: "Debate ended",
-        description: "The debate has been concluded.",
+        description: "Now rate your opponent.",
       });
-      navigate("/debates");
     },
     onError: (error) => {
       console.error("Failed to end debate:", error);
@@ -308,12 +326,37 @@ export default function DebateRoomPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [allMessages.length]);
 
-  // Auto-open voting modal when phase transitions to 'voting'
+  // Viewing the room: close its mini popup (avoid two inputs) and clear its bell notifications.
+  const { closeDebateWindow } = useDebateContext();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (roomId) closeDebateWindow(roomId); }, [roomId]);
   useEffect(() => {
-    if (room?.phase === 'voting' && isParticipant && !showVotingModal) {
+    if (!roomId || !currentUser) return;
+    apiRequest('POST', `/api/notifications/read-room/${roomId}`, {})
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
+      })
+      .catch(() => {});
+  }, [roomId, currentUser?.id, messages.length, room?.phase, room?.status]);
+
+  // Once both sides have rated, the dialog steps aside; the scores card on the page shows the result.
+  useEffect(() => {
+    if (votes?.bothSubmitted && showVotingModal) {
+      const t = setTimeout(() => setShowVotingModal(false), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [votes?.bothSubmitted, showVotingModal]);
+
+  // Auto-open the rating dialog once turns are over (or the debate ended) until this debater has rated.
+  const ratingDismissedRef = useRef(false);
+  useEffect(() => {
+    const amParticipant = !!currentUser && (currentUser.id === room?.participant1Id || currentUser.id === room?.participant2Id);
+    const ratingOpen = room?.phase === 'voting' || room?.status === 'ended';
+    if (amParticipant && ratingOpen && votes && !votes.myVoteSubmitted && !showVotingModal && !ratingDismissedRef.current) {
       setShowVotingModal(true);
     }
-  }, [room?.phase, isParticipant, showVotingModal]);
+  }, [room?.phase, room?.status, room?.participant1Id, room?.participant2Id, currentUser, votes, showVotingModal]);
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() || !currentUser) return;
@@ -382,6 +425,9 @@ export default function DebateRoomPage() {
   const isParticipant1 = currentUser?.id === room.participant1Id;
   const currentUserPrivacy = isParticipant1 ? room.participant1Privacy : room.participant2Privacy;
   const isPrivate = currentUserPrivacy === 'private';
+  const opp = isParticipant1 ? participant2 : participant1;
+  const opponentFirstName = opp?.firstName || (opp?.handle ? '@' + opp.handle : 'Opponent');
+  const opponentTypingHere = !!roomId && typingRooms.has(roomId) && room.status === 'active' && room.phase !== 'voting';
 
   return (
     <div className="max-w-5xl mx-auto space-y-4 p-4">
@@ -429,15 +475,15 @@ export default function DebateRoomPage() {
               <Avatar className="w-12 h-12 sm:w-16 sm:h-16">
                 <AvatarImage src={participant1?.profileImageUrl} />
                 <AvatarFallback>
-                  {participant1?.firstName?.[0] || participant1?.email?.[0]?.toUpperCase() || "?"}
-                  {participant1?.lastName?.[0] || participant1?.email?.[1]?.toUpperCase() || "?"}
+                  {participant1?.firstName?.[0] || participant1?.handle?.[0]?.toUpperCase() || "?"}
+                  {participant1?.lastName?.[0] || participant1?.handle?.[1]?.toUpperCase() || "?"}
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-col items-start">
                 <p className="font-semibold text-sm sm:text-base" data-testid={`text-participant-${participant1?.id}`}>
                   {participant1?.firstName && participant1?.lastName
                     ? `${participant1.firstName} ${participant1.lastName}`
-                    : participant1?.email || "Loading..."}
+                    : (participant1?.handle ? '@' + participant1?.handle : undefined) || "Loading..."}
                 </p>
                 <UserHandle handle={(participant1 as any)?.handle} />
                 <Badge variant="outline" className="text-xs">
@@ -457,7 +503,7 @@ export default function DebateRoomPage() {
                 <p className="font-semibold text-sm sm:text-base" data-testid={`text-participant-${participant2?.id}`}>
                   {participant2?.firstName && participant2?.lastName
                     ? `${participant2.firstName} ${participant2.lastName}`
-                    : participant2?.email || "Loading..."}
+                    : (participant2?.handle ? '@' + participant2?.handle : undefined) || "Loading..."}
                 </p>
                 <UserHandle handle={(participant2 as any)?.handle} className="text-right" />
                 <Badge variant="outline" className="text-xs">
@@ -467,8 +513,8 @@ export default function DebateRoomPage() {
               <Avatar className="w-12 h-12 sm:w-16 sm:h-16">
                 <AvatarImage src={participant2?.profileImageUrl} />
                 <AvatarFallback>
-                  {participant2?.firstName?.[0] || participant2?.email?.[0]?.toUpperCase() || "?"}
-                  {participant2?.lastName?.[0] || participant2?.email?.[1]?.toUpperCase() || "?"}
+                  {participant2?.firstName?.[0] || participant2?.handle?.[0]?.toUpperCase() || "?"}
+                  {participant2?.lastName?.[0] || participant2?.handle?.[1]?.toUpperCase() || "?"}
                 </AvatarFallback>
               </Avatar>
             </div>
@@ -509,6 +555,43 @@ export default function DebateRoomPage() {
             End Debate
           </Button>
         </div>
+      )}
+
+      {/* NEW: end-of-debate scores */}
+      {isParticipant && (room.phase === 'voting' || isEnded) && votes && (
+        <Card className="border-2 border-foreground/80" data-testid="card-debate-scores">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-serif text-xl font-bold">
+              {votes.bothSubmitted ? 'Final ratings' : votes.myVoteSubmitted ? 'Rating sent' : 'Rate your opponent'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {votes.bothSubmitted ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[{ id: room.participant1Id, p: participant1, got: votes.participant2Votes }, { id: room.participant2Id, p: participant2, got: votes.participant1Votes }].map(({ id, p, got }) => (
+                  <div key={id} className="rounded-md border p-3" data-testid={`scores-${id === currentUser?.id ? 'me' : 'opponent'}`}>
+                    <div className="font-semibold mb-2">{id === currentUser?.id ? 'You' : (p?.firstName || (p?.handle ? '@' + p.handle : 'Opponent'))}</div>
+                    {got ? (
+                      <ul className="text-sm space-y-1">
+                        <li className="flex justify-between"><span>Logic</span><span className="font-mono">{got.logicalReasoning}/5</span></li>
+                        <li className="flex justify-between"><span>Civility</span><span className="font-mono">{got.politeness}/5</span></li>
+                        <li className="flex justify-between"><span>Openness</span><span className="font-mono">{got.opennessToChange}/5</span></li>
+                        <li className="flex justify-between border-t pt-1 font-semibold"><span>Average</span><span className="font-mono">{((got.logicalReasoning + got.politeness + got.opennessToChange) / 3).toFixed(1)}</span></li>
+                      </ul>
+                    ) : <p className="text-sm text-muted-foreground">No rating.</p>}
+                  </div>
+                ))}
+              </div>
+            ) : votes.myVoteSubmitted ? (
+              <p className="text-sm text-muted-foreground">Thanks. Both sets of scores appear here once your opponent rates you too.</p>
+            ) : (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-sm text-muted-foreground">Turns are over. Score your opponent on logic, civility and openness.</p>
+                <Button size="sm" onClick={() => { ratingDismissedRef.current = false; setShowVotingModal(true); }} data-testid="button-open-rating">Rate now</Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Chat Area - Full Width */}
@@ -563,7 +646,7 @@ export default function DebateRoomPage() {
                   const sender = message.userId === room.participant1Id ? participant1 : participant2;
                   const senderName = sender?.firstName && sender?.lastName
                     ? `${sender.firstName} ${sender.lastName}`
-                    : sender?.email || 'Unknown';
+                    : (sender?.handle ? '@' + sender?.handle : undefined) || 'Unknown';
                   
                   return (
                     <div
@@ -574,8 +657,8 @@ export default function DebateRoomPage() {
                       <Avatar className="w-8 h-8">
                         <AvatarImage src={sender?.profileImageUrl} />
                         <AvatarFallback>
-                          {sender?.firstName?.[0] || sender?.email?.[0]?.toUpperCase() || "?"}
-                          {sender?.lastName?.[0] || sender?.email?.[1]?.toUpperCase() || "?"}
+                          {sender?.firstName?.[0] || sender?.handle?.[0]?.toUpperCase() || "?"}
+                          {sender?.lastName?.[0] || sender?.handle?.[1]?.toUpperCase() || "?"}
                         </AvatarFallback>
                       </Avatar>
                       <div className={`flex-1 max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
@@ -630,9 +713,10 @@ export default function DebateRoomPage() {
           {isParticipant && !isEnded && (
             <div className="border-t p-4">
               {/* Typing Indicator */}
-              {roomState.opponentTyping && (
-                <div className="text-sm text-muted-foreground mb-2 px-1">
-                  <span className="italic">Opponent is typing...</span>
+              {opponentTypingHere && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2 px-1" data-testid="room-typing">
+                  <TypingBubble label={`${opponentFirstName} is typing`} />
+                  <span>{opponentFirstName} is typing…</span>
                 </div>
               )}
               {/* Turn restriction notice */}
@@ -654,33 +738,14 @@ export default function DebateRoomPage() {
                   value={messageInput}
                   onChange={(e) => {
                     setMessageInput(e.target.value);
-                    
-                    // Send typing event
-                    if (e.target.value.length > 0) {
-                      sendTypingEvent(true);
-                      
-                      // Clear typing timeout and set new one
-                      if (typingTimeoutRef.current) {
-                        clearTimeout(typingTimeoutRef.current);
-                      }
-                      typingTimeoutRef.current = setTimeout(() => {
-                        sendTypingEvent(false);
-                      }, 2000);
-                    } else {
-                      sendTypingEvent(false);
-                      if (typingTimeoutRef.current) {
-                        clearTimeout(typingTimeoutRef.current);
-                      }
-                    }
+                    if (e.target.value.length > 0) typingSender.onKey(); else typingSender.stop();
                   }}
+                  onBlur={typingSender.stop}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSendMessage();
-                      sendTypingEvent(false); // Stop typing when sending
-                      if (typingTimeoutRef.current) {
-                        clearTimeout(typingTimeoutRef.current);
-                      }
+                      typingSender.stop();
                     }
                   }}
                   disabled={
@@ -691,7 +756,7 @@ export default function DebateRoomPage() {
                   data-testid="input-message"
                 />
                 <Button
-                  onClick={handleSendMessage}
+                  onClick={() => { handleSendMessage(); typingSender.stop(); }}
                   disabled={
                     !messageInput.trim() || 
                     sendMessageMutation.isPending ||
@@ -746,15 +811,15 @@ export default function DebateRoomPage() {
                       <Avatar>
                         <AvatarImage src={opponent.profileImageUrl} />
                         <AvatarFallback>
-                          {opponent.firstName?.[0] || opponent.email?.[0]?.toUpperCase() || "?"}
-                          {opponent.lastName?.[0] || opponent.email?.[1]?.toUpperCase() || "?"}
+                          {opponent.firstName?.[0] || opponent.handle?.[0]?.toUpperCase() || "?"}
+                          {opponent.lastName?.[0] || opponent.handle?.[1]?.toUpperCase() || "?"}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-medium text-sm">
                           {opponent.firstName && opponent.lastName
                             ? `${opponent.firstName} ${opponent.lastName}`
-                            : opponent.email}
+                            : (opponent.handle ? '@' + opponent.handle : undefined)}
                         </p>
                       </div>
                     </div>
@@ -795,14 +860,16 @@ export default function DebateRoomPage() {
             currentUser.id === room.participant1Id
               ? participant2?.firstName && participant2?.lastName
                 ? `${participant2.firstName} ${participant2.lastName}`
-                : participant2?.email || 'Unknown'
+                : (participant2?.handle ? '@' + participant2?.handle : undefined) || 'Unknown'
               : participant1?.firstName && participant1?.lastName
               ? `${participant1.firstName} ${participant1.lastName}`
-              : participant1?.email || 'Unknown'
+              : (participant1?.handle ? '@' + participant1?.handle : undefined) || 'Unknown'
           }
           opponentId={currentUser.id === room.participant1Id ? room.participant2Id : room.participant1Id}
           currentUserId={currentUser.id}
-          onClose={() => setShowVotingModal(false)}
+          allowContinue={!isEnded}
+          isParticipant1={currentUser.id === room.participant1Id}
+          onClose={() => { ratingDismissedRef.current = true; setShowVotingModal(false); }}
         />
       )}
     </div>

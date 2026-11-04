@@ -1,3 +1,53 @@
+## 2026-11-04 (09:22 CST, America/Chicago): Footer avatars get status dots, a live typing "…", and an Archive for finished debates (branch fix/full-qa)
+Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
+- **Removed the per-message unread number on footer avatars.** It counted every message after you last read, your own messages included, and the room page never cleared it. The old `getGroupedDebateRooms` query is gone. Grouping now lives in NEW `server/lib/userDebates.ts`, which also feeds the footer Debates list, so the two always agree.
+- Still one avatar per person. Each one shows a single indicator, in this order:
+  1. **"…" typing bubble** (animated) while that person is typing in an active debate with you. It overrides the dots because it's momentary and the most actionable signal. The dot comes back once they stop.
+  2. **Green dot:** a new debate invite from them you haven't opened yet.
+  3. **Red dot:** a debate with them needs you (your turn, or rate now).
+  4. Nothing otherwise.
+- Opening the debate clears the green dot, whether you open it from the room page, the Debates list, the person's list, or the popup. The popup now calls read-room too. Dots update live over WebSocket.
+- **Finished debates move to Archive.** "Finished" means both sides rated, or you've rated and are only waiting on theirs.
+  - A debate that ended but you haven't rated stays active with a red "Rate now" dot.
+  - A person whose debates are all finished appears only in Archive. A person with both kinds keeps an avatar for the active ones.
+  - The Archive button shows a count. The Archive panel is rebuilt from the same data: it shows the right opponent and opens the room on tap.
+  - The old 30-day cutoff is dropped, because status now decides.
+  - The Debates list uses the same split; its "Completed" section is now "Archive".
+- **Live typing.**
+  - Debate inputs (room page and popup) send typing start at most every 2s, and stop after 3s idle, on send, or on blur.
+  - On the receiving side the bubble expires after 5s, so a lost "stop" can't leave it stuck.
+  - The room page and popup show "<Name> is typing…" with the same bubble. This replaces the room's old typing text, which never worked because it listened on a socket the server doesn't serve.
+- **WebSocket typing is now locked down.** The server relays it only from a signed-in participant of that room, only while the debate is active and not in rating, and drops repeat "start" events within 1s. Unauthenticated sockets are ignored, as before.
+- Tests: NEW `/workspace/ff-qa-dots.cjs`, 25/25 PASS at 390px and on desktop, covering invite → green live → open clears green → red on your turn → "…" in footer and room → rate → Archive. The earlier `ff-qa-footer.cjs` still passes 36/36. Checked in dark, medium and light themes. Videos and screenshots are in /workspace/ff-videos/footer-dots/.
+- No new migration.
+
+## 2026-11-04 (08:12 CST, updated 08:31 CST, America/Chicago): Full QA pass, debate notifications and end-of-debate ratings (branch fix/full-qa)
+Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
+- Full end-to-end test with Playwright: alice, bob, admin and fresh sign-ups, on desktop and at 390px. Scripts are in /workspace (ff-qa-*.cjs); videos and screenshots are in /workspace/ff-videos/full-qa/.
+- NEW debate notifications, saved in the `notifications` table and pushed live over WebSocket. Types: new debate, your turn, debate ended, rate your opponent, ratings in. API: `/api/notifications` (list, read-all, read-room, mark one read).
+- Update after Timothy's review: **no bell in the header any more**, so the search bar gets its full width back. Everything now lives in the footer: a NEW **Debates** button (replaces "More") with a live unread badge opens "Your debates".
+  - The list includes every debate: new invites (highlighted, marked NEW), your turn, their turn, rate now, waiting for their rating, and a Completed section.
+  - Tapping an item opens the debate room and marks its notifications read.
+  - Backed by a new `GET /api/notifications/debates`. Checked in dark, medium and light themes.
+- Also fixed: a debate popup you'd already closed by opening the room page came back after a reload. Saved popups were restored after child pages had run.
+- NEW turn-based flow: 3 turns each, and only the person whose turn it is can post (others get a 409). After 3 turns each, or when someone ends the debate early, it moves to rating.
+- NEW end-of-debate rating: `POST /api/debate-rooms/:id/vote` (Logic, Civility, Openness, 1–5, one rating per person) and `GET /:id/votes`. Scores stay hidden until both sides have rated. A "Final ratings" card shows on the room page, and the opponent's stats update. Added a NEW "Top Rated" leaderboard tab.
+- Bugs fixed:
+  - Security: the WebSocket trusted any userId, so anyone could pose as anyone. It now uses the session.
+  - `/debate-room/:id` had no route (it 404'd).
+  - The rating dialog posted to an endpoint that didn't exist.
+  - "End debate" sent you to a 404.
+  - When sending a message failed, nothing told you.
+  - The turn badge didn't update.
+  - The popup window covered the room page.
+  - The rating dialog showed the wrong side's scores.
+  - Emails showed as name fallbacks.
+  - **Opinions were saved without their stance** (the repository dropped it).
+  - Posting an opinion on a brand-new topic returned a 500 (a Date was bound in raw SQL), even though the opinion had been saved.
+  - A new opinion didn't appear on the topic page for up to 2 minutes (stale cache).
+  - Two other raw-SQL Date bindings were fixed.
+- Typecheck 57; `vite build` passes. No migration (see DEPLOY-CHECKLIST.md about the DB timezone). QA test data deleted from the local DB.
+
 ## 2026-11-04 (06:45 CST, America/Chicago): Sign-up audit and first-run tutorial (branch feat/first-run-tutorial)
 Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
 - Audit (fresh sign-ups on desktop and at 390px; videos and screenshots in /workspace/ff-videos/signup-audit/):

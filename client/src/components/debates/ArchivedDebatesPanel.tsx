@@ -6,32 +6,22 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDebateContext } from '@/contexts/DebateContext';
 import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
 import { formatDistanceToNow } from 'date-fns';
+import { useLocation } from 'wouter';
+import { type OpponentGroup, type UserDebate, STATE_LABEL } from './DebateStatus';
 
-interface ArchivedDebate {
-  id: string;
-  topicId: string;
-  topicTitle: string;
-  participant1Id: string;
-  participant2Id: string;
-  participant1Name: string;
-  participant2Name: string;
-  participant1Avatar?: string | null;
-  participant2Avatar?: string | null;
-  participant1EconomicScore?: number;
-  participant1AuthoritarianScore?: number;
-  participant2EconomicScore?: number;
-  participant2AuthoritarianScore?: number;
-  endedAt?: string | null;
-}
-
+/** Archive = finished debates (both rated, or you rated and are waiting on theirs), newest first, by person. */
 export function ArchivedDebatesPanel() {
   const { activePanel, closePanel } = useDebateContext();
+  const [, navigate] = useLocation();
   const isOpen = activePanel === 'archived';
 
-  const { data: archivedDebates = [], isLoading } = useQuery<ArchivedDebate[]>({
-    queryKey: ['/api/debates/archived'],
+  const { data: groups = [], isLoading } = useQuery<OpponentGroup[]>({
+    queryKey: ['/api/debates/grouped'],
     enabled: isOpen,
   });
+  const archivedDebates = groups.flatMap((g) => g.finishedDebates ?? [])
+    .sort((a, b) => (b.endedAt ?? b.activityAt ?? '').localeCompare(a.endedAt ?? a.activityAt ?? ''));
+  const open = (id: string) => { closePanel(); navigate(`/debate-room/${id}`); };
 
   if (!isOpen) return null;
 
@@ -53,7 +43,7 @@ export function ArchivedDebatesPanel() {
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
             <ArchiveIcon className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">Archived Debates</h2>
+            <h2 className="text-lg font-semibold">Archive</h2>
           </div>
           <Button
             variant="ghost"
@@ -77,13 +67,13 @@ export function ArchivedDebatesPanel() {
                 <Inbox className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
                 <p className="text-muted-foreground">No archived debates</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Completed debates will appear here
+                  Finished debates move here once rated
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
                 {archivedDebates.map((debate) => (
-                  <ArchivedDebateCard key={debate.id} debate={debate} />
+                  <ArchivedDebateCard key={debate.id} debate={debate} onOpen={() => open(debate.id)} />
                 ))}
               </div>
             )}
@@ -94,42 +84,28 @@ export function ArchivedDebatesPanel() {
   );
 }
 
-function ArchivedDebateCard({ debate }: { debate: ArchivedDebate }) {
-  // Determine which participant is the opponent (not the current user)
-  // For now, just show participant2 as the opponent
-  const opponentName = debate.participant2Name;
-  const opponentAvatar = debate.participant2Avatar;
-  const avatarColor = get2DPoliticalCompassColor(
-    debate.participant2EconomicScore || 0,
-    debate.participant2AuthoritarianScore || 0
-  );
-
-  const endedTime = debate.endedAt 
-    ? formatDistanceToNow(new Date(debate.endedAt), { addSuffix: true })
-    : 'Recently';
-
+function ArchivedDebateCard({ debate, onOpen }: { debate: UserDebate; onOpen: () => void }) {
+  const avatarColor = get2DPoliticalCompassColor(0, 0);
+  const when = debate.endedAt ?? debate.activityAt;
   return (
-    <div
-      className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border"
+    <button
+      onClick={onOpen}
+      className="w-full text-left flex items-start gap-3 p-3 rounded-lg bg-muted/30 border hover-elevate"
       data-testid={`archived-debate-${debate.id}`}
     >
       <Avatar className="w-10 h-10 border-2" style={{ borderColor: avatarColor }}>
-        <AvatarImage src={opponentAvatar || undefined} />
-        <AvatarFallback 
-          style={{ 
-            background: avatarColor,
-            color: 'hsl(30 18% 11%)'
-          }}
-        >
-          {opponentName.slice(0, 2).toUpperCase()}
+        <AvatarImage src={debate.opponentAvatar || undefined} />
+        <AvatarFallback style={{ background: avatarColor, color: 'hsl(30 18% 11%)' }}>
+          {debate.opponentName.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
-
       <div className="flex-1 min-w-0">
         <p className="font-medium truncate">{debate.topicTitle}</p>
-        <p className="text-sm text-muted-foreground">vs {opponentName}</p>
-        <p className="text-xs text-muted-foreground mt-1">Ended {endedTime}</p>
+        <p className="text-sm text-muted-foreground">vs {debate.opponentName}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {STATE_LABEL[debate.state]}{when ? ` · ${formatDistanceToNow(new Date(when), { addSuffix: true })}` : ''}
+        </p>
       </div>
-    </div>
+    </button>
   );
 }

@@ -3,6 +3,7 @@ import { isAuthenticated } from '../middleware/auth.js';
 import { CounterpointService } from '../services/counterpointService.js';
 import { DebateService } from '../services/debateService.js';
 import { notifyNewDebateCreated } from '../websocket.js';
+import { postDebateMessage, notifyDebateInvite, displayNameOf } from '../lib/debateFlow.js';
 import { CounterpointRepository } from '../repositories/counterpointRepository.js';
 import { getPresenceForUserIds } from '../websocket.js';
 import { db } from '../db.js';
@@ -127,13 +128,14 @@ router.post('/:id/start-debate', isAuthenticated, async (req, res) => {
     // Seed an opening message so context is immediate
     const opening = `Counterpoint to paragraph ${counterpoint.sentenceIndex + 1}:\n\n${counterpoint.content}`;
     try {
-      await debateService.sendMessage(room.id, requestingUserId, opening, requestingUserId, req.userRole, req);
+      await postDebateMessage(room.id, requestingUserId, opening, req.userRole, req, { silent: true }); // the invite notification covers it
     } catch (e) {
       // Non-fatal: debate room exists even if seeding fails
     }
 
     // Notify opponent in realtime (if connected)
-    notifyNewDebateCreated(room.id, 'New debate', opponentUserId);
+    notifyNewDebateCreated(room.id, await displayNameOf(requestingUserId), opponentUserId);
+    await notifyDebateInvite(room.id, requestingUserId, opponentUserId, opinion.topicId);
 
     res.json(room);
   } catch (error: any) {

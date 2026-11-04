@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Minimize2, X, Send, GripVertical } from 'lucide-react';
+import { Minimize2, X, Send, GripVertical, Maximize2 } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useDebateContext } from '@/contexts/DebateContext';
@@ -10,6 +11,8 @@ import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTypingRooms, useTypingSender } from '@/lib/typingStore';
+import { TypingBubble } from './TypingBubble';
 
 interface Message {
   id: string;
@@ -28,6 +31,7 @@ interface DebateRoom {
   participant1Name: string;
   participant2Name: string;
   status: string;
+  phase?: 'structured' | 'voting' | 'free-form';
   currentTurn?: string | null;
 }
 
@@ -49,6 +53,8 @@ export function PopupDebateWindow({
   const { user } = useAuth();
   const { minimizeDebateWindow, closeDebateWindow, updateWindowPosition, clearUnread } = useDebateContext();
   const [message, setMessage] = useState('');
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [, setLocation] = useLocation();
   const [position, setPosition] = useState(initialPosition || { x: 100, y: 100 });
   // Phones: full-screen sheet sized to the visual viewport so the on-screen keyboard never covers the input.
   const isMobile = useIsMobile();
@@ -99,9 +105,26 @@ export function PopupDebateWindow({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms', debateRoomId, 'messages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/debates/grouped'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms', debateRoomId] });
       setMessage('');
+      setSendError(null);
     },
+    onError: (err: any) => setSendError(String(err?.message || 'Could not send').replace(/^\d+:\s*/, '').replace(/^\{"message":"(.*)"\}$/, '$1')),
   });
+
+  const typingRooms = useTypingRooms();
+  const opponentTyping = typingRooms.has(debateRoomId);
+  const typingSender = useTypingSender(debateRoomId);
+
+  // Opening the popup counts as opening the debate: clears its green "new" dot and list badges.
+  useEffect(() => {
+    apiRequest('POST', `/api/notifications/read-room/${debateRoomId}`, {})
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/debates/grouped'] });
+      })
+      .catch(() => {});
+  }, [debateRoomId]);
 
   // Mark as read
   useEffect(() => {
@@ -172,7 +195,10 @@ export function PopupDebateWindow({
 
   const avatarColor = get2DPoliticalCompassColor(0, 0);
   const isMyTurn = room?.currentTurn === user?.id;
-  const canSend = !room || room.status === 'active';
+  const isOver = !!room && (room.status !== 'active' || room.phase === 'voting');
+  const waiting = !!room && room.status === 'active' && room.phase === 'structured' && !!room.currentTurn && !isMyTurn;
+  const canSend = !room || (!isOver && !waiting);
+  const openFull = () => { minimizeDebateWindow(debateRoomId); setLocation(`/debate-room/${debateRoomId}`); };
 
   return (
     <div 
@@ -213,6 +239,16 @@ export function PopupDebateWindow({
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={isMobile ? "w-10 h-10" : "w-7 h-7"}
+            onClick={openFull}
+            aria-label="Open full debate page"
+            data-testid="button-open-full-debate"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -270,11 +306,27 @@ export function PopupDebateWindow({
       </div>
 
       {/* Turn Indicator */}
-      {room && isMyTurn && canSend && (
-        <div className="px-3 py-1 text-xs text-center bg-primary/10 text-primary border-t">
+      {room && isMyTurn && canSend && room.phase === 'structured' && (
+        <div className="px-3 py-1 text-xs text-center bg-primary/10 text-primary border-t" data-testid="text-popup-your-turn">
           Your turn to respond
         </div>
       )}
+      {waiting && (
+        <div className="px-3 py-1 text-xs text-center bg-muted text-muted-foreground border-t" data-testid="text-popup-waiting">
+          Waiting for {opponentName} to reply
+        </div>
+      )}
+      {isOver && (
+        <button className="w-full px-3 py-2 text-sm font-semibold text-center bg-primary text-primary-foreground border-t" onClick={openFull} data-testid="button-popup-rate">
+          Turns are over. Rate your opponent →
+        </button>
+      )}
+      {opponentTyping && !isOver && (
+        <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground border-t" data-testid="popup-typing">
+          <TypingBubble size="sm" label={`${opponentName} is typing`} /> {opponentName} is typing…
+        </div>
+      )}
+      {sendError && <div className="px-3 py-1 text-xs text-destructive border-t" data-testid="text-popup-send-error">{sendError}</div>}
 
       {/* Input */}
       <div className="p-3 border-t">
@@ -282,16 +334,17 @@ export function PopupDebateWindow({
           <input
             type="text"
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={canSend ? "Type a message..." : "Debate ended"}
+            onChange={(e) => { setMessage(e.target.value); if (e.target.value) typingSender.onKey(); else typingSender.stop(); }}
+            onBlur={typingSender.stop}
+            onKeyPress={(e) => { if (e.key === 'Enter') typingSender.stop(); handleKeyPress(e); }}
+            placeholder={canSend ? "Type a message..." : waiting ? "Wait for your turn" : "Debate ended"}
             disabled={!canSend || sendMutation.isPending}
             className="flex-1 min-w-0 px-3 py-2 text-base sm:text-sm rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             data-testid="input-message"
           />
           <Button
             size="icon"
-            onClick={handleSend}
+            onClick={() => { typingSender.stop(); handleSend(); }}
             disabled={!message.trim() || !canSend || sendMutation.isPending}
             data-testid="button-send"
           >

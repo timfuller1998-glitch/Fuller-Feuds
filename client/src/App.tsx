@@ -36,6 +36,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import Onboarding from "@/pages/Onboarding";
 import RecentOpinions from "@/pages/RecentOpinions";
 import NotFound from "@/pages/not-found";
+import DebateRoomPage from "@/pages/DebateRoomPage";
 
 function Router() {
   const { isAuthenticated } = useAuth();
@@ -46,6 +47,7 @@ function Router() {
       {isAuthenticated && <Route path="/onboarding" component={Onboarding} />}
       {isAuthenticated && <Route path="/settings" component={Settings} />}
       {isAuthenticated && <Route path="/admin" component={AdminDashboard} />}
+      {isAuthenticated && <Route path="/debate-room/:id" component={DebateRoomPage} />}
       
       {/* Public routes - visible to everyone */}
       <Route path="/" component={Home} />

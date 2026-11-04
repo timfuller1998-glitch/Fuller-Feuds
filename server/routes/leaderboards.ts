@@ -51,6 +51,18 @@ const CATEGORIES: Category[] = [
         ) a GROUP BY user_id`,
   },
   {
+    // NEW: points from end-of-debate ratings (logic + civility + openness, 1–5 each, per opponent rating)
+    id: 'topRatedDebaters',
+    title: 'Top Rated Debaters',
+    unit: 'rating points',
+    description: 'Points from opponents rating logic, civility and openness after each debate',
+    valueSql: (topicId) => sql`
+      SELECT v.voted_for_user_id AS user_id, SUM(v.logical_reasoning + v.politeness + v.openness_to_change)::int AS value
+      FROM debate_votes v
+      ${topicId ? sql`JOIN debate_rooms r ON r.id = v.room_id WHERE r.topic_id = ${topicId}` : sql``}
+      GROUP BY v.voted_for_user_id`,
+  },
+  {
     id: 'mostFollowers',
     title: 'Most Followers',
     unit: 'followers',
@@ -111,7 +123,7 @@ router.get('/', async (req, res) => {
     const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 10;
     const meId = (typeof req.query.userId === 'string' && req.query.userId) || (req.user as Express.User | undefined)?.id;
     const topicId = typeof req.query.topicId === 'string' && /^[0-9a-f-]{36}$/i.test(req.query.topicId) ? req.query.topicId : undefined;
-    const cats = topicId ? CATEGORIES.filter((c) => c.id === 'mostLiked' || c.id === 'mostActive') : CATEGORIES;
+    const cats = topicId ? CATEGORIES.filter((c) => c.id === 'mostLiked' || c.id === 'mostActive' || c.id === 'topRatedDebaters') : CATEGORIES;
     const categories = await Promise.all(cats.map((c) => rankCategory(c, limit, meId, topicId)));
     res.json({ scope: topicId ? { topicId } : 'global', userId: meId ?? null, categories });
   } catch (error) {
