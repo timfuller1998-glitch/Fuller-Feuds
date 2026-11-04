@@ -1,3 +1,9 @@
+## 2026-11-03 (21:05 CST, America/Chicago): Merged PR #7 and PR #8
+Made by the Fuller Feuds Dev bot (Grok Bot), on Timothy's OK ("Looks good, merge both").
+- PR #7 (Editorial redesign) merged into main as 681d325.
+- PR #8 (Editorial dark/dusk modes, saved-theme boot fix) retargeted to main and merged as 2a5de51, with no conflicts.
+- Main after both merges: typecheck at 61 errors (no change); `vite build` succeeds.
+
 ## 2026-11-03 (21:45 CST, America/Chicago) — Editorial dark mode (branch design/editorial-dark, stacked on design/editorial / PR #7)
 Made by the Fuller Feuds Dev bot (Grok Bot). Not merged.
 - Dark mode is now Editorial at night: ink-brown paper (`30 14% 9%`), cream type, and a brightened red accent (`4 72% 66%`) with dark-ink text on red buttons. It keeps the same Playfair, Source Serif, Inter caps and Anton wordmark, the square corners and the double rules.
