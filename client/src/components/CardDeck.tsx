@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
-import { motion, animate, useMotionValue, useTransform, useReducedMotion, PanInfo } from "framer-motion";
+import { motion, animate, useMotionValue, useTransform, useReducedMotion, PanInfo, type MotionValue } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -84,7 +84,7 @@ const BACK_LAYERS = [2] as const; // blank backs beyond the second card
 const backStyle = (d: number) => ({ y: 7 * d, scale: 1 - 0.035 * d });
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-type Role = "top" | "next" | "out" | "in";
+type Role = "top" | "next" | "out" | "in" | "peek";
 
 interface DeckCardProps {
   cardKey: string;
@@ -93,6 +93,9 @@ interface DeckCardProps {
   reduceMotion: boolean;
   draggable: boolean;
   onDragEnd?: (info: PanInfo, releaseX: number) => void;
+  onDrag?: (info: PanInfo) => void;
+  /** Rightward drag distance; the bottom ("peek") card emerges from behind the deck by this much. */
+  pull?: MotionValue<number>;
   onDone?: () => void;
   children: (isTop: boolean) => ReactNode;
 }
@@ -102,12 +105,13 @@ interface DeckCardProps {
  * keeps its own content and position; it is never re-used for another topic.
  * Outer values = deck placement/shuffle animation, inner x = finger drag.
  */
-function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, onDone, children }: DeckCardProps) {
+function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, onDrag, pull, onDone, children }: DeckCardProps) {
   const first = useRef(true);
+  const narrow = typeof window !== "undefined" && window.innerWidth < 640;
   const s1 = backStyle(1);
   const s2 = backStyle(2);
   const start =
-    role === "in" ? { y: s2.y, scale: s2.scale, z: 3 } : role === "next" ? { y: s1.y, scale: s1.scale, z: 5 } : { y: 0, scale: 1, z: 10 };
+    role === "in" || role === "peek" ? { y: s2.y, scale: s2.scale, z: role === "peek" ? 0 : 3 } : role === "next" ? { y: s1.y, scale: s1.scale, z: 5 } : { y: 0, scale: 1, z: 10 };
   const ox = useMotionValue(0);
   const oy = useMotionValue(start.y);
   const os = useMotionValue(start.scale);
@@ -120,6 +124,8 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
 
   useEffect(() => {
     const out = width * 1.12;
+    // How far the bottom card is pulled out on a backward move. On phones keep it partly on screen.
+    const pullTarget = narrow ? width * 0.55 : out * 0.92;
     let cancelled = false;
     const anims: { stop: () => void }[] = [];
     const go = (mv: any, to: number, duration: number) => {
@@ -130,9 +136,28 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
     const run = async () => {
       if (role === "top") {
         oz.set(10);
+        // Phones: while the bottom card is being pulled out to the right, nudge the top card left and
+        // shrink it a touch so the emerging card is clearly visible. The emerging card sits between the
+        // top card and the 2nd card, so the 2nd card is never uncovered.
+        if (pull && narrow) {
+          const follow = (v: number) => {
+            const f = Math.min(Math.max(v, 0) / (width * 0.55), 1);
+            ox.set(-f * 0.22 * width); os.set(1 - f * 0.05);
+          };
+          const unsub = pull.on("change", follow);
+          anims.push({ stop: unsub });
+        }
         if (first.current) return;
         go(ox, 0, 0.3); go(oy, 0, 0.3); go(os, 1, 0.3); go(orot, 0, 0.3);
       } else if (role === "next") {
+        // A card that was just on top (backward swipe) sinks to the next slot from wherever the finger
+        // released it: hand the drag offset to the outer layer so it never springs back first.
+        if (ix.get() !== 0) {
+          ix.stop();
+          ox.set(ox.get() + ix.get());
+          orot.set(orot.get() + irot.get());
+          ix.set(0);
+        }
         oz.set(5);
         go(ox, 0, 0.3); go(oy, s1.y, 0.3); go(os, s1.scale, 0.3); go(orot, 0, 0.3);
       } else if (role === "out") {
@@ -149,13 +174,30 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         oz.set(0); // now strictly behind every other card, including the blank back
         await Promise.all([go(ox, 0, 0.28), go(orot, 0, 0.28), go(oy, s2.y, 0.28), go(os, s2.scale, 0.28)]);
         if (!cancelled) doneRef.current?.();
+      } else if (role === "peek") {
+        // Bottom card hidden behind the plain backs; a rightward drag slides it out from behind.
+        oz.set(0); oy.set(s2.y); os.set(s2.scale);
+        if (pull) {
+          const follow = (v: number) => {
+            oz.set(v > 2 ? 6 : 0); // above the 2nd card while emerging, hidden behind the backs at rest
+            ox.set(Math.min(Math.max(v, 0) * 0.9, pullTarget)); orot.set(Math.min(Math.max(v, 0), 300) / 300 * 7); };
+          follow(pull.get());
+          const unsub = pull.on("change", follow);
+          anims.push({ stop: unsub });
+        }
       } else if (role === "in") {
-        // Backward: pulled out from under the deck to the right, then laid on top.
-        oz.set(3);
-        await Promise.all([go(ox, out * 0.92, 0.22), go(orot, 7, 0.22), go(oy, 4, 0.22), go(os, 0.98, 0.22)]);
+        // Backward (mirror of forward): the bottom card is pulled out from BEHIND the deck to the right
+        // (continuing from wherever the finger's pull left it), then laid over the top card, which only
+        // sinks one step down. The top card never slides away, so the 2nd card is never uncovered.
+        oz.set(6);
+        const target = pullTarget;
+        const left = Math.max(0, target - ox.get());
+        const d1 = Math.max(0.1, 0.22 * (left / target));
+        await Promise.all([go(ox, target, d1), go(orot, 7, d1), go(oy, 4, d1), go(os, 0.98, d1)]);
         if (cancelled) return;
         oz.set(15);
-        await Promise.all([go(ox, 0, 0.26), go(orot, 0, 0.26), go(oy, 0, 0.26), go(os, 1, 0.26)]);
+        await Promise.all([go(ox, 0, 0.28), go(orot, 0, 0.28), go(oy, 0, 0.28), go(os, 1, 0.28)]);
+        if (cancelled) return;
         if (!cancelled) doneRef.current?.();
       }
     };
@@ -177,9 +219,11 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
       <motion.div
         className={isTop ? "absolute inset-0 cursor-grab active:cursor-grabbing" : "absolute inset-0"}
         drag={isTop && draggable ? "x" : false}
-        dragElastic={0.9}
+        // Rightward drags must not move the top card (that would uncover the 2nd card); they pull the bottom card out instead.
+        dragElastic={{ left: 0.9, right: 0, top: 0, bottom: 0 }}
         dragConstraints={{ left: 0, right: 0 }}
         dragTransition={{ bounceStiffness: 400, bounceDamping: 30 }}
+        onDrag={isTop ? (_e, info) => onDrag?.(info) : undefined}
         onDragEnd={isTop ? (_e, info) => onDragEnd?.(info, ix.get()) : undefined}
         style={{ x: ix, rotate: irot, touchAction: "pan-y" }}
       >
@@ -230,6 +274,8 @@ export default function CardDeck<T>({
   const currentCard = n > 0 ? topics[wrap(currentIndex, n)] : null;
   const nextCard = n > 1 ? topics[wrap(currentIndex + 1, n)] : null;
   const busy = !!outgoing || !!incomingId;
+  const pull = useMotionValue(0);
+  const prevCard = n > 2 ? topics[wrap(currentIndex - 1, n)] : null;
 
   /** Move through the deck; flips the top card back first if it is showing its back. */
   const step = useCallback((dir: 1 | -1) => {
@@ -260,6 +306,7 @@ export default function CardDeck<T>({
     if (Math.abs(velocity.x) > SWIPE_VELOCITY_THRESHOLD) dir = velocity.x < 0 ? 1 : -1;
     else if (offset.x <= -SWIPE_OFFSET_THRESHOLD) dir = 1;
     else if (offset.x >= SWIPE_OFFSET_THRESHOLD) dir = -1;
+    if (dir !== -1) animate(pull, 0, { duration: 0.2 });
     if (dir === 0) return; // framer springs the card back to center
     step(dir);
   };
@@ -274,6 +321,7 @@ export default function CardDeck<T>({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Conventional keys: → next, ← previous. (Swipes stay physical: swipe left = next, swipe right = previous.)
     if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
   };
@@ -308,6 +356,9 @@ export default function CardDeck<T>({
   if (nextCard && getKey(nextCard) !== getKey(currentCard) && !entries.some((e) => getKey(e.card) === getKey(nextCard))) {
     entries.push({ card: nextCard, role: "next", key: `card-${getKey(nextCard)}` });
   }
+  if (!busy && prevCard && getKey(prevCard) !== getKey(currentCard) && !entries.some((e) => getKey(e.card) === getKey(prevCard))) {
+    entries.unshift({ card: prevCard, role: "peek", key: `card-${getKey(prevCard)}` });
+  }
   entries.push({ card: currentCard, role: incomingId === getKey(currentCard) ? "in" : "top", key: `card-${getKey(currentCard)}` });
 
   return (
@@ -332,8 +383,8 @@ export default function CardDeck<T>({
               aria-hidden
             >
               {/* Plain card back: only the bottom edge shows, no text can bleed through */}
-              <div className="w-full h-full rounded-xl border bg-card shadow-md overflow-hidden">
-                <div className="w-full h-full bg-gradient-to-br from-primary/10 via-muted/40 to-primary/5" />
+              <div className="w-full h-full rounded-xl border bg-card shadow-md overflow-hidden deck-card-surface">
+                <div className="w-full h-full bg-gradient-to-br from-primary/10 via-muted/40 to-primary/5 dark:from-foreground/[0.04] dark:via-transparent dark:to-foreground/[0.02]" />
               </div>
             </div>
           );
@@ -348,13 +399,15 @@ export default function CardDeck<T>({
             reduceMotion={reduceMotion}
             draggable={n > 1 && !busy}
             onDragEnd={handleDragEnd}
+            onDrag={(info) => pull.set(Math.max(0, info.offset.x))}
+            pull={role === "peek" || role === "top" ? pull : undefined}
             onDone={
-              role === "out" ? () => setOutgoing(null) : role === "in" ? () => setIncomingId(null) : undefined
+              role === "out" ? () => setOutgoing(null) : role === "in" ? () => { pull.set(0); setIncomingId(null); } : undefined
             }
           >
             {(isTop) => (
               <>
-                <div className={`w-full h-full rounded-xl ${isTop ? "shadow-xl" : "shadow-md overflow-hidden bg-card"}`}>
+                <div className={`w-full h-full rounded-xl deck-card-surface ${isTop ? "shadow-xl" : "shadow-md overflow-hidden bg-card"}`}>
                   {renderFace(card, isTop)}
                 </div>
                 {isTop && renderBadge && (
@@ -370,13 +423,14 @@ export default function CardDeck<T>({
 
       {n > 1 && (
         <div className="flex items-center gap-3 z-20">
-          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(-1)} aria-label="Previous card" data-testid="button-deck-prev">
+          {/* Conventional buttons: ‹ previous on the left, › next on the right. */}
+          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(-1)} aria-label="Previous card" title="Previous card" data-testid="button-deck-prev">
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <span className="text-sm text-muted-foreground tabular-nums min-w-[3.5rem] text-center" data-testid="text-deck-position">
             {wrap(currentIndex, n) + 1} / {n}
           </span>
-          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(1)} aria-label="Next card" data-testid="button-deck-next">
+          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(1)} aria-label="Next card" title="Next card" data-testid="button-deck-next">
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
