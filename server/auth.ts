@@ -5,6 +5,7 @@ import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { UserRepository } from "./repositories/userRepository.js";
+import { checkHandle, isHandleConflict } from "./lib/handles.js";
 
 const userRepository = new UserRepository();
 
@@ -111,7 +112,7 @@ export async function setupAuth(app: Express) {
   // Register endpoint
   app.post("/api/register", async (req, res) => {
     try {
-      const { email, password, firstName, lastName } = req.body;
+      const { email, password, firstName, lastName, handle } = req.body;
 
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
@@ -123,6 +124,15 @@ export async function setupAuth(app: Express) {
         return res.status(400).json({ message: "Email already registered" });
       }
 
+      // @handle picked at sign-up (optional for older clients: one is generated from the name if missing)
+      let chosenHandle: string | undefined;
+      if (handle) {
+        const hc = await checkHandle(String(handle));
+        if (!hc.valid) return res.status(400).json({ message: `Handle: ${hc.reason}`, suggestion: hc.suggestion });
+        if (!hc.available) return res.status(409).json({ message: hc.reason, suggestion: hc.suggestion });
+        chosenHandle = hc.handle;
+      }
+
       // Hash password
       const passwordHash = await bcrypt.hash(password, 10);
 
@@ -132,6 +142,7 @@ export async function setupAuth(app: Express) {
         passwordHash,
         firstName: firstName || "",
         lastName: lastName || "",
+        handle: chosenHandle,
       });
 
       // Log user in
@@ -148,10 +159,12 @@ export async function setupAuth(app: Express) {
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
+            handle: user.handle,
           },
         });
       });
     } catch (error: any) {
+      if (isHandleConflict(error)) return res.status(409).json({ message: "That handle is taken" });
       console.error("Registration error:", error);
       res.status(500).json({ message: "Registration failed", error: error.message });
     }

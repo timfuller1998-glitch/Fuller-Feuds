@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Topic, Opinion } from "@shared/schema";
+import { HandleField, type HandleStatus } from "@/components/HandleField";
 import { useAuth } from "@/hooks/useAuth";
 
 interface User {
@@ -40,6 +41,7 @@ interface User {
   bio?: string | null;
   location?: string | null;
   profileImageUrl?: string | null;
+  handle?: string | null;
   followedCategories?: string[] | null;
 }
 
@@ -55,6 +57,8 @@ export default function Onboarding() {
   const [bio, setBio] = useState("");
   const [location, setLocation] = useState("");
   const [profileImageUrl, setProfileImageUrl] = useState("");
+  const [handle, setHandle] = useState("");
+  const [handleStatus, setHandleStatus] = useState<HandleStatus>("idle");
   
   // Photo upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -153,7 +157,7 @@ export default function Onboarding() {
   useEffect(() => {
     switch (currentStep) {
       case 1:
-        setCanProceed(firstName.trim().length > 0 && lastName.trim().length > 0);
+        setCanProceed(firstName.trim().length > 0 && lastName.trim().length > 0 && handleStatus === "available");
         break;
       case 2:
         setCanProceed(selectedCategories.length >= 3);
@@ -168,7 +172,7 @@ export default function Onboarding() {
       default:
         setCanProceed(false);
     }
-  }, [currentStep, firstName, lastName, selectedCategories, createdOpinions]);
+  }, [currentStep, firstName, lastName, handleStatus, selectedCategories, createdOpinions]);
 
   const redirectLockRef = useRef(false); // Prevent redirect loops
   
@@ -211,6 +215,7 @@ export default function Onboarding() {
       setBio(user.bio || "");
       setLocation(user.location || "");
       setProfileImageUrl(user.profileImageUrl || "");
+      setHandle((h) => h || user.handle || "");
       if (Array.isArray(user.followedCategories) && user.followedCategories.length > 0) {
         setSelectedCategories(user.followedCategories);
       }
@@ -240,6 +245,10 @@ export default function Onboarding() {
         location,
         profileImageUrl
       });
+      if (handle && handle !== user?.handle) {
+        await apiRequest('PUT', '/api/handles/me', { handle });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"], exact: true });
+      }
     } else if (currentStep === 2) {
       await updateCategoriesMutation.mutateAsync(selectedCategories);
     }
@@ -577,6 +586,15 @@ export default function Onboarding() {
                   />
                 </div>
               </div>
+
+              <HandleField
+                value={handle}
+                onChange={setHandle}
+                onStatusChange={setHandleStatus}
+                current={user?.handle}
+                id="onboarding-handle"
+                label="Handle *"
+              />
 
               {/* Bio */}
               <div className="space-y-2">

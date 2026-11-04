@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { UserHandle } from "@/components/UserHandle";
 import type { Opinion } from "@shared/schema";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +52,10 @@ function AuthorRow({ op }: { op: Op }) {
         {op.author?.profileImageUrl ? <AvatarImage src={op.author.profileImageUrl} alt={name} /> : null}
         <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
       </Avatar>
-      <span className="font-semibold truncate" data-testid={`text-opinion-author-${op.id}`}>{name}</span>
+      <span className="min-w-0 flex flex-col">
+        <span className="font-semibold truncate leading-tight" data-testid={`text-opinion-author-${op.id}`}>{name}</span>
+        <UserHandle handle={(op.author as any)?.handle} testId={`text-opinion-handle-${op.id}`} />
+      </span>
       <span className="ml-auto flex-shrink-0"><StanceBadge op={op} /></span>
     </div>
   );

@@ -63,7 +63,7 @@ router.get('/:id/debate-candidates', isAuthenticated, async (req, res) => {
         FROM act JOIN users u ON u.id = act.user_id
         WHERE act.value > 0 AND COALESCE(u.status, 'active') = 'active'
       )
-      SELECT u.id, coalesce((select nullif(trim(sn.display_first_name), '') from user_profiles sn where sn.user_id = u.id limit 1), u.first_name) AS first_name, (case when exists (select 1 from user_profiles sn where sn.user_id = u.id and nullif(trim(sn.display_first_name), '') is not null) then (select sn.display_last_name from user_profiles sn where sn.user_id = u.id limit 1) else u.last_name end) AS last_name, u.profile_image_url, r.rank, r.value
+      SELECT u.id, coalesce((select nullif(trim(sn.display_first_name), '') from user_profiles sn where sn.user_id = u.id limit 1), u.first_name) AS first_name, (case when exists (select 1 from user_profiles sn where sn.user_id = u.id and nullif(trim(sn.display_first_name), '') is not null) then (select sn.display_last_name from user_profiles sn where sn.user_id = u.id limit 1) else u.last_name end) AS last_name, u.handle, u.profile_image_url, r.rank, r.value
       FROM users u LEFT JOIN ranked r ON r.user_id = u.id
       WHERE u.id IN (${sql.join(ordered.map((id) => sql`${id}`), sql`, `)})
         AND COALESCE(u.status, 'active') = 'active'`);
@@ -78,6 +78,7 @@ router.get('/:id/debate-candidates', isAuthenticated, async (req, res) => {
           return {
             userId: id,
             firstName: r.first_name,
+            handle: r.handle,
             lastName: r.last_name,
             profileImageUrl: r.profile_image_url,
             relation: id === counterpoint.authorUserId ? 'author' : 'liker',

@@ -16,6 +16,7 @@ import presenceRoutes from './presence.js';
 import profileRoutes from './profile.js';
 import followRoutes from './follow.js';
 import leaderboardRoutes from './leaderboards.js';
+import handleRoutes from './handles.js';
 
 const router = express.Router();
 
@@ -37,5 +38,6 @@ router.use('/presence', presenceRoutes);
 router.use('/profile', profileRoutes);
 router.use('/follow', followRoutes);
 router.use('/leaderboards', leaderboardRoutes);
+router.use('/handles', handleRoutes);
 
 export default router;

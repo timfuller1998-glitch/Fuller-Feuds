@@ -359,6 +359,7 @@ export class OpinionRepository {
           author: row.author ? {
             id: row.author.id,
             ...screenName(row.author, row.profile as any),
+            handle: row.author.handle ?? null,
             profileImageUrl: row.author.profileImageUrl,
             politicalLeaningScore: row.profile?.economicScore != null && row.profile?.authoritarianScore != null ?
               (row.profile.economicScore + row.profile.authoritarianScore) / 2 : undefined,
@@ -452,6 +453,7 @@ export class OpinionRepository {
           author: row.author ? {
             id: row.author.id,
             ...screenName(row.author, row.profile as any),
+            handle: row.author.handle ?? null,
             profileImageUrl: row.author.profileImageUrl,
             politicalLeaningScore: row.profile?.economicScore != null && row.profile?.authoritarianScore != null ?
               (row.profile.economicScore + row.profile.authoritarianScore) / 2 : undefined,
@@ -768,6 +770,7 @@ export class OpinionRepository {
         id: row.author.id,
         firstName: row.screenFirst,
         lastName: row.screenLast,
+        handle: row.author.handle ?? null,
         profileImageUrl: row.author.profileImageUrl,
       } : null
     }));

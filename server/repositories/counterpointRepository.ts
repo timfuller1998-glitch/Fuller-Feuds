@@ -56,6 +56,7 @@ export class CounterpointRepository {
           id: users.id,
           firstName: screenFirstNameSql(users.id, users.firstName),
           lastName: screenLastNameSql(users.id, users.lastName),
+          handle: users.handle,
           profileImageUrl: users.profileImageUrl,
         },
         likeCount: sql<number>`count(${counterpointLikes.id})::int`,

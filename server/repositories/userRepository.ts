@@ -6,19 +6,23 @@ import { checkUserOwnership, checkModifyPermission, sanitizeUserData, sanitizeUs
 import { logDataAccess, logDatabaseOperation, logSecurityEvent } from '../utils/securityLogger.js';
 import { AuthorizationError } from '../utils/securityErrors.js';
 import type { Request } from 'express';
+import { uniqueHandleFrom } from '../lib/handles.js';
 
 export class UserRepository {
   async create(user: UpsertUser): Promise<User> {
-    const [created] = await db.insert(users).values(user).returning();
+    // Every user needs a unique @handle (NOT NULL since migration 0008); generate one if the caller didn't pick one.
+    const handle = user.handle || (await uniqueHandleFrom(`${user.firstName || ''}${(user.lastName || '').slice(0, 1)}` || (user.email || '').split('@')[0]));
+    const [created] = await db.insert(users).values({ ...user, handle }).returning();
     return created;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     // Try to insert, and if there's a conflict on ID, update the existing user
     try {
+      const handle = userData.handle || (await uniqueHandleFrom(`${userData.firstName || ''}${(userData.lastName || '').slice(0, 1)}` || (userData.email || '').split('@')[0]));
       const [user] = await db
         .insert(users)
-        .values(userData)
+        .values({ ...userData, handle })
         .onConflictDoUpdate({
           target: users.id,
           set: {
