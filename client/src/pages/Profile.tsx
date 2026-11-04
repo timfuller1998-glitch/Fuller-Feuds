@@ -13,7 +13,10 @@ import { Progress } from "@/components/ui/progress";
 import OpinionCard from "@/components/OpinionCard";
 import TopicCard from "@/components/TopicCard";
 import { CardContainer } from "@/components/CardContainer";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import CardDeck from "@/components/CardDeck";
+import LeaderboardsDialog, { useLeaderboards, bestRank } from "@/components/LeaderboardsDialog";
+import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
 import { useAuth } from "@/hooks/useAuth";
 import * as LucideIcons from "lucide-react";
 import {
@@ -21,23 +24,30 @@ import {
   User,
   UserPlus,
   UserMinus,
-  BarChart3,
   Calendar,
   Trophy,
   Lock,
   Check,
   ChevronRight,
+  BarChart3,
   Star,
   MessageSquare,
-  Swords,
   Lightbulb
 } from "lucide-react";
+
+// Some list endpoints return a bare array, others `{ topics: [...] }`; error bodies are objects.
+function asList(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.topics)) return data.topics;
+  return [];
+}
 
 interface ProfileData {
   user: {
     id: string;
-    email: string;
+    email?: string;
     firstName: string;
+    bio?: string;
     lastName: string;
     profileImageUrl?: string;
     createdAt: string;
@@ -70,6 +80,7 @@ export default function Profile() {
   const [, navigate] = useLocation();
   const { user: currentUser } = useAuth();
   const [showBadgesModal, setShowBadgesModal] = useState(false);
+  const [opinionIndex, setOpinionIndex] = useState(0);
   const [showLeaderboardsModal, setShowLeaderboardsModal] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [showFollowingModal, setShowFollowingModal] = useState(false);
@@ -86,14 +97,18 @@ export default function Profile() {
   // Fetch user opinions (enriched with full data for OpinionCard)
   const { data: opinions = [], isLoading: opinionsLoading } = useQuery<any[]>({
     queryKey: ['/api/profile', userId, 'opinions-enriched'],
-    queryFn: () => fetch(`/api/profile/${userId}/opinions?limit=5`, { credentials: 'include' }).then(res => res.json()),
+    queryFn: () => fetch(`/api/profile/${userId}/opinions?limit=20`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(asList)
+      // The profile endpoint names the author `user`; the shared deck cards read `author`.
+      .then((rows) => rows.map((op: any) => ({ ...op, author: op.author ?? op.user }))),
     enabled: !!userId,
   });
 
   // Fetch user's created topics
   const { data: userTopics = [], isLoading: topicsLoading } = useQuery<any[]>({
     queryKey: ['/api/users', userId, 'topics'],
-    queryFn: () => fetch(`/api/topics?createdBy=${userId}&limit=5`, { credentials: 'include' }).then(res => res.json()),
+    queryFn: () => fetch(`/api/topics?createdBy=${userId}&limit=5`, { credentials: 'include' }).then(res => res.json()).then(asList),
     enabled: !!userId,
   });
 
@@ -101,14 +116,14 @@ export default function Profile() {
   // Fetch recommended topics (new endpoint)
   const { data: recommendedTopics = [] } = useQuery<any[]>({
     queryKey: ['/api/users', userId, 'recommended-topics'],
-    queryFn: () => fetch(`/api/users/${userId}/recommended-topics?limit=5`, { credentials: 'include' }).then(res => res.json()),
+    queryFn: () => fetch(`/api/users/${userId}/recommended-topics?limit=5`, { credentials: 'include' }).then(res => res.json()).then(asList),
     enabled: !!userId && isOwnProfile,
   });
 
   // Fetch topics from following (new endpoint)
   const { data: followingTopics = [] } = useQuery<any[]>({
     queryKey: ['/api/users', userId, 'following-topics'],
-    queryFn: () => fetch(`/api/users/${userId}/following-topics?limit=5`, { credentials: 'include' }).then(res => res.json()),
+    queryFn: () => fetch(`/api/users/${userId}/following-topics?limit=5`, { credentials: 'include' }).then(res => res.json()).then(asList),
     enabled: !!userId && isOwnProfile,
   });
 
@@ -122,14 +137,14 @@ export default function Profile() {
   // Fetch followers
   const { data: followers = [] } = useQuery<any[]>({
     queryKey: ['/api/profile', userId, 'followers'],
-    queryFn: () => fetch(`/api/profile/${userId}/followers`, { credentials: 'include' }).then(res => res.json()),
+    queryFn: () => fetch(`/api/profile/${userId}/followers`, { credentials: 'include' }).then(res => res.json()).then(asList),
     enabled: !!userId,
   });
 
   // Fetch following
   const { data: following = [] } = useQuery<any[]>({
     queryKey: ['/api/profile', userId, 'following'],
-    queryFn: () => fetch(`/api/profile/${userId}/following`, { credentials: 'include' }).then(res => res.json()),
+    queryFn: () => fetch(`/api/profile/${userId}/following`, { credentials: 'include' }).then(res => res.json()).then(asList),
     enabled: !!userId,
   });
 
@@ -151,12 +166,12 @@ export default function Profile() {
     enabled: !!userId,
   });
 
-  // Fetch leaderboards
-  const { data: leaderboards } = useQuery<any>({
-    queryKey: ['/api/leaderboards'],
-    queryFn: () => fetch('/api/leaderboards', { credentials: 'include' }).then(res => res.json()),
-    enabled: showLeaderboardsModal,
-  });
+  const earnedBadges = userBadges.filter((b: any) => b.unlockedAt);
+  const lockedBadges = userBadges.filter((b: any) => !b.unlockedAt);
+
+  // Rankings summary for the profile button (full board loads in the dialog)
+  const { data: leaderboards } = useLeaderboards(userId);
+  const topRank = bestRank(leaderboards);
 
   // Follow/unfollow mutation
   const followMutation = useMutation({
@@ -167,6 +182,14 @@ export default function Profile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/follow', userId, 'status'] });
       queryClient.invalidateQueries({ queryKey: ['/api/profile', userId] });
+    },
+  });
+
+  const voteMutation = useMutation({
+    mutationFn: ({ opinionId, voteType, currentVote }: { opinionId: string; voteType: 'like' | 'dislike'; currentVote?: string | null }) =>
+      apiRequest('POST', `/api/opinions/${opinionId}/vote`, { voteType: currentVote === voteType ? null : voteType }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/profile', userId, 'opinions-enriched'] });
     },
   });
 
@@ -275,7 +298,7 @@ export default function Profile() {
   const { user, profile } = profileData;
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
+    <div className="container mx-auto px-4 py-4 sm:py-6 space-y-6 max-w-5xl">
       {/* Profile Header - Cleaner Design */}
       <Card>
         <CardContent className="pt-6">
@@ -300,7 +323,7 @@ export default function Profile() {
                   <h1 className="text-2xl sm:text-3xl font-bold break-words" data-testid="profile-name">
                     {profile?.displayFirstName != null ? profile.displayFirstName : user.firstName}{profile?.displayFirstName != null ? (profile?.displayLastName ? ` ${profile.displayLastName}` : '') : (user.lastName ? ` ${user.lastName}` : '')}
                   </h1>
-                  {profile && (profile.economicScore !== undefined || profile.economicScore !== null) && (profile.authoritarianScore !== undefined || profile.authoritarianScore !== null) && (
+                  {profile && profile.economicScore != null && profile.authoritarianScore != null && (profile.totalOpinions ?? 0) > 0 && (
                     <Popover>
                       <PopoverTrigger asChild>
                         <button className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left" data-testid="political-leaning-label">
@@ -327,9 +350,9 @@ export default function Profile() {
                   )}
                 </div>
                 
-                {profile?.bio && (
+                {(user.bio || profile?.bio) && (
                   <p className="text-sm break-words" data-testid="profile-bio">
-                    {profile.bio}
+                    {user.bio || profile?.bio}
                   </p>
                 )}
 
@@ -343,19 +366,22 @@ export default function Profile() {
                     <div className="flex items-center gap-2">
                       <Trophy className="w-4 h-4" />
                       <div>
-                        <div className="text-sm font-bold">{userBadges.filter((b: any) => b.unlockedAt).length}/{userBadges.length}</div>
+                        <div className="text-sm font-bold">{earnedBadges.length}/{userBadges.length}</div>
                         <div className="text-xs text-muted-foreground">Badges</div>
                       </div>
                     </div>
                   </button>
-                  <button 
+                  <button
                     className="text-center hover-elevate active-elevate-2 rounded-md px-3 py-2 transition-colors border"
                     onClick={() => setShowLeaderboardsModal(true)}
                     data-testid="button-leaderboards"
                   >
                     <div className="flex items-center gap-2">
                       <BarChart3 className="w-4 h-4" />
-                      <div className="text-xs text-muted-foreground">Rankings</div>
+                      <div>
+                        <div className="text-sm font-bold">{topRank ? `#${topRank.me!.rank}` : "—"}</div>
+                        <div className="text-xs text-muted-foreground">{topRank ? `Rank · ${topRank.title.replace(/^(Most|Top) /, "")}` : "Rankings"}</div>
+                      </div>
                     </div>
                   </button>
                   <button 
@@ -366,7 +392,7 @@ export default function Profile() {
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4" />
                       <div>
-                        <div className="text-sm font-bold">{profile?.followerCount || 0}</div>
+                        <div className="text-sm font-bold">{profileData.followerCount ?? profile?.followerCount ?? 0}</div>
                         <div className="text-xs text-muted-foreground">Followers</div>
                       </div>
                     </div>
@@ -379,7 +405,7 @@ export default function Profile() {
                     <div className="flex items-center gap-2">
                       <UserPlus className="w-4 h-4" />
                       <div>
-                        <div className="text-sm font-bold">{profile?.followingCount || 0}</div>
+                        <div className="text-sm font-bold">{profileData.followingCount ?? profile?.followingCount ?? 0}</div>
                         <div className="text-xs text-muted-foreground">Following</div>
                       </div>
                     </div>
@@ -464,15 +490,7 @@ export default function Profile() {
       {/* My Topics Section - Horizontal Scrolling */}
       <div className="space-y-4" data-testid="section-my-topics">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">My Topics</h2>
-          {userTopics.length > 0 && (
-            <Link href={`/profile/${userId}`}>
-              <Button variant="ghost" size="sm" data-testid="link-view-all-topics">
-                View All
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-          )}
+          <h2 className="text-xl font-bold">{isOwnProfile ? "My Topics" : `${user.firstName}'s Topics`}</h2>
         </div>
         {userTopics.length > 0 ? (
           <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
@@ -580,41 +598,46 @@ export default function Profile() {
       {/* My Opinions Section - Horizontal Scrolling */}
       <div className="space-y-4" data-testid="section-my-opinions">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">My Opinions</h2>
-          {opinions.length > 0 && (
-            <Link href={`/profile/${userId}`}>
-              <Button variant="ghost" size="sm" data-testid="link-view-all-opinions">
-                View All
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-          )}
+          <h2 className="text-xl font-bold">{isOwnProfile ? "My Opinions" : `${user.firstName}'s Opinions`}</h2>
+          {opinions.length > 0 && <span className="text-sm text-muted-foreground">{opinions.length}</span>}
         </div>
         {opinions.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
-            {opinions.map((opinion) => (
-              <CardContainer key={opinion.id}>
-                <OpinionCard
-                  id={opinion.id}
-                  topicId={opinion.topicId}
-                  userId={opinion.userId}
-                  userName={`${opinion.user?.firstName || ''} ${opinion.user?.lastName || ''}`}
-                  userAvatar={opinion.user?.profileImageUrl}
-                  economicScore={opinion.user?.economicScore}
-                  authoritarianScore={opinion.user?.authoritarianScore}
-                  topicEconomicScore={opinion.topic?.economicScore}
-                  topicAuthoritarianScore={opinion.topic?.authoritarianScore}
-                  content={opinion.content}
-                  stance={opinion.stance}
-                  debateStatus={opinion.debateStatus}
-                  timestamp={opinion.createdAt}
-                  likesCount={opinion.likesCount || 0}
-                  dislikesCount={opinion.dislikesCount || 0}
-                  references={opinion.references}
-                  fallacyCounts={opinion.fallacyCounts}
+          <div className="space-y-3">
+            <CardDeck<any>
+              items={opinions}
+              getKey={(op) => op.id}
+              initialIndex={Math.min(opinionIndex, opinions.length - 1)}
+              onIndexChange={setOpinionIndex}
+              maxWidth={420}
+              testId="deck-profile-opinions"
+              ariaLabel={`${user.firstName}'s opinions`}
+              emptyLabel="No opinions yet."
+              renderFront={(op) => (
+                <OpinionDeckFront op={op} onSelectParagraph={() => navigate(`/topic/${op.topicId}`)} />
+              )}
+              renderBack={(op) => (
+                <OpinionDeckBack
+                  op={op}
+                  onVote={(voteType) => {
+                    if (!currentUser) return;
+                    voteMutation.mutate({ opinionId: op.id, voteType, currentVote: op.userVote?.voteType ?? null });
+                  }}
+                  onAdopt={() => navigate(`/topic/${op.topicId}`)}
+                  onFlag={() => navigate(`/topic/${op.topicId}`)}
+                  onSeeCounterpoints={() => navigate(`/topic/${op.topicId}`)}
                 />
-              </CardContainer>
-            ))}
+              )}
+            />
+            {opinions[opinionIndex] && (
+              <div className="flex justify-center">
+                <Link href={`/topic/${opinions[opinionIndex].topicId}`}>
+                  <Button variant="outline" size="sm" data-testid="button-open-opinion-topic">
+                    Open debate
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
         ) : (
           <Card className="p-8 text-center">
@@ -635,274 +658,90 @@ export default function Profile() {
 
       {/* Badges Modal */}
       <Dialog open={showBadgesModal} onOpenChange={setShowBadgesModal}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-3xl max-h-[85dvh] overflow-y-auto p-4 sm:p-6" data-testid="dialog-badges">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Trophy className="w-5 h-5" />
               Badges
             </DialogTitle>
             <DialogDescription>
-              {isOwnProfile 
-                ? `You've unlocked ${userBadges.filter((b: any) => b.unlockedAt).length} of ${userBadges.length} badges`
-                : `${user.firstName} has unlocked ${userBadges.filter((b: any) => b.unlockedAt).length} of ${userBadges.length} badges`}
+              {isOwnProfile
+                ? `You've earned ${earnedBadges.length} of ${userBadges.length} badges`
+                : `${user.firstName} has earned ${earnedBadges.length} of ${userBadges.length} badges`}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-4">
-            {userBadges.map((userBadge: any) => {
-              const isUnlocked = !!userBadge.unlockedAt;
-              const isSelected = userBadge.isSelected;
-              const IconComponent = (LucideIcons as any)[userBadge.icon] || Trophy;
-              
-              return (
-                <div
-                  key={userBadge.badgeId}
-                  className={`relative p-4 border rounded-lg transition-all ${
-                    isUnlocked 
-                      ? 'bg-card hover-elevate active-elevate-2' 
-                      : 'bg-muted/30 opacity-60'
-                  } ${isSelected ? 'ring-2 ring-primary' : ''}`}
-                  data-testid={`badge-${userBadge.badgeId}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                      isUnlocked ? 'bg-primary/10' : 'bg-muted'
-                    }`}>
-                      {isUnlocked ? (
-                        <IconComponent className="w-6 h-6 text-primary" />
-                      ) : (
-                        <Lock className="w-6 h-6 text-muted-foreground" />
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-semibold text-sm">{userBadge.name}</h3>
-                        {isSelected && (
-                          <Badge variant="default" className="text-xs">
-                            <Check className="w-3 h-3 mr-1" />
-                            Selected
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {userBadge.description}
-                      </p>
-                      
-                      {isUnlocked ? (
-                        <div className="mt-2 flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground">
-                            Unlocked {new Date(userBadge.unlockedAt).toLocaleDateString()}
-                          </p>
-                          {isOwnProfile && (
-                            <Button
-                              size="sm"
-                              variant={isSelected ? "outline" : "default"}
-                              onClick={() => selectBadgeMutation.mutate(isSelected ? null : userBadge.badgeId)}
-                              disabled={selectBadgeMutation.isPending}
-                              data-testid={`button-select-badge-${userBadge.badgeId}`}
-                            >
-                              {isSelected ? 'Deselect' : 'Display'}
-                            </Button>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          🔒 Locked
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Leaderboards Modal */}
-      <Dialog open={showLeaderboardsModal} onOpenChange={setShowLeaderboardsModal}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5" />
-              Leaderboards
-            </DialogTitle>
-            <DialogDescription>
-              See how you rank among other users
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-6 mt-4">
-            {leaderboards ? (
-              <>
-                {/* Most Opinionated Users */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4" />
-                    Most Opinionated Users
-                  </h3>
-                  <div className="space-y-2">
-                    {(leaderboards.mostOpinionated || []).map((entry: any, index: number) => (
+          {[{ title: "Earned", list: earnedBadges }, { title: "Locked", list: lockedBadges }].map(({ title, list }) =>
+            list.length === 0 ? null : (
+              <div key={title} className="space-y-2" data-testid={`badges-${title.toLowerCase()}`}>
+                <h3 className="text-sm font-semibold text-muted-foreground">{title} ({list.length})</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {list.map((userBadge: any) => {
+                    const isUnlocked = !!userBadge.unlockedAt;
+                    const isSelected = userBadge.isSelected;
+                    const IconComponent = (LucideIcons as any)[userBadge.icon] || Trophy;
+                    const cur = Math.min(userBadge.progress?.current ?? 0, userBadge.progress?.required ?? 1);
+                    const req = userBadge.progress?.required ?? 1;
+                    return (
                       <div
-                        key={entry.userId}
-                        className={`flex items-center gap-3 p-3 rounded-lg border ${
-                          entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
-                        }`}
+                        key={userBadge.badgeId}
+                        className={`relative p-3 border rounded-lg bg-card ${isUnlocked ? "" : "opacity-75"} ${isSelected ? "ring-2 ring-primary" : ""}`}
+                        data-testid={`badge-${userBadge.badgeId}`}
                       >
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                          index === 0 ? 'bg-yellow-500 text-yellow-50' :
-                          index === 1 ? 'bg-gray-400 text-gray-50' :
-                          index === 2 ? 'bg-orange-600 text-orange-50' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
-                          {index + 1}
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${isUnlocked ? "bg-primary/10" : "bg-muted"}`}>
+                            {isUnlocked ? <IconComponent className="w-5 h-5 text-primary" /> : <Lock className="w-5 h-5 text-muted-foreground" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="font-semibold text-sm">{userBadge.name}</h4>
+                              {isSelected && (
+                                <Badge variant="default" className="text-xs"><Check className="w-3 h-3 mr-1" />Shown</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{userBadge.description}</p>
+                            {isUnlocked ? (
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <p className="text-xs text-muted-foreground">
+                                  Earned {new Date(userBadge.unlockedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                </p>
+                                {isOwnProfile && (
+                                  <Button
+                                    size="sm"
+                                    variant={isSelected ? "outline" : "secondary"}
+                                    className="h-7 text-xs"
+                                    onClick={() => selectBadgeMutation.mutate(isSelected ? null : userBadge.badgeId)}
+                                    disabled={selectBadgeMutation.isPending}
+                                    data-testid={`button-select-badge-${userBadge.badgeId}`}
+                                  >
+                                    {isSelected ? "Hide" : "Show on avatar"}
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="mt-2 space-y-1">
+                                <Progress value={(cur / req) * 100} className="h-1.5" />
+                                <p className="text-xs text-muted-foreground">{cur} / {req}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={entry.profileImageUrl} />
-                          <AvatarFallback className="text-xs">
-                            {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {entry.firstName} {entry.lastName}
-                            {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
-                          </p>
-                        </div>
-                        <Badge variant="secondary">{entry.count} opinions</Badge>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-
-                {/* Most Active Debaters */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Swords className="w-4 h-4" />
-                    Most Active Debaters
-                  </h3>
-                  <div className="space-y-2">
-                    {(leaderboards.mostDebates || []).map((entry: any, index: number) => (
-                      <div
-                        key={entry.userId}
-                        className={`flex items-center gap-3 p-3 rounded-lg border ${
-                          entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
-                        }`}
-                      >
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                          index === 0 ? 'bg-yellow-500 text-yellow-50' :
-                          index === 1 ? 'bg-gray-400 text-gray-50' :
-                          index === 2 ? 'bg-orange-600 text-orange-50' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
-                          {index + 1}
-                        </div>
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={entry.profileImageUrl} />
-                          <AvatarFallback className="text-xs">
-                            {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {entry.firstName} {entry.lastName}
-                            {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
-                          </p>
-                        </div>
-                        <Badge variant="secondary">{entry.count} debates</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Top Topic Creators */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Lightbulb className="w-4 h-4" />
-                    Top Topic Creators
-                  </h3>
-                  <div className="space-y-2">
-                    {(leaderboards.mostTopics || []).map((entry: any, index: number) => (
-                      <div
-                        key={entry.userId}
-                        className={`flex items-center gap-3 p-3 rounded-lg border ${
-                          entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
-                        }`}
-                      >
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                          index === 0 ? 'bg-yellow-500 text-yellow-50' :
-                          index === 1 ? 'bg-gray-400 text-gray-50' :
-                          index === 2 ? 'bg-orange-600 text-orange-50' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
-                          {index + 1}
-                        </div>
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={entry.profileImageUrl} />
-                          <AvatarFallback className="text-xs">
-                            {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {entry.firstName} {entry.lastName}
-                            {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
-                          </p>
-                        </div>
-                        <Badge variant="secondary">{entry.count} topics</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Logical Reasoning Champions */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Star className="w-4 h-4" />
-                    Logical Reasoning Champions
-                  </h3>
-                  <div className="space-y-2">
-                    {(leaderboards.logicalReasoning || []).map((entry: any, index: number) => (
-                      <div
-                        key={entry.userId}
-                        className={`flex items-center gap-3 p-3 rounded-lg border ${
-                          entry.userId === userId ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'
-                        }`}
-                      >
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                          index === 0 ? 'bg-yellow-500 text-yellow-50' :
-                          index === 1 ? 'bg-gray-400 text-gray-50' :
-                          index === 2 ? 'bg-orange-600 text-orange-50' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
-                          {index + 1}
-                        </div>
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={entry.profileImageUrl} />
-                          <AvatarFallback className="text-xs">
-                            {entry.firstName?.charAt(0)}{entry.lastName?.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {entry.firstName} {entry.lastName}
-                            {entry.userId === userId && <span className="text-xs text-primary ml-2">(You)</span>}
-                          </p>
-                        </div>
-                        <Badge variant="secondary">{entry.fallacyRate.toFixed(1)}% fallacy rate</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Loading leaderboards...</p>
               </div>
-            )}
-          </div>
+            )
+          )}
         </DialogContent>
       </Dialog>
+
+      <LeaderboardsDialog
+        open={showLeaderboardsModal}
+        onOpenChange={setShowLeaderboardsModal}
+        userId={userId!}
+        displayName={user.firstName}
+        isOwnProfile={isOwnProfile}
+      />
 
       {/* Followers Modal */}
       <Dialog open={showFollowersModal} onOpenChange={setShowFollowersModal}>
@@ -932,9 +771,8 @@ export default function Profile() {
                         {follower.firstName?.charAt(0)}{follower.lastName?.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
-                      <p className="font-medium">{follower.firstName} {follower.lastName}</p>
-                      <p className="text-sm text-muted-foreground">{follower.email}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{follower.firstName} {follower.lastName}</p>
                     </div>
                     <Button
                       variant="outline"
@@ -982,9 +820,8 @@ export default function Profile() {
                         {followedUser.firstName?.charAt(0)}{followedUser.lastName?.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
-                      <p className="font-medium">{followedUser.firstName} {followedUser.lastName}</p>
-                      <p className="text-sm text-muted-foreground">{followedUser.email}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{followedUser.firstName} {followedUser.lastName}</p>
                     </div>
                     <Button
                       variant="outline"

@@ -25,23 +25,17 @@ async function recomputeFollowCounts(userIdA: string, userIdB: string) {
   await ensureProfileRow(userIdA);
   await ensureProfileRow(userIdB);
 
-  await db.execute(sql`
-    UPDATE ${userProfiles}
-    SET ${userProfiles.followingCount} = (
-      SELECT COUNT(*)::int FROM ${userFollows}
-      WHERE ${userFollows.followerId} = ${userIdA}
-    )
-    WHERE ${userProfiles.userId} = ${userIdA}
-  `);
+  // Note: interpolating columns into a raw UPDATE ... SET renders "table"."column",
+  // which Postgres rejects, so use the query builder.
+  await db
+    .update(userProfiles)
+    .set({ followingCount: sql<number>`(SELECT COUNT(*)::int FROM ${userFollows} WHERE ${userFollows.followerId} = ${userIdA})` })
+    .where(eq(userProfiles.userId, userIdA));
 
-  await db.execute(sql`
-    UPDATE ${userProfiles}
-    SET ${userProfiles.followerCount} = (
-      SELECT COUNT(*)::int FROM ${userFollows}
-      WHERE ${userFollows.followingId} = ${userIdB}
-    )
-    WHERE ${userProfiles.userId} = ${userIdB}
-  `);
+  await db
+    .update(userProfiles)
+    .set({ followerCount: sql<number>`(SELECT COUNT(*)::int FROM ${userFollows} WHERE ${userFollows.followingId} = ${userIdB})` })
+    .where(eq(userProfiles.userId, userIdB));
 }
 
 // GET /api/follow/:targetUserId/status

@@ -139,6 +139,46 @@ export const BADGE_DEFINITIONS: InsertBadge[] = [
     requirement: 25,
     requirementType: "low_fallacy_rate",
   },
+  {
+    id: "well_liked",
+    name: "Well Liked",
+    description: "Received 5 likes on your opinions",
+    icon: "ThumbsUp",
+    category: "community",
+    tier: 1,
+    requirement: 5,
+    requirementType: "likes_received",
+  },
+  {
+    id: "crowd_favorite",
+    name: "Crowd Favorite",
+    description: "Received 50 likes on your opinions",
+    icon: "Heart",
+    category: "community",
+    tier: 2,
+    requirement: 50,
+    requirementType: "likes_received",
+  },
+  {
+    id: "first_follower",
+    name: "First Follower",
+    description: "Gained your first follower",
+    icon: "UserPlus",
+    category: "community",
+    tier: 1,
+    requirement: 1,
+    requirementType: "follower_count",
+  },
+  {
+    id: "influencer",
+    name: "Influencer",
+    description: "Gained 10 followers",
+    icon: "Users",
+    category: "community",
+    tier: 2,
+    requirement: 10,
+    requirementType: "follower_count",
+  },
 ];
 
 // Badge categories for UI organization
@@ -147,6 +187,7 @@ export const BADGE_CATEGORIES = [
   { id: "opinion", name: "Opinion", icon: "Lightbulb" },
   { id: "topic", name: "Topic", icon: "Plus" },
   { id: "quality", name: "Quality", icon: "Award" },
+  { id: "community", name: "Community", icon: "Users" },
 ] as const;
 
 // Requirement types for badge unlock checking
@@ -154,4 +195,6 @@ export type BadgeRequirementType =
   | "debate_count" 
   | "opinion_count" 
   | "topic_count" 
-  | "low_fallacy_rate";
+  | "low_fallacy_rate"
+  | "likes_received"
+  | "follower_count";
