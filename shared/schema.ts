@@ -19,7 +19,7 @@ import { z } from "zod";
 export const debateStatusEnum = pgEnum('debate_status', ['open', 'closed', 'private']);
 export const debatePhaseEnum = pgEnum('debate_phase', ['structured', 'voting', 'free-form']);
 
-// Session storage table for Replit Auth
+// Session storage table (connect-pg-simple / express-session)
 export const sessions = pgTable(
   "sessions",
   {
@@ -30,7 +30,7 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table for Replit Auth
+// User storage table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
