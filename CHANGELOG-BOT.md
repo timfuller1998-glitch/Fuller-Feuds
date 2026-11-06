@@ -1,3 +1,9 @@
+## 2026-11-05 (19:40 CST, America/Chicago) — Fix /create-topic 404 (branch fix/create-topic-404)
+
+- **Cause:** Client had no `/create-topic` route. `CreateTopicPage.tsx` was removed in an Oct 2025 Replit restore, but `CategoryPage` still navigated to `/create-topic`, so the SPA catch-all rendered `NotFound` ("404 Page Not Found"). Not caused by cleanup PR #16 (routes unchanged there); API `POST /api/topics` was fine.
+- **Fix:** Restored `client/src/pages/CreateTopicPage.tsx` (updated for `useAuth` + current `apiRequest`), registered `<Route path="/create-topic" />` in `App.tsx`. Category CTAs pass `?category=`. Empty category state also gets a Create button. SearchBar inline create path unchanged.
+- Not merged yet until local + live verify.
+
 ## 2026-11-05 (19:25 CST, America/Chicago) — Drop leftover Replit + Vercel config (branch chore/drop-replit-vercel)
 
 - Removed Replit host files: `.replit`, `replit.md`, unused `server/replitAuth.ts`, Replit object-storage stack (`server/objectStorage.ts`, `server/objectAcl.ts`).
