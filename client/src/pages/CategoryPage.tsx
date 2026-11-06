@@ -194,7 +194,7 @@ export default function CategoryPage() {
                 </CardHeader>
                 <CardContent>
                   <Button 
-                    onClick={() => setLocation('/create-topic')}
+                    onClick={() => setLocation(`/create-topic?category=${encodeURIComponent(category || '')}`)}
                     data-testid="button-add-topic-from-category"
                     className="w-full sm:w-auto"
                   >
@@ -210,9 +210,16 @@ export default function CategoryPage() {
             <CardContent className="py-12 text-center">
               <CategoryIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-lg font-medium mb-2">No debates yet</p>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground mb-4">
                 Be the first to start a debate in {category}
               </p>
+              <Button
+                onClick={() => setLocation(`/create-topic?category=${encodeURIComponent(category || '')}`)}
+                data-testid="button-add-topic-empty-category"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create New Topic
+              </Button>
             </CardContent>
           </Card>
         )}

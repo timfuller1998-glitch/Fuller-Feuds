@@ -36,6 +36,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import Onboarding from "@/pages/Onboarding";
 import RecentOpinions from "@/pages/RecentOpinions";
 import NotFound from "@/pages/not-found";
+import CreateTopicPage from "@/pages/CreateTopicPage";
 import DebateRoomPage from "@/pages/DebateRoomPage";
 
 function Router() {
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/profile/:userId" component={Profile} />
       <Route path="/u/:handle" component={HandleRedirect} />
       <Route path="/live-stream/:id" component={LiveStreamPage} />
+      <Route path="/create-topic" component={CreateTopicPage} />
       <Route component={NotFound} />
     </Switch>
   );
