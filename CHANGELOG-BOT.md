@@ -1,3 +1,12 @@
+## 2026-11-05 (19:25 CST, America/Chicago) — Drop leftover Replit + Vercel config (branch chore/drop-replit-vercel)
+
+- Removed Replit host files: `.replit`, `replit.md`, unused `server/replitAuth.ts`, Replit object-storage stack (`server/objectStorage.ts`, `server/objectAcl.ts`).
+- Removed Vercel-only pieces: `vercel.json`, `api/` serverless shim, `VERCEL_STATIC_FILES_EXPLANATION.md`, `APPROACH_1_IMPLEMENTATION.md`.
+- Vite: dropped `@replit/vite-plugin-*` (cartographer, dev-banner, runtime-error-modal) and `REPL_ID` gates; plugins is just `@vitejs/plugin-react`.
+- npm: uninstalled `@replit/vite-plugin-*`, `openid-client` (Replit OIDC only), `@google-cloud/storage` (Replit sidecar only).
+- Kept `render.yaml` (Render hosting). Local auth (`server/auth.ts`), passport-local, and Editorial app code unchanged.
+- Not merged; waiting for Timothy.
+
 ## 2026-11-04 (09:22 CST, America/Chicago): Footer avatars get status dots, a live typing "…", and an Archive for finished debates (branch fix/full-qa)
 Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
 - **Removed the per-message unread number on footer avatars.** It counted every message after you last read, your own messages included, and the room page never cleared it. The old `getGroupedDebateRooms` query is gone. Grouping now lives in NEW `server/lib/userDebates.ts`, which also feeds the footer Debates list, so the two always agree.

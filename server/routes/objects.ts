@@ -6,8 +6,7 @@ const router = Router();
 // GET /api/objects/:objectPath(*) - Download objects
 router.get('/:objectPath(*)', isAuthenticated, async (req, res) => {
   try {
-    // TODO: Implement object download using ObjectStorageService
-    // This would use the existing objectAcl.ts and objectStorage.ts logic
+    // TODO: Implement object download (storage backend TBD; Replit object storage removed)
     res.status(501).json({ message: "Object download not yet implemented" });
   } catch (error) {
     console.error("Error downloading object:", error);
@@ -18,7 +17,7 @@ router.get('/:objectPath(*)', isAuthenticated, async (req, res) => {
 // POST /api/objects/upload - Upload objects
 router.post('/upload', isAuthenticated, async (req, res) => {
   try {
-    // TODO: Implement object upload using ObjectStorageService
+    // TODO: Implement object upload (storage backend TBD)
     res.status(501).json({ message: "Object upload not yet implemented" });
   } catch (error) {
     console.error("Error uploading object:", error);

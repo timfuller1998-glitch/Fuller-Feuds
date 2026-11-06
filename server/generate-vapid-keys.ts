@@ -9,7 +9,7 @@ console.log(vapidKeys.publicKey);
 console.log('\nPrivate Key:');
 console.log(vapidKeys.privateKey);
 console.log('\n========================\n');
-console.log('Add these to your Replit Secrets:');
+console.log('Add these to your host env vars (e.g. Render Environment):');
 console.log('VAPID_PUBLIC_KEY:', vapidKeys.publicKey);
 console.log('VAPID_PRIVATE_KEY:', vapidKeys.privateKey);
 console.log('\n');
