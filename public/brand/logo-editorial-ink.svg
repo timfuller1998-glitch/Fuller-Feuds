@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Fuller Feuds">
+  <title>Fuller Feuds (ink variation)</title>
+  <rect width="512" height="512" fill="#f6efe1"/>
+  <circle cx="256" cy="256" r="236" fill="none" stroke="#211c17" stroke-width="5"/>
+  <circle cx="256" cy="256" r="224" fill="none" stroke="#211c17" stroke-width="1.5" opacity="0.45"/>
+  <circle cx="256" cy="256" r="208" fill="#fbf9f3"/>
+  <defs>
+    <g id="letter-f-ink"><path d="M0 0 H78 V18 H22 V52 H68 V70 H22 V128 H0 Z"/></g>
+  </defs>
+  <g transform="translate(168 168) rotate(-22)">
+    <path fill="#fbf9f3" d="M-100,-78 H96 Q122,-78 122,-52 V44 Q122,70 96,70 H-14 L-52 118 L-36 70 H-100 Q-126 70 -126 44 V-52 Q-126 -78 -100 -78 Z"/>
+    <path fill="#211c17" d="M-92,-70 H88 Q108,-70 108,-50 V36 Q108,56 88,56 H-10 L-42 96 L-28 56 H-92 Q-112 56 -112 36 V-50 Q-112 -70 -92 -70 Z"/>
+    <g transform="translate(-46 -42) scale(1.05)" fill="#fbf9f3"><use href="#letter-f-ink"/></g>
+  </g>
+  <g transform="translate(344 344) rotate(-22)">
+    <path fill="#fbf9f3" d="M-100,-78 H96 Q122,-78 122,-52 V44 Q122,70 96,70 H14 L52 118 L36 70 H-100 Q-126 70 -126 44 V-52 Q-126 -78 -100 -78 Z"/>
+    <path fill="#211c17" d="M-92,-70 H88 Q108,-70 108,-50 V36 Q108,56 88,56 H10 L42 96 L28 56 H-92 Q-112 56 -112 36 V-50 Q-112 -70 -92 -70 Z"/>
+    <g transform="translate(-46 -42) scale(1.05)" fill="#8c2020"><use href="#letter-f-ink"/></g>
+  </g>
+  <g transform="translate(256 256) rotate(-45)">
+    <rect x="-28" y="-3.5" width="56" height="7" fill="#8c2020"/>
+  </g>
+</svg>

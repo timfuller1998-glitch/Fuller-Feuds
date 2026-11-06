@@ -1,14 +1,18 @@
 {
   "name": "Fuller Feuds",
   "short_name": "Fuller Feuds",
-  "description": "Every opinion. One fair fight. Submit your opinion, change the summary. Debate 1v1 — no comments, no noise, no crowd.",
-  "theme_color": "#1e293b",
-  "background_color": "#0f172a",
+  "description": "Every opinion. One fair fight. Submit your opinion, change the summary. Debate 1v1 \u2014 no comments, no noise, no crowd.",
+  "theme_color": "#f6efe1",
+  "background_color": "#f6efe1",
   "display": "standalone",
   "scope": "/",
   "start_url": "/",
   "orientation": "portrait-primary",
-  "categories": ["social", "debate", "discussion"],
+  "categories": [
+    "social",
+    "debate",
+    "discussion"
+  ],
   "icons": [
     {
       "src": "/pwa-64x64.png",

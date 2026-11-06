@@ -1,3 +1,12 @@
+## 2026-11-05 (19:15 CST, America/Chicago) — Editorial logo + PWA splash refresh (branch design/logo-editorial)
+
+- Recreated the clashing dual-chat-bubble mark as crisp SVG (`public/brand/logo-editorial.svg`), recolored to Editorial tokens: cream paper `#f6efe1`, card `#fbf9f3`, ink `#211c17`, stance-for `#234f65`, primary/against `#8c2020`, gold clash `#805f1e`. Bold condensed path "F"s (Arena/Anton weight). Ink monochrome alternate kept at `public/brand/logo-editorial-ink.svg` (not wired as default).
+- Regenerated `logo.png`, `logo.svg`, `favicon.ico`, `favicon-32x32.png`, `pwa-64/192/512`, `maskable-icon-512x512.png`, `apple-touch-icon-180x180.png` via `scripts/generate-brand-icons.js`.
+- PWA `manifest.json` `theme_color` / `background_color` moved from navy (`#0f172a` / `#1e293b`) to cream `#f6efe1` so the install/splash screen matches Editorial (was the navy phone splash Timothy screenshotted).
+- Sidebar header logo now uses `/logo.svg` on a cream card with ink border (no primary-red square behind it). `client/index.html` adds SVG favicon link; theme-color was already cream.
+- Previews (not shipped): `/workspace/ff-videos/logo-refresh/` — new icon, side-by-side, mocked 473×1024 cream splash.
+- `render.yaml` untouched.
+
 ## 2026-11-04 (09:22 CST, America/Chicago): Footer avatars get status dots, a live typing "…", and an Archive for finished debates (branch fix/full-qa)
 Made by the Fuller Feuds Dev bot (Grok Bot). Not merged; waiting for Timothy's review.
 - **Removed the per-message unread number on footer avatars.** It counted every message after you last read, your own messages included, and the room page never cleared it. The old `getGroupedDebateRooms` query is gone. Grouping now lives in NEW `server/lib/userDebates.ts`, which also feeds the footer Debates list, so the two always agree.
