@@ -36,6 +36,7 @@ import { InteractiveSentenceText } from "@/components/InteractiveSentenceText";
 import { getParagraphTextAtIndex } from "@/lib/textSegments";
 import CardDeck from "@/components/CardDeck";
 import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
+import { SummaryParagraphFront, SummaryParagraphBack, type SummaryParagraphCard } from "@/components/SummaryParagraphCard";
 import { tallyStances } from "@/lib/stance";
 import { useQueries } from "@tanstack/react-query";
 
@@ -401,6 +402,27 @@ export default function Topic() {
     const counts = summarySentences.map((s) => (s.referencedOpinionIds || []).reduce((a, opId) => a + (summaryTotalsByOpinion.get(opId) ?? 0), 0));
     return (i: number) => counts[i] ?? 0;
   }, [summarySentences, summaryTotalsByOpinion]);
+
+  const [summaryChromeReserve, setSummaryChromeReserve] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth >= 768 ? 490 : 580,
+  );
+  useEffect(() => {
+    const onResize = () => setSummaryChromeReserve(window.innerWidth >= 768 ? 490 : 580);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const summaryParagraphCards: SummaryParagraphCard[] = useMemo(() => {
+    const map = new Map((opinions || []).map((o) => [o.id, o]));
+    return summarySentences.map((s, index) => ({
+      index,
+      total: summarySentences.length,
+      text: s.text,
+      topicId: id || "",
+      opinions: (s.referencedOpinionIds || []).map((oid) => map.get(oid)).filter(Boolean) as Opinion[],
+      counterpointCountFor: (oid: string) => summaryTotalsByOpinion.get(oid) ?? 0,
+    }));
+  }, [summarySentences, opinions, id, summaryTotalsByOpinion]);
 
   const openCounterpointsForSummarySentence = (idx: number) => {
     const ids = summarySentences[idx]?.referencedOpinionIds || [];
@@ -870,36 +892,31 @@ export default function Topic() {
         </TabsList>
 
         <TabsContent value="ai" className="mt-4">
-          <article className="rounded-xl border bg-card shadow-md deck-card-surface overflow-hidden px-5 py-5 md:px-8 md:py-7" data-testid="ai-summary-card">
-            <header className="mb-5">
-              <p className="font-ui text-xs uppercase tracking-[0.14em] text-[hsl(var(--gold))]">AI Summary</p>
-              <div className="mt-3 h-px w-full bg-[hsl(var(--gold)/0.45)]" />
-            </header>
-            {cumulativeData ? (
-              <>
-                <InteractiveSentenceText
-                  chunks={summarySentences.map((s) => s?.text ?? "")}
-                  interactionCount={summaryCounterpointCount}
-                  badgeLabel={(n) => `${n} counterpoint${n === 1 ? "" : "s"}`}
-                  selectedSentenceIndex={selectedSentenceIndex}
-                  onSelectSentence={(idx) => {
-                    setSelectedSentenceIndex(idx);
-                    setSheetIntent("references");
-                    setSheetOpen(true);
-                  }}
-                  onSelectBadge={(idx) => openCounterpointsForSummarySentence(idx)}
-                  className="font-serif text-[1.05rem] leading-[1.7]"
-                />
-                <p className="mt-6 font-ui text-[0.65rem] uppercase tracking-[0.1em] text-muted-foreground">
-                  Tap a paragraph for the opinions it draws on. The badge opens its counterpoints.
-                </p>
-              </>
-            ) : (
+          {summaryParagraphCards.length > 0 ? (
+            <div className="flex justify-center py-2" data-testid="ai-summary-card">
+              <CardDeck<SummaryParagraphCard>
+                items={summaryParagraphCards}
+                getKey={(item) => String(item.index)}
+                renderFront={(item) => <SummaryParagraphFront item={item} />}
+                renderBack={(item) => <SummaryParagraphBack item={item} />}
+                maxWidth={400}
+                emptyLabel="No summary yet"
+                ariaLabel="AI summary paragraphs"
+                testId="summary-deck"
+                chromeReserve={summaryChromeReserve}
+              />
+            </div>
+          ) : (
+            <article className="rounded-xl border bg-card shadow-md deck-card-surface overflow-hidden px-5 py-5 md:px-8 md:py-7" data-testid="ai-summary-empty">
+              <header className="mb-5">
+                <p className="font-ui text-xs uppercase tracking-[0.14em] text-[hsl(var(--gold))]">AI Summary</p>
+                <div className="mt-3 h-px w-full bg-[hsl(var(--gold)/0.45)]" />
+              </header>
               <p className="font-serif text-base italic text-muted-foreground">
                 No summary yet. Once enough opinions are in, an overview of the discussion will appear here.
               </p>
-            )}
-          </article>
+            </article>
+          )}
         </TabsContent>
 
         <TabsContent value="yours" className="mt-4">

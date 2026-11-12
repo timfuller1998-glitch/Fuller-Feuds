@@ -1,9 +1,9 @@
-import { Heart, Swords } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
 import { StanceChip, type Person } from "@/components/OpinionDeckCard";
 import type { Stance } from "@/lib/stance";
+import { OpponentPicker } from "@/components/OpponentPicker";
+import type { Opponent } from "@/lib/opponentSides";
 
 export type CounterpointCardItem = {
   id: string;
@@ -77,62 +77,50 @@ export function CounterpointDeckFront({ item }: { item: CounterpointCardItem }) 
 
 export function CounterpointDeckBack({
   item,
-  isOpinionAuthor,
+  people,
+  originalAuthorId,
+  originalAuthorStance,
+  meId,
+  isAuthenticated,
   canLike,
   onLike,
-  onStartDebate,
+  onChallenge,
+  onNeedSignIn,
   likePending,
-  debatePending,
+  challengePending,
 }: {
   item: CounterpointCardItem;
-  isOpinionAuthor: boolean;
+  people: Opponent[];
+  originalAuthorId: string;
+  originalAuthorStance?: Stance | null;
+  meId?: string | null;
+  isAuthenticated: boolean;
   canLike: boolean;
   onLike: () => void;
-  onStartDebate: () => void;
+  onChallenge: (opponent: Opponent, side: "for" | "against") => void;
+  onNeedSignIn: () => void;
   likePending?: boolean;
-  debatePending?: boolean;
+  challengePending?: boolean;
 }) {
-  const para = item.sentenceIndex + 1;
   return (
     <div className={`${shell} p-4`} data-testid={`counterpoint-card-back-${item.id}`}>
-      <p className="font-ui text-[0.65rem] uppercase tracking-[0.14em] text-[hsl(var(--gold))]">
-        Actions
-      </p>
-      <div className="mt-3 h-px bg-foreground/15" />
-      <div className="mt-4 space-y-3">
-        <Button
-          type="button"
-          variant={item.likedByMe ? "default" : "outline"}
-          className="w-full justify-start"
-          disabled={!canLike || likePending}
-          onClick={onLike}
-          data-testid={`button-like-counterpoint-${item.id}`}
-        >
-          <Heart className={`w-4 h-4 mr-2 ${item.likedByMe ? "fill-current" : ""}`} />
-          {item.likedByMe ? "Liked" : "Like"} · {item.likeCount}
-        </Button>
-        {isOpinionAuthor ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full justify-start"
-            disabled={debatePending}
-            onClick={onStartDebate}
-            data-testid={`button-start-debate-${item.id}`}
-          >
-            <Swords className="w-4 h-4 mr-2" />
-            Start a debate
-          </Button>
-        ) : null}
-      </div>
-      <div className="mt-auto pt-4 border-t border-foreground/15">
-        <p className="font-ui text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground mb-1">
-          On ¶{para} of the original
-        </p>
-        <p className="font-serif text-sm italic text-muted-foreground line-clamp-4">
-          {item.paragraphText || "This counterpoint answers a paragraph of the original opinion."}
-        </p>
-      </div>
+      <OpponentPicker
+        meId={meId}
+        isAuthenticated={isAuthenticated}
+        people={people}
+        counterpointAuthorId={item.authorUserId}
+        originalAuthorId={originalAuthorId}
+        counterpointAuthorStance={item.authorStance}
+        originalAuthorStance={originalAuthorStance}
+        likedByMe={item.likedByMe}
+        likeCount={item.likeCount}
+        canLike={canLike}
+        likePending={likePending}
+        onLike={onLike}
+        onChallenge={onChallenge}
+        challengePending={challengePending}
+        onNeedSignIn={onNeedSignIn}
+      />
     </div>
   );
 }
