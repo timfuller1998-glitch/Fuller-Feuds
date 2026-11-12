@@ -35,9 +35,28 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Anton&family=Playfair+Display:ital,wght@0,600..900;1,600..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..700&display=swap" rel="stylesheet">
+    <!-- Launch screen (Fuller Feuds Dev, Nov 2026): Editorial black / red with thin gold accents; logo artwork unchanged.
+         Shown before React mounts (inside #root) and reused by the app's auth-loading state (LaunchScreen.tsx). -->
+    <style>
+      .ff-launch{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+        background:radial-gradient(120% 80% at 50% 38%,#231d18 0%,#14110e 60%,#0d0b09 100%);color:#f6efe1;}
+      .ff-launch::before,.ff-launch::after{content:"";position:absolute;left:24px;right:24px;height:0;border-top:1px solid rgba(227,184,90,.55);}
+      .ff-launch::before{top:24px;border-bottom:1px solid rgba(227,184,90,.25);height:3px}
+      .ff-launch::after{bottom:24px;border-bottom:1px solid rgba(227,184,90,.25);height:3px}
+      .ff-launch-logo{width:148px;height:148px;border-radius:50%;padding:5px;border:1.5px solid #e3b85a;box-shadow:0 0 0 6px rgba(227,184,90,.08),0 18px 40px rgba(0,0,0,.55);}
+      .ff-launch-logo img{width:100%;height:100%;border-radius:50%;display:block}
+      .ff-launch-word{font-family:Anton,Impact,"Arial Narrow",sans-serif;font-size:40px;letter-spacing:.03em;line-height:1;text-transform:uppercase;margin:0}
+      .ff-launch-word span{color:#c8322b}
+      .ff-launch-rule{width:120px;height:1px;background:linear-gradient(90deg,transparent,#e3b85a,transparent)}
+      .ff-launch-tag{font-family:"Playfair Display",Georgia,serif;font-style:italic;font-size:15px;color:#d9c9a8;margin:0}
+      .ff-launch-bar{width:96px;height:2px;background:rgba(227,184,90,.18);overflow:hidden;border-radius:2px}
+      .ff-launch-bar i{display:block;width:40%;height:100%;background:#c8322b;animation:ffbar 1.1s ease-in-out infinite}
+      @keyframes ffbar{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
+      @media (prefers-reduced-motion:reduce){.ff-launch-bar i{animation:none;width:100%}}
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="ff-launch" role="status" aria-label="Loading Fuller Feuds"><div class="ff-launch-logo"><img src="/launch-logo-512.png" alt="" /></div><p class="ff-launch-word">Fuller <span>Feuds</span></p><div class="ff-launch-rule"></div><p class="ff-launch-tag">Every opinion. One fair fight.</p><div class="ff-launch-bar"><i></i></div></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

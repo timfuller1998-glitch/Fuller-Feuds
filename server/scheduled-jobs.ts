@@ -1,4 +1,6 @@
 import cron from 'node-cron';
+import { sql } from 'drizzle-orm';
+import { db } from './db.js';
 import { log } from './utils/logger.js';
 import { TopicService } from './services/topicService.js';
 import { OpinionService } from './services/opinionService.js';
@@ -57,7 +59,28 @@ export async function runAISummaryUpdate(): Promise<{
   return { generated, refreshed, skipped, errors };
 }
 
+/**
+ * Supabase keep-alive: free-plan projects pause after ~7 days without activity. Run a tiny real query
+ * (not just SELECT 1) against the app's own tables twice a day from this always-on Render service.
+ * Free; no extra service. Only works while the Render service is running (e.g. not suspended for billing).
+ */
+export async function runDbKeepAlive(): Promise<boolean> {
+  try {
+    const r: any = await db.execute(sql`SELECT count(*)::int AS users, now() AS at FROM users`);
+    const row = (r.rows ?? r)[0] ?? {};
+    log(`[CRON] DB keep-alive ok (users=${row.users})`);
+    return true;
+  } catch (error) {
+    log(`[CRON ERROR] DB keep-alive failed: ${error}`);
+    return false;
+  }
+}
+
 export function startScheduledJobs() {
+  cron.schedule('17 */12 * * *', () => { void runDbKeepAlive(); }, { timezone: 'UTC' });
+  log('[CRON] Scheduled Supabase keep-alive every 12 hours');
+  setTimeout(() => { void runDbKeepAlive(); }, 60_000); // once shortly after each deploy/restart
+
   cron.schedule('0 2 * * *', async () => {
     log('[CRON] Starting daily AI summary update at 2:00 AM');
     const result = await runAISummaryUpdate();
