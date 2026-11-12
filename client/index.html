@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background:#f7f2e9">
   <head>
     <meta charset="UTF-8" />
     <title>Fuller Feuds - Every opinion. One fair fight.</title>
@@ -8,7 +8,7 @@
     
     <!-- PWA Configuration -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#f6efe1" />
+    <meta name="theme-color" content="#f7f2e9" />
     <script>
       // Apply the saved light/medium/dark preference before first paint (Settings writes localStorage "theme").
       (function () {
@@ -16,15 +16,20 @@
           var t = localStorage.getItem("theme");
           if (t === "dark" || t === "medium") {
             document.documentElement.classList.add(t);
+            var bg = t === "dark" ? "#1a1612" : "#2b251f";
             var m = document.querySelector('meta[name="theme-color"]');
-            if (m) m.setAttribute("content", t === "dark" ? "#1a1612" : "#2b251f");
+            if (m) m.setAttribute("content", bg);
+            document.documentElement.style.background = bg;
+            document.addEventListener("DOMContentLoaded", function () {
+              document.body.style.background = bg;
+            });
           }
         } catch (e) {}
       })();
     </script>
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Fuller Feuds" />
     
     <!-- PWA Icons -->
@@ -35,27 +40,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Anton&family=Playfair+Display:ital,wght@0,600..900;1,600..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..700&display=swap" rel="stylesheet">
-    <!-- Launch screen (Fuller Feuds Dev, Nov 2026): Editorial black / red with thin gold accents; logo artwork unchanged.
-         Shown before React mounts (inside #root) and reused by the app's auth-loading state (LaunchScreen.tsx). -->
+    <!-- Launch screen: paper page color so the Android/PWA splash, first paint, and
+         "Loading debates..." shell do not flash dark-to-cream. Logo artwork unchanged. -->
     <style>
+      html,body{background:#f7f2e9;margin:0}
       .ff-launch{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
-        background:radial-gradient(120% 80% at 50% 38%,#231d18 0%,#14110e 60%,#0d0b09 100%);color:#f6efe1;}
-      .ff-launch::before,.ff-launch::after{content:"";position:absolute;left:24px;right:24px;height:0;border-top:1px solid rgba(227,184,90,.55);}
-      .ff-launch::before{top:24px;border-bottom:1px solid rgba(227,184,90,.25);height:3px}
-      .ff-launch::after{bottom:24px;border-bottom:1px solid rgba(227,184,90,.25);height:3px}
-      .ff-launch-logo{width:148px;height:148px;border-radius:50%;padding:5px;border:1.5px solid #e3b85a;box-shadow:0 0 0 6px rgba(227,184,90,.08),0 18px 40px rgba(0,0,0,.55);}
+        background:#f7f2e9;color:#211c17;}
+      .ff-launch-logo{width:148px;height:148px;border-radius:50%;}
       .ff-launch-logo img{width:100%;height:100%;border-radius:50%;display:block}
-      .ff-launch-word{font-family:Anton,Impact,"Arial Narrow",sans-serif;font-size:40px;letter-spacing:.03em;line-height:1;text-transform:uppercase;margin:0}
-      .ff-launch-word span{color:#c8322b}
-      .ff-launch-rule{width:120px;height:1px;background:linear-gradient(90deg,transparent,#e3b85a,transparent)}
-      .ff-launch-tag{font-family:"Playfair Display",Georgia,serif;font-style:italic;font-size:15px;color:#d9c9a8;margin:0}
-      .ff-launch-bar{width:96px;height:2px;background:rgba(227,184,90,.18);overflow:hidden;border-radius:2px}
-      .ff-launch-bar i{display:block;width:40%;height:100%;background:#c8322b;animation:ffbar 1.1s ease-in-out infinite}
+      .ff-launch-word{font-family:Anton,Impact,"Arial Narrow",sans-serif;font-size:40px;letter-spacing:.03em;line-height:1;text-transform:uppercase;margin:0;color:#211c17}
+      .ff-launch-word span{color:#8c2121}
+      .ff-launch-rule{width:120px;height:1px;background:linear-gradient(90deg,transparent,#211c17,transparent);opacity:.35}
+      .ff-launch-tag{font-family:"Playfair Display",Georgia,serif;font-style:italic;font-size:15px;color:#5f574e;margin:0}
+      .ff-launch-bar{width:96px;height:2px;background:rgba(33,28,23,.12);overflow:hidden;border-radius:2px}
+      .ff-launch-bar i{display:block;width:40%;height:100%;background:#8c2121;animation:ffbar 1.1s ease-in-out infinite}
       @keyframes ffbar{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
       @media (prefers-reduced-motion:reduce){.ff-launch-bar i{animation:none;width:100%}}
     </style>
   </head>
-  <body>
+  <body style="background:#f7f2e9;margin:0">
     <div id="root"><div class="ff-launch" role="status" aria-label="Loading Fuller Feuds"><div class="ff-launch-logo"><img src="/launch-logo-512.png" alt="" /></div><p class="ff-launch-word">Fuller <span>Feuds</span></p><div class="ff-launch-rule"></div><p class="ff-launch-tag">Every opinion. One fair fight.</p><div class="ff-launch-bar"><i></i></div></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -1,3 +1,10 @@
+## 2026-11-12 (06:30 CST) — Match the installed-app splash to the paper loading screen
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/pwa-splash-paper`
+- **What:** The Android home-screen splash was still the old Editorial black (`background_color` / `theme_color` `#14110e`) with a white/grey rounded icon tile, so opening the app showed a dark splash (and the dark in-page launch) before the cream "Loading debates..." shell. Set the manifest, `<meta name="theme-color">`, and `html`/`body` first-paint background to the page paper color `#f7f2e9` (`--background`). Rebuilt 64/192/512 and maskable/apple-touch icons as the existing logo on that same paper (logo artwork unchanged) so Android does not draw a white tile. Color-matched the pre-React / auth launch screen to paper as well, otherwise a paper splash would still flash through a dark in-page loader. Name/short_name remain "Fuller Feuds". The native splash is baked into the WebAPK and will not change on a regular refresh — see the PR notes.
+- **Typecheck:** 52 (CSS/HTML/JSON/PNG only).
+
 ## 2026-11-12 (06:05 CST) — Copy repo public/ assets into the production build
 
 - **By:** Fuller Feuds Dev
