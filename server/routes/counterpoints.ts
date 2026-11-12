@@ -3,7 +3,8 @@ import { isAuthenticated } from '../middleware/auth.js';
 import { CounterpointService } from '../services/counterpointService.js';
 import { DebateService } from '../services/debateService.js';
 import { notifyNewDebateCreated } from '../websocket.js';
-import { postDebateMessage, notifyDebateInvite, displayNameOf } from '../lib/debateFlow.js';
+import { postDebateMessage, notifyDebateInvite, displayNameOf, FlowError } from '../lib/debateFlow.js';
+import { checkDebateStart, markInvitePending } from '../lib/debateLimits.js';
 import { CounterpointRepository } from '../repositories/counterpointRepository.js';
 import { getPresenceForUserIds } from '../websocket.js';
 import { db } from '../db.js';
@@ -119,6 +120,9 @@ router.post('/:id/start-debate', isAuthenticated, async (req, res) => {
       return res.status(403).json({ message: 'Only the opinion author can start this debate' });
     }
 
+    const existing = await checkDebateStart(requestingUserId, opponentUserId, opinion.topicId);
+    if (existing) return res.json({ ...existing, reused: true });
+
     const room = await debateService.createDebateRoomBetweenUsersForTopic({
       topicId: opinion.topicId,
       participant1Id: requestingUserId,
@@ -134,11 +138,13 @@ router.post('/:id/start-debate', isAuthenticated, async (req, res) => {
     }
 
     // Notify opponent in realtime (if connected)
+    await markInvitePending(room.id, requestingUserId, opponentUserId);
     notifyNewDebateCreated(room.id, await displayNameOf(requestingUserId), opponentUserId);
     await notifyDebateInvite(room.id, requestingUserId, opponentUserId, opinion.topicId);
 
     res.json(room);
   } catch (error: any) {
+    if (error instanceof FlowError) return res.status(error.status).json({ message: error.message });
     console.error('Error starting debate from counterpoint:', error);
     res.status(500).json({ message: error.message || 'Failed to start debate' });
   }

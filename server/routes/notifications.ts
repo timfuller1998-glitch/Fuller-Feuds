@@ -27,9 +27,11 @@ router.get('/debates', isAuthenticated, async (req, res) => {
   try {
     const all = await listUserDebates(req.user!.id);
     // Needs-you and new first, then by activity
-    const rank = (d: any) => (d.isNew || d.unread > 0 ? 0 : d.state === 'your_turn' || d.state === 'rate' ? 1 : 2);
+    const rank = (d: any) => (d.isNew ? 0 : d.state === 'invited' || d.state === 'your_turn' || d.state === 'rate' ? 1 : 2);
     const items = [...all].sort((x, y) => rank(x) - rank(y));
-    res.json({ items, unreadCount: items.reduce((n, i) => n + i.unread, 0) });
+    // needsYou/hasNew drive the footer's single dot (no counts in the UI).
+    res.json({ items, unreadCount: items.reduce((n, i) => n + i.unread, 0),
+      hasNew: items.some((i) => i.isNew), needsYou: items.some((i) => !i.finished && (i.state === 'invited' || i.state === 'your_turn' || i.state === 'rate')) });
   } catch (e) {
     console.error('Error fetching footer debates:', e);
     res.status(500).json({ message: 'Failed to fetch debates' });

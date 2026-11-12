@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { DebateService } from '../services/debateService.js';
 import { isAuthenticated } from '../middleware/auth.js';
 import { notifyNewDebateMessage, notifyDebateEnded } from '../websocket.js';
-import { postDebateMessage, endDebate, submitRating, getVoteSummary, displayNameOf, FlowError, STRUCTURED_TURNS } from '../lib/debateFlow.js';
+import { postDebateMessage, endDebate, submitRating, getVoteSummary, displayNameOf, FlowError, STRUCTURED_TURNS, respondToInvite } from '../lib/debateFlow.js';
 import { UnauthorizedError, ForbiddenError, AuthorizationError, DataAccessError } from '../utils/securityErrors.js';
 
 const router = Router();
@@ -118,6 +118,20 @@ router.post('/:id/end', isAuthenticated, async (req, res) => {
     if (error instanceof FlowError) return res.status(error.status).json({ message: error.message });
     console.error('Error ending debate:', error);
     res.status(500).json({ message: error.message || 'Failed to end debate' });
+  }
+});
+
+// POST /api/debate-rooms/:id/invite/(accept|decline|withdraw) - answer a pending debate invite
+router.post('/:id/invite/:action', isAuthenticated, async (req, res) => {
+  const action = req.params.action;
+  if (action !== 'accept' && action !== 'decline' && action !== 'withdraw') return res.status(404).json({ message: 'Unknown action' });
+  try {
+    const room = await respondToInvite(req.params.id, req.user!.id, action);
+    res.json(room);
+  } catch (error: any) {
+    if (error instanceof FlowError) return res.status(error.status).json({ message: error.message });
+    console.error('Error answering invite:', error);
+    res.status(500).json({ message: 'Failed to answer invite' });
   }
 });
 

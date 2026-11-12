@@ -13,7 +13,7 @@ import { db } from '../db.js';
  *   completed  - both rated, or archived                          (finished → archive)
  * isNew: an unread "new_debate" notification exists for this room (green dot until opened).
  */
-export type DebateState = 'your_turn' | 'waiting' | 'rate' | 'rated' | 'completed';
+export type DebateState = 'your_turn' | 'waiting' | 'rate' | 'rated' | 'completed' | 'invited' | 'invite_sent' | 'declined';
 export type UserDebate = {
   id: string; topicTitle: string; opponentId: string; opponentName: string; opponentHandle: string | null;
   opponentAvatar: string | null; state: DebateState; isNew: boolean; unread: number; finished: boolean;
@@ -30,7 +30,7 @@ const iso = (d: any): string | null => {
 export async function listUserDebates(me: string): Promise<UserDebate[]> {
   const r: any = await db.execute(sql`
     SELECT d.id, d.status, d.phase, d.current_turn, d.turn_count1, d.turn_count2,
-           d.participant1_id,
+           d.participant1_id, d.invite_status, d.invitee_id,
            (coalesce(d.last_message_at, d.started_at) AT TIME ZONE 'UTC') AS activity_at,
            (d.ended_at AT TIME ZONE 'UTC') AS ended_at,
            t.title AS topic_title,
@@ -49,7 +49,12 @@ export async function listUserDebates(me: string): Promise<UserDebate[]> {
     LIMIT 200`);
   return ((r.rows ?? r) as any[]).map((d) => {
     const voting = d.phase === 'voting' || d.status === 'ended' || d.status === 'archived';
-    const state: DebateState = d.status === 'archived' || d.vote_count >= 2
+    const closedInvite = d.invite_status === 'declined' || d.invite_status === 'withdrawn';
+    const state: DebateState = closedInvite
+      ? 'declined'
+      : d.invite_status === 'pending' && d.status === 'active'
+        ? (d.invitee_id === me ? 'invited' : 'invite_sent')
+      : d.status === 'archived' || d.vote_count >= 2
       ? 'completed'
       : voting
         ? (d.i_voted ? 'rated' : 'rate')
@@ -59,7 +64,7 @@ export async function listUserDebates(me: string): Promise<UserDebate[]> {
       id: d.id, topicTitle: d.topic_title, opponentId: d.opponent_id, opponentName: d.opponent_name,
       opponentHandle: d.opponent_handle, opponentAvatar: d.opponent_avatar, state,
       isNew: d.unread_invite > 0, unread: d.unread,
-      finished: state === 'completed' || state === 'rated',
+      finished: state === 'completed' || state === 'rated' || state === 'declined',
       myTurns: (isP1 ? d.turn_count1 : d.turn_count2) ?? 0,
       activityAt: iso(d.activity_at), endedAt: iso(d.ended_at),
     };
@@ -87,7 +92,10 @@ export async function groupUserDebates(me: string): Promise<OpponentGroup[]> {
   }
   for (const g of map.values()) {
     if (g.activeDebates.some((d) => d.isNew)) g.status = 'new';
-    else if (g.activeDebates.some((d) => d.state === 'your_turn' || d.state === 'rate')) g.status = 'needs_you';
+    else if (g.activeDebates.some((d) => d.state === 'your_turn' || d.state === 'rate' || d.state === 'invited')) g.status = 'needs_you';
   }
-  return [...map.values()].sort((a, b) => (b.mostRecentActivity ?? '').localeCompare(a.mostRecentActivity ?? ''));
+  // Priority sort for the footer: new invites (green), then needs you (red), then the rest; newest first within each.
+  const rank = { new: 0, needs_you: 1, none: 2 } as const;
+  return [...map.values()].sort((a, b) =>
+    rank[a.status] - rank[b.status] || (b.mostRecentActivity ?? '').localeCompare(a.mostRecentActivity ?? ''));
 }

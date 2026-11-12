@@ -2,7 +2,7 @@ import { db } from '../db.js';
 import { notifications } from '../../shared/schema.js';
 import { pushNotification } from '../websocket.js';
 
-export type NotifyType = 'new_debate' | 'your_turn' | 'debate_ended' | 'rate_opponent' | 'ratings_in';
+export type NotifyType = 'new_debate' | 'your_turn' | 'debate_ended' | 'rate_opponent' | 'ratings_in' | 'debate_accepted' | 'debate_declined';
 
 /** Store a notification for the bell and push it over the user's live sockets. Never throws. */
 export async function notifyUser(

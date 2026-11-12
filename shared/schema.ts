@@ -168,6 +168,10 @@ export const debateRooms = pgTable("debate_rooms", {
   lastMessageAt: timestamp("last_message_at"), // For auto-archiving inactive debates
   startedAt: timestamp("started_at").defaultNow(),
   endedAt: timestamp("ended_at"),
+  // Invites (migration 0011): 'pending' until the invitee accepts (or replies), 'declined' / 'withdrawn' close it.
+  // Rooms created before invites existed default to 'accepted'.
+  inviteStatus: varchar("invite_status", { length: 20 }).notNull().default("accepted"),
+  inviteeId: varchar("invitee_id").references(() => users.id),
 });
 
 // Messages in debate rooms
