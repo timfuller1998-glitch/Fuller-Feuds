@@ -294,11 +294,13 @@ function AppContent() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+      // Same markup/CSS as the pre-React launch screen in client/index.html
+      <div className="ff-launch" role="status" aria-label="Loading Fuller Feuds" data-testid="launch-screen">
+        <div className="ff-launch-logo"><img src="/launch-logo-512.png" alt="" /></div>
+        <p className="ff-launch-word">Fuller <span>Feuds</span></p>
+        <div className="ff-launch-rule" />
+        <p className="ff-launch-tag">Every opinion. One fair fight.</p>
+        <div className="ff-launch-bar"><i /></div>
       </div>
     );
   }

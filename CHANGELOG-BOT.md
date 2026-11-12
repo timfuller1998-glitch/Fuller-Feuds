@@ -1,3 +1,10 @@
+## 2026-11-11 (21:50 CST, America/Chicago) — Launch screen recolor + Supabase keep-alive (branch chore/keepalive-loading)
+Made by the Fuller Feuds Dev bot (Grok Bot).
+- **Launch/loading screen matches the Editorial scheme** (logo artwork unchanged, per Timothy Nov 11): near-black background, "FULLER" in paper white + "FEUDS" in red (Anton), thin gold rules top and bottom, a thin gold ring around the logo, italic gold-beige tagline, and a small red loading bar. The same screen shows before React loads (inline in `client/index.html`) and while sign-in state loads (`App.tsx`), replacing the old grey spinner + "Loading...".
+- **Installed-app (PWA) splash**: `manifest.json` background/theme color changed from navy slate (#0f172a/#1e293b) to Editorial black (#14110e). New `launch-logo-512.png` / `launch-logo-192.png` are the same logo trimmed to its circle (transparent corners) so it doesn't sit in a grey square on the dark splash. Maskable/home-screen icon unchanged. Android caches the manifest: re-adding the app to the home screen may be needed to see the new splash.
+- **Supabase keep-alive (fix item 7)**: new `runDbKeepAlive()` in `server/scheduled-jobs.ts` runs a tiny real query on `users` every 12 h (00:17/12:17 UTC) plus once a minute after each start. Free, inside the existing Render service (Starter plan, always on). Caveat: it can't help if the Render service itself is suspended (e.g. billing) — Supabase emails before pausing.
+- Typecheck 52.
+
 ## 2026-11-11 (21:40 CST, America/Chicago) — Fix list items 1–6 (branch fix/nov11-fixes)
 Made by the Fuller Feuds Dev bot (Grok Bot).
 1. **End debate early** now uses a styled Editorial dialog ("End this debate early?" · Keep debating / End debate) instead of the browser's plain confirm() pop-up (debate room page; the popup window already had its own).
