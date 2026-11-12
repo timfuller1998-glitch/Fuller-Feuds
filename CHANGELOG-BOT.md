@@ -1,3 +1,8 @@
+## 2026-11-12 (03:08 CST, America/Chicago) — Forward swipe now moves the rest of the deck by a visible amount (branch fix/forward-swipe-settle)
+Made by the Fuller Feuds Dev bot (Grok Bot).
+- **Forward swipe only seemed to move the top card.** The rest of the pile did animate during a left drag, but it only rose 7px and scaled up 3.5% (the distance from the 2nd slot to the top). On a phone that is almost invisible next to the top card sliding away. A back swipe already nudges the top card about 78px (22% of the card width) and shrinks it 5%.
+- The remaining pile now takes that same left shift while the top card is dragged away, rises and scales into the top spot, and settles back to center when you let go. The blank back and the hidden previous card follow so they do not peek out. The › button and → key start the new top from that same offset and slide it into place. Typecheck 52.
+
 ## 2026-11-12 (00:10 CST, America/Chicago) — Card-pile swipe: no leftover cards on back swipe, deck settles on forward swipe (branch fix/card-pile-swipe)
 Made by the Fuller Feuds Dev bot (Grok Bot).
 - **Back swipe no longer uncovers cards deeper in the pile.** On phones, pulling the bottom card out nudged the top card left and shrank it, which left a gap. The 2nd card (and the blank back) stayed put, so they peeked out beside the incoming card. Those cards now follow the same nudge and stay tucked under the top card. Only the current top card, the incoming card, and the normal downward peek of the pile are visible. The ‹ button, ← key, and the wheel use the same pull, so they get the same motion.
