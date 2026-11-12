@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type HTMLAttributes } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 import { CARD_GESTURE_LOCK_PX, markCardGesture } from "@/lib/cardGesture";
 
@@ -17,22 +17,74 @@ function nearestPageScroller(from: HTMLElement | null): HTMLElement | null {
  * (usually `main`) scroll. At either end of the in-card scroller, further
  * vertical drags chain to the page. A move is marked as a gesture so it
  * does not flip the card on pointer-up.
+ *
+ * Chaining uses a non-passive touchmove listener so it works with real
+ * touches (and Playwright CDP), not only pointer events.
  */
 export function CardScrollBody({ className, children, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, ...rest }: HTMLAttributes<HTMLDivElement>) {
   const ref = useRef<HTMLDivElement>(null);
   const lastY = useRef<number | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
   const [overflows, setOverflows] = useState(false);
+  const overflowsRef = useRef(false);
+  overflowsRef.current = overflows;
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const update = () => setOverflows(el.scrollHeight - el.clientHeight > 1);
-    update();
     const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
+    const watch = () => {
+      ro.observe(el);
+      el.querySelectorAll("*").forEach((n) => ro.observe(n));
+    };
+    update();
+    watch();
+    const mo = new MutationObserver(() => { update(); watch(); });
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => { ro.disconnect(); mo.disconnect(); };
   }, [children]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let last: number | null = null;
+    let startY: number | null = null;
+    const onStart = (e: TouchEvent) => {
+      last = e.touches[0]?.clientY ?? null;
+      startY = last;
+    };
+    const onMove = (e: TouchEvent) => {
+      const y = e.touches[0]?.clientY;
+      if (y == null || last == null) return;
+      if (startY != null && Math.abs(y - startY) >= CARD_GESTURE_LOCK_PX) markCardGesture();
+      const dy = last - y;
+      last = y;
+      if (!overflowsRef.current || dy === 0) return;
+      const max = el.scrollHeight - el.clientHeight;
+      const atStart = el.scrollTop <= 0;
+      const atEnd = el.scrollTop >= max - 1;
+      if ((dy < 0 && atStart) || (dy > 0 && atEnd)) {
+        const page = nearestPageScroller(el.parentElement);
+        if (page) {
+          e.preventDefault();
+          page.scrollTop += dy;
+          markCardGesture();
+        }
+      }
+    };
+    const onEnd = () => { last = null; startY = null; };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  }, []);
 
   return (
     <div
