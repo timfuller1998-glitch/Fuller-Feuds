@@ -1,3 +1,9 @@
+## 2026-11-12 (00:10 CST, America/Chicago) — Card-pile swipe: no leftover cards on back swipe, deck settles on forward swipe (branch fix/card-pile-swipe)
+Made by the Fuller Feuds Dev bot (Grok Bot).
+- **Back swipe no longer uncovers cards deeper in the pile.** On phones, pulling the bottom card out nudged the top card left and shrank it, which left a gap. The 2nd card (and the blank back) stayed put, so they peeked out beside the incoming card. Those cards now follow the same nudge and stay tucked under the top card. Only the current top card, the incoming card, and the normal downward peek of the pile are visible. The ‹ button, ← key, and the wheel use the same pull, so they get the same motion.
+- **Forward swipe now moves the rest of the deck.** While the top card is swiped left, the card behind it rises and scales into the top spot, and the blank back settles one layer forward — the same kind of slight motion the top card already got on a back swipe. After the swipe commits, a new 2nd card rises from the back of the pile into place. The › button and → key use the same settle.
+- `prefers-reduced-motion` still skips the timed animations (durations go to 0). Typecheck 52.
+
 ## 2026-11-11 (23:26 CST, America/Chicago) — Counterpoints links and scrolling (branch fix/counterpoints-navigation)
 Made by the Fuller Feuds Dev bot (Grok Bot).
 - **Summary "N counterpoints" badge opens counterpoints, not opinions.** Clicking a summary paragraph still opens the referenced-opinions sheet, but the badge itself goes to `/opinion/:id/counterpoints` when the paragraph points at one opinion. When it points at several, a sheet titled "Counterpoints" lists those opinions with a "See counterpoints (N) →" link on each. Referenced-opinion cards also got that same link so they are no longer a dead end.
