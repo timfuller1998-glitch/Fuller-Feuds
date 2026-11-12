@@ -11,6 +11,7 @@ import {
   type Opponent,
 } from "@/lib/opponentSides";
 import type { Stance } from "@/lib/stance";
+import { CardScrollBody } from "@/components/CardScrollBody";
 
 function initials(p: Opponent) {
   return `${p.firstName?.[0] || ""}${p.lastName?.[0] || ""}`.toUpperCase() || "?";
@@ -184,7 +185,7 @@ export function OpponentPicker({
         </Button>
       </div>
       <div className="mt-2 h-px bg-[hsl(var(--gold)/0.45)] shrink-0" />
-      <div className="mt-2 flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-contain space-y-3 pr-0.5">
+      <CardScrollBody className="mt-2 space-y-3">
         <Side
           title="Debate for"
           hint="Face the original opinion"
@@ -206,7 +207,7 @@ export function OpponentPicker({
               : "No one on this side yet."
           }
         />
-      </div>
+      </CardScrollBody>
       <div className="pt-2 mt-auto shrink-0">
         <Button
           type="button"

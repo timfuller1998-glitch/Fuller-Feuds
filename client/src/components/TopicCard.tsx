@@ -20,6 +20,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import { LoginPromptDialog } from "@/components/LoginPromptDialog";
 import type { FallacyType } from "@shared/fallacies";
+import { CARD_GESTURE_LOCK_PX, cardGestureJustHappened, markCardGesture } from "@/lib/cardGesture";
 
 const opinionFormSchema = insertOpinionSchema.omit({
   topicId: true,
@@ -90,6 +91,7 @@ export default function TopicCard({
   const backSideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const lastForceUnflipRef = useRef(0);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Get glow style based on political distribution
   const glowStyle = politicalDistribution && opinionsCount > 0
@@ -184,8 +186,10 @@ export default function TopicCard({
   });
 
   const handleFlip = (e: React.MouseEvent) => {
-    // Only flip if clicking on the main content area, not on interactive buttons
-    if ((e.target as HTMLElement).closest('button, [role="button"]')) {
+    // Only flip if clicking on the main content area, not on interactive buttons/links.
+    // A scroll or deck swipe must not count as a tap.
+    if (cardGestureJustHappened()) return;
+    if ((e.target as HTMLElement).closest('button, a, [role="button"], input, textarea, select')) {
       return;
     }
     const newFlipped = !isFlipped;
@@ -350,6 +354,14 @@ export default function TopicCard({
         >
           <Card
             className="hover-elevate active-elevate-2 overflow-visible cursor-pointer relative w-full h-full bg-card"
+            onPointerDown={(e) => { pointerStartRef.current = { x: e.clientX, y: e.clientY }; }}
+            onPointerMove={(e) => {
+              const s = pointerStartRef.current;
+              if (!s) return;
+              if (Math.hypot(e.clientX - s.x, e.clientY - s.y) >= CARD_GESTURE_LOCK_PX) markCardGesture();
+            }}
+            onPointerUp={() => { pointerStartRef.current = null; }}
+            onPointerCancel={() => { pointerStartRef.current = null; }}
             onClick={handleFlip}
             style={{
               transformStyle: "preserve-3d",
