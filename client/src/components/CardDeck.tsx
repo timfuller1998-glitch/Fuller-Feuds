@@ -95,7 +95,7 @@ const applyNudge = (ox: MotionValue<number>, os: MotionValue<number>, pull: numb
   os.set(baseScale * (1 - f * NUDGE_SCALE));
 };
 const liftProgress = (lift: number, width: number) => Math.min(Math.max(lift, 0) / (width * 0.45), 1);
-/** Remaining pile on a forward swipe: the same left-shift the top card gets on a back swipe, plus rise/scale into the next slot. */
+/** Remaining pile on a forward swipe: shifts right (opposite the departing top card) by the same amount as the back-swipe top nudge, plus rise/scale into the next slot. */
 const applyLift = (
   ox: MotionValue<number>,
   oy: MotionValue<number>,
@@ -108,7 +108,7 @@ const applyLift = (
   toScale = 1,
 ) => {
   const p = liftProgress(lift, width);
-  ox.set(-p * NUDGE_X * width);
+  ox.set(p * NUDGE_X * width);
   oy.set(fromY + (toY - fromY) * p);
   os.set(fromScale + (toScale - fromScale) * p);
 };
@@ -192,10 +192,10 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
     role === "in" || role === "peek"
       ? { y: s2.y, scale: s2.scale, z: role === "peek" ? 0 : 3 }
       : role === "next" && enterFromBack
-      ? { x: -NUDGE_X * width, y: backStyle(2.6).y, scale: backStyle(2.6).scale, z: 2 }
+      ? { x: NUDGE_X * width, y: backStyle(2.6).y, scale: backStyle(2.6).scale, z: 2 }
       : role === "next" ? { y: s1.y, scale: s1.scale, z: 5 }
       : { y: 0, scale: 1, z: 10 };
-  const ox = useMotionValue(role === "next" && enterFromBack ? -NUDGE_X * width : 0);
+  const ox = useMotionValue(role === "next" && enterFromBack ? NUDGE_X * width : 0);
   const oy = useMotionValue(start.y);
   const os = useMotionValue(start.scale);
   const orot = useMotionValue(0);
@@ -225,10 +225,10 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         const topNudging = pull && narrow ? followNudge(pull, ox, os, width, 1, anims) : false;
         if (first.current) return;
         if (!topNudging) {
-          // Button/key forward starts at rest (x=0). Give the new top the same left
-          // offset a finished forward drag would have, then settle to center, so the
-          // motion is as visible as the back-swipe nudge.
-          if (Math.abs(ox.get()) < 2) ox.set(-NUDGE_X * width);
+          // Button/key forward starts at rest (x=0). Give the new top the same right
+          // offset a finished forward drag would have (out of the departing card's way),
+          // then settle to center, so the motion is as visible as the back-swipe nudge.
+          if (Math.abs(ox.get()) < 2) ox.set(NUDGE_X * width);
           go(ox, 0, 0.32); go(os, 1, 0.32);
         }
         go(oy, 0, 0.32); go(orot, 0, 0.32);
@@ -252,8 +252,8 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
           go(ox, 0, 0.3); go(os, s1.scale, 0.3);
         }
         // Forward swipe: as the top card is dragged left, the rest of the pile shifts
-        // left by the same amount as the back-swipe top nudge, and this card rises/scales
-        // into the top slot — visible in sync with the departing card.
+        // right (out of its way) by the same amount as the back-swipe top nudge, and this
+        // card rises/scales into the top slot.
         if (lift) {
           followLift(lift, ox, oy, os, width, s1.y, s1.scale, anims, () => !!(pull && pull.get() > 2));
         }
@@ -282,11 +282,11 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
           const unsub = pull.on("change", follow);
           anims.push({ stop: unsub });
         }
-        // Stay tucked behind the blank backs when those backs shift left on a forward swipe.
+        // Stay tucked behind the blank backs when those backs shift right on a forward swipe.
         if (lift) {
           const apply = (v: number) => {
             if (pull && pull.get() > 2) return;
-            ox.set(-liftProgress(v, width) * NUDGE_X * width);
+            ox.set(liftProgress(v, width) * NUDGE_X * width);
           };
           let lifting = lift.get() > 2;
           if (lifting) apply(lift.get());

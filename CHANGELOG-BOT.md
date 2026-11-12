@@ -1,3 +1,7 @@
+## 2026-11-12 (03:14 CST, America/Chicago) — Forward swipe: the rest of the pile slides right, out of the top card's way (branch fix/forward-swipe-opposite)
+Made by the Fuller Feuds Dev bot (Grok Bot).
+- **The stack was sliding with the top card on a forward swipe.** PR #24 made the remaining pile move by a visible amount, but it followed the top card left. It now shifts the other way — right, about 78px, the same size as the back-swipe top nudge — so the deck looks like it is moving out of the departing card's way. The next card still rises and scales into the top spot, then the pile settles back to center when you let go. The › button and → key do the same. Back swipe is unchanged. Typecheck 52.
+
 ## 2026-11-12 (03:08 CST, America/Chicago) — Forward swipe now moves the rest of the deck by a visible amount (branch fix/forward-swipe-settle)
 Made by the Fuller Feuds Dev bot (Grok Bot).
 - **Forward swipe only seemed to move the top card.** The rest of the pile did animate during a left drag, but it only rose 7px and scaled up 3.5% (the distance from the 2nd slot to the top). On a phone that is almost invisible next to the top card sliding away. A back swipe already nudges the top card about 78px (22% of the card width) and shrinks it 5%.
