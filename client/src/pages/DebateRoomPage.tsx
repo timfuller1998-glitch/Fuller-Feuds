@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "wouter";
+import { parseServerDate } from "@/lib/dates";
 import { UserHandle } from "@/components/UserHandle";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
@@ -10,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { MessageSquare, Send, LogOut, Swords, Lock, Unlock, RefreshCw, UserPlus, Flag } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -79,6 +81,7 @@ export default function DebateRoomPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{id: string, content: string, timestamp: string}>>([]);
   const [showVotingModal, setShowVotingModal] = useState(false);
+  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingRooms = useTypingRooms();
   const typingSender = useTypingSender(roomId);
@@ -283,7 +286,7 @@ export default function DebateRoomPage() {
     return !messages.some(dbMsg => 
       dbMsg.userId === wsMsg.userId && 
       dbMsg.content === wsMsg.content &&
-      Math.abs(new Date(dbMsg.createdAt).getTime() - new Date(wsMsg.createdAt).getTime()) < 5000 // Within 5 seconds
+      Math.abs(parseServerDate(dbMsg.createdAt).getTime() - parseServerDate(wsMsg.createdAt).getTime()) < 5000 // Within 5 seconds
     );
   });
   
@@ -298,7 +301,7 @@ export default function DebateRoomPage() {
   }));
   
   const allMessages = [...messages, ...dedupedWsMessages, ...optimisticMsgs].sort((a, b) => 
-    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    parseServerDate(a.createdAt).getTime() - parseServerDate(b.createdAt).getTime()
   );
   
   // Clean up optimistic messages when they appear in DB or WebSocket (use effect to avoid render mutation)
@@ -311,7 +314,7 @@ export default function DebateRoomPage() {
         return allRealMessages.some(msg => 
           msg.content === optMsg.content &&
           msg.userId === (currentUser?.id || '') &&
-          Math.abs(new Date(msg.createdAt).getTime() - new Date(optMsg.timestamp).getTime()) < 5000
+          Math.abs(parseServerDate(msg.createdAt).getTime() - parseServerDate(optMsg.timestamp).getTime()) < 5000
         );
       })
       .map(opt => opt.id);
@@ -384,11 +387,8 @@ export default function DebateRoomPage() {
     });
   };
 
-  const handleEndDebate = () => {
-    if (confirm("Are you sure you want to end this debate?")) {
-      endDebateMutation.mutate();
-    }
-  };
+  // Styled confirm (replaces the browser's plain confirm() pop-up)
+  const handleEndDebate = () => setConfirmEndOpen(true);
 
   const handleTogglePrivacy = () => {
     const newPrivacyState = !isPrivate;
@@ -667,7 +667,7 @@ export default function DebateRoomPage() {
                             {senderName}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(message.createdAt).toLocaleTimeString()}
+                            {parseServerDate(message.createdAt).toLocaleTimeString()}
                           </p>
                         </div>
                         <div
@@ -872,6 +872,26 @@ export default function DebateRoomPage() {
           onClose={() => { ratingDismissedRef.current = true; setShowVotingModal(false); }}
         />
       )}
+      <AlertDialog open={confirmEndOpen} onOpenChange={setConfirmEndOpen}>
+        <AlertDialogContent data-testid="dialog-confirm-end-debate">
+          <AlertDialogHeader>
+            <AlertDialogTitle>End this debate early?</AlertDialogTitle>
+            <AlertDialogDescription>
+              No more messages can be sent. You and your opponent will both be asked to rate the debate.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-end-debate">Keep debating</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => endDebateMutation.mutate()}
+              data-testid="button-confirm-end-debate"
+            >
+              End debate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

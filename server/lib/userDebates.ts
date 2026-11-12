@@ -20,7 +20,12 @@ export type UserDebate = {
   myTurns: number; activityAt: string | null; endedAt: string | null;
 };
 
-const iso = (d: any): string | null => (d == null ? null : d instanceof Date ? d.toISOString() : String(d));
+// Raw SQL returns "2026-11-03 14:16:47.72+00"; send a real ISO string (Safari can't parse the "+00" form).
+const iso = (d: any): string | null => {
+  if (d == null) return null;
+  const dt = d instanceof Date ? d : new Date(String(d).replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00'));
+  return isNaN(dt.getTime()) ? String(d) : dt.toISOString();
+};
 
 export async function listUserDebates(me: string): Promise<UserDebate[]> {
   const r: any = await db.execute(sql`

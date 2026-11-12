@@ -11,6 +11,8 @@ export interface UserBadgeStats {
   followerCount: number;
   messageCount: number;
   fallacyRate: number;
+  ratedDebates: number;
+  avgRating: number;
 }
 
 export class BadgeRepository {
@@ -48,7 +50,10 @@ export class BadgeRepository {
         (SELECT COUNT(*)::int FROM user_follows WHERE following_id = ${userId}) AS followers,
         (SELECT COUNT(*)::int FROM debate_messages WHERE user_id = ${userId}) AS messages,
         (SELECT COUNT(DISTINCT f.message_id)::int FROM debate_message_flags f
-           JOIN debate_messages m ON m.id = f.message_id WHERE m.user_id = ${userId}) AS flagged
+           JOIN debate_messages m ON m.id = f.message_id WHERE m.user_id = ${userId}) AS flagged,
+        (SELECT COUNT(DISTINCT room_id)::int FROM debate_votes WHERE voted_for_user_id = ${userId} AND voter_id <> ${userId}) AS rated,
+        (SELECT AVG((logical_reasoning + politeness + openness_to_change) / 3.0)::float FROM debate_votes
+           WHERE voted_for_user_id = ${userId} AND voter_id <> ${userId}) AS avg_rating
     `);
     const r = (result.rows ?? result)[0] ?? {};
     const messages = Number(r.messages || 0);
@@ -61,6 +66,8 @@ export class BadgeRepository {
       followerCount: Number(r.followers || 0),
       messageCount: messages,
       fallacyRate: messages > 0 ? (flagged / messages) * 100 : 0,
+      ratedDebates: Number(r.rated || 0),
+      avgRating: Number(r.avg_rating || 0),
     };
   }
 
@@ -73,6 +80,7 @@ export class BadgeRepository {
       case 'likes_received': return { current: stats.likesReceived, required: badge.requirement };
       case 'follower_count': return { current: stats.followerCount, required: badge.requirement };
       case 'low_fallacy_rate': return { current: stats.debateCount, required: badge.requirement };
+      case 'high_rating': return { current: stats.ratedDebates, required: badge.requirement };
       default: return { current: 0, required: badge.requirement };
     }
   }
@@ -84,6 +92,9 @@ export class BadgeRepository {
       // Quality badges also need real debate messages and a low share of flagged ones.
       const maxRate = badge.id === 'master_debater' ? 3 : 5;
       return stats.messageCount > 0 && stats.fallacyRate < maxRate;
+    }
+    if (badge.requirementType === 'high_rating') {
+      return stats.avgRating >= (badge.id === 'top_rated' ? 4.5 : 4.0);
     }
     return true;
   }

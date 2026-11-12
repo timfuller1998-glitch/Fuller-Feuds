@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import StackSection from "@/components/StackSection";
@@ -13,7 +14,9 @@ import {
   Clock,
   Calendar,
   MessageSquare,
-  Users
+  Users,
+  Search as SearchIcon,
+  X
 } from "lucide-react";
 import climateImage from '@assets/generated_images/Climate_change_debate_thumbnail_3b0bbda7.png';
 
@@ -39,6 +42,8 @@ type AnySectionData = SectionData | OpinionSectionData;
 
 export default function Home() {
   const { user } = useAuth();
+  // Enter in the header search on "/" sets ?filter=... (see SearchBar); the home deck then shows only matches.
+  const homeFilter = (new URLSearchParams(useSearch()).get("filter") || "").trim();
 
   // Fetch all topics
   const { data: apiTopics, isLoading: topicsLoading } = useQuery<TopicWithCounts[]>({
@@ -61,11 +66,16 @@ export default function Home() {
   const activeDebateRoomsList = Array.isArray(activeDebateRooms) ? activeDebateRooms : [];
 
   // Use real API topics with default image fallback
-  const topics = topicsSource.map(topic => ({
+  const allTopics = topicsSource.map(topic => ({
     ...topic,
     imageUrl: topic.imageUrl || climateImage,
     isActive: topic.isActive || false
   }));
+  const filterTerms = homeFilter.toLowerCase().split(/\s+/).filter(Boolean);
+  const topics = filterTerms.length === 0 ? allTopics : allTopics.filter(t => {
+    const hay = [t.title, (t as any).description, ...((t as any).categories || [])].filter(Boolean).join(" ").toLowerCase();
+    return filterTerms.every(term => hay.includes(term));
+  });
 
   // Create sections data
   const sections: AnySectionData[] = [];
@@ -254,12 +264,36 @@ export default function Home() {
   }
 
   // Filter to only topic sections (exclude opinion sections for now)
-  const topicSections = sections.filter((s): s is SectionData => s.type !== 'opinions');
+  const topicSections: SectionData[] = homeFilter
+    ? (topics.length ? [{ title: "Search results", icon: SearchIcon, topics, totalCount: topics.length }] : [])
+    : sections.filter((s): s is SectionData => s.type !== 'opinions');
 
   return (
     <div className="absolute inset-0 -mx-3 -my-3 sm:-mx-4 sm:-my-4 md:-mx-6 md:-my-6 -mb-20 overflow-y-auto snap-y snap-mandatory -webkit-overflow-scrolling-touch">
+      {homeFilter && (
+        <div className="sticky top-0 z-20 flex justify-center pt-2 pointer-events-none">
+          <div className="pointer-events-auto inline-flex items-center gap-2 border border-foreground bg-background px-3 py-1 font-ui text-xs uppercase tracking-[0.08em]" data-testid="chip-home-filter">
+            <SearchIcon className="h-3.5 w-3.5" />
+            <span>{topics.length} {topics.length === 1 ? "topic" : "topics"} matching “{homeFilter}”</span>
+            <Link href="/" className="inline-flex items-center hover:text-primary" aria-label="Clear filter" data-testid="button-clear-home-filter"><X className="h-3.5 w-3.5" /></Link>
+          </div>
+        </div>
+      )}
       {/* Stack Sections */}
-      {topicSections.length === 0 ? (
+      {homeFilter && topicSections.length === 0 ? (
+        <section className="min-h-[100dvh] snap-start flex items-center justify-center px-4">
+          <Card>
+            <CardContent className="py-12 text-center space-y-3" data-testid="empty-home-filter">
+              <SearchIcon className="w-10 h-10 text-muted-foreground mx-auto" />
+              <p className="text-lg font-medium">No topics match “{homeFilter}”</p>
+              <div className="flex gap-2 justify-center flex-wrap">
+                <Button asChild><Link href={`/create-topic?title=${encodeURIComponent(homeFilter)}`}>Create this topic</Link></Button>
+                <Button asChild variant="outline"><Link href="/">Clear search</Link></Button>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      ) : topicSections.length === 0 ? (
         <section className="min-h-[100dvh] snap-start flex items-center justify-center">
           <Card>
             <CardContent className="py-12 text-center">
@@ -274,7 +308,7 @@ export default function Home() {
       ) : (
         topicSections.map((section, index) => (
           <StackSection
-            key={section.title}
+            key={section.title + homeFilter}
             title={section.title}
             icon={section.icon}
             sectionKey={section.title.toLowerCase().replace(/\s+/g, '-')}

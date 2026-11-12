@@ -34,6 +34,7 @@ import AllCategoriesPage from "@/pages/AllCategoriesPage";
 import CategoryPage from "@/pages/CategoryPage";
 import LiveStreamPage from "@/pages/LiveStreamPage";
 import AdminDashboard from "@/pages/AdminDashboard";
+import CounterpointsPage from "@/pages/CounterpointsPage";
 import Onboarding from "@/pages/Onboarding";
 import RecentOpinions from "@/pages/RecentOpinions";
 import NotFound from "@/pages/not-found";
@@ -61,6 +62,7 @@ function Router() {
       <Route path="/category/:category" component={CategoryPage} />
       <Route path="/recent-opinions" component={RecentOpinions} />
       <Route path="/topic/:id" component={Topic} />
+      <Route path="/opinion/:id/counterpoints" component={CounterpointsPage} />
       <Route path="/profile/:userId" component={Profile} />
       <Route path="/u/:handle" component={HandleRedirect} />
       <Route path="/live-stream/:id" component={LiveStreamPage} />

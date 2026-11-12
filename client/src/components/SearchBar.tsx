@@ -299,6 +299,20 @@ export default function SearchBar({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       if (!query.trim()) return;
+
+      // On the home page, Enter filters the home deck in place (/?filter=...) instead of leaving the page.
+      if (window.location.pathname === "/") {
+        e.preventDefault();
+        const term = query.trim();
+        saveToHistory(term);
+        setShowSuggestions(false);
+        setShowCreateForm(false);
+        setPendingEnterKey(null);
+        setLocation(`/?q=${encodeURIComponent(term)}&filter=${encodeURIComponent(term)}`);
+        (e.target as HTMLElement).blur?.();
+        window.dispatchEvent(new CustomEvent('searchHistoryUpdate'));
+        return;
+      }
       
       // Immediately flush debounce and mark as pending
       setDebouncedQuery(query);

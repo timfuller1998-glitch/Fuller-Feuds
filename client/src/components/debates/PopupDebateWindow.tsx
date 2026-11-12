@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { parseServerDate } from "@/lib/dates";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Minimize2, X, Send, GripVertical, Maximize2 } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -296,7 +297,7 @@ export function PopupDebateWindow({
                 >
                   <p className="text-sm break-words">{msg.content}</p>
                   <p className={`text-xs mt-1 ${isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                    {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                    {formatDistanceToNow(parseServerDate(msg.createdAt), { addSuffix: true })}
                   </p>
                 </div>
               </div>

@@ -139,6 +139,27 @@ export const BADGE_DEFINITIONS: InsertBadge[] = [
     requirement: 25,
     requirementType: "low_fallacy_rate",
   },
+  // Rating badges: average opponent rating (logic + politeness + openness, 1–5) across rated debates
+  {
+    id: "highly_rated",
+    name: "Highly Rated",
+    description: "Averaged 4.0+ out of 5 from opponents across 3 rated debates",
+    icon: "Medal",
+    category: "quality",
+    tier: 2,
+    requirement: 3,
+    requirementType: "high_rating",
+  },
+  {
+    id: "top_rated",
+    name: "Top Rated",
+    description: "Averaged 4.5+ out of 5 from opponents across 10 rated debates",
+    icon: "Gem",
+    category: "quality",
+    tier: 3,
+    requirement: 10,
+    requirementType: "high_rating",
+  },
   {
     id: "well_liked",
     name: "Well Liked",
@@ -197,4 +218,5 @@ export type BadgeRequirementType =
   | "topic_count" 
   | "low_fallacy_rate"
   | "likes_received"
-  | "follower_count";
+  | "follower_count"
+  | "high_rating";

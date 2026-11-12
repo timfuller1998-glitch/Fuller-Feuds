@@ -327,14 +327,16 @@ router.get('/:opinionId/counterpoints/counts', async (req, res) => {
 router.get('/:opinionId/counterpoints', async (req, res) => {
   try {
     const sentenceIndexRaw = req.query.sentenceIndex;
+    // No sentenceIndex (or "all") = every paragraph's counterpoints (used by the full counterpoints page)
+    const all = sentenceIndexRaw === undefined || sentenceIndexRaw === 'all';
     const sentenceIndex = typeof sentenceIndexRaw === 'string' ? parseInt(sentenceIndexRaw, 10) : NaN;
-    if (!Number.isInteger(sentenceIndex) || sentenceIndex < 0) {
+    if (!all && (!Number.isInteger(sentenceIndex) || sentenceIndex < 0)) {
       return res.status(400).json({ error: 'sentenceIndex is required and must be a non-negative integer' });
     }
     const currentUserId = (req.user as Express.User | undefined)?.id;
     const counterpoints = await counterpointService.listCounterpoints({
       opinionId: req.params.opinionId,
-      sentenceIndex,
+      sentenceIndex: all ? undefined : sentenceIndex,
       currentUserId,
     });
     res.json(counterpoints);
