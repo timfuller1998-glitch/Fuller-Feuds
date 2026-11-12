@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/AppSidebar";
 import { FirstRunTutorial } from "@/components/FirstRunTutorial";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
 import SearchBar from "@/components/SearchBar";
 import { ActiveBackgroundGradient } from "@/components/ActiveBackgroundGradient";
 import { useAuth } from "@/hooks/useAuth";
@@ -134,6 +135,7 @@ function AppWithSidebar({
           <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} />
         </header>
         <FirstRunTutorial user={user} isAuthenticated={isAuthenticated} suppressed={location === "/onboarding"} />
+        <FeedbackDialog />
         <main className={`flex-1 min-h-0 overflow-x-hidden px-4 pt-5 sm:px-6 sm:pt-7 md:px-8 pb-10 ${location === "/" ? "overflow-y-hidden relative" : "overflow-y-auto"}`}>
           <div className={`max-w-7xl mx-auto w-full ${location === "/" ? "h-full relative" : ""}`}>
             <Router />

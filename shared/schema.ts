@@ -657,3 +657,23 @@ export const seedingJobs = pgTable("seeding_jobs", {
 
 export type SeedingJob = typeof seedingJobs.$inferSelect;
 export type InsertSeedingJob = typeof seedingJobs.$inferInsert;
+
+// In-app bug reports and feature requests (migration 0010). user_id is null for signed-out submitters.
+export const FEEDBACK_TYPES = ['bug', 'feature'] as const;
+export const FEEDBACK_STATUSES = ['new', 'in_progress', 'done', 'wont_fix'] as const;
+export const feedbackRequests = pgTable("feedback_requests", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'set null' }),
+  type: varchar("type", { length: 20 }).notNull(),
+  title: varchar("title", { length: 140 }).notNull(),
+  description: text("description").notNull(),
+  pageUrl: text("page_url"),
+  userAgent: text("user_agent"),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_feedback_status_created").on(table.status, table.createdAt),
+]);
+export type FeedbackRequest = typeof feedbackRequests.$inferSelect;

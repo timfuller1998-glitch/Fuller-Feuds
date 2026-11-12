@@ -89,8 +89,12 @@ export function AuditLog({ queriesEnabled = false }: { queriesEnabled?: boolean 
         return `Restored ${target}`;
       case 'role_change':
         return `Changed user role`;
+      case 'status_change':
+        return `Changed user status`;
+      case 'delete':
+        return `Deleted ${target}`;
       default:
-        return `${type} ${target}`;
+        return `${String(action.action.rawType || type).replace(/_/g, ' ')}`;
     }
   };
 
@@ -122,6 +126,8 @@ export function AuditLog({ queriesEnabled = false }: { queriesEnabled?: boolean 
                 <SelectItem value="archive">Archive</SelectItem>
                 <SelectItem value="restore">Restore</SelectItem>
                 <SelectItem value="role_change">Role Change</SelectItem>
+                <SelectItem value="status_change">Status Change</SelectItem>
+                <SelectItem value="delete">Delete</SelectItem>
               </SelectContent>
             </Select>
           </div>

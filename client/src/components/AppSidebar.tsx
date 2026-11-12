@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { openTutorial } from "@/lib/tutorial";
+import { openFeedback } from "@/lib/feedback";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   Sidebar, 
@@ -34,6 +35,7 @@ import {
   Settings,
   LogOut,
   HelpCircle,
+  MessageSquarePlus,
   Plus,
   User,
   Grid,
@@ -255,6 +257,18 @@ export default function AppSidebar({
                 >
                   <HelpCircle className="w-4 h-4" />
                   <span>How it works</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => {
+                    handleLinkClick();
+                    openFeedback();
+                  }}
+                  data-testid="button-nav-feedback"
+                >
+                  <MessageSquarePlus className="w-4 h-4" />
+                  <span>Report a bug / idea</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

@@ -16,6 +16,7 @@ import { Save, User, Cloudy, Sun, Moon, AtSign, HelpCircle } from "lucide-react"
 import { HandleField, type HandleStatus } from "@/components/HandleField";
 import { useToast } from "@/hooks/use-toast";
 import { openTutorial } from "@/lib/tutorial";
+import { openFeedback } from "@/lib/feedback";
 
 const profileFormSchema = z.object({
   displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
@@ -188,6 +189,9 @@ export default function Settings() {
         <CardContent>
           <Button variant="outline" onClick={() => openTutorial()} data-testid="button-replay-tutorial">
             Replay tutorial
+          </Button>
+          <Button variant="outline" className="ml-2" onClick={() => openFeedback()} data-testid="button-settings-feedback">
+            Report a bug / idea
           </Button>
         </CardContent>
       </Card>
