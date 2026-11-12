@@ -8,6 +8,22 @@ import { DebateTray } from './DebateTray';
 import { TypingBubble } from './TypingBubble';
 import { type OpponentGroup, StatusDot } from './DebateStatus';
 import { useTypingRooms } from '@/lib/typingStore';
+import { openDebatesTray } from '@/lib/debatesTray';
+import { useEffect, useState } from 'react';
+
+/** How many 48px avatars (12px gap) fit in the row; when there are more people, one slot becomes the "+N" chip. */
+function useAvatarSlots() {
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
+  const [slots, setSlots] = useState(3);
+  useEffect(() => {
+    if (!el) return;
+    const measure = () => setSlots(Math.max(1, Math.floor((el.clientWidth + 12) / 60)));
+    measure();
+    const ro = new ResizeObserver(measure); ro.observe(el);
+    return () => ro.disconnect();
+  }, [el]);
+  return { ref: setEl, slots };
+}
 
 /**
  * Footer avatar row: one avatar per person you have an ACTIVE debate with.
@@ -17,15 +33,21 @@ import { useTypingRooms } from '@/lib/typingStore';
  * Finished debates (both rated, or you rated and are waiting on theirs) live in Archive instead.
  */
 export function DebateFooter() {
-  const { openPanel, openOpponentPanel } = useDebateContext();
+  const { openOpponentPanel } = useDebateContext();
+  const { ref: rowRef, slots } = useAvatarSlots();
   const typingRooms = useTypingRooms();
 
   const { data: groupedDebates = [] } = useQuery<OpponentGroup[]>({
     queryKey: ['/api/debates/grouped'],
   });
 
+  // Server sorts by priority: new (green) → needs you (red) → the rest, newest first.
   const recentDebates = groupedDebates.filter((g) => g.activeDebates?.length > 0);
-  const finishedCount = groupedDebates.reduce((n, g) => n + (g.finishedDebates?.length ?? 0), 0);
+  const maxAvatars = recentDebates.length > slots ? Math.max(1, slots - 1) : slots;
+  const visible = recentDebates.slice(0, maxAvatars);
+  const overflow = recentDebates.length - visible.length;
+  const overflowDot = recentDebates.slice(maxAvatars).some((g) => g.status === 'new') ? 'new'
+    : recentDebates.slice(maxAvatars).some((g) => g.status === 'needs_you') ? 'needs_you' : null;
   const archivedDebates = groupedDebates.filter((g) => g.finishedDebates?.length > 0);
 
   // Determine what to show in the footer
@@ -47,11 +69,12 @@ export function DebateFooter() {
 
             {/* Avatar Row - Scrollable */}
             <div 
-              className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-thin"
+              ref={rowRef}
+              className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden scrollbar-thin"
               style={{ scrollbarWidth: 'thin' }}
             >
               <div className="flex gap-3 py-1">
-                {recentDebates.map((group) => {
+                {visible.map((group) => {
                   const typing = group.activeDebates.some((d) => typingRooms.has(d.id));
                   const indicator = typing ? 'typing' : group.status;
                   const avatarColor = get2DPoliticalCompassColor(
@@ -97,6 +120,17 @@ export function DebateFooter() {
                     </button>
                   );
                 })}
+                {overflow > 0 && (
+                  <button
+                    onClick={() => openDebatesTray('active')}
+                    className="relative shrink-0 w-12 h-12 rounded-full border-2 border-foreground bg-background font-ui text-sm font-bold"
+                    aria-label={`${overflow} more people`}
+                    data-testid="chip-footer-more"
+                  >
+                    +{overflow}
+                    {overflowDot && <StatusDot kind={overflowDot} className="absolute -top-0.5 -right-0.5" data-testid="dot-footer-more" />}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -104,12 +138,12 @@ export function DebateFooter() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => openPanel('archived')}
+              onClick={() => openDebatesTray('archive')}
               className="shrink-0"
               data-testid="button-archived-debates"
             >
               <Archive className="w-4 h-4 mr-1" />
-              Archive{finishedCount > 0 ? ` (${finishedCount})` : ''}
+              Archive
             </Button>
           </>
         ) : hasArchivedDebates ? (
@@ -122,12 +156,12 @@ export function DebateFooter() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => openPanel('archived')}
+              onClick={() => openDebatesTray('archive')}
               className="shrink-0"
               data-testid="button-archived-debates"
             >
               <Archive className="w-4 h-4 mr-1" />
-              View Archive ({finishedCount})
+              View Archive
             </Button>
           </>
         ) : (

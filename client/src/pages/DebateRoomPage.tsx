@@ -1,5 +1,6 @@
 import { useParams, useLocation } from "wouter";
 import { parseServerDate } from "@/lib/dates";
+import { answerInvite } from "@/lib/debatesTray";
 import { UserHandle } from "@/components/UserHandle";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
@@ -355,7 +356,8 @@ export default function DebateRoomPage() {
   const ratingDismissedRef = useRef(false);
   useEffect(() => {
     const amParticipant = !!currentUser && (currentUser.id === room?.participant1Id || currentUser.id === room?.participant2Id);
-    const ratingOpen = room?.phase === 'voting' || room?.status === 'ended';
+    const inviteClosed = (room as any)?.inviteStatus === 'declined' || (room as any)?.inviteStatus === 'withdrawn';
+    const ratingOpen = !inviteClosed && (room?.phase === 'voting' || room?.status === 'ended');
     if (amParticipant && ratingOpen && votes && !votes.myVoteSubmitted && !showVotingModal && !ratingDismissedRef.current) {
       setShowVotingModal(true);
     }
@@ -422,6 +424,20 @@ export default function DebateRoomPage() {
 
   const isParticipant = currentUser?.id === room.participant1Id || currentUser?.id === room.participant2Id;
   const isEnded = room.status === "ended";
+  const inviteStatus = (room as any).inviteStatus as string | undefined;
+  const inviteClosed = inviteStatus === "declined" || inviteStatus === "withdrawn";
+  const invitePendingForMe = inviteStatus === "pending" && (room as any).inviteeId === currentUser?.id;
+  const invitePendingFromMe = inviteStatus === "pending" && !!(room as any).inviteeId && (room as any).inviteeId !== currentUser?.id;
+  const answerInviteHere = async (action: "accept" | "decline" | "withdraw") => {
+    try {
+      await answerInvite(room.id, action);
+      queryClient.invalidateQueries({ queryKey: ["/api/debate-rooms", roomId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
+    } catch (e: any) {
+      toast({ title: "Couldn't answer the invite", description: e?.message, variant: "destructive" });
+    }
+  };
   const isParticipant1 = currentUser?.id === room.participant1Id;
   const currentUserPrivacy = isParticipant1 ? room.participant1Privacy : room.participant2Privacy;
   const isPrivate = currentUserPrivacy === 'private';
@@ -557,8 +573,36 @@ export default function DebateRoomPage() {
         </div>
       )}
 
+      {/* Debate invites: accept / decline (invitee), waiting + withdraw (inviter), closed notice */}
+      {isParticipant && invitePendingForMe && (
+        <Card className="border-2 border-primary" data-testid="card-invite-pending">
+          <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm"><span className="font-semibold">{opponentFirstName}</span> invited you to debate. Accept, decline, or just reply to accept.</p>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => answerInviteHere("accept")} data-testid="button-accept-invite">Accept</Button>
+              <Button size="sm" variant="outline" onClick={() => answerInviteHere("decline")} data-testid="button-decline-invite">Decline</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {isParticipant && invitePendingFromMe && (
+        <Card data-testid="card-invite-sent">
+          <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">Waiting for {opponentFirstName} to accept your invite.</p>
+            <Button size="sm" variant="ghost" onClick={() => answerInviteHere("withdraw")} data-testid="button-withdraw-invite">Withdraw</Button>
+          </CardContent>
+        </Card>
+      )}
+      {isParticipant && inviteClosed && (
+        <Card data-testid="card-invite-closed">
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            {inviteStatus === "declined" ? "This invite was declined." : "This invite was withdrawn."} It's in your Archive.
+          </CardContent>
+        </Card>
+      )}
+
       {/* NEW: end-of-debate scores */}
-      {isParticipant && (room.phase === 'voting' || isEnded) && votes && (
+      {isParticipant && !inviteClosed && (room.phase === 'voting' || isEnded) && votes && (
         <Card className="border-2 border-foreground/80" data-testid="card-debate-scores">
           <CardHeader className="pb-2">
             <CardTitle className="font-serif text-xl font-bold">

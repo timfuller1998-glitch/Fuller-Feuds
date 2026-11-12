@@ -1,5 +1,9 @@
 import { notifyNewDebateCreated } from '../websocket.js';
-import { notifyDebateInvite, displayNameOf } from '../lib/debateFlow.js';
+import { notifyDebateInvite, displayNameOf, FlowError } from '../lib/debateFlow.js';
+import { checkDebateStart, markInvitePending } from '../lib/debateLimits.js';
+import { db } from '../db.js';
+import { opinions as opinionsTable } from '../../shared/schema.js';
+import { eq } from 'drizzle-orm';
 import { Router } from 'express';
 import { OpinionService } from '../services/opinionService.js';
 import { DebateService } from '../services/debateService.js';
@@ -242,13 +246,21 @@ router.post('/:opinionId/start-debate', isAuthenticated, async (req, res) => {
     if (!requestingUserId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
+    // Overload guards: caps, hourly limit, and reuse of an already-open debate between the same two people.
+    const [op] = await db.select({ userId: opinionsTable.userId, topicId: opinionsTable.topicId }).from(opinionsTable).where(eq(opinionsTable.id, req.params.opinionId)).limit(1);
+    if (op && op.userId !== requestingUserId) {
+      const existing = await checkDebateStart(requestingUserId, op.userId, op.topicId);
+      if (existing) return res.json({ ...existing, reused: true });
+    }
     // Note: createDebateRoom doesn't have security context parameters yet, but we still handle errors
     const debateRoom = await debateService.createDebateRoom(req.params.opinionId, requestingUserId);
-    // Opinion author (participant1) is invited and goes first.
+    // Opinion author (participant1) is invited and goes first; the room is a pending invite until they accept or reply.
+    await markInvitePending(debateRoom.id, requestingUserId, debateRoom.participant1Id);
     notifyNewDebateCreated(debateRoom.id, await displayNameOf(requestingUserId), debateRoom.participant1Id);
     await notifyDebateInvite(debateRoom.id, requestingUserId, debateRoom.participant1Id, debateRoom.topicId);
-    res.json(debateRoom);
+    res.json({ ...debateRoom, inviteStatus: 'pending', inviteeId: debateRoom.participant1Id });
   } catch (error) {
+    if (error instanceof FlowError) return res.status(error.status).json({ message: error.message });
     if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
       return res.status(error.statusCode).json({ error: error.message, code: error.code });
     }

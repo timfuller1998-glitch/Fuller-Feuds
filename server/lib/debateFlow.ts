@@ -48,6 +48,10 @@ export async function postDebateMessage(roomId: string, userId: string, content:
     throw new FlowError(409, "It's not your turn yet");
   }
 
+  // Replying to a pending invite accepts it.
+  if (room.inviteStatus === 'pending' && room.inviteeId === userId) {
+    await db.update(debateRooms).set({ inviteStatus: 'accepted' }).where(eq(debateRooms.id, roomId));
+  }
   const message = await debateService.sendMessage(roomId, userId, content, userId, role, req);
   const opponentId = room.participant1Id === userId ? room.participant2Id : room.participant1Id;
   let updated = room;
@@ -84,12 +88,45 @@ export async function notifyDebateInvite(roomId: string, fromUserId: string, toU
   });
 }
 
+/**
+ * Accept or decline a pending invite (invitee), or withdraw it (inviter). Declined/withdrawn invites close
+ * without ratings and move to Archive for both people.
+ */
+export async function respondToInvite(roomId: string, userId: string, action: 'accept' | 'decline' | 'withdraw') {
+  const room = await getRoomRaw(roomId);
+  if (!room) throw new FlowError(404, 'Debate room not found');
+  if (room.participant1Id !== userId && room.participant2Id !== userId) throw new FlowError(403, 'Only the two debaters can answer this invite');
+  if (room.inviteStatus !== 'pending' || room.status !== 'active') throw new FlowError(409, 'This invite was already answered');
+  const isInvitee = room.inviteeId === userId;
+  if ((action === 'withdraw') === isInvitee) throw new FlowError(403, isInvitee ? 'Decline the invite instead' : 'Only the invited person can answer');
+  const otherId = room.participant1Id === userId ? room.participant2Id : room.participant1Id;
+  const me = await displayNameOf(userId);
+  if (action === 'accept') {
+    await db.update(debateRooms).set({ inviteStatus: 'accepted' }).where(eq(debateRooms.id, roomId));
+    await notifyUser(otherId, { type: 'debate_accepted', title: 'Invite accepted', message: `${me} accepted your debate.`, debateRoomId: roomId });
+  } else {
+    await db.update(debateRooms).set({
+      inviteStatus: action === 'decline' ? 'declined' : 'withdrawn', status: 'ended', endedAt: new Date(), currentTurn: null,
+    }).where(eq(debateRooms.id, roomId));
+    await notifyUser(otherId, {
+      type: 'debate_declined', title: action === 'decline' ? 'Invite declined' : 'Invite withdrawn',
+      message: action === 'decline' ? `${me} declined your debate. No hard feelings.` : `${me} withdrew their debate invite.`,
+      debateRoomId: roomId,
+    });
+  }
+  return (await getRoomRaw(roomId))!;
+}
+
 /** End a debate early: it closes and both sides are asked to rate. */
 export async function endDebate(roomId: string, userId: string) {
   const room = await getRoomRaw(roomId);
   if (!room) throw new FlowError(404, 'Debate room not found');
   if (room.participant1Id !== userId && room.participant2Id !== userId) throw new FlowError(403, 'Only the two debaters can end this debate');
   if (room.status === 'ended') return room;
+  // Ending a debate nobody has accepted yet just closes the invite (no ratings).
+  if (room.inviteStatus === 'pending') {
+    return respondToInvite(roomId, userId, room.inviteeId === userId ? 'decline' : 'withdraw');
+  }
   await db.update(debateRooms).set({ status: 'ended', endedAt: new Date(), currentTurn: null, phase: 'voting' }).where(eq(debateRooms.id, roomId));
   const opponentId = room.participant1Id === userId ? room.participant2Id : room.participant1Id;
   if (opponentId) {
@@ -128,6 +165,7 @@ export async function submitRating(roomId: string, voterId: string, body: any) {
   if (room.participant1Id !== voterId && room.participant2Id !== voterId) throw new FlowError(403, 'Only the two debaters can rate');
   const opponentId = room.participant1Id === voterId ? room.participant2Id : room.participant1Id;
   if (!opponentId) throw new FlowError(400, 'No opponent to rate');
+  if (room.inviteStatus === 'declined' || room.inviteStatus === 'withdrawn') throw new FlowError(400, 'This invite was never accepted, so there is nothing to rate');
   if (body?.votedForUserId && body.votedForUserId !== opponentId) throw new FlowError(400, 'You can only rate your opponent');
   if (room.phase !== 'voting' && room.status !== 'ended') throw new FlowError(400, 'Rating opens when the turns are over or the debate ends');
   const score = (k: string) => {

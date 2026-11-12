@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { parseServerDate } from "@/lib/dates";
+import { answerInvite } from "@/lib/debatesTray";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Minimize2, X, Send, GripVertical, Maximize2 } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -305,6 +306,19 @@ export function PopupDebateWindow({
           })
         )}
       </div>
+
+      {/* Pending invite: accept / decline right here (replying also accepts) */}
+      {room && (room as any).inviteStatus === 'pending' && (room as any).inviteeId === user?.id && (
+        <div className="px-3 py-1.5 text-xs flex items-center justify-between gap-2 bg-primary/10 border-t" data-testid="popup-invite-pending">
+          <span>{opponentName} invited you</span>
+          <span className="flex gap-1.5">
+            <button className="font-ui uppercase tracking-[0.08em] px-2 py-0.5 bg-primary text-primary-foreground" data-testid="popup-accept-invite"
+              onClick={async () => { await answerInvite(debateRoomId, 'accept').catch(() => {}); queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms', debateRoomId] }); queryClient.invalidateQueries({ queryKey: ['/api/notifications'] }); queryClient.invalidateQueries({ queryKey: ['/api/debates/grouped'] }); }}>Accept</button>
+            <button className="font-ui uppercase tracking-[0.08em] px-2 py-0.5 border border-foreground/40" data-testid="popup-decline-invite"
+              onClick={async () => { await answerInvite(debateRoomId, 'decline').catch(() => {}); queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms', debateRoomId] }); queryClient.invalidateQueries({ queryKey: ['/api/notifications'] }); queryClient.invalidateQueries({ queryKey: ['/api/debates/grouped'] }); }}>Decline</button>
+          </span>
+        </div>
+      )}
 
       {/* Turn Indicator */}
       {room && isMyTurn && canSend && room.phase === 'structured' && (

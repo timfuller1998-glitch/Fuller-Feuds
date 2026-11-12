@@ -1,3 +1,15 @@
+## 2026-11-11 (22:05 CST, America/Chicago) — Debate overload plan (branch feat/debate-overload)
+Made by the Fuller Feuds Dev bot (Grok Bot). Migration `0011_debate_invites.sql`.
+- **Accept / decline invites.** New debates start as a *pending invite* (`debate_rooms.invite_status` = pending, `invitee_id`). The invited person can Accept or Decline from the Debates list, the room page banner, or the popup — or just reply, which accepts. The sender sees "Waiting for X to accept" with **Withdraw**. Declined/withdrawn invites close without ratings, go to Archive for both, and the sender gets a notification. Existing debates are marked accepted.
+- **Caps** (server-side, friendly messages): max **5** invites waiting for an answer per sender (429); nobody can be in more than **10** open debates (pending + active, not counting rating/finished) — applies to both sender (409) and recipient ("They have a full plate", 409).
+- **Rate limit:** max **10** new debates started per user per hour (429).
+- **Same debate twice** (same two people, same topic, still open) reuses the existing room instead of creating a duplicate.
+- **Priority sort:** footer avatars and the Debates list order new invites (green) → needs you (red: your turn, rate now, invite to answer) → the rest, newest first.
+- **+N chip:** the footer shows as many avatars as fit (measured live) and collapses the rest into a "+N" chip that carries the most urgent dot (green/red) and opens the list.
+- **One merged list:** the Debates button, the +N chip and the Archive button all open the same list, sectioned Needs you / Waiting on them / Archive (Archive jumps to its section). The separate Archive panel is no longer used from the footer.
+- **No counts** (Timothy's footer prefs): removed the unread number on the Debates button (now a single green/red dot), the "(N)" on Archive, and the per-row "N new". Kept: green dot = new, red dot = needs you, "…" while the opponent types, finished debates → Archive.
+- Local Playwright: 21/21 (`/workspace/ff-nov11-overload.cjs`) + API checks for the 5-pending cap (429) and the 10-open cap (409). Typecheck 52.
+
 ## 2026-11-11 (21:50 CST, America/Chicago) — Launch screen recolor + Supabase keep-alive (branch chore/keepalive-loading)
 Made by the Fuller Feuds Dev bot (Grok Bot).
 - **Launch/loading screen matches the Editorial scheme** (logo artwork unchanged, per Timothy Nov 11): near-black background, "FULLER" in paper white + "FEUDS" in red (Anton), thin gold rules top and bottom, a thin gold ring around the logo, italic gold-beige tagline, and a small red loading bar. The same screen shows before React loads (inline in `client/index.html`) and while sign-in state loads (`App.tsx`), replacing the old grey spinner + "Loading...".
