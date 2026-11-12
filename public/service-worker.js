@@ -1,46 +1,28 @@
 // Service Worker for Fuller Feuds PWA
-// Handles push notifications, offline caching, and app updates
+// Push notifications, hashed-asset caching, and prompt app updates.
+// HTML and the app shell are always fetched from the network so a new
+// deploy is not hidden behind a stale Cache Storage entry.
 
 const CACHE_NAME = '{{CACHE_VERSION}}';
 const RUNTIME_CACHE = '{{RUNTIME_CACHE_VERSION}}';
 
-// Assets to cache on install
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json'
-];
-
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing...');
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS))
-      .then(() => self.skipWaiting())
-  );
+  // Activate this worker immediately so a new deploy is not stuck waiting.
+  event.waitUntil(self.skipWaiting());
 });
 
-// Listen for SKIP_WAITING message from UpdateNotification
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('[Service Worker] Received SKIP_WAITING message');
     self.skipWaiting();
   }
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activating...');
   event.waitUntil(
-    caches.keys().then(cacheNames => {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map(cacheName => {
-          // Delete all caches that don't match current cache names
-          // This ensures old versions are cleaned up
-          if (!cacheName.startsWith('fuller-feuds-')) {
-            return Promise.resolve();
-          }
+        cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
-            console.log('[Service Worker] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
           return Promise.resolve();
@@ -50,41 +32,51 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch handler - Network First for API, Cache First for assets
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
+  if (request.method !== 'GET') return;
 
-  // Skip non-GET requests
-  if (request.method !== 'GET') {
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // The browser already manages updates of this file; do not intercept it.
+  if (url.pathname === '/service-worker.js') return;
+
+  const accept = request.headers.get('accept') || '';
+  const isNavigate = request.mode === 'navigate' || accept.includes('text/html');
+  const isShell =
+    url.pathname === '/' ||
+    url.pathname === '/index.html' ||
+    url.pathname === '/manifest.json' ||
+    url.pathname === '/version.json' ||
+    url.pathname.endsWith('.html');
+
+  // App shell: network first, never prefer a cached index.html.
+  if (isNavigate || isShell) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => response)
+        .catch(() => caches.match(request).then((cached) => cached || new Response('Offline', { status: 503 })))
+    );
     return;
   }
 
-  // API requests - Network First with fallback
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
-      caches.open(RUNTIME_CACHE).then(cache => {
+      caches.open(RUNTIME_CACHE).then((cache) => {
         return fetch(request)
-          .then(response => {
-            // Cache successful responses
+          .then((response) => {
             if (response && response.status === 200) {
               cache.put(request, response.clone());
             }
             return response;
           })
           .catch(() => {
-            // Fallback to cache if network fails
-            return cache.match(request).then(cached => {
-              if (cached) {
-                return cached;
-              }
-              // Return offline response for API calls
+            return cache.match(request).then((cached) => {
+              if (cached) return cached;
               return new Response(
                 JSON.stringify({ error: 'Offline', offline: true }),
-                { 
-                  status: 503,
-                  headers: { 'Content-Type': 'application/json' }
-                }
+                { status: 503, headers: { 'Content-Type': 'application/json' } }
               );
             });
           });
@@ -93,51 +85,43 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets - Stale-While-Revalidate strategy
-  // Serve cached version immediately, fetch fresh in background
-  event.respondWith(
-    caches.open(CACHE_NAME).then(cache => {
-      return caches.match(request).then(cached => {
-        // Fetch fresh version in background
-        const fetchPromise = fetch(request).then(response => {
-          // Only cache successful responses
-          if (response && response.status === 200) {
-            cache.put(request, response.clone());
-          }
-          return response;
-        }).catch(() => {
-          // If fetch fails, we'll use cached version if available
-          console.log('[Service Worker] Network fetch failed, using cache if available');
+  // Fingerprinted build assets are safe to cache long-term.
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.match(request).then((cached) => {
+          if (cached) return cached;
+          return fetch(request).then((response) => {
+            if (response && response.status === 200) {
+              cache.put(request, response.clone());
+            }
+            return response;
+          });
         });
-
-        // Return cached version immediately if available, otherwise wait for fetch
-        if (cached) {
-          // Return cached version immediately, but still fetch in background
-          fetchPromise.catch(() => {}); // Suppress errors from background fetch
-          return cached;
-        }
-        // No cache available, wait for network fetch
-        return fetchPromise;
-      });
-    })
-  );
-});
-
-// Handle push notifications
-self.addEventListener('push', (event) => {
-  console.log('[Service Worker] Push received:', event);
-
-  if (!event.data) {
-    console.log('[Service Worker] Push event but no data');
+      })
+    );
     return;
   }
 
+  // Icons and other unhashed public files: network first, cache a copy for offline.
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+        }
+        return response;
+      })
+      .catch(() => caches.match(request))
+  );
+});
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
   try {
     const payload = event.data.json();
-    console.log('[Service Worker] Push payload:', payload);
-
     const { title, body, icon, badge, tag, data } = payload;
-
     const options = {
       body: body || '',
       icon: icon || '/icon-192.png',
@@ -147,55 +131,31 @@ self.addEventListener('push', (event) => {
       vibrate: [200, 100, 200],
       requireInteraction: false,
       actions: [
-        {
-          action: 'view',
-          title: 'View',
-        },
-        {
-          action: 'close',
-          title: 'Close',
-        },
+        { action: 'view', title: 'View' },
+        { action: 'close', title: 'Close' },
       ],
     };
-
-    event.waitUntil(
-      self.registration.showNotification(title || 'Fuller Feuds', options)
-    );
+    event.waitUntil(self.registration.showNotification(title || 'Fuller Feuds', options));
   } catch (error) {
     console.error('[Service Worker] Error parsing push data:', error);
   }
 });
 
-// Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
-  console.log('[Service Worker] Notification clicked:', event);
-
   event.notification.close();
-
   const urlToOpen = event.notification.data?.url || '/';
-
-  if (event.action === 'close') {
-    return;
-  }
+  if (event.action === 'close') return;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Check if there's already a window open
       for (const client of clientList) {
         if (client.url.includes(urlToOpen) && 'focus' in client) {
           return client.focus();
         }
       }
-
-      // If not, open a new window
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }
     })
   );
-});
-
-// Handle notification close
-self.addEventListener('notificationclose', (event) => {
-  console.log('[Service Worker] Notification closed:', event);
 });

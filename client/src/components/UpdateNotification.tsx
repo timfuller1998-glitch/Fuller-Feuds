@@ -25,10 +25,6 @@ export function UpdateNotification() {
         });
       });
 
-      // Listen for controller change (new SW activated)
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        window.location.reload();
-      });
     }
   }, []);
 
