@@ -7,15 +7,28 @@ import { AIService } from '../aiService.js';
 import { requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertBannedPhraseSchema } from '../../shared/schema.js';
 import { z } from 'zod';
+import { db } from '../db.js';
+import { moderationActions, users } from '../../shared/schema.js';
+import { desc, eq } from 'drizzle-orm';
 import { runAISummaryUpdate } from '../scheduled-jobs.js';
 
 const router = Router();
+
+// Moderators may not suspend/ban/reinstate admins or other moderators, and nobody acts on their own account.
+async function blockedTarget(req: any, targetId: string): Promise<string | null> {
+  if (targetId === req.user?.id) return "You can't change your own account here";
+  if (req.userRole === 'admin') return null;
+  const [t] = await db.select({ role: users.role }).from(users).where(eq(users.id, targetId));
+  return t && (t.role === 'admin' || t.role === 'moderator') ? 'Only an admin can moderate staff accounts' : null;
+}
 const moderationService = new ModerationService();
 const topicService = new TopicService();
 
 // User moderation routes
 router.post('/users/:userId/suspend', requireModerator, async (req, res) => {
   try {
+    const blocked = await blockedTarget(req, req.params.userId);
+    if (blocked) return res.status(403).json({ error: blocked });
     const { reason } = req.body;
     await moderationService.suspendUser(req.params.userId, req.user!.id, reason);
     res.json({ message: "User suspended successfully" });
@@ -27,6 +40,8 @@ router.post('/users/:userId/suspend', requireModerator, async (req, res) => {
 
 router.post('/users/:userId/ban', requireModerator, async (req, res) => {
   try {
+    const blocked = await blockedTarget(req, req.params.userId);
+    if (blocked) return res.status(403).json({ error: blocked });
     const { reason } = req.body;
     await moderationService.banUser(req.params.userId, req.user!.id, reason);
     res.json({ message: "User banned successfully" });
@@ -38,6 +53,8 @@ router.post('/users/:userId/ban', requireModerator, async (req, res) => {
 
 router.post('/users/:userId/reinstate', requireModerator, async (req, res) => {
   try {
+    const blocked = await blockedTarget(req, req.params.userId);
+    if (blocked) return res.status(403).json({ error: blocked });
     const { reason } = req.body;
     await moderationService.reinstateUser(req.params.userId, req.user!.id, reason);
     res.json({ message: "User reinstated successfully" });
@@ -129,6 +146,9 @@ router.get('/users', requireModerator, async (req, res) => {
 
 router.put('/users/:userId/role', requireAdmin, async (req, res) => {
   try {
+    if (req.params.userId === req.user!.id) {
+      return res.status(400).json({ error: "You can't change your own account here" });
+    }
     const { role } = req.body;
     if (!role || !['user', 'moderator', 'admin'].includes(role)) {
       return res.status(400).json({ error: 'Valid role is required' });
@@ -144,6 +164,9 @@ router.put('/users/:userId/role', requireAdmin, async (req, res) => {
 
 router.put('/users/:userId/status', requireAdmin, async (req, res) => {
   try {
+    if (req.params.userId === req.user!.id) {
+      return res.status(400).json({ error: "You can't change your own account here" });
+    }
     const { status } = req.body;
     if (!status || !['active', 'suspended', 'banned'].includes(status)) {
       return res.status(400).json({ error: 'Valid status is required' });
@@ -159,6 +182,9 @@ router.put('/users/:userId/status', requireAdmin, async (req, res) => {
 
 router.delete('/users/:userId', requireAdmin, async (req, res) => {
   try {
+    if (req.params.userId === req.user!.id) {
+      return res.status(400).json({ error: "You can't change your own account here" });
+    }
     await moderationService.deleteUser(req.params.userId, req.user!.id);
     res.json({ message: "User deleted successfully" });
   } catch (error) {
@@ -204,9 +230,26 @@ router.get('/pending-challenges', requireModerator, async (_req, res) => {
   res.json([]);
 });
 
-// Client calls `/api/admin/audit-log`; keep a lightweight list endpoint for moderators (empty until backed by DB)
-router.get('/audit-log', requireModerator, async (_req, res) => {
-  res.json([]);
+// Audit log: real moderation_actions rows (newest 200), with the moderator. actionType is normalized to the
+// verbs the client filters on (approve, hide, ban, role_change, ...); rawType keeps the stored value.
+const AUDIT_VERB: Record<string, string> = { update_user_role: 'role_change', update_user_status: 'status_change' };
+const auditVerb = (t: string) => AUDIT_VERB[t] || (t.split('_')[0] === 'update' ? t : t.split('_')[0]);
+router.get('/audit-log', requireModerator, async (req, res) => {
+  try {
+    const filter = String(req.query.actionType || '').trim();
+    const rows = await db.select({ action: moderationActions, moderator: {
+      id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl,
+    } }).from(moderationActions).leftJoin(users, eq(users.id, moderationActions.moderatorId))
+      .orderBy(desc(moderationActions.createdAt)).limit(500);
+    const out = rows
+      .map((r) => ({ ...r, action: { ...r.action, rawType: r.action.actionType, actionType: auditVerb(r.action.actionType) } }))
+      .filter((r) => !filter || r.action.actionType === filter)
+      .slice(0, 200);
+    res.json(out);
+  } catch (error) {
+    console.error('Error fetching audit log:', error);
+    res.status(500).json({ error: 'Failed to fetch audit log' });
+  }
 });
 
 router.post('/opinions/:opinionId/approve', requireModerator, async (req, res) => {

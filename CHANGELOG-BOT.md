@@ -1,3 +1,17 @@
+## 2026-11-11 (21:25 CST, America/Chicago) — In-app bug reports & feature requests + admin page fixes (branch feat/feedback-admin)
+Made by the Fuller Feuds Dev bot (Grok Bot).
+- **New "Report a bug / idea" form.** Sidebar item (every visitor, signed in or not) and a button in Settings. Pick Bug or Feature idea, add a title and details; the page you were on is attached automatically (plus browser user-agent). Signed-in submissions keep your user id.
+- **New table `feedback_requests`** (migration `0010_feedback_requests.sql`): type, title, description, page_url, user_agent, status (new / in_progress / done / wont_fix), admin_note, timestamps. RLS on with no policies so Supabase's public REST API can't read it.
+- API: `POST /api/feedback` (validated, 5 per 10 min per user/IP). `GET /api/admin/feedback?type=&status=` and `PATCH /api/admin/feedback/:id` are **admin-only on the server** (403 for moderators/users, checked in tests). Status changes are written to the audit log.
+- **Admin page audit + fixes:**
+  - New **Requests** tab (admins only) with type/status filters, counts, a red "new" badge on the tab, and a per-request status dropdown.
+  - Removed the dead **Challenges** tab (its API was a stub that always returned nothing).
+  - **Audit Log** was a stub that always said "No actions recorded"; it now reads the real `moderation_actions` table with the moderator's name, and the filter works.
+  - Tabs no longer overflow on phones (horizontally scrollable row).
+  - Safety: admins can't change role/status of, or delete, their own account; moderators can't suspend/ban/reinstate admins or other moderators.
+- Admin access is decided by `users.role` (`admin` / `moderator` / `user`), checked server-side by `requireAdmin`/`requireModerator`. Both of Timothy's accounts (timfuller1998@gmail.com @timf and Timfuller1998@gmail.com @TIMOTHYF) are `admin` in production.
+- Typecheck 56 → 52.
+
 ## 2026-11-05 (19:40 CST, America/Chicago) — Fix /create-topic 404 (branch fix/create-topic-404)
 
 - **Cause:** Client had no `/create-topic` route. `CreateTopicPage.tsx` was removed in an Oct 2025 Replit restore, but `CategoryPage` still navigated to `/create-topic`, so the SPA catch-all rendered `NotFound` ("404 Page Not Found"). Not caused by cleanup PR #16 (routes unchanged there); API `POST /api/topics` was fine.

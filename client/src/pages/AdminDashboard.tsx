@@ -40,6 +40,7 @@ import { UserManagement } from "@/components/admin/UserManagement";
 import { ContentFilters } from "@/components/admin/ContentFilters";
 import { AuditLog } from "@/components/admin/AuditLog";
 import { DataSeeding } from "@/components/admin/DataSeeding";
+import { FeedbackRequests } from "@/components/admin/FeedbackRequests";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,6 +57,11 @@ export default function AdminDashboard() {
   const { user, isLoading: authLoading } = useAuth();
   const canAccessAdmin = user?.role === "admin" || user?.role === "moderator";
   const adminQueriesEnabled = !authLoading && !!user && canAccessAdmin;
+  const isAdmin = user?.role === "admin";
+  const { data: requestCounts } = useQuery<{ counts: Record<string, number> }>({
+    queryKey: ['/api/admin/feedback'],
+    enabled: adminQueriesEnabled && isAdmin,
+  });
 
   const [selectedOpinion, setSelectedOpinion] = useState<string | null>(null);
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
@@ -83,10 +89,9 @@ export default function AdminDashboard() {
   });
 
   // Fetch pending challenges
-  const { data: pendingChallenges, isLoading: loadingChallenges } = useQuery({
-    queryKey: ['/api/admin/pending-challenges'],
-    enabled: adminQueriesEnabled,
-  });
+  // Challenges were never backed by storage; the tab was replaced by Requests (Nov 2026).
+  const pendingChallenges: any[] = [];
+  const loadingChallenges = false;
 
   // Opinion moderation mutations
   const approveOpinionMutation = useMutation({
@@ -266,7 +271,7 @@ export default function AdminDashboard() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid lg:grid-cols-9" data-testid="tabs-admin-sections">
+        <TabsList className="flex w-full justify-start overflow-x-auto overflow-y-hidden h-auto flex-nowrap" data-testid="tabs-admin-sections">
           <TabsTrigger value="overview" data-testid="tab-overview">
             <LayoutDashboard className="h-4 w-4 mr-2" />
             Overview
@@ -290,13 +295,15 @@ export default function AdminDashboard() {
               <Badge variant="destructive" className="ml-2">{flaggedOpinions.length}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="challenges" data-testid="tab-pending-challenges">
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Challenges
-            {pendingChallenges?.length > 0 && (
-              <Badge variant="default" className="ml-2">{pendingChallenges.length}</Badge>
-            )}
-          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="requests" data-testid="tab-requests">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Requests
+              {(requestCounts?.counts?.new ?? 0) > 0 && (
+                <Badge variant="destructive" className="ml-2" data-testid="badge-requests-new">{requestCounts!.counts.new}</Badge>
+              )}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="filters" data-testid="tab-filters">
             <Filter className="h-4 w-4 mr-2" />
             Filters
@@ -594,109 +601,11 @@ export default function AdminDashboard() {
         </TabsContent>
 
         {/* Pending Challenges Tab */}
-        <TabsContent value="challenges" className="space-y-4">
-          {loadingChallenges ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                Loading pending challenges...
-              </CardContent>
-            </Card>
-          ) : pendingChallenges?.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No pending challenges to review
-              </CardContent>
-            </Card>
-          ) : (
-            pendingChallenges?.map((item: any) => (
-              <Card key={item.challenge.id} className="hover-elevate" data-testid={`card-pending-challenge-${item.challenge.id}`}>
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <Avatar className="h-10 w-10 shrink-0">
-                        <AvatarImage src={item.author.profileImageUrl} />
-                        <AvatarFallback>{item.author.username?.[0] || item.author.email[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{item.author.username || item.author.email}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDistanceToNow(new Date(item.challenge.createdAt), { addSuffix: true })}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary">Pending</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium mb-2">Challenge Context:</p>
-                    <p className="text-sm bg-muted/50 p-3 rounded-md">{item.challenge.context}</p>
-                  </div>
-
-                  <Separator />
-
-                  <div>
-                    <p className="text-sm font-medium mb-2">Original Opinion:</p>
-                    <div className="bg-muted/30 p-3 rounded-md">
-                      <p className="text-sm text-muted-foreground">{item.opinion.content}</p>
-                    </div>
-                  </div>
-
-                  {selectedChallenge === item.challenge.id ? (
-                    <div className="space-y-3 pt-2">
-                      <Textarea
-                        placeholder="Moderation reason (optional)"
-                        value={challengeModerationReason}
-                        onChange={(e) => setChallengeModerationReason(e.target.value)}
-                        data-testid={`textarea-challenge-reason-${item.challenge.id}`}
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => approveChallengeMutation.mutate(item.challenge.id)}
-                          disabled={approveChallengeMutation.isPending}
-                          variant="default"
-                          data-testid={`button-approve-challenge-${item.challenge.id}`}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Approve
-                        </Button>
-                        <Button
-                          onClick={() => rejectChallengeMutation.mutate(item.challenge.id)}
-                          disabled={rejectChallengeMutation.isPending}
-                          variant="destructive"
-                          data-testid={`button-reject-challenge-${item.challenge.id}`}
-                        >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Reject
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setSelectedChallenge(null);
-                            setChallengeModerationReason("");
-                          }}
-                          variant="ghost"
-                          data-testid={`button-cancel-challenge-${item.challenge.id}`}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      onClick={() => setSelectedChallenge(item.challenge.id)}
-                      variant="outline"
-                      className="w-full"
-                      data-testid={`button-moderate-challenge-${item.challenge.id}`}
-                    >
-                      <Shield className="h-4 w-4 mr-2" />
-                      Moderate
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="requests">
+            <FeedbackRequests />
+          </TabsContent>
+        )}
 
         {/* Content Filters Tab */}
         <TabsContent value="filters">
