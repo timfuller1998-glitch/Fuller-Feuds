@@ -403,15 +403,6 @@ export default function Topic() {
     return (i: number) => counts[i] ?? 0;
   }, [summarySentences, summaryTotalsByOpinion]);
 
-  const [summaryChromeReserve, setSummaryChromeReserve] = useState(() =>
-    typeof window !== "undefined" && window.innerWidth >= 768 ? 490 : 580,
-  );
-  useEffect(() => {
-    const onResize = () => setSummaryChromeReserve(window.innerWidth >= 768 ? 490 : 580);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
   const summaryParagraphCards: SummaryParagraphCard[] = useMemo(() => {
     const map = new Map((opinions || []).map((o) => [o.id, o]));
     return summarySentences.map((s, index) => ({
@@ -899,11 +890,10 @@ export default function Topic() {
                 getKey={(item) => String(item.index)}
                 renderFront={(item) => <SummaryParagraphFront item={item} />}
                 renderBack={(item) => <SummaryParagraphBack item={item} />}
-                maxWidth={400}
+                maxWidth={420}
                 emptyLabel="No summary yet"
                 ariaLabel="AI summary paragraphs"
                 testId="summary-deck"
-                chromeReserve={summaryChromeReserve}
               />
             </div>
           ) : (

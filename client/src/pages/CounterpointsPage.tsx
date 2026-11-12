@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useLocation, useParams, useSearch } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Plus } from "lucide-react";
@@ -95,14 +95,6 @@ export default function CounterpointsPage() {
   const [filter, setFilter] = useState<"all" | number>(Number.isInteger(focus) ? focus : "all");
   const [topIndex, setTopIndex] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
-  const [chromeReserve, setChromeReserve] = useState(() =>
-    typeof window !== "undefined" && window.innerWidth >= 768 ? 500 : 480,
-  );
-  useEffect(() => {
-    const onResize = () => setChromeReserve(window.innerWidth >= 768 ? 500 : 480);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   const [draftPara, setDraftPara] = useState<number>(Number.isInteger(focus) ? focus : 0);
   const [draft, setDraft] = useState("");
@@ -387,8 +379,7 @@ export default function CounterpointsPage() {
           )}
           initialIndex={0}
           onIndexChange={(i) => setTopIndex(i)}
-          maxWidth={400}
-          chromeReserve={chromeReserve}
+          maxWidth={420}
           emptyLabel="No counterpoints yet"
           ariaLabel="Counterpoint cards"
           testId="counterpoint-deck"

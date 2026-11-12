@@ -39,7 +39,7 @@ export function SummaryParagraphFront({ item }: { item: SummaryParagraphCard }) 
         ¶ {item.index + 1} of {item.total}
       </p>
       <div className="mt-3 h-px bg-[hsl(var(--gold)/0.45)]" />
-      <p className="mt-4 font-serif text-[1.08rem] leading-[1.7] flex-1 min-h-0 overflow-y-auto touch-pan-y overscroll-contain">
+      <p className="mt-4 font-serif text-base leading-relaxed flex-1 min-h-0 overflow-y-auto overflow-x-hidden touch-pan-y overscroll-contain pr-1">
         {item.text}
       </p>
       <div className="mt-3 pt-3 border-t border-foreground/15 shrink-0">
