@@ -17,7 +17,16 @@ export function registerServiceWorker(callbacks: SWRegistrationCallbacks = {}) {
 
         console.log('[SW] Service Worker registered:', registration);
 
-        // Check for updates immediately on registration
+        // When a new worker takes control, reload once so this tab gets the new build.
+        if (!(window as any).__ffSwReloadHooked) {
+          (window as any).__ffSwReloadHooked = true;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if ((window as any).__ffSwReloading) return;
+            (window as any).__ffSwReloading = true;
+            window.location.reload();
+          });
+        }
+
         registration.update();
 
         // Check for updates every 15 minutes (reduced from 1 hour)

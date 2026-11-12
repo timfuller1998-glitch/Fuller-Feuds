@@ -52,6 +52,16 @@ export default function Settings() {
   const { user: currentUser } = useAuth();
   const [themePreference, setThemePreference] = useState<"light" | "medium" | "dark">("light");
   const { toast } = useToast();
+  const { data: buildInfo } = useQuery({
+    queryKey: ["/api/version"],
+    queryFn: async () => {
+      const res = await fetch("/api/version");
+      if (!res.ok) throw new Error("version");
+      return res.json() as Promise<{ sha?: string; shortSha?: string; builtAt?: string | null }>;
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
   const currentHandle: string | null = (currentUser as any)?.handle ?? null;
   const [handle, setHandle] = useState("");
   const [handleStatus, setHandleStatus] = useState<HandleStatus>("idle");
@@ -426,6 +436,12 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      <p className="text-xs text-muted-foreground pt-2" data-testid="text-app-version">
+        {buildInfo?.shortSha || buildInfo?.sha
+          ? `App version ${buildInfo.shortSha || buildInfo.sha?.slice(0, 7)}${buildInfo.builtAt ? ` · ${new Date(buildInfo.builtAt).toLocaleString()}` : ""}`
+          : "App version unavailable"}
+      </p>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { staticIndexHtml } from "./static-files.js";
 // Access it to ensure it's not tree-shaken
 void staticIndexHtml;
 import { startScheduledJobs } from "./scheduled-jobs.js";
+import { getBuildInfo } from "./buildInfo.js";
 import { BadgeRepository } from "./repositories/badgeRepository.js";
 import { setupAuth } from "./auth.js";
 import { attachUserRole } from "./middleware/permissions.js";
@@ -42,17 +43,14 @@ app.use(express.urlencoded({ extended: false }));
 // Attach request ID for tracing (should be early in the middleware chain)
 app.use(attachRequestId);
 
-// Serve static files from public folder (for PWA files: service-worker.js, manifest.json, icons)
-const publicPath = path.resolve(import.meta.dirname, "..", "public");
-app.use(express.static(publicPath));
-
-// Ensure service worker is never cached - critical for PWA updates
-app.get('/service-worker.js', (req, res, next) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  next();
-});
+// In development Vite serves /public. In production the built dist/public
+// already includes those files (plus the versioned service-worker.js).
+// Never mount the source /public folder in production — it would shadow the
+// built service worker with the unversioned template and pin phones to a stale cache.
+if (process.env.NODE_ENV !== 'production') {
+  const publicPath = path.resolve(import.meta.dirname, "..", "public");
+  app.use(express.static(publicPath));
+}
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -91,6 +89,11 @@ setupAuth(app);
 app.use(attachUserRole);
 
 // Mount API routes
+app.get('/api/version', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.json(getBuildInfo());
+});
+
 app.use('/api', routes);
 
 // Diagnostic route to check served HTML
@@ -269,17 +272,6 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   }
 });
 
-// importantly only setup vite in development and after
-// setting up all the other routes so the catch-all route
-// doesn't interfere with the other routes
-if (app.get("env") === "development") {
-  // Dynamically import setupVite only in development to avoid bundling Vite/Rollup in production
-  const { setupVite } = await import("./vite.js");
-  await setupVite(app, server);
-} else {
-  serveStatic(app);
-}
-
 // Health check endpoint for Render monitoring
 app.get('/health', async (req, res) => {
   try {
@@ -300,6 +292,18 @@ app.get('/health', async (req, res) => {
     });
   }
 });
+
+// importantly only setup vite in development and after
+// setting up all the other routes so the catch-all route
+// doesn't interfere with the other routes
+if (app.get("env") === "development") {
+  // Dynamically import setupVite only in development to avoid bundling Vite/Rollup in production
+  const { setupVite } = await import("./vite.js");
+  await setupVite(app, server);
+} else {
+  serveStatic(app);
+}
+
 
 // Start the server
 const port = parseInt(process.env.PORT || '5000', 10);
