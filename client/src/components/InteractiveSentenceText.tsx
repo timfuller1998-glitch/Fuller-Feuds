@@ -36,6 +36,8 @@ export function InteractiveSentenceText(props: {
   badgeLabel?: (n: number) => string;
   /** When false, only the badge is tappable (e.g. inside a flippable card). Default true. */
   paragraphsClickable?: boolean;
+  /** Called when the interaction badge is tapped. Defaults to onSelectSentence. */
+  onSelectBadge?: (sentenceIndex: number) => void;
 }) {
   const stacked = props.chunks !== undefined || props.segmentMode === "paragraph";
 
@@ -73,6 +75,7 @@ export function InteractiveSentenceText(props: {
               : `${n} counterpoint${n === 1 ? "" : "s"}`);
           const clickable = props.paragraphsClickable !== false;
           const select = () => props.onSelectSentence(s.index);
+          const selectBadge = () => (props.onSelectBadge ?? props.onSelectSentence)(s.index);
 
           return (
             <div key={s.index} className="mb-5 last:mb-0" data-paragraph-index={s.index}>
@@ -100,7 +103,7 @@ export function InteractiveSentenceText(props: {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    select();
+                    selectBadge();
                   }}
                   className="mt-1.5 inline-flex min-h-[32px] items-center gap-1.5 rounded-full border bg-secondary/60 px-3 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   data-testid={`badge-paragraph-${s.index}`}
