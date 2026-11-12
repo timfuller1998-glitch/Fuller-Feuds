@@ -12,6 +12,10 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
+  // Root is client/, so the default publicDir (client/public) does not exist.
+  // Static PWA files live in the repo-level public/ folder and must be copied
+  // into dist/public so production can serve a single build directory.
+  publicDir: path.resolve(import.meta.dirname, "public"),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,

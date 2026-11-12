@@ -1,3 +1,10 @@
+## 2026-11-12 (06:05 CST) — Copy repo public/ assets into the production build
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/copy-public-assets-into-dist`
+- **What:** Vite root is `client/`, so `public/manifest.json`, favicon, logo, and PWA icons were not copied into `dist/public`. After #31 stopped serving the source `public/` folder in production those files 404ed. Set `publicDir` to the repo-level `public/` folder so they land in the same build directory as `index.html`.
+- **Typecheck:** 52 (unchanged; config-only change).
+
 ## 2026-11-12 (06:05 CST, America/Chicago) — Phones no longer keep an old build after a deploy (branch fix/stale-pwa-and-cache-headers)
 Made by the Fuller Feuds Dev bot (Grok Bot).
 - **The phone was being served a cached copy of the site, and sometimes an unversioned service worker, so a new Render deploy did not show up right away.** Production was mounting the source `public/` folder *before* the built files, so `/service-worker.js` was the template with `{{CACHE_VERSION}}` still in it — the same bytes on every deploy. The browser never saw a new worker, and that worker used stale-while-revalidate for the app shell (`/` and `index.html`), so it handed back the previous page immediately and only fetched a fresh one in the background. `/index.html` was also getting a one-year `Cache-Control` from Express. The server looked through several folders (`dist/public`, `server/static`, even source `public/` and `dist/`) to decide what to serve.
