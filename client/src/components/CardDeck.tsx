@@ -83,6 +83,36 @@ const wrap = (i: number, n: number) => ((i % n) + n) % n;
 const BACK_LAYERS = [2] as const; // blank backs beyond the second card
 const backStyle = (d: number) => ({ y: 7 * d, scale: 1 - 0.035 * d });
 const EASE = [0.22, 1, 0.36, 1] as const;
+// Phone-only: while the bottom card is pulled out, the rest of the pile shifts left and
+// shrinks with the top card so no deeper card is uncovered beside the incoming one.
+const NUDGE_X = 0.22;
+const NUDGE_SCALE = 0.05;
+const nudgeProgress = (pull: number, width: number) => Math.min(Math.max(pull, 0) / (width * 0.55), 1);
+const pullTargetFor = (width: number, narrow: boolean) => (narrow ? width * 0.55 : width * 1.12 * 0.92);
+const applyNudge = (ox: MotionValue<number>, os: MotionValue<number>, pull: number, width: number, baseScale: number) => {
+  const f = nudgeProgress(pull, width);
+  ox.set(-f * NUDGE_X * width);
+  os.set(baseScale * (1 - f * NUDGE_SCALE));
+};
+/** Follow an active back-swipe pull without applying a 0-pull on subscribe (that would cancel a settle animation). */
+const followNudge = (
+  pull: MotionValue<number>,
+  ox: MotionValue<number>,
+  os: MotionValue<number>,
+  width: number,
+  baseScale: number,
+  anims: { stop: () => void }[],
+) => {
+  let nudging = pull.get() > 2;
+  const apply = (v: number) => applyNudge(ox, os, v, width, baseScale);
+  if (nudging) apply(pull.get());
+  const unsub = pull.on("change", (v) => {
+    if (v > 2) { nudging = true; apply(v); }
+    else if (nudging) { nudging = false; apply(0); }
+  });
+  anims.push({ stop: unsub });
+  return nudging;
+};
 
 type Role = "top" | "next" | "out" | "in" | "peek";
 
@@ -96,6 +126,10 @@ interface DeckCardProps {
   onDrag?: (info: PanInfo) => void;
   /** Rightward drag distance; the bottom ("peek") card emerges from behind the deck by this much. */
   pull?: MotionValue<number>;
+  /** Freshly mounted "next" card during a forward swipe: start at the back and rise into the 2nd slot. */
+  enterFromBack?: boolean;
+  /** Leftward drag distance; the rest of the pile rises/settles forward by this much. */
+  lift?: MotionValue<number>;
   onDone?: () => void;
   children: (isTop: boolean) => ReactNode;
 }
@@ -105,13 +139,18 @@ interface DeckCardProps {
  * keeps its own content and position; it is never re-used for another topic.
  * Outer values = deck placement/shuffle animation, inner x = finger drag.
  */
-function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, onDrag, pull, onDone, children }: DeckCardProps) {
+function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, onDrag, pull, lift, enterFromBack, onDone, children }: DeckCardProps) {
   const first = useRef(true);
   const narrow = typeof window !== "undefined" && window.innerWidth < 640;
   const s1 = backStyle(1);
   const s2 = backStyle(2);
   const start =
-    role === "in" || role === "peek" ? { y: s2.y, scale: s2.scale, z: role === "peek" ? 0 : 3 } : role === "next" ? { y: s1.y, scale: s1.scale, z: 5 } : { y: 0, scale: 1, z: 10 };
+    role === "in" || role === "peek"
+      ? { y: s2.y, scale: s2.scale, z: role === "peek" ? 0 : 3 }
+      : role === "next" && enterFromBack
+      ? { y: backStyle(2.6).y, scale: backStyle(2.6).scale, z: 2 }
+      : role === "next" ? { y: s1.y, scale: s1.scale, z: 5 }
+      : { y: 0, scale: 1, z: 10 };
   const ox = useMotionValue(0);
   const oy = useMotionValue(start.y);
   const os = useMotionValue(start.scale);
@@ -137,18 +176,12 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
       if (role === "top") {
         oz.set(10);
         // Phones: while the bottom card is being pulled out to the right, nudge the top card left and
-        // shrink it a touch so the emerging card is clearly visible. The emerging card sits between the
-        // top card and the 2nd card, so the 2nd card is never uncovered.
-        if (pull && narrow) {
-          const follow = (v: number) => {
-            const f = Math.min(Math.max(v, 0) / (width * 0.55), 1);
-            ox.set(-f * 0.22 * width); os.set(1 - f * 0.05);
-          };
-          const unsub = pull.on("change", follow);
-          anims.push({ stop: unsub });
-        }
+        // shrink it a touch so the emerging card is clearly visible. Deeper cards follow this same
+        // nudge so they stay tucked under the top card and never peek out beside the incoming one.
+        const topNudging = pull && narrow ? followNudge(pull, ox, os, width, 1, anims) : false;
         if (first.current) return;
-        go(ox, 0, 0.3); go(oy, 0, 0.3); go(os, 1, 0.3); go(orot, 0, 0.3);
+        if (!topNudging) { go(ox, 0, 0.3); go(os, 1, 0.3); }
+        go(oy, 0, 0.3); go(orot, 0, 0.3);
       } else if (role === "next") {
         // A card that was just on top (backward swipe) sinks to the next slot from wherever the finger
         // released it: hand the drag offset to the outer layer so it never springs back first.
@@ -159,7 +192,32 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
           ix.set(0);
         }
         oz.set(5);
-        go(ox, 0, 0.3); go(oy, s1.y, 0.3); go(os, s1.scale, 0.3); go(orot, 0, 0.3);
+        go(oy, s1.y, 0.3); go(orot, 0, 0.3);
+        // Stay tucked under the top card during a back-swipe nudge; otherwise settle into the 2nd slot
+        // (rising from the back when this card just mounted during a forward swipe).
+        if (pull && narrow) {
+          const nudging = followNudge(pull, ox, os, width, s1.scale, anims);
+          if (!nudging) { go(ox, 0, 0.3); go(os, s1.scale, 0.3); }
+        } else {
+          go(ox, 0, 0.3); go(os, s1.scale, 0.3);
+        }
+        // Forward swipe: as the top card is dragged left, this card (and after commit, a
+        // freshly mounted one) rises toward the top slot so the back of the deck is in motion.
+        if (lift) {
+          const apply = (v: number) => {
+            if (pull && pull.get() > 2) return;
+            const p = Math.min(Math.max(v, 0) / (width * 0.45), 1);
+            oy.set(s1.y * (1 - p));
+            os.set(s1.scale + (1 - s1.scale) * p);
+          };
+          let lifting = lift.get() > 2;
+          if (lifting) apply(lift.get());
+          const unsub = lift.on("change", (v) => {
+            if (v > 2) { lifting = true; apply(v); }
+            else if (lifting) { lifting = false; apply(0); }
+          });
+          anims.push({ stop: unsub });
+        }
       } else if (role === "out") {
         // Forward: slide off to the left from wherever the finger released it, then drop behind the deck.
         // Hand the finger offset over to the outer layer and stop the drag's spring-back, so the card
@@ -196,6 +254,8 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         await Promise.all([go(ox, target, d1), go(orot, 7, d1), go(oy, 4, d1), go(os, 0.98, d1)]);
         if (cancelled) return;
         oz.set(15);
+        // Release the pile's back-swipe nudge as this card lands, so deeper cards ease back with it.
+        if (pull) go(pull, 0, 0.28);
         await Promise.all([go(ox, 0, 0.28), go(orot, 0, 0.28), go(oy, 0, 0.28), go(os, 1, 0.28)]);
         if (cancelled) return;
         if (!cancelled) doneRef.current?.();
@@ -229,6 +289,71 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
       >
         {children(isTop)}
       </motion.div>
+    </motion.div>
+  );
+}
+
+/** Plain card back under the face cards. Follows the back-swipe nudge and, on a forward swipe, settles up from one layer deeper. */
+function DeckBack({ depth, width, narrow, pull, lift, settleToken, reduceMotion }: {
+  depth: number;
+  width: number;
+  narrow: boolean;
+  pull: MotionValue<number>;
+  lift: MotionValue<number>;
+  settleToken: number;
+  reduceMotion: boolean;
+}) {
+  const s = backStyle(depth);
+  const deeper = backStyle(depth + 1);
+  const ox = useMotionValue(0);
+  const oy = useMotionValue(s.y);
+  const os = useMotionValue(s.scale);
+
+  useEffect(() => {
+    if (!settleToken) return;
+    oy.set(deeper.y);
+    os.set(deeper.scale);
+    const a1 = animate(oy, s.y, { duration: reduceMotion ? 0 : 0.3, ease: EASE as any });
+    const a2 = animate(os, s.scale, { duration: reduceMotion ? 0 : 0.3, ease: EASE as any });
+    return () => { a1.stop(); a2.stop(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settleToken]);
+
+  useEffect(() => {
+    if (!narrow) return;
+    const anims: { stop: () => void }[] = [];
+    followNudge(pull, ox, os, width, s.scale, anims);
+    return () => anims.forEach((a) => a.stop());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [narrow, width, pull]);
+
+  useEffect(() => {
+    const to = backStyle(Math.max(0, depth - 1));
+    const apply = (v: number) => {
+      if (settleToken || pull.get() > 2) return;
+      const p = Math.min(Math.max(v, 0) / (width * 0.45), 1);
+      oy.set(s.y + (to.y - s.y) * p);
+      os.set(s.scale + (to.scale - s.scale) * p);
+    };
+    let lifting = lift.get() > 2;
+    if (lifting) apply(lift.get());
+    const unsub = lift.on("change", (v) => {
+      if (v > 2) { lifting = true; apply(v); }
+      else if (lifting) { lifting = false; apply(0); }
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, lift, pull, settleToken]);
+
+  return (
+    <motion.div
+      className="absolute inset-0 pointer-events-none select-none"
+      style={{ x: ox, y: oy, scale: os, zIndex: 3 - depth }}
+      aria-hidden
+    >
+      <div className="w-full h-full rounded-xl border bg-card shadow-md overflow-hidden deck-card-surface">
+        <div className="w-full h-full bg-gradient-to-br from-primary/10 via-muted/40 to-primary/5 dark:from-foreground/[0.04] dark:via-transparent dark:to-foreground/[0.02]" />
+      </div>
     </motion.div>
   );
 }
@@ -275,7 +400,12 @@ export default function CardDeck<T>({
   const nextCard = n > 1 ? topics[wrap(currentIndex + 1, n)] : null;
   const busy = !!outgoing || !!incomingId;
   const pull = useMotionValue(0);
+  const lift = useMotionValue(0);
   const prevCard = n > 2 ? topics[wrap(currentIndex - 1, n)] : null;
+
+  useEffect(() => {
+    if (outgoing) lift.set(0);
+  }, [outgoing, lift]);
 
   /** Move through the deck; flips the top card back first if it is showing its back. */
   const step = useCallback((dir: 1 | -1) => {
@@ -288,6 +418,12 @@ export default function CardDeck<T>({
         setOutgoing({ card: leaving, key: keyRef.current });
       } else {
         setIncomingId(getKey(topics[wrap(currentIndex - 1, n)]));
+        // Buttons, keys, and the wheel don't drag, so drive the same pull the finger would:
+        // the top card and the rest of the pile nudge together while the bottom card comes out.
+        if (!reduceMotion && pull.get() < 2) {
+          const narrow = window.innerWidth < 640;
+          animate(pull, pullTargetFor(dimensions.width, narrow), { duration: 0.2, ease: EASE as any });
+        }
       }
       setCurrentIndex((i) => wrap(i + dir, n));
     };
@@ -297,7 +433,7 @@ export default function CardDeck<T>({
     } else {
       run();
     }
-  }, [n, currentCard, flipped, busy, topics, currentIndex, getKey]);
+  }, [n, currentCard, flipped, busy, topics, currentIndex, getKey, reduceMotion, pull, dimensions.width]);
 
   const handleDragEnd = (info: PanInfo) => {
     const { offset, velocity } = info;
@@ -306,7 +442,10 @@ export default function CardDeck<T>({
     if (Math.abs(velocity.x) > SWIPE_VELOCITY_THRESHOLD) dir = velocity.x < 0 ? 1 : -1;
     else if (offset.x <= -SWIPE_OFFSET_THRESHOLD) dir = 1;
     else if (offset.x >= SWIPE_OFFSET_THRESHOLD) dir = -1;
-    if (dir !== -1) animate(pull, 0, { duration: 0.2 });
+    if (dir !== -1 && pull.get() > 2) animate(pull, 0, { duration: 0.2 });
+    if (dir !== 1 && lift.get() > 2) animate(lift, 0, { duration: 0.2 });
+    // On a committed forward swipe, leave lift as-is until the next render unsubscribes
+    // followers (the rising card becomes "top" and keeps its mid-lift position).
     if (dir === 0) return; // framer springs the card back to center
     step(dir);
   };
@@ -373,22 +512,18 @@ export default function CardDeck<T>({
       data-testid={testId ?? "card-deck"}
     >
       <div className="relative" style={{ width: cardWidth, height: cardHeight, perspective: 1200 }}>
-        {backs.map((d) => {
-          const s = backStyle(d);
-          return (
-            <div
-              key={`back-${d}`}
-              className="absolute inset-0 pointer-events-none select-none"
-              style={{ transform: `translateY(${s.y}px) scale(${s.scale})`, zIndex: 3 - d }}
-              aria-hidden
-            >
-              {/* Plain card back: only the bottom edge shows, no text can bleed through */}
-              <div className="w-full h-full rounded-xl border bg-card shadow-md overflow-hidden deck-card-surface">
-                <div className="w-full h-full bg-gradient-to-br from-primary/10 via-muted/40 to-primary/5 dark:from-foreground/[0.04] dark:via-transparent dark:to-foreground/[0.02]" />
-              </div>
-            </div>
-          );
-        })}
+        {backs.map((d) => (
+          <DeckBack
+            key={`back-${d}`}
+            depth={d}
+            width={cardWidth}
+            narrow={typeof window !== "undefined" && window.innerWidth < 640}
+            pull={pull}
+            lift={lift}
+            settleToken={outgoing?.key ?? 0}
+            reduceMotion={reduceMotion}
+          />
+        ))}
 
         {entries.map(({ card, role, key }) => (
           <DeckCard
@@ -399,8 +534,13 @@ export default function CardDeck<T>({
             reduceMotion={reduceMotion}
             draggable={n > 1 && !busy}
             onDragEnd={handleDragEnd}
-            onDrag={(info) => pull.set(Math.max(0, info.offset.x))}
-            pull={role === "peek" || role === "top" ? pull : undefined}
+            onDrag={(info) => {
+              pull.set(Math.max(0, info.offset.x));
+              lift.set(Math.max(0, -info.offset.x));
+            }}
+            pull={role === "peek" || role === "top" || role === "next" || role === "in" ? pull : undefined}
+            lift={role === "next" && !outgoing ? lift : undefined}
+            enterFromBack={role === "next" && !!outgoing}
             onDone={
               role === "out" ? () => setOutgoing(null) : role === "in" ? () => { pull.set(0); setIncomingId(null); } : undefined
             }
