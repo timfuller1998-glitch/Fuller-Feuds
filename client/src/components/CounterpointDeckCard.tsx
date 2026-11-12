@@ -4,6 +4,7 @@ import { StanceChip, type Person } from "@/components/OpinionDeckCard";
 import type { Stance } from "@/lib/stance";
 import { OpponentPicker } from "@/components/OpponentPicker";
 import type { Opponent } from "@/lib/opponentSides";
+import { CardScrollBody } from "@/components/CardScrollBody";
 
 export type CounterpointCardItem = {
   id: string;
@@ -68,9 +69,9 @@ export function CounterpointDeckFront({ item }: { item: CounterpointCardItem }) 
           on ¶{para}
         </span>
       </div>
-      <p className="mt-3 font-serif text-base leading-relaxed flex-1 min-h-0 overflow-y-auto overflow-x-hidden touch-pan-y overscroll-contain pr-1">
+      <CardScrollBody className="mt-3 font-serif text-base leading-relaxed">
         {item.content}
-      </p>
+      </CardScrollBody>
     </div>
   );
 }

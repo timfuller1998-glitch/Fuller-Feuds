@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Flag, MessageSquareReply, RotateCcw, ThumbsDown, ThumbsUp, UserPlus } from "lucide-react";
 import { InteractiveSentenceText } from "@/components/InteractiveSentenceText";
+import { CardScrollBody } from "@/components/CardScrollBody";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
 import { getOpinionStance, stanceLabel, type Stance } from "@/lib/stance";
 
@@ -96,7 +97,7 @@ export function OpinionDeckFront({
       <div className="absolute inset-0 pointer-events-none" style={getOpinionGradientStyle(op.topicEconomicScore, op.topicAuthoritarianScore)} aria-hidden />
       <div className="relative flex flex-col flex-1 min-h-0">
       <AuthorRow op={op} />
-      <div className="mt-3 flex-1 min-h-0 overflow-y-auto overflow-x-hidden touch-pan-y overscroll-contain pr-1">
+      <CardScrollBody className="mt-3">
         <InteractiveSentenceText
           text={op.content}
           segmentMode="paragraph"
@@ -106,7 +107,7 @@ export function OpinionDeckFront({
           onSelectBadge={onSelectBadge}
           paragraphsClickable={paragraphsClickable}
         />
-      </div>
+      </CardScrollBody>
       {footer === undefined ? (
         <p className="pt-2 text-xs text-muted-foreground text-center flex-shrink-0">Tap card for votes &amp; actions</p>
       ) : footer}

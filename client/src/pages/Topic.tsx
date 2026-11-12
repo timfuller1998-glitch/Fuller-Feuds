@@ -923,12 +923,8 @@ export default function Topic() {
                       profileImageUrl: user?.profileImageUrl,
                     },
                   }}
-                  paragraphsClickable
                   onSelectParagraph={(idx) => {
-                    setSelectedSentenceIndex(idx);
-                    setSelectedCounterpointId(null);
-                    setSheetIntent("counterpoints");
-                    setSheetOpen(true);
+                    navigate(`/opinion/${userOpinion.id}/counterpoints?p=${idx}`);
                   }}
                   onSelectBadge={(idx) => {
                     navigate(`/opinion/${userOpinion.id}/counterpoints?p=${idx}`);
@@ -936,7 +932,7 @@ export default function Topic() {
                   footer={
                     <div className="pt-3 mt-auto flex flex-col gap-2 flex-shrink-0">
                       <p className="font-ui text-[0.65rem] uppercase tracking-[0.1em] text-muted-foreground text-center">
-                        Tap a paragraph for its counterpoints
+                        Tap a counterpoints badge to open them
                       </p>
                       <Button
                         variant="outline"

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, type ReactNode } from "react"
 import { motion, animate, useMotionValue, useTransform, useReducedMotion, PanInfo, type MotionValue } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CARD_GESTURE_LOCK_PX, cardGestureJustHappened, markCardGesture } from "@/lib/cardGesture";
 
 /**
  * Generic physical card deck: overlapping cards, tap-to-flip, and a shuffle where the top
@@ -49,13 +50,25 @@ export interface CardDeckProps<T> {
 
 /** Built-in 3D flip used when the deck owns the flip (renderBack provided). */
 function FlipFaces({ flipped, onToggle, front, back }: { flipped: boolean; onToggle: () => void; front: ReactNode; back: ReactNode }) {
+  const start = useRef<{ x: number; y: number } | null>(null);
   const face = (rot: number, visible: boolean): React.CSSProperties => ({
     transform: `rotateY(${rot}deg)`, backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
     opacity: visible ? 1 : 0, pointerEvents: visible ? "auto" : "none", transition: "opacity 0.6s ease-in-out",
   });
   return (
     <div className="relative w-full h-full" style={{ perspective: "1000px" }}
-      onClick={(e) => { if (!(e.target as HTMLElement).closest('button, a, [role="button"]')) onToggle(); }}>
+      onPointerDown={(e) => { start.current = { x: e.clientX, y: e.clientY }; }}
+      onPointerMove={(e) => {
+        const s = start.current;
+        if (!s) return;
+        if (Math.hypot(e.clientX - s.x, e.clientY - s.y) >= CARD_GESTURE_LOCK_PX) markCardGesture();
+      }}
+      onPointerUp={() => { start.current = null; }}
+      onPointerCancel={() => { start.current = null; }}
+      onClick={(e) => {
+        if (cardGestureJustHappened()) return;
+        if (!(e.target as HTMLElement).closest('button, a, [role="button"], input, textarea, select')) onToggle();
+      }}>
       <div className="relative w-full h-full" style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)", transition: `transform ${FLIP_DURATION_MS}ms ease-in-out` }}>
         <div className="absolute inset-0" style={face(0, !flipped)}>{front}</div>
         <div className="absolute inset-0" style={face(180, flipped)}>{back}</div>
@@ -582,6 +595,7 @@ export default function CardDeck<T>({
             draggable={n > 1 && !busy}
             onDragEnd={handleDragEnd}
             onDrag={(info) => {
+              if (Math.abs(info.offset.x) >= CARD_GESTURE_LOCK_PX || Math.abs(info.offset.y) >= CARD_GESTURE_LOCK_PX) markCardGesture();
               pull.set(Math.max(0, info.offset.x));
               lift.set(Math.max(0, -info.offset.x));
             }}
