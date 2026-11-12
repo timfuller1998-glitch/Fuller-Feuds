@@ -1002,6 +1002,15 @@ export default function Topic() {
               {activeTab === "yours" && "Counterpoints"}
               {activeTab === "others" && "Counterpoints"}
             </SheetTitle>
+            {(activeTab === "yours" ? userOpinion : activeTab === "others" ? currentOtherOpinion : null) && (
+              <Link
+                href={`/opinion/${(activeTab === "yours" ? userOpinion : currentOtherOpinion)!.id}/counterpoints?p=${(activeTab === "yours" ? selectedSentenceIndex : selectedOtherSentenceIndex) ?? 0}`}
+                className="font-ui text-xs uppercase tracking-[0.08em] text-primary hover:underline"
+                data-testid="link-full-counterpoints"
+              >
+                See all counterpoints on this opinion →
+              </Link>
+            )}
           </SheetHeader>
 
           <div className="mt-4 space-y-4">

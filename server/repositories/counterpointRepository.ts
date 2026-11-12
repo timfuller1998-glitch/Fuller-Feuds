@@ -48,7 +48,7 @@ export class CounterpointRepository {
     }));
   }
 
-  async listCounterpoints(params: { opinionId: string; sentenceIndex: number; currentUserId?: string }) {
+  async listCounterpoints(params: { opinionId: string; sentenceIndex?: number; currentUserId?: string }) {
     const rows = await db
       .select({
         counterpoint: opinionSentenceCounterpoints,
@@ -70,7 +70,7 @@ export class CounterpointRepository {
       .where(
         and(
           eq(opinionSentenceCounterpoints.opinionId, params.opinionId),
-          eq(opinionSentenceCounterpoints.sentenceIndex, params.sentenceIndex),
+          params.sentenceIndex === undefined ? undefined : eq(opinionSentenceCounterpoints.sentenceIndex, params.sentenceIndex),
           eq(opinionSentenceCounterpoints.status, 'approved')
         )
       )

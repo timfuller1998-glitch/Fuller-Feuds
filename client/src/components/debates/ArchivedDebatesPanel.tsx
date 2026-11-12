@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { parseServerDate } from "@/lib/dates";
 import { X, Archive as ArchiveIcon, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -103,7 +104,7 @@ function ArchivedDebateCard({ debate, onOpen }: { debate: UserDebate; onOpen: ()
         <p className="font-medium truncate">{debate.topicTitle}</p>
         <p className="text-sm text-muted-foreground">vs {debate.opponentName}</p>
         <p className="text-xs text-muted-foreground mt-1">
-          {STATE_LABEL[debate.state]}{when ? ` · ${formatDistanceToNow(new Date(when), { addSuffix: true })}` : ''}
+          {STATE_LABEL[debate.state]}{when ? ` · ${formatDistanceToNow(parseServerDate(when), { addSuffix: true })}` : ''}
         </p>
       </div>
     </button>

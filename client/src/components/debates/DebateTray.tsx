@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { parseServerDate } from "@/lib/dates";
 import { useTypingRooms } from "@/lib/typingStore";
 import { TypingBubble } from "./TypingBubble";
 import { StatusDot } from "./DebateStatus";
@@ -77,7 +78,7 @@ export function DebateTray() {
             </div>
             <div className="text-xs text-muted-foreground truncate">
               vs {d.opponentName}{d.opponentHandle ? ` · @${d.opponentHandle}` : ""}
-              {d.activityAt ? ` · ${formatDistanceToNow(new Date(d.activityAt), { addSuffix: true })}` : ""}
+              {d.activityAt ? ` · ${formatDistanceToNow(parseServerDate(d.activityAt), { addSuffix: true })}` : ""}
             </div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">

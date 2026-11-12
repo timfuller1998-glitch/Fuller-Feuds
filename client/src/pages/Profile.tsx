@@ -626,7 +626,7 @@ export default function Profile() {
                   }}
                   onAdopt={() => navigate(`/topic/${op.topicId}`)}
                   onFlag={() => navigate(`/topic/${op.topicId}`)}
-                  onSeeCounterpoints={() => navigate(`/topic/${op.topicId}`)}
+                  onSeeCounterpoints={(idx) => navigate(`/opinion/${op.id}/counterpoints?p=${idx}`)}
                 />
               )}
             />
@@ -741,7 +741,7 @@ export default function Profile() {
         open={showLeaderboardsModal}
         onOpenChange={setShowLeaderboardsModal}
         userId={userId!}
-        displayName={user.firstName}
+        displayName={(user as any).handle ? `@${(user as any).handle}` : user.firstName}
         isOwnProfile={isOwnProfile}
       />
 
@@ -754,7 +754,7 @@ export default function Profile() {
               Followers ({followers.length})
             </DialogTitle>
             <DialogDescription>
-              People following {isOwnProfile ? 'you' : `${user.firstName}`}
+              People following {isOwnProfile ? 'you' : ((user as any).handle ? `@${(user as any).handle}` : user.firstName)}
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4">
@@ -803,7 +803,7 @@ export default function Profile() {
               Following ({following.length})
             </DialogTitle>
             <DialogDescription>
-              People {isOwnProfile ? 'you follow' : `${user.firstName} follows`}
+              People {isOwnProfile ? 'you follow' : `${(user as any).handle ? `@${(user as any).handle}` : user.firstName} follows`}
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4">

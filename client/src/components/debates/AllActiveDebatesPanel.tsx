@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { parseServerDate } from "@/lib/dates";
 import { X, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -37,12 +38,12 @@ export function AllActiveDebatesPanel() {
   const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
   const recentDebates = groupedDebates.filter(group => {
     if (!group.mostRecentActivity) return false;
-    return new Date(group.mostRecentActivity).getTime() >= thirtyDaysAgo;
+    return parseServerDate(group.mostRecentActivity).getTime() >= thirtyDaysAgo;
   });
 
   const inactiveDebates = groupedDebates.filter(group => {
     if (!group.mostRecentActivity) return true;
-    return new Date(group.mostRecentActivity).getTime() < thirtyDaysAgo;
+    return parseServerDate(group.mostRecentActivity).getTime() < thirtyDaysAgo;
   });
 
   if (!isOpen) return null;
@@ -151,7 +152,7 @@ function OpponentDebateCard({
   );
 
   const mostRecent = group.mostRecentActivity 
-    ? formatDistanceToNow(new Date(group.mostRecentActivity), { addSuffix: true })
+    ? formatDistanceToNow(parseServerDate(group.mostRecentActivity), { addSuffix: true })
     : 'No recent activity';
 
   return (

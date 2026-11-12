@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { parseServerDate } from "@/lib/dates";
 import { X, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -93,7 +94,7 @@ export function OpponentDebateList() {
             )}
             {opponentGroup.activeDebates.map((debate) => {
               const lastActivity = debate.activityAt
-                ? formatDistanceToNow(new Date(debate.activityAt), { addSuffix: true })
+                ? formatDistanceToNow(parseServerDate(debate.activityAt), { addSuffix: true })
                 : 'No messages yet';
               return (
                 <button

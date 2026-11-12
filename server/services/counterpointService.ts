@@ -33,7 +33,7 @@ export class CounterpointService {
     });
   }
 
-  async listCounterpoints(params: { opinionId: string; sentenceIndex: number; currentUserId?: string }) {
+  async listCounterpoints(params: { opinionId: string; sentenceIndex?: number; currentUserId?: string }) {
     return this.repo.listCounterpoints(params);
   }
 

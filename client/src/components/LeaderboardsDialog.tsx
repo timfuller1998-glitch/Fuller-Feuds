@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { UserHandle } from "@/components/UserHandle";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -69,8 +68,9 @@ function Row({ e, unit, highlight, onOpen }: { e: LeaderboardEntry; unit: string
         <AvatarFallback className="text-xs">{e.firstName?.charAt(0)}{e.lastName?.charAt(0)}</AvatarFallback>
       </Avatar>
       <span className="flex-1 min-w-0">
-        <span className="block truncate text-sm font-medium">{e.firstName} {e.lastName}</span>
-        <UserHandle handle={e.handle} />
+        {/* @handle first (public identity); real name underneath */}
+        <span className="block truncate text-sm font-medium">{e.handle ? `@${e.handle}` : `${e.firstName ?? ""} ${e.lastName ?? ""}`.trim()}</span>
+        {e.handle && <span className="block truncate text-xs leading-tight text-muted-foreground">{`${e.firstName ?? ""} ${e.lastName ?? ""}`.trim()}</span>}
       </span>
       <span className="text-sm font-semibold tabular-nums">{e.value}</span>
       <span className="text-xs text-muted-foreground w-[4.5rem] truncate">{unit}</span>
@@ -89,7 +89,7 @@ export default function LeaderboardsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-1.5rem)] max-w-xl max-h-[85dvh] overflow-y-auto p-4 sm:p-6" data-testid="dialog-leaderboards">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><BarChart3 className="w-5 h-5" />Rankings</DialogTitle>
+          <DialogTitle className="flex items-center gap-2" data-testid="text-leaderboards-title"><BarChart3 className="w-5 h-5" />{isOwnProfile ? "Your rankings" : `${displayName}'s rankings`}</DialogTitle>
           <DialogDescription>Top 10 across Fuller Feuds. {who === "You" ? "Your" : `${displayName}'s`} position is highlighted.</DialogDescription>
         </DialogHeader>
         {isLoading && <p className="py-8 text-center text-sm text-muted-foreground">Loading rankings…</p>}
