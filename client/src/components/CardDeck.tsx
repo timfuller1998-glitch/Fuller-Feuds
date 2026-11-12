@@ -43,6 +43,8 @@ export interface CardDeckProps<T> {
   onIndexChange?: (index: number, item: T) => void;
   /** Index of the card shown on top when the deck mounts. */
   initialIndex?: number;
+  /** Pixels reserved for page chrome above/below the deck (default 290). */
+  chromeReserve?: number;
 }
 
 /** Built-in 3D flip used when the deck owns the flip (renderBack provided). */
@@ -62,12 +64,12 @@ function FlipFaces({ flipped, onToggle, front, back }: { flipped: boolean; onTog
   );
 }
 
-const getCardDimensions = (maxWidth: number) => {
+export const getCardDimensions = (maxWidth: number, chromeReserve = 290) => {
   let width = Math.min(window.innerWidth - 34, maxWidth); // 17px gutter each side
   let height = (width * 7) / 5; // 5:7 playing-card ratio
-  // On short screens, cap by viewport height (header, page title, deck controls and the
-  // footer take ~290px) so the whole deck fits above the footer instead of being clipped.
-  const maxHeight = Math.max(300, window.innerHeight - 290);
+  // On short screens, cap by viewport height so the whole deck fits above the footer
+  // instead of being clipped. chromeReserve covers header, title, and controls.
+  const maxHeight = Math.max(260, window.innerHeight - chromeReserve);
   if (height > maxHeight) { height = maxHeight; width = (height * 5) / 7; }
   return { width, height };
 };
@@ -405,21 +407,22 @@ function DeckBack({ depth, width, narrow, pull, lift, settleToken, reduceMotion 
 export default function CardDeck<T>({
   items, getKey, renderFront, renderBack, onEmpty, maxWidth = 400, renderBadge, testId,
   emptyLabel = "No more topics", ariaLabel = "Topic deck", onIndexChange, initialIndex = 0,
+  chromeReserve = 290,
 }: CardDeckProps<T>) {
   const topics = items;
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const [forceUnflipSignal, setForceUnflipSignal] = useState(0);
-  const [dimensions, setDimensions] = useState(() => getCardDimensions(maxWidth));
+  const [dimensions, setDimensions] = useState(() => getCardDimensions(maxWidth, chromeReserve));
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastWheelRef = useRef(0);
   const n = topics.length;
 
   useEffect(() => {
-    const onResize = () => setDimensions(getCardDimensions(maxWidth));
+    const onResize = () => setDimensions(getCardDimensions(maxWidth, chromeReserve));
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [maxWidth]);
+  }, [maxWidth, chromeReserve]);
 
   useEffect(() => () => { if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current); }, []);
 

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { UserHandle } from "@/components/UserHandle";
 import type { Opinion } from "@shared/schema";
@@ -7,7 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Flag, MessageSquareReply, RotateCcw, ThumbsDown, ThumbsUp, UserPlus } from "lucide-react";
 import { InteractiveSentenceText } from "@/components/InteractiveSentenceText";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
-import { getOpinionStance, stanceLabel } from "@/lib/stance";
+import { getOpinionStance, stanceLabel, type Stance } from "@/lib/stance";
+
+export type Person = { firstName?: string | null; lastName?: string | null; handle?: string | null; profileImageUrl?: string | null };
+
+export function StanceChip({ stance, testId }: { stance: Stance; testId?: string }) {
+  const cls =
+    stance === "for"
+      ? "bg-stance-for text-primary-foreground"
+      : stance === "against"
+        ? "bg-stance-against text-primary-foreground"
+        : "bg-stance-neutral text-primary-foreground";
+  return <Badge className={cls} data-testid={testId}>{stanceLabel[stance]}</Badge>;
+}
 
 type Op = Opinion & { author?: { firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null } | null; userVote?: { voteType?: string } | null };
 
@@ -63,7 +76,19 @@ function AuthorRow({ op }: { op: Op }) {
 
 const shell = "w-full h-full rounded-xl border bg-card shadow-md text-card-foreground flex flex-col overflow-hidden p-4";
 
-export function OpinionDeckFront({ op, onSelectParagraph }: { op: Op; onSelectParagraph: (paragraphIndex: number) => void }) {
+export function OpinionDeckFront({
+  op,
+  onSelectParagraph,
+  onSelectBadge,
+  paragraphsClickable = false,
+  footer,
+}: {
+  op: Op;
+  onSelectParagraph: (paragraphIndex: number) => void;
+  onSelectBadge?: (paragraphIndex: number) => void;
+  paragraphsClickable?: boolean;
+  footer?: ReactNode;
+}) {
   const { byIndex } = useCounterpointCounts(op.id);
   return (
     <div className={`${shell} relative`} data-testid={`opinion-card-front-${op.id}`}>
@@ -75,13 +100,16 @@ export function OpinionDeckFront({ op, onSelectParagraph }: { op: Op; onSelectPa
         <InteractiveSentenceText
           text={op.content}
           segmentMode="paragraph"
-          paragraphsClickable={false}
           interactionCount={(i) => byIndex.get(i) ?? 0}
           selectedSentenceIndex={null}
           onSelectSentence={onSelectParagraph}
+          onSelectBadge={onSelectBadge}
+          paragraphsClickable={paragraphsClickable}
         />
       </div>
-      <p className="pt-2 text-xs text-muted-foreground text-center flex-shrink-0">Tap card for votes &amp; actions</p>
+      {footer === undefined ? (
+        <p className="pt-2 text-xs text-muted-foreground text-center flex-shrink-0">Tap card for votes &amp; actions</p>
+      ) : footer}
       </div>
     </div>
   );

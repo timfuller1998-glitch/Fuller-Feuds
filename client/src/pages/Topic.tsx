@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ArrowLeft, Brain, Flag, MessageCircle, Plus, UserPlus, Users, TrendingUp } from "lucide-react";
+import { ArrowLeft, Flag, MessageCircle, Plus, UserPlus, Users, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType, type SummarySentence } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -93,6 +93,7 @@ function parseCounterpointCountRows(data: unknown): CounterpointCountRow[] {
   }
   return out;
 }
+
 
 export default function Topic() {
   const { id } = useParams();
@@ -774,7 +775,7 @@ export default function Topic() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in pb-10">
+    <div className="space-y-6 animate-fade-in pb-28">
       {/* Back Button */}
       <Link href="/">
         <Button variant="ghost" size="sm" data-testid="button-back-home">
@@ -869,15 +870,13 @@ export default function Topic() {
         </TabsList>
 
         <TabsContent value="ai" className="mt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="w-5 h-5 text-primary" />
-                AI Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {cumulativeData ? (
+          <article className="rounded-xl border bg-card shadow-md deck-card-surface overflow-hidden px-5 py-5 md:px-8 md:py-7" data-testid="ai-summary-card">
+            <header className="mb-5">
+              <p className="font-ui text-xs uppercase tracking-[0.14em] text-[hsl(var(--gold))]">AI Summary</p>
+              <div className="mt-3 h-px w-full bg-[hsl(var(--gold)/0.45)]" />
+            </header>
+            {cumulativeData ? (
+              <>
                 <InteractiveSentenceText
                   chunks={summarySentences.map((s) => s?.text ?? "")}
                   interactionCount={summaryCounterpointCount}
@@ -889,40 +888,36 @@ export default function Topic() {
                     setSheetOpen(true);
                   }}
                   onSelectBadge={(idx) => openCounterpointsForSummarySentence(idx)}
+                  className="font-serif text-[1.05rem] leading-[1.7]"
                 />
-              ) : (
-                <p className="text-muted-foreground">No AI summary yet.</p>
-              )}
-            </CardContent>
-          </Card>
+                <p className="mt-6 font-ui text-[0.65rem] uppercase tracking-[0.1em] text-muted-foreground">
+                  Tap a paragraph for the opinions it draws on. The badge opens its counterpoints.
+                </p>
+              </>
+            ) : (
+              <p className="font-serif text-base italic text-muted-foreground">
+                No summary yet. Once enough opinions are in, an overview of the discussion will appear here.
+              </p>
+            )}
+          </article>
         </TabsContent>
 
         <TabsContent value="yours" className="mt-4">
           {userOpinion ? (
-            <Card style={getOpinionGradientStyle(userOpinion.topicEconomicScore, userOpinion.topicAuthoritarianScore)}>
-              <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
-                <CardTitle>Your Opinion</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    opinionForm.setValue("content", userOpinion.content);
-                    opinionForm.setValue("debateStatus", (userOpinion.debateStatus || "open") as any);
-                    opinionForm.setValue("references", userOpinion.references || []);
-                    opinionForm.setValue("stance", (userOpinion.stance ?? undefined) as any);
-                    setShowOpinionForm(true);
+            <div className="flex justify-center py-2" data-testid="your-opinion-card">
+              <div className="w-full max-w-[400px] min-h-[260px]">
+                <OpinionDeckFront
+                  op={{
+                    ...userOpinion,
+                    author: (userOpinion as any).author ?? {
+                      firstName: user?.firstName,
+                      lastName: user?.lastName,
+                      handle: user?.handle,
+                      profileImageUrl: user?.profileImageUrl,
+                    },
                   }}
-                >
-                  Update
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <InteractiveSentenceText
-                  text={userOpinion.content}
-                  segmentMode="paragraph"
-                  interactionCount={userParagraphInteractionCount}
-                  selectedSentenceIndex={selectedSentenceIndex}
-                  onSelectSentence={(idx) => {
+                  paragraphsClickable
+                  onSelectParagraph={(idx) => {
                     setSelectedSentenceIndex(idx);
                     setSelectedCounterpointId(null);
                     setSheetIntent("counterpoints");
@@ -931,18 +926,43 @@ export default function Topic() {
                   onSelectBadge={(idx) => {
                     navigate(`/opinion/${userOpinion.id}/counterpoints?p=${idx}`);
                   }}
+                  footer={
+                    <div className="pt-3 mt-auto flex flex-col gap-2 flex-shrink-0">
+                      <p className="font-ui text-[0.65rem] uppercase tracking-[0.1em] text-muted-foreground text-center">
+                        Tap a paragraph for its counterpoints
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          opinionForm.setValue("content", userOpinion.content);
+                          opinionForm.setValue("debateStatus", (userOpinion.debateStatus || "open") as any);
+                          opinionForm.setValue("references", userOpinion.references || []);
+                          opinionForm.setValue("stance", (userOpinion.stance ?? undefined) as any);
+                          setShowOpinionForm(true);
+                        }}
+                        data-testid="button-update-opinion"
+                      >
+                        Update
+                      </Button>
+                    </div>
+                  }
                 />
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ) : (
-            <Card>
-              <CardContent className="py-10 text-center">
-                <Button variant="default" onClick={handleShareOpinionClick}>
+            <div className="flex justify-center py-2" data-testid="your-opinion-empty">
+              <div className="w-full max-w-[400px] rounded-xl border bg-card shadow-md deck-card-surface flex flex-col items-center justify-center px-6 py-10 text-center">
+                <p className="font-ui text-xs uppercase tracking-[0.14em] text-[hsl(var(--gold))]">Your take</p>
+                <div className="mt-3 h-px w-16 bg-[hsl(var(--gold)/0.45)]" />
+                <p className="mt-5 font-serif text-lg leading-relaxed">You haven&apos;t weighed in on this topic yet.</p>
+                <Button className="mt-6" variant="default" onClick={handleShareOpinionClick} data-testid="button-share-opinion">
                   <Plus className="w-4 h-4 mr-2" />
                   Share Your Opinion
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
         </TabsContent>
 
