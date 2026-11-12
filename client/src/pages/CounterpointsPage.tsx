@@ -9,6 +9,11 @@ import { UserHandle } from "@/components/UserHandle";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+import { useDebateContext } from "@/contexts/DebateContext";
+import { LoginPromptDialog } from "@/components/LoginPromptDialog";
+import type { Opponent } from "@/lib/opponentSides";
+import { getOpinionStance } from "@/lib/stance";
 import { splitIntoParagraphs } from "@/lib/textSegments";
 import CardDeck from "@/components/CardDeck";
 import { StanceChip, type Person } from "@/components/OpinionDeckCard";
@@ -85,6 +90,8 @@ export default function CounterpointsPage() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { openDebateWindow } = useDebateContext();
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [filter, setFilter] = useState<"all" | number>(Number.isInteger(focus) ? focus : "all");
   const [topIndex, setTopIndex] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
@@ -197,11 +204,78 @@ export default function CounterpointsPage() {
         variant: "destructive",
       }),
   });
+  const peopleFor = (item: CounterpointCardItem): Opponent[] => {
+    const out: Opponent[] = [];
+    const seen = new Set<string>();
+    const push = (p: Opponent) => {
+      if (!p.userId || seen.has(p.userId)) return;
+      seen.add(p.userId);
+      out.push(p);
+    };
+    if (item.authorUserId) {
+      push({
+        userId: item.authorUserId,
+        firstName: item.author?.firstName,
+        lastName: item.author?.lastName,
+        handle: item.author?.handle,
+        profileImageUrl: item.author?.profileImageUrl,
+        stance: item.authorStance,
+        relation: "author",
+      });
+    }
+    if (opinion?.userId) {
+      const origOp = topicOpinions.find((o) => o.userId === opinion.userId);
+      push({
+        userId: opinion.userId,
+        firstName: author?.firstName,
+        lastName: author?.lastName,
+        handle: author?.handle,
+        profileImageUrl: author?.profileImageUrl,
+        stance: getOpinionStance(origOp || opinion),
+        relation: "original",
+      });
+    }
+    for (const o of topicOpinions) {
+      const a = (o as any).author || {};
+      push({
+        userId: o.userId,
+        firstName: a.firstName,
+        lastName: a.lastName,
+        handle: a.handle,
+        profileImageUrl: a.profileImageUrl,
+        stance: getOpinionStance(o),
+        relation: o.userId === item.authorUserId ? "author" : o.userId === opinion?.userId ? "original" : "topic",
+      });
+    }
+    return out;
+  };
+
   const debate = useMutation({
-    mutationFn: async (cp: CounterpointCardItem) =>
-      (await apiRequest("POST", `/api/counterpoints/${cp.id}/start-debate`, { opponentUserId: cp.authorUserId || (cp.author as any)?.id })).json(),
-    onSuccess: (room: any) => room?.id && navigate(`/debate-room/${room.id}`),
-    onError: () => toast({ title: "Couldn't start the debate", variant: "destructive" }),
+    mutationFn: async ({ cpId, opponent }: { cpId: string; opponent: Opponent }) => {
+      const res = await apiRequest("POST", `/api/counterpoints/${cpId}/start-debate`, { opponentUserId: opponent.userId });
+      return { room: await res.json(), opponent };
+    },
+    onSuccess: ({ room, opponent }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/debates/grouped"] });
+      const opponentName = `${opponent.firstName || ""} ${opponent.lastName || ""}`.trim() || (opponent.handle ? `@${opponent.handle}` : "your opponent");
+      if (!room?.id) return;
+      const open = () =>
+        openDebateWindow({ debateRoomId: room.id, topicTitle: topic?.title || "Debate", opponentName, opponentId: opponent.userId });
+      open();
+      toast({
+        title: room.reused ? "Debate already open" : "Invite sent",
+        description: room.reused
+          ? `You already have an open debate with ${opponentName}.`
+          : `You challenged ${opponentName}. They'll get an invite — it's also in your debates footer.`,
+        action: <ToastAction altText="Open debate" onClick={open}>Open</ToastAction>,
+      });
+    },
+    onError: (e: any) =>
+      toast({
+        title: "Couldn't start the debate",
+        description: String(e?.message || "Failed to start debate").replace(/^\d+:\s*/, ""),
+        variant: "destructive",
+      }),
   });
 
   const openAdd = () => {
@@ -298,12 +372,17 @@ export default function CounterpointsPage() {
           renderBack={(item) => (
             <CounterpointDeckBack
               item={item}
-              isOpinionAuthor={isAuthor && item.authorUserId !== user?.id}
+              people={peopleFor(item)}
+              originalAuthorId={opinion.userId}
+              originalAuthorStance={getOpinionStance(opinion)}
+              meId={user?.id}
+              isAuthenticated={isAuthenticated}
               canLike={isAuthenticated}
               onLike={() => like.mutate({ cpId: item.id, like: !item.likedByMe })}
-              onStartDebate={() => debate.mutate(item)}
+              onChallenge={(opponent) => debate.mutate({ cpId: item.id, opponent })}
+              onNeedSignIn={() => setShowLoginPrompt(true)}
               likePending={like.isPending}
-              debatePending={debate.isPending}
+              challengePending={debate.isPending}
             />
           )}
           initialIndex={0}
@@ -383,6 +462,7 @@ export default function CounterpointsPage() {
           </div>
         </DialogContent>
       </Dialog>
+      <LoginPromptDialog open={showLoginPrompt} onOpenChange={setShowLoginPrompt} action="debate" />
     </div>
   );
 }

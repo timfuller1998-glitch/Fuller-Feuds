@@ -8,7 +8,8 @@ import { checkDebateStart, markInvitePending } from '../lib/debateLimits.js';
 import { CounterpointRepository } from '../repositories/counterpointRepository.js';
 import { getPresenceForUserIds } from '../websocket.js';
 import { db } from '../db.js';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import { opinions } from '../../shared/schema.js';
 
 const router = Router();
 const counterpointService = new CounterpointService();
@@ -43,9 +44,9 @@ router.get('/:id/likers', async (req, res) => {
 // Who the opinion author can debate over this counterpoint: the counterpoint's author first,
 // then users who liked it. Includes names/avatars, online status, and "Most Active" leaderboard
 // rank (same definition as /api/leaderboards). The requesting user is excluded.
-router.get('/:id/debate-candidates', isAuthenticated, async (req, res) => {
+router.get('/:id/debate-candidates', async (req, res) => {
   try {
-    const me = req.user!.id;
+    const me = (req.user as { id?: string } | undefined)?.id;
     const counterpoint = await counterpointService.getCounterpoint(req.params.id);
     if (!counterpoint) return res.status(404).json({ message: 'Counterpoint not found' });
     const likerIds = await counterpointService.listLikerIds(req.params.id);
@@ -115,9 +116,23 @@ router.post('/:id/start-debate', isAuthenticated, async (req, res) => {
       return res.status(404).json({ message: 'Opinion not found' });
     }
 
-    // Only the opinion author can initiate debates from counterpoints on their opinion
-    if (opinion.userId !== requestingUserId) {
-      return res.status(403).json({ message: 'Only the opinion author can start this debate' });
+    if (opponentUserId === requestingUserId) {
+      return res.status(400).json({ message: 'You cannot debate yourself' });
+    }
+
+    const likerIds = await counterpointService.listLikerIds(req.params.id);
+    const topicAuthors = await db
+      .select({ userId: opinions.userId })
+      .from(opinions)
+      .where(eq(opinions.topicId, opinion.topicId));
+    const allowed = new Set<string>([
+      counterpoint.authorUserId,
+      opinion.userId,
+      ...likerIds,
+      ...topicAuthors.map((row) => row.userId),
+    ].filter(Boolean));
+    if (!allowed.has(opponentUserId)) {
+      return res.status(400).json({ message: 'You can only challenge someone in this discussion.' });
     }
 
     const existing = await checkDebateStart(requestingUserId, opponentUserId, opinion.topicId);
@@ -145,6 +160,10 @@ router.post('/:id/start-debate', isAuthenticated, async (req, res) => {
     res.json(room);
   } catch (error: any) {
     if (error instanceof FlowError) return res.status(error.status).json({ message: error.message });
+    const msg = String(error?.message || '');
+    if (/cannot debate yourself|cannot debate your own|must have an opinion/i.test(msg)) {
+      return res.status(400).json({ message: msg });
+    }
     console.error('Error starting debate from counterpoint:', error);
     res.status(500).json({ message: error.message || 'Failed to start debate' });
   }
