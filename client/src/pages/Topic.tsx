@@ -115,6 +115,7 @@ export default function Topic() {
   const [selectedSentenceIndex, setSelectedSentenceIndex] = useState<number | null>(null);
   const [selectedOtherSentenceIndex, setSelectedOtherSentenceIndex] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetIntent, setSheetIntent] = useState<"references" | "counterpoints">("references");
   const [selectedCounterpointId, setSelectedCounterpointId] = useState<string | null>(null);
   const [counterpointDraftYours, setCounterpointDraftYours] = useState("");
   const [counterpointDraftOthers, setCounterpointDraftOthers] = useState("");
@@ -386,16 +387,34 @@ export default function Topic() {
       },
     })),
   });
-  const summaryCounterpointCount = useMemo(() => {
+  const summaryTotalsByOpinion = useMemo(() => {
     const totals = new Map<string, number>();
     summaryRefIds.forEach((opId, k) => {
       const rows = parseCounterpointCountRows(summaryRefCountQueries[k]?.data);
       totals.set(opId, rows.reduce((a, r) => a + r.count, 0));
     });
-    const counts = summarySentences.map((s) => (s.referencedOpinionIds || []).reduce((a, opId) => a + (totals.get(opId) ?? 0), 0));
-    return (i: number) => counts[i] ?? 0;
+    return totals;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [summarySentences, summaryRefIds, summaryRefCountQueries.map((q) => q.dataUpdatedAt).join(",")]);
+  }, [summaryRefIds, summaryRefCountQueries.map((q) => q.dataUpdatedAt).join(",")]);
+  const summaryCounterpointCount = useMemo(() => {
+    const counts = summarySentences.map((s) => (s.referencedOpinionIds || []).reduce((a, opId) => a + (summaryTotalsByOpinion.get(opId) ?? 0), 0));
+    return (i: number) => counts[i] ?? 0;
+  }, [summarySentences, summaryTotalsByOpinion]);
+
+  const openCounterpointsForSummarySentence = (idx: number) => {
+    const ids = summarySentences[idx]?.referencedOpinionIds || [];
+    const scored = ids.map((opId) => ({ opId, count: summaryTotalsByOpinion.get(opId) ?? 0 }));
+    const preferred = scored.filter((x) => x.count > 0);
+    const targets = preferred.length > 0 ? preferred : scored;
+    if (targets.length === 1) {
+      setSheetOpen(false);
+      navigate(`/opinion/${targets[0].opId}/counterpoints`);
+      return;
+    }
+    setSelectedSentenceIndex(idx);
+    setSheetIntent("counterpoints");
+    setSheetOpen(true);
+  };
 
   const stanceTally = useMemo(() => tallyStances(opinions || []), [opinions]);
   const headerDescription = useMemo(() => {
@@ -866,8 +885,10 @@ export default function Topic() {
                   selectedSentenceIndex={selectedSentenceIndex}
                   onSelectSentence={(idx) => {
                     setSelectedSentenceIndex(idx);
+                    setSheetIntent("references");
                     setSheetOpen(true);
                   }}
+                  onSelectBadge={(idx) => openCounterpointsForSummarySentence(idx)}
                 />
               ) : (
                 <p className="text-muted-foreground">No AI summary yet.</p>
@@ -904,7 +925,11 @@ export default function Topic() {
                   onSelectSentence={(idx) => {
                     setSelectedSentenceIndex(idx);
                     setSelectedCounterpointId(null);
+                    setSheetIntent("counterpoints");
                     setSheetOpen(true);
+                  }}
+                  onSelectBadge={(idx) => {
+                    navigate(`/opinion/${userOpinion.id}/counterpoints?p=${idx}`);
                   }}
                 />
               </CardContent>
@@ -941,8 +966,7 @@ export default function Topic() {
                   <OpinionDeckFront
                     op={op as any}
                     onSelectParagraph={(idx) => {
-                      setSelectedOtherSentenceIndex(idx);
-                      setSheetOpen(true);
+                      navigate(`/opinion/${op.id}/counterpoints?p=${idx}`);
                     }}
                   />
                 )}
@@ -976,8 +1000,7 @@ export default function Topic() {
                       setOtherOpinionFlagOpen(true);
                     }}
                     onSeeCounterpoints={(idx) => {
-                      setSelectedOtherSentenceIndex(idx);
-                      setSheetOpen(true);
+                      navigate(`/opinion/${op.id}/counterpoints?p=${idx}`);
                     }}
                   />
                 )}
@@ -995,10 +1018,10 @@ export default function Topic() {
 
       {/* Right-side sheet for paragraph / summary-segment interactions */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-lg">
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col overflow-y-auto overflow-x-hidden">
           <SheetHeader>
             <SheetTitle>
-              {activeTab === "ai" && "Referenced Opinions"}
+              {activeTab === "ai" && (sheetIntent === "counterpoints" ? "Counterpoints" : "Referenced Opinions")}
               {activeTab === "yours" && "Counterpoints"}
               {activeTab === "others" && "Counterpoints"}
             </SheetTitle>
@@ -1013,39 +1036,48 @@ export default function Topic() {
             )}
           </SheetHeader>
 
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 space-y-4 pb-8">
             {activeTab === "ai" && (
               <>
                 {referencedOpinionsForSelectedSummarySentence.length > 0 ? (
                   <ScrollArea className="h-[calc(100vh-140px)] pr-4">
                     <div className="space-y-3">
                       {referencedOpinionsForSelectedSummarySentence.map((op) => (
-                        <OpinionCard
-                          key={op.id}
-                          id={op.id}
-                          topicId={id!}
-                          userId={op.userId}
-                          userName={op.author ? `${op.author.firstName || ""} ${op.author.lastName || ""}`.trim() || "Anonymous" : "Anonymous"}
-                          userAvatar={op.author?.profileImageUrl || undefined}
-                          economicScore={op.author?.economicScore}
-                          authoritarianScore={op.author?.authoritarianScore}
-                          topicEconomicScore={op.topicEconomicScore}
-                          topicAuthoritarianScore={op.topicAuthoritarianScore}
-                          content={op.content}
-                          debateStatus={op.debateStatus}
-                          timestamp={"—"}
-                          likesCount={op.likesCount || 0}
-                          dislikesCount={op.dislikesCount || 0}
-                          references={op.references || []}
-                          fallacyCounts={op.fallacyCounts}
-                          isLiked={op.userVote?.voteType === "like"}
-                          isDisliked={op.userVote?.voteType === "dislike"}
-                        />
+                        <div key={op.id} className="space-y-1.5">
+                          <OpinionCard
+                            id={op.id}
+                            topicId={id!}
+                            userId={op.userId}
+                            userName={op.author ? `${op.author.firstName || ""} ${op.author.lastName || ""}`.trim() || "Anonymous" : "Anonymous"}
+                            userAvatar={op.author?.profileImageUrl || undefined}
+                            economicScore={op.author?.economicScore}
+                            authoritarianScore={op.author?.authoritarianScore}
+                            topicEconomicScore={op.topicEconomicScore}
+                            topicAuthoritarianScore={op.topicAuthoritarianScore}
+                            content={op.content}
+                            debateStatus={op.debateStatus}
+                            timestamp={"—"}
+                            likesCount={op.likesCount || 0}
+                            dislikesCount={op.dislikesCount || 0}
+                            references={op.references || []}
+                            fallacyCounts={op.fallacyCounts}
+                            isLiked={op.userVote?.voteType === "like"}
+                            isDisliked={op.userVote?.voteType === "dislike"}
+                          />
+                          <Link
+                            href={`/opinion/${op.id}/counterpoints`}
+                            className="inline-flex items-center font-ui text-xs uppercase tracking-[0.08em] text-primary hover:underline"
+                            data-testid={`link-summary-counterpoints-${op.id}`}
+                            onClick={() => setSheetOpen(false)}
+                          >
+                            See counterpoints{(summaryTotalsByOpinion.get(op.id) ?? 0) > 0 ? ` (${summaryTotalsByOpinion.get(op.id)})` : ""} →
+                          </Link>
+                        </div>
                       ))}
                     </div>
                   </ScrollArea>
                 ) : (
-                  <p className="text-muted-foreground">Select a paragraph to see referenced opinions.</p>
+                  <p className="text-muted-foreground">{sheetIntent === "counterpoints" ? "No counterpoints on the opinions this paragraph references." : "Select a paragraph to see referenced opinions."}</p>
                 )}
               </>
             )}
