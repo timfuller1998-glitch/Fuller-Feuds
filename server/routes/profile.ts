@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db.js';
 import { users, userFollows, userProfiles } from '../../shared/schema.js';
 import { isAuthenticated } from '../middleware/auth.js';
@@ -37,23 +37,38 @@ async function listFollowUsers(
   const rows =
     mode === 'followers'
       ? await db
-          .select({ u: users })
+          .select({ u: users, p: userProfiles })
           .from(userFollows)
           .innerJoin(users, eq(userFollows.followerId, users.id))
+          .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
           .where(eq(userFollows.followingId, targetUserId))
       : await db
-          .select({ u: users })
+          .select({ u: users, p: userProfiles })
           .from(userFollows)
           .innerJoin(users, eq(userFollows.followingId, users.id))
+          .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
           .where(eq(userFollows.followerId, targetUserId));
+
+  const ids = rows.map((row) => row.u.id).filter(Boolean);
+  const followingSet = new Set<string>();
+  if (requestingUserId && ids.length > 0) {
+    const rels = await db
+      .select({ id: userFollows.followingId })
+      .from(userFollows)
+      .where(and(eq(userFollows.followerId, requestingUserId), inArray(userFollows.followingId, ids)));
+    for (const rel of rels) followingSet.add(rel.id);
+  }
 
   return rows.map((row) => {
     const sanitized = sanitizeUserData(row.u, requestingUserId, requestingUserRole) as Record<string, unknown>;
+    const displayFirst = row.p?.displayFirstName?.trim();
     return {
       id: sanitized.id,
-      firstName: sanitized.firstName,
-      lastName: sanitized.lastName,
+      firstName: displayFirst || sanitized.firstName,
+      lastName: displayFirst ? (row.p?.displayLastName || '') : sanitized.lastName,
+      handle: sanitized.handle ?? row.u.handle ?? null,
       profileImageUrl: sanitized.profileImageUrl,
+      isFollowedByMe: requestingUserId ? followingSet.has(row.u.id) : false,
     };
   });
 }

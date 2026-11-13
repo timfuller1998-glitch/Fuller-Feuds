@@ -1,3 +1,10 @@
+## 2026-11-13 (15:50 CST) — Restyle the user profile in the Editorial theme
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `feat/profile-editorial-restyle`
+- **What:** The profile page (own and other users) now follows the MatDash Users Profile layout, restyled in the current Editorial theme — paper `#f7f2e9`, serif titles, small-caps labels, red `#8c2121` accents and gold on a CSS/SVG cover banner (no stock image, no upload required). Centered avatar overlapping the banner, @handle, badges on the avatar, three real stat counters (Opinions, Followers, Following), and existing actions (Follow / Unfollow, Edit profile / Settings, rankings). Icon tabs switch between Profile, Opinions, Topics, Followers, Following, and Badges. Followers/Following use a searchable person-card grid with Follow/Followed. Wins/win rate, social network buttons, and “Add to Story” were left out because the app has no such data or features. Typecheck 52.
+- **Typecheck:** 52.
+
 ## 2026-11-12 (06:30 CST) — Match the installed-app splash to the paper loading screen
 
 - **By:** Fuller Feuds Dev
