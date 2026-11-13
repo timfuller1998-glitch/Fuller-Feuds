@@ -709,7 +709,7 @@ export default function Profile() {
 
         <div className="border-t border-border bg-sidebar/80">
           <div
-            className="flex items-stretch overflow-x-auto hide-scrollbar"
+            className="flex items-stretch overflow-x-auto hide-scrollbar snap-x"
             role="tablist"
             aria-label="Profile sections"
           >
@@ -726,7 +726,7 @@ export default function Profile() {
                     setActiveTab(tab.id);
                     if (tab.id === "followers" || tab.id === "following") setPeopleSearch("");
                   }}
-                  className={`relative flex-1 min-w-[4.4rem] px-2 pt-3 pb-2.5 flex flex-col items-center gap-1 text-muted-foreground hover-elevate ${
+                  className={`relative flex-none min-w-[4.85rem] sm:flex-1 px-2 pt-3 pb-2.5 flex flex-col items-center gap-1 text-muted-foreground hover-elevate snap-start ${
                     active ? "text-foreground" : ""
                   }`}
                   data-testid={tab.testId}

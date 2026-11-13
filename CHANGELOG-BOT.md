@@ -1,3 +1,10 @@
+## 2026-11-13 (15:50 CST) — Let the profile tab bar scroll on a phone
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/profile-tab-bar-scroll`
+- **What:** On a 390px screen the last profile tabs were clipped mid-label (Following / Badges). Tabs now keep their full width and the bar scrolls horizontally instead of shrinking to fit.
+- **Typecheck:** 52.
+
 ## 2026-11-13 (15:50 CST) — Restyle the user profile in the Editorial theme
 
 - **By:** Fuller Feuds Dev
