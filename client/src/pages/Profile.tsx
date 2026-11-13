@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import CardDeck from "@/components/CardDeck";
 import TopicCard from "@/components/TopicCard";
+import SwipeableCardStack from "@/components/SwipeableCardStack";
 import LeaderboardsDialog, { useLeaderboards, bestRank } from "@/components/LeaderboardsDialog";
 import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
 import { useAuth } from "@/hooks/useAuth";
@@ -578,18 +579,7 @@ export default function Profile() {
   );
 
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-6 space-y-4 max-w-5xl">
-      <Card className="overflow-hidden">
-        <CardContent className="p-4 sm:px-5 sm:py-4">
-          <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Home / Profile
-          </p>
-          <h1 className="ff-wordmark font-display uppercase leading-none tracking-[0.02em] text-[1.85rem] sm:text-[2.15rem] mt-1" data-testid="text-profile-title">
-            Profile
-          </h1>
-        </CardContent>
-      </Card>
-
+    <div className="container mx-auto px-4 pt-3 pb-4 sm:pt-4 sm:pb-6 space-y-4 max-w-5xl">
       <Card className="overflow-hidden">
         <div className="relative h-32 sm:h-40 lg:h-44">
           <EditorialCover />
@@ -957,9 +947,13 @@ export default function Profile() {
             {topicsLoading ? (
               <div className="h-48 bg-muted animate-pulse rounded-lg" />
             ) : userTopics.length > 0 ? (
-              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
-                {userTopics.map((topic) => renderTopicCard(topic))}
-              </div>
+              <SwipeableCardStack
+                topics={userTopics.map((topic) => ({
+                  ...topic,
+                  opinionsCount: topic.opinionsCount ?? topic.opinionCount ?? 0,
+                }))}
+                testId="deck-profile-topics"
+              />
             ) : (
               <Card className="p-8 text-center">
                 <Lightbulb className="w-12 h-12 mx-auto mb-3 opacity-50" />

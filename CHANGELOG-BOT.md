@@ -1,3 +1,10 @@
+## 2026-11-13 (16:00 CST) — Drop the profile page title and stack topics in a card deck
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/profile-drop-title-topics-deck`
+- **What:** Removed the Home / Profile breadcrumb and Bold Arena "PROFILE" title strip (the site header stays). The Topics tab now uses the same SwipeableCardStack / TopicCard pile as the home page — default card sizing, tap to flip, swipe to the next card, vertical swipes still scroll the page — with the existing empty state if the user has no topics.
+- **Typecheck:** 52.
+
 ## 2026-11-13 (15:50 CST) — Let the profile tab bar scroll on a phone
 
 - **By:** Fuller Feuds Dev
