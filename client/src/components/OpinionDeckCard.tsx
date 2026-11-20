@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Flag, MessageSquareReply, RotateCcw, ThumbsDown, ThumbsUp, UserPlus } from "lucide-react";
+import { AiWriteFlagButton } from "@/components/AiWriteFlagButton";
 import { InteractiveSentenceText } from "@/components/InteractiveSentenceText";
 import { CardScrollBody } from "@/components/CardScrollBody";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
@@ -157,6 +158,7 @@ export function OpinionDeckBack({ op, onVote, onAdopt, onFlag, onSeeCounterpoint
             <Flag className="w-4 h-4 mr-1.5" /> Flag
           </Button>
         </div>
+        <AiWriteFlagButton opinionId={op.id} authorId={op.userId} />
         <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><RotateCcw className="w-3 h-3" /> Tap card to flip back</p>
       </div>
     </div>

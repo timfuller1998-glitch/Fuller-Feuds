@@ -1,3 +1,10 @@
+## 2026-11-19 (20:00 CST) — Let users flag opinions as likely AI-written
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `feat/ai-opinion-flags`
+- **What:** Added a "Flag as AI-written" button on the back of opinion cards (one flag per signed-in user per opinion, not on your own). Flags are stored in `opinion_ai_flags` (migration `0012_opinion_ai_flags.sql`). The admin Requests tab now lists flag counts. No automatic AI detector yet.
+- **Typecheck:** 52.
+
 ## 2026-11-19 (19:45 CST) — Fix AI summaries, category suggestions, and leftover opinion scores
 
 - **By:** Fuller Feuds Dev
