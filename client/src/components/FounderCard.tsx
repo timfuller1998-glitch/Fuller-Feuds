@@ -9,10 +9,12 @@ import { FOUNDER_INVITE_CODES } from "@shared/founders";
 
 type MyFounder = {
   founderNumber: number | null;
-  codes: { code: string; link: string; used: boolean; usedByHandle: string | null; revoked: boolean }[];
+  publicLaunch?: boolean;
+  passPremiumMonths?: number;
+  codes: { code: string; isPass?: boolean; link: string; used: boolean; usedByHandle: string | null; revoked: boolean }[];
 };
 
-/** Settings card for founding members: number, invite codes to share, Founders' Room link. */
+/** Settings card for founding members: number, launch passes to share, Founders' Room link. */
 export function FounderCard({ founderNumber, publicLaunch }: { founderNumber: number; publicLaunch: boolean }) {
   const { toast } = useToast();
   const [copied, setCopied] = useState<string | null>(null);
@@ -57,8 +59,14 @@ export function FounderCard({ founderNumber, publicLaunch }: { founderNumber: nu
         </ul>
         {codes.length > 0 ? (
           <div className="space-y-2">
-            <p className="text-sm font-medium">Your invite codes ({codes.filter((c) => !c.used && !c.revoked).length} of {codes.length} left)</p>
-            <p className="text-xs text-muted-foreground">Each works once. Give them to people you'd trust to argue in good faith.</p>
+            <p className="text-sm font-medium">Your launch passes ({codes.filter((c) => !c.used && !c.revoked).length} of {codes.length} left)</p>
+            <p className="text-xs text-muted-foreground" data-testid="text-pass-explainer">
+              Give these to people you'd trust to argue in good faith. Each pass works once, on or after our public launch:
+              whoever uses it joins with {data?.passPremiumMonths ?? 12} months of premium (no ads) free.{" "}
+              {publicLaunch
+                ? "We've launched, so your passes work now."
+                : "While we're invite-only, a pass can't open an account yet. Anyone who tries can leave their email to hear when it unlocks."}
+            </p>
             <div className="space-y-2">
               {codes.map((c) => (
                 <div key={c.code} className="flex items-center justify-between gap-2 border border-foreground/15 px-3 py-2" data-testid={`row-invite-${c.code}`}>
@@ -70,7 +78,7 @@ export function FounderCard({ founderNumber, publicLaunch }: { founderNumber: nu
                   {!c.used && !c.revoked ? (
                     <Button size="sm" variant="outline" onClick={() => copy(c.link, c.code)} data-testid={`button-copy-invite-${c.code}`}>
                       {copied === c.code ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
-                      {copied === c.code ? "Copied" : "Copy link"}
+                      {copied === c.code ? "Copied" : "Copy pass link"}
                     </Button>
                   ) : null}
                 </div>
@@ -79,7 +87,7 @@ export function FounderCard({ founderNumber, publicLaunch }: { founderNumber: nu
           </div>
         ) : data ? (
           <p className="text-xs text-muted-foreground">
-            Founders admitted through an application get {FOUNDER_INVITE_CODES} invite codes. Ask Timothy if you'd like some.
+            Founders admitted through an application get {FOUNDER_INVITE_CODES} launch passes. Ask Timothy if you'd like some.
           </p>
         ) : null}
       </CardContent>

@@ -8,7 +8,8 @@ import { UserRepository } from "./repositories/userRepository.js";
 import { checkHandle, isHandleConflict } from "./lib/handles.js";
 import { getSiteConfig } from "./lib/siteSettings.js";
 import { clientIp } from "./lib/clientIp.js";
-import { claimInviteCode, finalizeInvitedSignup, normalizeCode, releaseInviteCode, type InviteRow } from "./lib/invites.js";
+import { claimInviteCode, finalizeInvitedSignup, lookupInviteCode, normalizeCode, releaseInviteCode, type InviteRow } from "./lib/invites.js";
+import { PASS_LOCKED_MESSAGE } from "../shared/founders.js";
 
 // Sign-up rate limits (founding members, Nov 20 2026), in memory per IP: 20 attempts an hour (slows invite-code
 // guessing) and 5 new accounts an hour.
@@ -154,6 +155,14 @@ export async function setupAuth(app: Express) {
       if (site.foundingMode && !inviteCode) {
         return res.status(403).json({ message: "Fuller Feuds is invite-only right now. Apply at /apply for an invite code.", code: "INVITE_REQUIRED" });
       }
+      // A founder's launch pass only opens an account once the admin "public launch" switch is on.
+      const passLocked = () => res.status(403).json({
+        message: `${PASS_LOCKED_MESSAGE}. Leave your email and we'll tell you when it does.`, code: "PASS_LOCKED",
+      });
+      if (inviteCode && !site.publicLaunch) {
+        const pre = await lookupInviteCode(inviteCode);
+        if (pre?.kind === "founder" && !pre.used_at && !pre.revoked_at) return passLocked();
+      }
 
       // Check if user already exists
       const existingUser = await userRepository.findByEmail(email);
@@ -180,6 +189,10 @@ export async function setupAuth(app: Express) {
         if (!invite && site.foundingMode) {
           return res.status(403).json({ message: "That invite code isn't valid or has already been used.", code: "INVITE_INVALID" });
         }
+        if (invite?.kind === "founder" && !site.publicLaunch) {
+          await releaseInviteCode(invite.id).catch(() => {});
+          return passLocked();
+        }
       }
 
       // Create user
@@ -199,7 +212,7 @@ export async function setupAuth(app: Express) {
         throw createErr;
       }
       recordAccountCreated(ip);
-      let founder: { founderNumber: number | null; codes: string[] } = { founderNumber: null, codes: [] };
+      let founder: { founderNumber: number | null; codes: string[]; premiumUntil: string | null } = { founderNumber: null, codes: [], premiumUntil: null };
       if (invite) {
         try {
           founder = await finalizeInvitedSignup(user.id, invite, { foundingMode: site.foundingMode });
@@ -227,6 +240,7 @@ export async function setupAuth(app: Express) {
           },
           founderNumber: founder.founderNumber,
           inviteCodes: founder.codes,
+          premiumUntil: founder.premiumUntil,
         });
       });
     } catch (error: any) {

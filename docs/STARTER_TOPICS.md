@@ -1,8 +1,8 @@
-# Starter topics — DRAFT for Timothy's approval (not published)
+# Starter topics — PUBLISHED Nov 20 2026 (approved by Timothy)
 
 Drafted by Fuller Feuds Dev, Nov 20 2026. Twenty broad, evergreen topics for the founding members to open with.
-Titles are neutral questions; descriptions give both sides one line each. Nothing here is on the site yet.
-Once approved, each should go live with a real opening opinion from Timothy or a founder (not a bot).
+Titles are neutral questions; descriptions give both sides one line each. Published to production on Nov 20 2026
+as @timf with no opinions; the first opinions should come from Timothy or the founders (not a bot).
 
 Categories reuse the site's existing names where they fit (Politics, Technology, Science, Economics, Sports,
 Entertainment, Health, Society, Law, Climate, Education). "Ethics", "Philosophy" and "Religion" would be new

@@ -11,7 +11,7 @@ import { listPublicDebates } from '../lib/debateWatch.js';
 import { clientIp } from '../lib/clientIp.js';
 import {
   APPLICATION_STATUSES, FREQUENCY_OPTIONS, INTEREST_AREAS, POLITICS_OPTIONS, RELIGION_OPTIONS, STEELMAN_PROMPTS,
-  buildAcceptanceMessage, inviteLink, politicsBucket, religionBucket, type RubricScores,
+  PASS_LOCKED_MESSAGE, PASS_PREMIUM_MONTHS, buildAcceptanceMessage, inviteLink, politicsBucket, religionBucket, type RubricScores,
 } from '../../shared/founders.js';
 
 // Founding members (Fuller Feuds Dev, Nov 20 2026): site switches, /apply, admin review, invite codes,
@@ -38,6 +38,7 @@ function limiter(max: number, windowMs: number) {
 const allowApplication = limiter(3, 60 * 60 * 1000);
 const allowCodeCheck = limiter(30, 10 * 60 * 1000);
 const allowRoomPost = limiter(10, 10 * 60 * 1000);
+const allowWaitlist = limiter(5, 60 * 60 * 1000);
 
 async function audit(moderatorId: string, actionType: string, targetType: string, targetId: string, reason: string) {
   await db.execute(sql`
@@ -59,8 +60,37 @@ publicFoundersRouter.get('/site-config', async (_req, res) => {
 publicFoundersRouter.get('/invites/check', async (req, res) => {
   if (!allowCodeCheck(clientIp(req))) return res.status(429).json({ valid: false, message: 'Too many tries. Wait a few minutes.' });
   const row = await lookupInviteCode(normalizeCode(req.query.code));
-  const valid = !!row && !row.used_at && !row.revoked_at;
-  res.json({ valid, message: valid ? 'Invite code accepted' : row ? 'That code has already been used' : "That code isn't valid" });
+  const usable = !!row && !row.used_at && !row.revoked_at;
+  // A founder's launch pass only works once the site has publicly launched.
+  const isPass = row?.kind === 'founder';
+  const { publicLaunch } = await getSiteConfig();
+  if (usable && isPass && !publicLaunch) {
+    return res.json({ valid: false, locked: true, kind: 'pass', message: PASS_LOCKED_MESSAGE });
+  }
+  res.json({
+    valid: usable, locked: false, kind: isPass ? 'pass' : 'invite',
+    message: usable
+      ? (isPass ? `Launch pass accepted: ${PASS_PREMIUM_MONTHS} months of premium free` : 'Invite code accepted')
+      : row ? 'That code has already been used' : "That code isn't valid",
+  });
+});
+
+// POST /api/waitlist { email, inviteCode? } — pass holders (or anyone) leave an email to hear about public launch.
+const waitlistSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Enter a valid email').max(254),
+  inviteCode: z.string().max(40).optional().nullable(),
+});
+publicFoundersRouter.post('/waitlist', async (req, res) => {
+  const parsed = waitlistSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || 'Enter a valid email' });
+  if (!allowWaitlist(clientIp(req))) return res.status(429).json({ message: 'Too many tries. Please try again later.' });
+  const code = parsed.data.inviteCode ? await lookupInviteCode(normalizeCode(parsed.data.inviteCode)) : null;
+  const codeId = code && !code.used_at && !code.revoked_at ? code.id : null;
+  await db.execute(sql`
+    insert into launch_waitlist (email, invite_code_id, source)
+    values (${parsed.data.email}, ${codeId}, ${codeId ? 'launch_pass' : 'waitlist'})
+    on conflict (lower(email)) do update set invite_code_id = coalesce(launch_waitlist.invite_code_id, excluded.invite_code_id)`);
+  res.status(201).json({ ok: true, message: "You're on the list. We'll email you when your pass unlocks." });
 });
 
 const applicationSchema = z.object({
@@ -143,13 +173,16 @@ foundersRouter.use(isAuthenticated, (req, res, next) => {
 foundersRouter.get('/me', async (req, res) => {
   const u = req.user as any;
   const codes = rows(await db.execute(sql`
-    select c.code, c.used_at, c.revoked_at, u.handle as used_by_handle
+    select c.code, c.kind, c.used_at, c.revoked_at, u.handle as used_by_handle
     from invite_codes c left join users u on u.id = c.used_by_user_id
     where c.owner_user_id = ${u.id} order by c.created_at`));
+  const { publicLaunch } = await getSiteConfig();
   res.json({
     founderNumber: u.founderNumber ?? null,
+    publicLaunch,
+    passPremiumMonths: PASS_PREMIUM_MONTHS,
     codes: codes.map((c) => ({
-      code: c.code, link: inviteLink(siteOrigin(req), c.code),
+      code: c.code, isPass: c.kind === 'founder', link: inviteLink(siteOrigin(req), c.code),
       used: !!c.used_by_handle || !!c.used_at, usedByHandle: c.used_by_handle ?? null, revoked: !!c.revoked_at,
     })),
   });
@@ -379,6 +412,20 @@ adminFoundersRouter.post('/codes/:id/revoke', async (req, res) => {
   if (!r.length) return res.status(400).json({ message: 'Only unused codes can be revoked' });
   await audit(req.user!.id, 'revoke_invite_code', 'invite_code', req.params.id, 'Revoked invite code');
   res.json({ ok: true });
+});
+
+// Launch waitlist (pass holders who tried before public launch). No email provider: Timothy contacts them by hand.
+adminFoundersRouter.get('/waitlist', async (_req, res) => {
+  const list = rows(await db.execute(sql`
+    select w.id, w.email, w.source, w.created_at, c.code, o.handle as pass_owner_handle, o.founder_number as pass_owner_founder_number
+    from launch_waitlist w
+    left join invite_codes c on c.id = w.invite_code_id
+    left join users o on o.id = c.owner_user_id
+    order by w.created_at desc limit 1000`));
+  res.json(list.map((w) => ({
+    id: w.id, email: w.email, source: w.source, createdAt: w.created_at, code: w.code ?? null,
+    passOwnerHandle: w.pass_owner_handle ?? null, passOwnerFounderNumber: w.pass_owner_founder_number ?? null,
+  })));
 });
 
 // Showcase: feature a public debate on /live.
