@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from "react";
 import { motion, animate, useMotionValue, useTransform, useReducedMotion, PanInfo, type MotionValue } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CARD_GESTURE_LOCK_PX, cardGestureJustHappened, markCardGesture } from "@/lib/cardGesture";
+import { useAdsEnabled } from "@/hooks/useAdsEnabled";
+import { AdCardFace, AdCardBack, AdCardSelfFlip } from "@/components/ads/AdCard";
 
 /**
  * Generic physical card deck: overlapping cards, tap-to-flip, and a shuffle where the top
@@ -46,6 +48,8 @@ export interface CardDeckProps<T> {
   initialIndex?: number;
   /** Pixels reserved for page chrome above/below the deck (default 290). */
   chromeReserve?: number;
+  /** Set false to keep ad cards out of this deck (default true; ad-free users never get them). */
+  ads?: boolean;
 }
 
 /** Built-in 3D flip used when the deck owns the flip (renderBack provided). */
@@ -449,11 +453,19 @@ function DeckBack({ depth, width, narrow, pull, lift, settleToken, reduceMotion 
   );
 }
 
-export default function CardDeck<T>({
+/** Internal: lets the ad wrapper keep ad cards out of the position counter. */
+interface CoreCounterProps {
+  /** Position among real cards for deck index i, or null for an ad card. */
+  realPosition?: (index: number) => number | null;
+  /** Number of real (non-ad) cards. */
+  realTotal?: number;
+}
+
+function CardDeckCore<T>({
   items, getKey, renderFront, renderBack, onEmpty, maxWidth = 400, renderBadge, testId,
   emptyLabel = "No more topics", ariaLabel = "Topic deck", onIndexChange, initialIndex = 0,
-  chromeReserve = 290,
-}: CardDeckProps<T>) {
+  chromeReserve = 290, realPosition, realTotal,
+}: CardDeckProps<T> & CoreCounterProps) {
   const topics = items;
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
@@ -600,6 +612,9 @@ export default function CardDeck<T>({
   };
 
   const backs = BACK_LAYERS.filter((d) => d < n);
+  const topPos = realPosition ? realPosition(wrap(currentIndex, n)) : wrap(currentIndex, n);
+  const shownTotal = realTotal ?? n;
+  const positionLabel = topPos === null ? "Sponsored" : `${topPos + 1} / ${shownTotal}`;
   type Entry = { card: T; role: Role; key: string };
   const entries: Entry[] = [];
   if (outgoing) entries.push({ card: outgoing.card, role: "out", key: `card-${getKey(outgoing.card)}` });
@@ -620,7 +635,7 @@ export default function CardDeck<T>({
       onWheel={handleWheel}
       role="region"
       aria-roledescription="card deck"
-      aria-label={`${ariaLabel}, card ${wrap(currentIndex, n) + 1} of ${n}`}
+      aria-label={topPos === null ? `${ariaLabel}, advertisement` : `${ariaLabel}, card ${topPos + 1} of ${shownTotal}`}
       data-testid={testId ?? "card-deck"}
     >
       <div className="relative" style={{ width: cardWidth, height: cardHeight, perspective: 1200 }}>
@@ -681,7 +696,7 @@ export default function CardDeck<T>({
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <span className="text-sm text-muted-foreground tabular-nums min-w-[3.5rem] text-center" data-testid="text-deck-position">
-            {wrap(currentIndex, n) + 1} / {n}
+            {positionLabel}
           </span>
           <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(1)} aria-label="Next card" title="Next card" data-testid="button-deck-next">
             <ChevronRight className="w-4 h-4" />
@@ -689,5 +704,49 @@ export default function CardDeck<T>({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Ad cards (Fuller Feuds Dev, Nov 20 2026): one sponsored card after every AD_EVERY real cards, only
+ * in decks with at least AD_EVERY cards, never for ad-free users. Ad cards don't count in the
+ * position counter, onIndexChange or initialIndex; callers only ever see their own items.
+ */
+export const AD_EVERY = 5;
+type DeckEntry<T> = { kind: "item"; item: T; i: number } | { kind: "ad"; n: number };
+
+export default function CardDeck<T>(props: CardDeckProps<T>) {
+  const { items, getKey, renderFront, renderBack, renderBadge, onIndexChange, initialIndex = 0, ads = true } = props;
+  const adsEnabled = useAdsEnabled() && ads;
+
+  const mixed = useMemo<DeckEntry<T>[]>(() => {
+    const out: DeckEntry<T>[] = [];
+    items.forEach((item, i) => {
+      out.push({ kind: "item", item, i });
+      if (adsEnabled && items.length >= AD_EVERY && (i + 1) % AD_EVERY === 0) out.push({ kind: "ad", n: (i + 1) / AD_EVERY });
+    });
+    return out;
+  }, [items, adsEnabled]);
+
+  if (!adsEnabled || mixed.length === items.length) return <CardDeckCore<T> {...props} />;
+
+  const mixedInitial = Math.max(0, mixed.findIndex((e) => e.kind === "item" && e.i === initialIndex));
+  return (
+    <CardDeckCore<DeckEntry<T>>
+      {...(props as unknown as CardDeckProps<DeckEntry<T>>)}
+      items={mixed}
+      getKey={(e) => (e.kind === "ad" ? `__ad-${e.n}` : getKey(e.item))}
+      renderFront={(e, ctx) =>
+        e.kind === "ad"
+          ? renderBack ? <AdCardFace slot={e.n} isTop={ctx.isTop} /> : <AdCardSelfFlip slot={e.n} ctx={ctx} />
+          : renderFront(e.item, { ...ctx, index: e.i })
+      }
+      renderBack={renderBack ? (e, ctx) => (e.kind === "ad" ? <AdCardBack /> : renderBack(e.item, { ...ctx, index: e.i })) : undefined}
+      renderBadge={renderBadge ? (e) => (e.kind === "ad" ? null : renderBadge(e.item, e.i)) : undefined}
+      onIndexChange={onIndexChange ? (_idx, e) => { if (e.kind === "item") onIndexChange(e.i, e.item); } : undefined}
+      initialIndex={mixedInitial}
+      realPosition={(idx) => { const e = mixed[idx]; return e && e.kind === "item" ? e.i : null; }}
+      realTotal={items.length}
+    />
   );
 }

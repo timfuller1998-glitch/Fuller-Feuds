@@ -331,6 +331,11 @@ export default function Home() {
             <p>Break echo chamber, one fair fight at a time.</p>
           </div>
         </div>
+        <p className="mt-8 font-ui text-xs text-muted-foreground" data-testid="home-legal-links">
+          <Link href="/privacy" className="hover:text-foreground hover:underline" data-testid="link-home-privacy">Privacy</Link>
+          <span aria-hidden="true"> · </span>
+          <Link href="/terms" className="hover:text-foreground hover:underline" data-testid="link-home-terms">Terms</Link>
+        </p>
       </section>
     </div>
   );

@@ -19,6 +19,7 @@ import { HandleField, type HandleStatus } from "@/components/HandleField";
 import { useToast } from "@/hooks/use-toast";
 import { openTutorial } from "@/lib/tutorial";
 import { openFeedback } from "@/lib/feedback";
+import { Link } from "wouter";
 
 const profileFormSchema = z.object({
   displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
@@ -496,7 +497,12 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground pt-2" data-testid="text-app-version">
+      <p className="text-xs text-muted-foreground pt-2" data-testid="settings-legal-links">
+        <Link href="/privacy" className="underline underline-offset-2" data-testid="link-settings-privacy">Privacy Policy</Link>
+        {" · "}
+        <Link href="/terms" className="underline underline-offset-2" data-testid="link-settings-terms">Terms of Use</Link>
+      </p>
+      <p className="text-xs text-muted-foreground" data-testid="text-app-version">
         {buildInfo?.shortSha || buildInfo?.sha
           ? `App version ${buildInfo.shortSha || buildInfo.sha?.slice(0, 7)}${buildInfo.builtAt ? ` · ${new Date(buildInfo.builtAt).toLocaleString()}` : ""}`
           : "App version unavailable"}

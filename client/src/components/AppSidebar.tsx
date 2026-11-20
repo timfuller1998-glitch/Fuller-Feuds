@@ -271,6 +271,13 @@ export default function AppSidebar({
                   <span>Report a bug / idea</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <div className="flex items-center gap-2 px-2 py-1 font-ui text-xs text-muted-foreground" data-testid="nav-legal-links">
+                  <Link href="/privacy" onClick={handleLinkClick} className="hover:text-foreground hover:underline" data-testid="link-nav-privacy">Privacy</Link>
+                  <span aria-hidden="true">·</span>
+                  <Link href="/terms" onClick={handleLinkClick} className="hover:text-foreground hover:underline" data-testid="link-nav-terms">Terms</Link>
+                </div>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

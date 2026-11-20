@@ -906,6 +906,7 @@ export default function Topic() {
                 emptyLabel="No summary yet"
                 ariaLabel="AI summary paragraphs"
                 testId="summary-deck"
+                ads={false}
               />
             </div>
           ) : (
