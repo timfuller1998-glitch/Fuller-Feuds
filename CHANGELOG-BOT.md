@@ -1,3 +1,10 @@
+## 2026-11-19 (19:30 CST) — Keep the tuck-under visible after the first forward swipe
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/card-tuck-animation`
+- **What:** After the first forward swipe, the departing card dropped behind the blank middle backs, so you could not see it tucking under the pile. It now returns under the face cards but above those backs, then settles behind the deck. Leftover nudge and lift motion values are cleared when the swipe animation finishes. Back-swipe behavior is unchanged: the top card stays put while the bottom card is pulled out and laid on top.
+- **Typecheck:** 52.
+
 ## 2026-11-19 (19:20 CST) — Remove duplicate category titles on the home page
 
 - **By:** Fuller Feuds Dev
