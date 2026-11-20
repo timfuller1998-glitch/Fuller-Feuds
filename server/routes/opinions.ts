@@ -1,5 +1,5 @@
 import { notifyNewDebateCreated } from '../websocket.js';
-import { notifyDebateInvite, displayNameOf, FlowError } from '../lib/debateFlow.js';
+import { notifyDebateInvite, displayNameOf, FlowError, postDebateMessage } from '../lib/debateFlow.js';
 import { checkDebateStart, markInvitePending } from '../lib/debateLimits.js';
 import { db } from '../db.js';
 import { opinions as opinionsTable } from '../../shared/schema.js';
@@ -298,9 +298,19 @@ router.post('/:opinionId/start-debate', isAuthenticated, async (req, res) => {
       const existing = await checkDebateStart(requestingUserId, op.userId, op.topicId);
       if (existing) return res.json({ ...existing, reused: true });
     }
-    // Note: createDebateRoom doesn't have security context parameters yet, but we still handle errors
-    const debateRoom = await debateService.createDebateRoom(req.params.opinionId, requestingUserId);
-    // Opinion author (participant1) is invited and goes first; the room is a pending invite until they accept or reply.
+    // Challenge button (Nov 20 2026): no opinion needed. Optional stance (if you have no opinion here) and an
+    // optional opening argument; with an opening, the challenger goes first and the author replies.
+    const stance = ['for', 'against', 'neutral'].includes(req.body?.stance) ? req.body.stance : null;
+    const opening = typeof req.body?.opening === 'string' ? req.body.opening.trim().slice(0, 4000) : '';
+    const debateRoom = await debateService.createDebateRoom(req.params.opinionId, requestingUserId, { stance, challengerFirst: !!opening });
+    if (opening) {
+      try {
+        await postDebateMessage(debateRoom.id, requestingUserId, opening, req.userRole, req, { silent: true }); // the invite notification covers it
+      } catch (e) {
+        console.error('Could not post opening argument:', e);
+      }
+    }
+    // Opinion author (participant1) is invited; the room is a pending invite until they accept or reply. Never expires.
     await markInvitePending(debateRoom.id, requestingUserId, debateRoom.participant1Id);
     notifyNewDebateCreated(debateRoom.id, await displayNameOf(requestingUserId), debateRoom.participant1Id);
     await notifyDebateInvite(debateRoom.id, requestingUserId, debateRoom.participant1Id, debateRoom.topicId);

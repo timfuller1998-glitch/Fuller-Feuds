@@ -1,3 +1,14 @@
+## 2026-11-20 (09:45 CST) — Debates overhaul: Challenge button, invites that never expire, live viewing
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `feat/debates-overhaul`
+- **Starting debates:** Opinion cards (Topic and Profile decks) have a **Challenge to a debate** button on the card back. It's an explicit button, so swipes and taps on the card behave as before. The dialog picks your side and takes an optional opening argument; with an opening, the challenger goes first. You no longer need your own opinion on the topic (from the card or the counterpoint opponent picker): your stance comes from your opinion if you have one, otherwise from the side you pick. Stances are saved on the room (`participant1_stance` / `participant2_stance`, migration `0014`, additive) and shown in the room and on the Live page.
+- **Invites:** Invites never expire. A pending invite stays open until it is accepted, declined, or cancelled, and the inviter's "Withdraw" is now **Cancel invite**. The hourly start limit (10/hour) is counted from `debate_rooms` in the database, so it survives deploys.
+- **Live viewing:** Anyone, signed in or not, can watch a debate once the invite is accepted, unless a debater hides it ("Hide from spectators", which now works). Spectators get a read-only room that updates live over `/ws` (`watch_debate`): new messages, whose turn it is, a typing bubble, an "N watching" count, and the final ratings once both have rated. Pending, declined, and cancelled invites stay private. New `GET /api/debates/live` and `GET /api/debates/finished` power a rebuilt **Live Debates** page (`/live`) with Watch and Read links. `/debate-room/:id` is now a public route.
+- **Room cleanup:** Removed the dead Switch-opponent dialog and the unused second socket (`useDebateRoom`). The fallacy flag now posts to `/api/debates/messages/:id/flag` and validates the type. Unknown flag types no longer crash the room. The chat area scrolls inside its card. The stale "Open the bell to reply" toast now points to the Debates bar. Deleted dead panels and pages: AllActiveDebatesPanel, ArchivedDebatesPanel, MessengerChat, LiveDebateRoom, DebateRoom, MyDebates, MyActiveDebates, DebateOnboardingModal. Footer dots, typing, and Archive are unchanged.
+- **QA:** Local end-to-end with Alice, Bob, Carol, and an anonymous viewer: 40/40 checks passed. Screenshots are in `/workspace/ff-videos/nov20/debates/`.
+- **Typecheck:** 50 (ceiling 52).
+
 ## 2026-11-20 (06:45 CST) — Fix the stuck middle card on later forward swipes
 
 - **By:** Fuller Feuds Dev

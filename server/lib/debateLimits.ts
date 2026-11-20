@@ -7,15 +7,24 @@ import { FlowError } from './debateFlow.js';
  * Debate overload guards (Nov 2026). Applied whenever someone starts a debate with someone else.
  * - At most MAX_PENDING_SENT invites waiting for an answer per sender.
  * - Nobody can be pulled into more than MAX_ACTIVE open debates (pending invites + active debates).
- * - At most MAX_STARTS_PER_HOUR new debates started per user per hour.
+ * - At most MAX_STARTS_PER_HOUR new debates started per user per hour (counted from debate_rooms in the DB,
+ *   so the limit survives deploys and restarts; Nov 20 2026).
+ * - Invites never expire: a pending invite stays open until it is accepted, declined or withdrawn.
  * - Starting the same debate again (same two people, same topic, still open) returns the existing room.
  */
 export const MAX_PENDING_SENT = 5;
 export const MAX_ACTIVE = 10;
 export const MAX_STARTS_PER_HOUR = 10;
 
-const starts = new Map<string, number[]>();
-const HOUR = 60 * 60 * 1000;
+/** Debates this person started (sent an invite for) in the last hour. */
+export async function startsInLastHour(userId: string): Promise<number> {
+  const r: any = await db.execute(sql`
+    SELECT count(*)::int AS n FROM debate_rooms
+    WHERE invitee_id IS NOT NULL AND invitee_id <> ${userId}
+      AND (participant1_id = ${userId} OR participant2_id = ${userId})
+      AND started_at > now() - interval '1 hour'`);
+  return Number((r.rows ?? r)[0]?.n || 0);
+}
 
 async function openLoad(userId: string): Promise<number> {
   const r: any = await db.execute(sql`
@@ -38,9 +47,7 @@ export async function checkDebateStart(inviterId: string, inviteeId: string, top
   )).limit(1);
   if (existing) return existing;
 
-  const now = Date.now();
-  const recent = (starts.get(inviterId) || []).filter((t) => now - t < HOUR);
-  if (recent.length >= MAX_STARTS_PER_HOUR) {
+  if (await startsInLastHour(inviterId) >= MAX_STARTS_PER_HOUR) {
     throw new FlowError(429, `You've started ${MAX_STARTS_PER_HOUR} debates in the last hour. Take a breather and try again later.`);
   }
 
@@ -60,10 +67,7 @@ export async function checkDebateStart(inviterId: string, inviteeId: string, top
   return null;
 }
 
-/** Call after a new room is created. Marks it as a pending invite and counts it toward the hourly limit. */
-export async function markInvitePending(roomId: string, inviterId: string, inviteeId: string) {
-  const now = Date.now();
-  starts.set(inviterId, [...(starts.get(inviterId) || []).filter((t) => now - t < HOUR), now]);
-  if (starts.size > 10000) starts.clear();
+/** Call after a new room is created. Marks it as a pending invite (which also counts it toward the hourly limit). */
+export async function markInvitePending(roomId: string, _inviterId: string, inviteeId: string) {
   await db.update(debateRooms).set({ inviteStatus: 'pending', inviteeId }).where(eq(debateRooms.id, roomId));
 }

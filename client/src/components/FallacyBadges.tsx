@@ -26,7 +26,8 @@ export default function FallacyBadges({ fallacyCounts, className = "" }: Fallacy
       <div className={`flex flex-wrap gap-1.5 ${className}`}>
         {sortedFallacies.map(([fallacyType, count]) => {
           const fallacy = getFallacy(fallacyType as FallacyType);
-          
+          if (!fallacy) return null; // unknown/legacy flag type: skip instead of crashing the room
+
           return (
             <Tooltip key={fallacyType}>
               <TooltipTrigger asChild>
