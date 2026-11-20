@@ -1,3 +1,10 @@
+## 2026-11-19 (19:22 CST) — Don't replace real AI summaries when OpenAI is out of credits
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/keep-summary-on-ai-failure`
+- **What:** If summary generation falls back (OpenAI unconfigured, out of credits, or a request error), the service now keeps an existing real summary and only attaches sentence citations to that text. It no longer overwrites a good stored summary with the vote-count fallback. This also protects the 2:00 AM UTC daily refresh. The earlier one-time backfill already overwrote the 10 existing summaries because the OpenAI account had no credits; those need a credit top-up and a regenerate to restore quality.
+- **Typecheck:** 52.
+
 ## 2026-11-19 (20:20 CST) — Start a debate from a YouTube, X, or article link
 
 - **By:** Fuller Feuds Dev
