@@ -3,6 +3,7 @@ import { TopicService } from '../services/topicService.js';
 import { OpinionService } from '../services/opinionService.js';
 import { InteractionRepository } from '../repositories/interactionRepository.js';
 import { CumulativeOpinionService } from '../services/cumulativeOpinionService.js';
+import { AIService } from '../aiService.js';
 import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertTopicSchema, insertOpinionSchema } from '../../shared/schema.js';
 import { z } from 'zod';
@@ -253,9 +254,8 @@ router.post('/generate-categories', isAuthenticated, async (req, res) => {
       return res.status(400).json({ error: 'Title is required' });
     }
 
-    // This would typically be handled by TopicService
-    // For now, return placeholder
-    res.json({ categories: ['Politics', 'Society', 'General'] });
+    const categories = await AIService.generateCategories(title.trim());
+    res.json({ categories });
   } catch (error) {
     console.error('Error generating categories:', error);
     res.status(500).json({ error: 'Failed to generate categories' });

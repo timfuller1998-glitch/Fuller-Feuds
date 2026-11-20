@@ -1,3 +1,10 @@
+## 2026-11-19 (19:45 CST) — Fix AI summaries, category suggestions, and leftover opinion scores
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/ai-summary-sentences`
+- **What:** AI summaries now store `summary_sentences` with per-paragraph links to the opinions each card draws on, so the back of a summary card shows its own opinions instead of the same top three on every card. The daily refresh actually regenerates instead of skipping. After deploy, existing summaries missing those citations are regenerated once, and the 36 older opinions that had political scores but no taste/passion scores are filled in with the local lexicon scorer. "Suggest categories" on create-topic now calls `AIService.generateCategories` instead of always returning Politics / Society / General.
+- **Typecheck:** 52.
+
 ## 2026-11-19 (19:30 CST) — Keep the tuck-under visible after the first forward swipe
 
 - **By:** Fuller Feuds Dev
