@@ -124,7 +124,8 @@ export class UserRepository {
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, email))
+      // Case-insensitive (Nov 20 2026): "Tim@x.com" and "tim@x.com" are the same person at sign-in and sign-up.
+      .where(sql`lower(${users.email}) = lower(${String(email ?? '').trim()})`)
       .limit(1);
     return user;
   }

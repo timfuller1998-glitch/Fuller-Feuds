@@ -1,7 +1,7 @@
 import { randomInt } from 'crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '../db.js';
-import { FOUNDER_CAP, FOUNDER_INVITE_CODES, FOUNDING_BADGE_ID } from '../../shared/founders.js';
+import { FOUNDER_CAP, FOUNDER_INVITE_CODES, FOUNDING_BADGE_ID, PASS_PREMIUM_MONTHS, PASS_PREMIUM_TIER } from '../../shared/founders.js';
 
 // Single-use invite codes and founder perks (Fuller Feuds Dev, Nov 20 2026).
 
@@ -68,7 +68,8 @@ export async function lookupInviteCode(code: string): Promise<InviteRow | null> 
 }
 
 /**
- * Links a new account to the code it used and, while founding mode is on, makes it a numbered founder:
+ * Links a new account to the code it used. A founder's launch pass gives 1 year of premium (no founder number).
+ * An admin/acceptance code, while founding mode is on, makes the account a numbered founder:
  * Founding Member badge, lifetime ad-free stored (active only after public launch), and FOUNDER_INVITE_CODES
  * codes of its own when it was admitted by an admin (application acceptance or an admin-issued code).
  */
@@ -81,7 +82,19 @@ export async function finalizeInvitedSignup(userId: string, invite: InviteRow, o
     update users set invited_by_user_id = ${invitedBy}, invite_code_id = ${invite.id}, updated_at = now(),
       signup_ref = coalesce(signup_ref, (select ref_source from founder_applications where id = ${invite.application_id}))
     where id = ${userId}`);
-  if (!opts.foundingMode) return { founderNumber: null as number | null, codes: [] as string[] };
+  // Launch passes (a founder's codes): never a numbered founder and no codes of their own; they get
+  // PASS_PREMIUM_MONTHS of premium (ad-free on). The sign-up route only lets passes through after public launch.
+  if (invite.kind === 'founder') {
+    const r = await db.execute(sql`
+      update users set subscription_tier = ${PASS_PREMIUM_TIER},
+        subscription_expires_at = now() + make_interval(months => ${PASS_PREMIUM_MONTHS}::int),
+        ad_free = true, updated_at = now()
+      where id = ${userId}
+      returning subscription_expires_at`);
+    const until = rows(r)[0]?.subscription_expires_at ?? null;
+    return { founderNumber: null as number | null, codes: [] as string[], premiumUntil: until ? new Date(until).toISOString() : null };
+  }
+  if (!opts.foundingMode) return { founderNumber: null as number | null, codes: [] as string[], premiumUntil: null as string | null };
 
   let founderNumber: number | null = null;
   for (let attempt = 0; attempt < 5 && founderNumber === null; attempt++) {
@@ -100,7 +113,7 @@ export async function finalizeInvitedSignup(userId: string, invite: InviteRow, o
       if (String(e?.code) !== '23505') throw e; // two sign-ups raced for the same number; retry
     }
   }
-  if (founderNumber === null) return { founderNumber: null, codes: [] };
+  if (founderNumber === null) return { founderNumber: null, codes: [], premiumUntil: null };
 
   await db.execute(sql`
     insert into user_badges (user_id, badge_id) values (${userId}, ${FOUNDING_BADGE_ID}) on conflict do nothing`);
@@ -112,5 +125,5 @@ export async function finalizeInvitedSignup(userId: string, invite: InviteRow, o
       codes.push(c.code);
     }
   }
-  return { founderNumber, codes };
+  return { founderNumber, codes, premiumUntil: null as string | null };
 }

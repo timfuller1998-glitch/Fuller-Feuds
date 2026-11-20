@@ -27,8 +27,48 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
   const [handleStatus, setHandleStatus] = useState<HandleStatus>("idle");
   const [inviteCode, setInviteCode] = useState("");
   const [is18Plus, setIs18Plus] = useState(false);
-  const { foundingMode } = useSiteConfig();
+  const { foundingMode, publicLaunch } = useSiteConfig();
   const queryClient = useQueryClient();
+  // Launch passes (a founder's codes) only work after public launch; before that, offer the waitlist.
+  const [passLocked, setPassLocked] = useState(false);
+  const [passNote, setPassNote] = useState<string | null>(null);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistDone, setWaitlistDone] = useState(false);
+  const [waitlistBusy, setWaitlistBusy] = useState(false);
+  useEffect(() => {
+    const code = inviteCode.trim();
+    setPassLocked(false);
+    setPassNote(null);
+    if (!isRegister || code.length < 12) return;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/invites/check?code=${encodeURIComponent(code)}`, { credentials: "include" });
+        if (!res.ok) return;
+        const r = await res.json();
+        if (r.locked) setPassLocked(true);
+        else if (r.kind === "pass" && r.valid) setPassNote(r.message);
+      } catch { /* the server checks again on submit */ }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [inviteCode, isRegister]);
+  const joinWaitlist = async () => {
+    setWaitlistBusy(true);
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: waitlistEmail || email, inviteCode: inviteCode.trim() }),
+      });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(r.message || "Couldn't save your email");
+      setWaitlistDone(true);
+    } catch (e: any) {
+      toast({ title: "Waitlist", description: e.message, variant: "destructive" });
+    } finally {
+      setWaitlistBusy(false);
+    }
+  };
 
   // An invite link (/?invite=FF-XXXX-XXXX) opens straight into Create Account with the code filled in.
   useEffect(() => {
@@ -88,6 +128,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
 
       if (!res.ok) {
         const error = await res.json();
+        if (error.code === "PASS_LOCKED") setPassLocked(true);
         throw new Error(error.message || "Registration failed");
       }
 
@@ -101,8 +142,10 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
       toast({
         title: data?.founderNumber ? `Welcome, Founding Member #${data.founderNumber}!` : "Account created!",
         description: data?.founderNumber
-          ? "Your badge and invite codes are in Settings."
-          : "Welcome to Fuller Feuds.",
+          ? "Your badge and launch passes are in Settings."
+          : data?.premiumUntil
+            ? `Your launch pass gave you premium (no ads) until ${new Date(data.premiumUntil).toLocaleDateString()}.`
+            : "Welcome to Fuller Feuds.",
       });
       onOpenChange(false);
       // Reset form
@@ -131,6 +174,10 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
       }
       if (foundingMode && !inviteCode.trim()) {
         toast({ title: "Invite code needed", description: "Fuller Feuds is invite-only for now. Apply for a founding spot at /apply.", variant: "destructive" });
+        return;
+      }
+      if (passLocked) {
+        toast({ title: "This pass unlocks at public launch", description: "Leave your email below and we'll tell you when it does." });
         return;
       }
       if (!is18Plus) {
@@ -165,9 +212,9 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          {isRegister && foundingMode && (
+          {isRegister && (foundingMode || publicLaunch) && (
             <div className="space-y-2 border border-[hsl(var(--gold))]/60 bg-[hsl(var(--gold))]/5 p-3" data-testid="section-invite-code">
-              <Label htmlFor="inviteCode">Invite code</Label>
+              <Label htmlFor="inviteCode">{foundingMode ? "Invite code" : "Launch pass (optional)"}</Label>
               <Input
                 id="inviteCode"
                 type="text"
@@ -175,17 +222,49 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                 autoComplete="off"
-                required
+                required={foundingMode}
                 disabled={isLoading}
                 className="font-mono tracking-wider"
                 data-testid="input-invite-code"
               />
+              {passLocked ? (
+                <div className="space-y-2 border border-foreground/15 bg-background p-3" data-testid="section-pass-locked">
+                  <p className="text-sm font-medium">This pass unlocks at public launch</p>
+                  <p className="text-xs text-muted-foreground">
+                    A founding member gave you a launch pass. It opens your account the day Fuller Feuds launches publicly,
+                    with a year of premium (no ads) free. Leave your email and we'll let you know.
+                  </p>
+                  {waitlistDone ? (
+                    <p className="text-sm" data-testid="text-waitlist-done">You're on the list. Keep your pass; you'll use it on launch day.</p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        placeholder="you@example.com"
+                        value={waitlistEmail || email}
+                        onChange={(e) => setWaitlistEmail(e.target.value)}
+                        disabled={waitlistBusy}
+                        data-testid="input-waitlist-email"
+                      />
+                      <Button type="button" variant="outline" onClick={joinWaitlist} disabled={waitlistBusy || !(waitlistEmail || email)} data-testid="button-join-waitlist">
+                        {waitlistBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Notify me"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : passNote ? (
+                <p className="text-xs text-[hsl(var(--gold))] font-medium" data-testid="text-pass-accepted">{passNote}</p>
+              ) : null}
+              {foundingMode ? (
               <p className="text-xs text-muted-foreground">
                 We're invite-only while our founding members settle in.{" "}
                 <Link href="/apply" onClick={() => onOpenChange(false)} className="underline underline-offset-2 text-foreground" data-testid="link-apply-from-signup">
                   No code? Apply to be a founding member
                 </Link>
               </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Got a pass from a founding member? Enter it for a year of premium free.</p>
+              )}
             </div>
           )}
           {isRegister && (

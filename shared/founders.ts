@@ -1,8 +1,18 @@
 // Founding members (Fuller Feuds Dev, Nov 20 2026): shared constants for /apply, the admin Applications tab,
 // invite codes and founder perks. Change numbers here; server and client both read them.
 
-/** Single-use invite codes each application-accepted founder gets on sign-up. */
+/**
+ * Single-use "launch passes" each application-accepted founder gets on sign-up (stored as invite_codes.kind
+ * 'founder'). A pass can't open an account while the site is invite-only; once the admin "public launch"
+ * switch is on, it lets one person join with PASS_PREMIUM_MONTHS of premium. Pass holders aren't founders.
+ */
 export const FOUNDER_INVITE_CODES = 3;
+export const FOUNDER_PASSES = FOUNDER_INVITE_CODES;
+/** Months of free premium (ad-free) a launch pass gives the person who signs up with it. */
+export const PASS_PREMIUM_MONTHS = 12;
+/** subscription_tier given to launch-pass sign-ups (expires with subscription_expires_at). */
+export const PASS_PREMIUM_TIER = "premium_gift";
+export const PASS_LOCKED_MESSAGE = "This pass unlocks at public launch";
 /** Founding Member numbers run #1..#100 and are never issued again. */
 export const FOUNDER_CAP = 100;
 /** Founding Member badge id (numbered via users.founder_number). */
@@ -83,7 +93,7 @@ Thanks for applying. I'd love to have you as one of the founding members of Full
 Your invite code: ${opts.code}
 It works once. Sign up here and it's filled in for you: ${link}
 
-When you join you'll get a numbered Founding Member badge, access to the Founders' Room, and ${FOUNDER_INVITE_CODES} invite codes of your own for people you'd trust to argue in good faith.
+When you join you'll get a numbered Founding Member badge, access to the Founders' Room, and ${FOUNDER_INVITE_CODES} launch passes to give people you'd trust to argue in good faith. Each pass lets one person join the day we open to the public, with a year of premium free.
 
 Three things to do this week:
 1. Post one opinion on any topic.

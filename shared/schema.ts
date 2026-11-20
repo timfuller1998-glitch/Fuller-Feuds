@@ -50,7 +50,7 @@ export const users = pgTable("users", {
   tutorialCompletedAt: timestamp("tutorial_completed_at"),
   role: varchar("role", { length: 20 }).default("user"), // 'user', 'moderator', 'admin'
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'suspended', 'banned'
-  isSynthetic: boolean("is_synthetic").default(false), // True for users created by data seeding
+  isSynthetic: boolean("is_synthetic").default(false), // Legacy: users from the removed data-seeding tool (none remain)
   selectedBadgeId: varchar("selected_badge_id"), // Badge displayed on user avatar
   // Ad-free switch + future subscription placeholders (migration 0015, additive). No payments yet.
   adFree: boolean("ad_free").default(false),
@@ -662,7 +662,7 @@ export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
 export type TopicInteraction = typeof topicInteractions.$inferSelect;
 export type InsertTopicInteraction = typeof topicInteractions.$inferInsert;
 
-// Seeding jobs - tracks data import jobs from external sources
+// Seeding jobs - legacy table from the removed data-seeding tool (kept to avoid a destructive migration)
 export const seedingJobs = pgTable("seeding_jobs", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   source: varchar("source", { length: 50 }).notNull(),

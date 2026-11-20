@@ -71,8 +71,8 @@ export function PrivacyPage() {
           “ref” tag), and a one-way hash of your IP address to spot duplicate applications. The political and religious
           questions are optional; we use them only to keep the founding group balanced, they are seen only by the people
           reviewing applications, and they are never shown publicly. Your answers may be scored by simple rules and, when
-          available, an AI provider to help us review them; a person makes every decision. Invite codes record who invited
-          whom. Ask us through the <ContactLink /> to delete your application.
+          available, an AI provider to help us review them; a person makes every decision. Invite codes and launch passes record who invited
+          whom. If you leave your email on the launch waitlist, we use it only to tell you when your pass unlocks. Ask us through the <ContactLink /> to delete your application.
         </p>
       </section>
       <section>

@@ -30,6 +30,7 @@ type App = {
 type Mix = { count: number; politics: Record<string, number>; religion: Record<string, number> };
 type AppsResponse = { items: App[]; counts: Record<string, number>; mix: { accepted: Mix; bestPicks: Mix } };
 type Settings = { foundingMode: boolean; publicLaunch: boolean; stats: { founders: number; last_number: number; pending: number } };
+type WaitlistEntry = { id: string; email: string; source: string; createdAt: string; code: string | null; passOwnerHandle: string | null; passOwnerFounderNumber: number | null };
 type Code = { id: string; code: string; kind: string; note: string | null; usedAt: string | null; revoked: boolean; createdAt: string; ownerHandle: string | null; ownerFounderNumber: number | null; usedByHandle: string | null; usedByFounderNumber: number | null };
 type PublicDebate = { id: string; topicTitle: string; participant1Name: string; participant2Name: string; status: string; isShowcase: boolean };
 
@@ -240,6 +241,7 @@ export function FoundingMembers() {
   const apps = useQuery<AppsResponse>({ queryKey: ["/api/admin/founders/applications"] });
   const codes = useQuery<Code[]>({ queryKey: ["/api/admin/founders/codes"] });
   const showcase = useQuery<{ live: PublicDebate[]; finished: PublicDebate[] }>({ queryKey: ["/api/admin/founders/showcase"] });
+  const waitlist = useQuery<WaitlistEntry[]>({ queryKey: ["/api/admin/founders/waitlist"] });
 
   const setSwitch = useMutation({
     mutationFn: (body: Partial<Pick<Settings, "foundingMode" | "publicLaunch">>) => send("PUT", "/api/admin/founders/settings", body),
@@ -287,7 +289,7 @@ export function FoundingMembers() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Public launch</p>
-              <p className="text-xs text-muted-foreground">Turns on founders' lifetime ad-free. Until then founders see ads like everyone else.</p>
+              <p className="text-xs text-muted-foreground">Turns on founders' lifetime ad-free and unlocks founders' launch passes (each gives a new member 1 year of premium). Until then founders see ads like everyone else and passes can't open accounts.</p>
             </div>
             <Switch checked={!!s?.publicLaunch} disabled={!s || setSwitch.isPending} onCheckedChange={(v) => setSwitch.mutate({ publicLaunch: v })} data-testid="switch-public-launch" />
           </div>
@@ -325,7 +327,7 @@ export function FoundingMembers() {
       <Card>
         <CardHeader>
           <CardTitle>Invite codes</CardTitle>
-          <CardDescription>Make a code for someone you're inviting directly (your own network). Each works once and records who invited whom.</CardDescription>
+          <CardDescription>Make a code for someone you're inviting directly (your own network). Each works once and records who invited whom. Founders' launch passes are listed here too; they only work after public launch.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex gap-2">
@@ -339,7 +341,7 @@ export function FoundingMembers() {
                 <div className="min-w-0">
                   <span className={`font-mono ${c.revoked ? "line-through text-muted-foreground" : ""}`}>{c.code}</span>
                   <span className="text-xs text-muted-foreground ml-2">
-                    {c.kind === "founder" ? `Founder #${c.ownerFounderNumber ?? "?"}'s code` : c.kind === "acceptance" ? "Application" : "Direct"}
+                    {c.kind === "founder" ? `Launch pass from Founder #${c.ownerFounderNumber ?? "?"}` : c.kind === "acceptance" ? "Application" : "Direct"}
                     {c.note && c.kind !== "founder" ? ` · ${c.note}` : ""}
                   </span>
                 </div>
@@ -349,6 +351,27 @@ export function FoundingMembers() {
                     <Button size="sm" variant="ghost" onClick={() => revoke.mutate(c.id)} data-testid={`button-revoke-${c.code}`}><Ban className="w-3.5 h-3.5 mr-1" /> Revoke</Button>
                   ) : null}
                 </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Launch waitlist</CardTitle>
+          <CardDescription>People who tried a launch pass before public launch and left their email. Let them know by hand when you launch.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="divide-y border border-foreground/15" data-testid="list-waitlist">
+            {(waitlist.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground p-3">Nobody yet.</p> : null}
+            {(waitlist.data ?? []).map((w) => (
+              <div key={w.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm" data-testid={`waitlist-${w.email}`}>
+                <span className="font-medium break-all">{w.email}</span>
+                <span className="text-xs text-muted-foreground">
+                  {w.code ? `${w.code}${w.passOwnerFounderNumber ? ` · from Founder #${w.passOwnerFounderNumber}` : ""}` : "no pass"}
+                  {" · "}{formatDistanceToNow(parseServerDate(w.createdAt), { addSuffix: true })}
+                </span>
               </div>
             ))}
           </div>

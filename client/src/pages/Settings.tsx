@@ -17,6 +17,8 @@ import { Switch } from "@/components/ui/switch";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { FounderCard } from "@/components/FounderCard";
 import { canUseAdFree } from "@shared/supporter";
+import { parseServerDate } from "@/lib/dates";
+import { PASS_PREMIUM_TIER } from "@shared/founders";
 import { HandleField, type HandleStatus } from "@/components/HandleField";
 import { useToast } from "@/hooks/use-toast";
 import { openTutorial } from "@/lib/tutorial";
@@ -489,7 +491,9 @@ export default function Settings() {
                 Hide ads on my account
               </label>
               <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-ad-free-note">
-                {adFreeAllowed
+                {adFreeAllowed && (currentUser as any)?.subscriptionTier === PASS_PREMIUM_TIER && (currentUser as any)?.subscriptionExpiresAt
+                  ? `Premium from your launch pass, until ${parseServerDate((currentUser as any).subscriptionExpiresAt).toLocaleDateString()}. You can turn ads off for your account.`
+                  : adFreeAllowed
                   ? "You can turn ads off for your account."
                   : founderNumber != null
                     ? "Founding members get lifetime ad-free when Fuller Feuds publicly launches."

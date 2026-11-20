@@ -28,7 +28,6 @@ import {
   Trash2,
   BookOpen,
   Sparkles,
-  Database,
   Crown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -40,7 +39,6 @@ import { DashboardOverview } from "@/components/admin/DashboardOverview";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { ContentFilters } from "@/components/admin/ContentFilters";
 import { AuditLog } from "@/components/admin/AuditLog";
-import { DataSeeding } from "@/components/admin/DataSeeding";
 import { FeedbackRequests } from "@/components/admin/FeedbackRequests";
 import { AiOpinionFlags } from "@/components/admin/AiOpinionFlags";
 import { FoundingMembers } from "@/components/admin/FoundingMembers";
@@ -324,10 +322,6 @@ export default function AdminDashboard() {
           <TabsTrigger value="filters" data-testid="tab-filters">
             <Filter className="h-4 w-4 mr-2" />
             Filters
-          </TabsTrigger>
-          <TabsTrigger value="seeding" data-testid="tab-seeding">
-            <Database className="h-4 w-4 mr-2" />
-            Data Seeding
           </TabsTrigger>
           <TabsTrigger value="audit" data-testid="tab-audit">
             <FileText className="h-4 w-4 mr-2" />
@@ -634,11 +628,6 @@ export default function AdminDashboard() {
         {/* Content Filters Tab */}
         <TabsContent value="filters">
           <ContentFilters queriesEnabled={adminQueriesEnabled} />
-        </TabsContent>
-
-        {/* Data Seeding Tab */}
-        <TabsContent value="seeding">
-          <DataSeeding queriesEnabled={adminQueriesEnabled} />
         </TabsContent>
 
         {/* Audit Log Tab */}
