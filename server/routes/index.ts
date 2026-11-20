@@ -1,6 +1,7 @@
 import express from 'express';
 import authRoutes from './auth.js';
 import topicRoutes from './topics.js';
+import feedRoutes from './feed.js';
 import userRoutes from './users.js';
 import opinionRoutes from './opinions.js';
 import counterpointRoutes from './counterpoints.js';
@@ -25,6 +26,7 @@ const router = express.Router();
 // Mount route modules with their prefixes
 router.use('/auth', authRoutes);
 router.use('/topics', topicRoutes);
+router.use('/feed', feedRoutes);
 router.use('/users', userRoutes);
 router.use('/opinions', opinionRoutes);
 router.use('/counterpoints', counterpointRoutes);

@@ -50,6 +50,13 @@ export interface CardDeckProps<T> {
   chromeReserve?: number;
   /** Set false to keep ad cards out of this deck (default true; ad-free users never get them). */
   ads?: boolean;
+  /**
+   * Endless deck (Home sections): no "n / m" counter, no wrap-around. The caller keeps appending items
+   * (onNearEnd fires when FEW cards are left); back swipes walk through what was already shown.
+   */
+  infinite?: boolean;
+  /** Infinite decks: called with the number of cards left after the top one whenever it is small. */
+  onNearEnd?: (remaining: number) => void;
 }
 
 /** Built-in 3D flip used when the deck owns the flip (renderBack provided). */
@@ -111,6 +118,8 @@ export const getCardDimensions = (
 };
 
 const wrap = (i: number, n: number) => ((i % n) + n) % n;
+/** Infinite decks: onNearEnd fires once this many cards (or fewer) are left after the top card. */
+const NEAR_END = 4;
 
 /**
  * Shuffle model: moving forward tucks the top card under the deck (slides out to the
@@ -475,7 +484,7 @@ interface CoreCounterProps {
 function CardDeckCore<T>({
   items, getKey, renderFront, renderBack, onEmpty, maxWidth = 400, renderBadge, testId,
   emptyLabel = "No more topics", ariaLabel = "Topic deck", onIndexChange, initialIndex = 0,
-  chromeReserve = 290, realPosition, realTotal,
+  chromeReserve = 290, realPosition, realTotal, infinite = false, onNearEnd,
 }: CardDeckProps<T> & CoreCounterProps) {
   const topics = items;
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -524,6 +533,18 @@ function CardDeckCore<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, n]);
 
+  // Infinite decks: ask for more while a few cards are still left, so the pile never runs out.
+  const onNearEndRef = useRef(onNearEnd);
+  onNearEndRef.current = onNearEnd;
+  useEffect(() => {
+    if (!infinite || n === 0) return;
+    const remaining = n - 1 - currentIndex;
+    if (remaining <= NEAR_END) onNearEndRef.current?.(remaining);
+  }, [infinite, currentIndex, n]);
+  // Infinite decks never wrap: no going back past the first card, no jumping from the last to the first.
+  const canBack = !infinite || currentIndex > 0;
+  const canForward = !infinite || currentIndex < n - 1;
+
   const reduceMotion = !!useReducedMotion();
   /** Cards still animating out of / into the top spot. Each is its own element keyed by topic id. */
   const [outgoing, setOutgoing] = useState<{ card: T; key: number } | null>(null);
@@ -534,7 +555,7 @@ function CardDeckCore<T>({
   const busy = !!outgoing || !!incomingId;
   const pull = useMotionValue(0);
   const lift = useMotionValue(0);
-  const prevCard = n > 2 ? topics[wrap(currentIndex - 1, n)] : null;
+  const prevCard = n > 2 && (!infinite || currentIndex > 0) ? topics[wrap(currentIndex - 1, n)] : null;
 
   const resetPileMotion = useCallback(() => {
     pull.set(0);
@@ -544,6 +565,7 @@ function CardDeckCore<T>({
   /** Move through the deck; flips the top card back first if it is showing its back. */
   const step = useCallback((dir: 1 | -1) => {
     if (n < 2 || !currentCard || busy) return;
+    if ((dir === -1 && !canBack) || (dir === 1 && !canForward)) return;
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     const leaving = currentCard;
     const run = () => {
@@ -567,7 +589,7 @@ function CardDeckCore<T>({
     } else {
       run();
     }
-  }, [n, currentCard, flipped, busy, topics, currentIndex, getKey, reduceMotion, pull, dimensions.width]);
+  }, [n, currentCard, flipped, busy, topics, currentIndex, getKey, reduceMotion, pull, dimensions.width, canBack, canForward]);
 
   const handleDragEnd = (info: PanInfo) => {
     const { offset, velocity } = info;
@@ -576,6 +598,7 @@ function CardDeckCore<T>({
     if (Math.abs(velocity.x) > SWIPE_VELOCITY_THRESHOLD) dir = velocity.x < 0 ? 1 : -1;
     else if (offset.x <= -SWIPE_OFFSET_THRESHOLD) dir = 1;
     else if (offset.x >= SWIPE_OFFSET_THRESHOLD) dir = -1;
+    if ((dir === -1 && !canBack) || (dir === 1 && !canForward)) dir = 0; // infinite deck edges: spring back
     if (dir !== -1 && pull.get() > 2) animate(pull, 0, { duration: 0.2 });
     if (dir !== 1 && lift.get() > 2) animate(lift, 0, { duration: 0.2 });
     // On a committed forward swipe, leave lift as-is until the next render unsubscribes
@@ -625,7 +648,7 @@ function CardDeckCore<T>({
   const backs = BACK_LAYERS.filter((d) => d < n);
   const topPos = realPosition ? realPosition(wrap(currentIndex, n)) : wrap(currentIndex, n);
   const shownTotal = realTotal ?? n;
-  const positionLabel = topPos === null ? "Sponsored" : `${topPos + 1} / ${shownTotal}`;
+  const positionLabel = topPos === null ? "Sponsored" : infinite ? "" : `${topPos + 1} / ${shownTotal}`;
   type Entry = { card: T; role: Role; key: string };
   const entries: Entry[] = [];
   if (outgoing) entries.push({ card: outgoing.card, role: "out", key: `card-${getKey(outgoing.card)}` });
@@ -646,8 +669,9 @@ function CardDeckCore<T>({
       onWheel={handleWheel}
       role="region"
       aria-roledescription="card deck"
-      aria-label={topPos === null ? `${ariaLabel}, advertisement` : `${ariaLabel}, card ${topPos + 1} of ${shownTotal}`}
+      aria-label={topPos === null ? `${ariaLabel}, advertisement` : infinite ? ariaLabel : `${ariaLabel}, card ${topPos + 1} of ${shownTotal}`}
       data-testid={testId ?? "card-deck"}
+      data-top-key={getKey(currentCard)}
     >
       <div className="relative" style={{ width: cardWidth, height: cardHeight, perspective: 1200 }}>
         {backs.map((d) => (
@@ -703,13 +727,13 @@ function CardDeckCore<T>({
       {n > 1 && (
         <div className="flex items-center gap-3 z-20">
           {/* Conventional buttons: ‹ previous on the left, › next on the right. */}
-          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(-1)} aria-label="Previous card" title="Previous card" data-testid="button-deck-prev">
+          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(-1)} disabled={!canBack} aria-label="Previous card" title="Previous card" data-testid="button-deck-prev">
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <span className="text-sm text-muted-foreground tabular-nums min-w-[3.5rem] text-center" data-testid="text-deck-position">
             {positionLabel}
           </span>
-          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(1)} aria-label="Next card" title="Next card" data-testid="button-deck-next">
+          <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={() => step(1)} disabled={!canForward} aria-label="Next card" title="Next card" data-testid="button-deck-next">
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
