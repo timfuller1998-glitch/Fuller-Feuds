@@ -173,6 +173,9 @@ export const debateRooms = pgTable("debate_rooms", {
   // Rooms created before invites existed default to 'accepted'.
   inviteStatus: varchar("invite_status", { length: 20 }).notNull().default("accepted"),
   inviteeId: varchar("invitee_id").references(() => users.id),
+  // Debate overhaul (migration 0014): each side's stance, from their opinion or picked when challenging.
+  participant1Stance: varchar("participant1_stance", { length: 10 }),
+  participant2Stance: varchar("participant2_stance", { length: 10 }),
 });
 
 // Messages in debate rooms

@@ -14,14 +14,15 @@ export class DebateService {
     this.opinionRepository = new OpinionRepository();
   }
 
-  async createDebateRoom(opinionId: string, userId: string): Promise<DebateRoom> {
-    return await this.debateRepository.createDebateRoomWithOpinionAuthor(opinionId, userId);
+  async createDebateRoom(opinionId: string, userId: string, opts: { stance?: string | null; challengerFirst?: boolean } = {}): Promise<DebateRoom> {
+    return await this.debateRepository.createDebateRoomWithOpinionAuthor(opinionId, userId, opts);
   }
 
   async createDebateRoomBetweenUsersForTopic(params: {
     topicId: string;
     participant1Id: string;
     participant2Id: string;
+    participant1Stance?: string | null;
   }): Promise<DebateRoom> {
     return await this.debateRepository.createDebateRoomBetweenUsersForTopic(params);
   }

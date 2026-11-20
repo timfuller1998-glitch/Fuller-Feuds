@@ -25,116 +25,68 @@ import { checkDebateParticipation } from '../utils/authorization.js';
 import { logDataAccess, logDatabaseOperation, logSecurityEvent } from '../utils/securityLogger.js';
 import type { Request } from 'express';
 
+function cleanStance(s: unknown): 'for' | 'against' | 'neutral' | null {
+  return s === 'for' || s === 'against' || s === 'neutral' ? s : null;
+}
+
 export class DebateRepository {
   async createDebateRoom(room: InsertDebateRoom): Promise<DebateRoom> {
     const [created] = await db.insert(debateRooms).values(room).returning();
     return created;
   }
 
-  async createDebateRoomWithOpinionAuthor(opinionId: string, userId: string): Promise<DebateRoom> {
-    // Get the opinion to find the author and topic
+  /**
+   * Challenge an opinion's author. The challenger no longer needs their own opinion on the topic (Nov 20 2026):
+   * their stance comes from their opinion if they have one, otherwise from the stance they picked.
+   * When `challengerFirst` is set the challenger opens (their opening argument is posted right after).
+   */
+  async createDebateRoomWithOpinionAuthor(opinionId: string, userId: string, opts: { stance?: string | null; challengerFirst?: boolean } = {}): Promise<DebateRoom> {
     const [opinion] = await db.select().from(opinions).where(eq(opinions.id, opinionId)).limit(1);
     if (!opinion) {
       throw new Error("Opinion not found");
     }
-
     const opinionAuthorId = opinion.userId;
     const topicId = opinion.topicId;
-
-    console.log(`[Debate Storage] Creating debate: opinionAuthor=${opinionAuthorId}, currentUser=${userId}, topicId=${topicId}`);
-
-    // Prevent users from debating themselves
     if (opinionAuthorId === userId) {
       throw new Error("You cannot debate your own opinion");
     }
-
-    // Get current user's opinion on the same topic
     const [userOpinion] = await db
-      .select()
+      .select({ stance: opinions.stance })
       .from(opinions)
-      .where(and(
-        eq(opinions.topicId, topicId),
-        eq(opinions.userId, userId)
-      ))
+      .where(and(eq(opinions.topicId, topicId), eq(opinions.userId, userId)))
       .limit(1);
 
-    console.log(`[Debate Storage] Found ${userOpinion ? 1 : 0} opinions for user ${userId} on topic ${topicId}`);
-
-    if (!userOpinion) {
-      throw new Error("You must have an opinion on this topic before starting a debate");
-    }
-
-    // Get political scores for both users to check alignment difference
-    // Join with userProfiles to get economicScore and authoritarianScore
-    const [currentUser] = await db
-      .select({ 
-        economicScore: userProfiles.economicScore, 
-        authoritarianScore: userProfiles.authoritarianScore 
-      })
-      .from(userProfiles)
-      .where(eq(userProfiles.userId, userId))
-      .limit(1);
-
-    const [opinionAuthor] = await db
-      .select({ 
-        economicScore: userProfiles.economicScore, 
-        authoritarianScore: userProfiles.authoritarianScore 
-      })
-      .from(userProfiles)
-      .where(eq(userProfiles.userId, opinionAuthorId))
-      .limit(1);
-
-    // Calculate political distance between users
-    let politicalDistance = 0;
-    if (currentUser?.economicScore !== null && currentUser?.authoritarianScore !== null &&
-        opinionAuthor?.economicScore !== null && opinionAuthor?.authoritarianScore !== null) {
-      const economicDiff = Math.abs((currentUser.economicScore || 0) - (opinionAuthor.economicScore || 0));
-      const authoritarianDiff = Math.abs((currentUser.authoritarianScore || 0) - (opinionAuthor.authoritarianScore || 0));
-      politicalDistance = Math.sqrt(economicDiff ** 2 + authoritarianDiff ** 2);
-    }
-
-    console.log(`[Debate Storage] Political distance: ${politicalDistance}`);
-
-    // Create the debate room
-    // Note: status, phase, turnCount1, turnCount2, and startedAt are omitted from InsertDebateRoom
-    // They will use their default values from the schema
     const debateRoomData: InsertDebateRoom = {
       topicId,
       participant1Id: opinionAuthorId,
       participant2Id: userId,
       participant1Privacy: 'public',
       participant2Privacy: 'public',
-      currentTurn: opinionAuthorId, // Opinion author goes first
+      participant1Stance: cleanStance(opinion.stance),
+      participant2Stance: cleanStance(userOpinion?.stance) ?? cleanStance(opts.stance),
+      currentTurn: opts.challengerFirst ? userId : opinionAuthorId,
     };
-
     const [created] = await db.insert(debateRooms).values(debateRoomData).returning();
-    console.log(`[Debate Storage] Created debate room: ${created.id}`);
-
     return created;
   }
 
+  /** Room between two people on a topic (counterpoint opponent picker). Opinions are no longer required. */
   async createDebateRoomBetweenUsersForTopic(params: {
     topicId: string;
     participant1Id: string;
     participant2Id: string;
+    participant1Stance?: string | null;
   }): Promise<DebateRoom> {
     const { topicId, participant1Id, participant2Id } = params;
-
     if (participant1Id === participant2Id) {
       throw new Error('You cannot debate yourself');
     }
-
-    // Require each participant to have an opinion on this topic
-    const opinionsForUsers = await db
-      .select({ userId: opinions.userId })
+    const rows = await db
+      .select({ userId: opinions.userId, stance: opinions.stance })
       .from(opinions)
       .where(and(eq(opinions.topicId, topicId), inArray(opinions.userId, [participant1Id, participant2Id])))
       .limit(10);
-
-    const userSet = new Set(opinionsForUsers.map(r => r.userId));
-    if (!userSet.has(participant1Id) || !userSet.has(participant2Id)) {
-      throw new Error('Both users must have an opinion on this topic before starting a debate');
-    }
+    const stanceOf = (uid: string) => cleanStance(rows.find((r) => r.userId === uid)?.stance);
 
     const debateRoomData: InsertDebateRoom = {
       topicId,
@@ -142,9 +94,10 @@ export class DebateRepository {
       participant2Id,
       participant1Privacy: 'public',
       participant2Privacy: 'public',
+      participant1Stance: stanceOf(participant1Id) ?? cleanStance(params.participant1Stance),
+      participant2Stance: stanceOf(participant2Id),
       currentTurn: participant1Id,
     };
-
     const [created] = await db.insert(debateRooms).values(debateRoomData).returning();
     return created;
   }

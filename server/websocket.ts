@@ -6,6 +6,7 @@ import { log } from './vite.js';
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: string;
   isAuthenticated?: boolean;
+  isAlive?: boolean;
 }
 
 interface WebSocketMessage {
@@ -20,6 +21,34 @@ const userIdBySocket = new Map<WebSocket, string>();
 // Presence tracking (in-memory)
 const typingLastSent = new Map<string, number>();
 const lastActiveAtByUserId = new Map<string, number>();
+// Live viewing (Nov 20 2026): sockets watching a debate room, signed in or not. Read-only.
+// The boolean says whether the socket counts as a spectator (debaters keep the page open too but aren't counted).
+const watchersByRoom = new Map<string, Map<WebSocket, boolean>>();
+const roomsBySocket = new Map<WebSocket, Set<string>>();
+
+function stopWatching(ws: WebSocket, roomId?: string) {
+  const rooms = roomsBySocket.get(ws);
+  if (!rooms) return;
+  for (const id of roomId ? [roomId] : Array.from(rooms)) {
+    rooms.delete(id);
+    const set = watchersByRoom.get(id);
+    if (set) {
+      set.delete(ws);
+      if (set.size === 0) watchersByRoom.delete(id);
+      sendWatcherCount(id);
+    }
+  }
+  if (rooms.size === 0) roomsBySocket.delete(ws);
+}
+
+function sendWatcherCount(roomId: string) {
+  const set = watchersByRoom.get(roomId);
+  if (!set) return;
+  let count = 0;
+  set.forEach((counts) => { if (counts) count++; });
+  const msg = JSON.stringify({ type: 'debate_viewers', debateRoomId: roomId, count });
+  set.forEach((_c, sock) => { if (sock.readyState === WebSocket.OPEN) sock.send(msg); });
+}
 
 let sessionMw: any = null;
 async function resolveSessionUserId(req: IncomingMessage): Promise<string | null> {
@@ -96,6 +125,33 @@ export function setupWebSocketServer(server: any) {
           return;
         }
 
+        // Watch a debate live (allowed before sign-in). Only public, accepted debates — or your own.
+        if (message.type === 'watch_debate' || message.type === 'unwatch_debate') {
+          const roomId = message.debateRoomId;
+          if (typeof roomId !== 'string' || roomId.length > 64) return;
+          if (message.type === 'unwatch_debate') { stopWatching(ws, roomId); return; }
+          const { getRoomRaw } = await import('./lib/debateFlow.js');
+          const { isWatchable } = await import('./lib/debateWatch.js');
+          const room = await getRoomRaw(roomId).catch(() => undefined);
+          // A debater's own page can always follow their room (verified from the session cookie, not trusted from the client).
+          let debater = false;
+          if (room && message.asDebater === true) {
+            const uid = ws.userId || await resolveSessionUserId(req);
+            debater = !!uid && (room.participant1Id === uid || room.participant2Id === uid);
+          }
+          if (!room || (!debater && !isWatchable(room))) {
+            ws.send(JSON.stringify({ type: 'watch_error', debateRoomId: roomId, message: 'This debate is not open to watch' }));
+            return;
+          }
+          if (!watchersByRoom.has(roomId)) watchersByRoom.set(roomId, new Map());
+          watchersByRoom.get(roomId)!.set(ws, !debater);
+          if (!roomsBySocket.has(ws)) roomsBySocket.set(ws, new Set());
+          roomsBySocket.get(ws)!.add(roomId);
+          ws.send(JSON.stringify({ type: 'watching', debateRoomId: roomId }));
+          sendWatcherCount(roomId);
+          return;
+        }
+
         // Require authentication for all other messages
         if (!ws.isAuthenticated || !ws.userId) {
           ws.send(JSON.stringify({
@@ -129,22 +185,10 @@ export function setupWebSocketServer(server: any) {
               if (!opponentId) break;
               if (isTyping) typingLastSent.set(key, now); else typingLastSent.delete(key);
               sendToUser(opponentId, { type: 'opponent_typing', debateRoomId, isTyping, userId: ws.userId });
+              sendToWatchers(debateRoomId, { type: 'debate_typing', debateRoomId, isTyping, userId: ws.userId }, [opponentId, ws.userId]);
             } catch (error: any) {
               log(`[WebSocket] Error handling typing indicator: ${error.message}`, 'error');
             }
-            break;
-          }
-
-          case 'join_room': {
-            // Handle room joining (for live streams)
-            // This can be extended based on your needs
-            log(`[WebSocket] User ${ws.userId} joined room ${message.roomId}`);
-            break;
-          }
-
-          case 'leave_room': {
-            // Handle room leaving
-            log(`[WebSocket] User ${ws.userId} left room`);
             break;
           }
 
@@ -161,6 +205,7 @@ export function setupWebSocketServer(server: any) {
     });
 
     ws.on('close', () => {
+      stopWatching(ws);
       const userId = userIdBySocket.get(ws);
       if (userId) {
         const userClients = clientsByUserId.get(userId);
@@ -246,6 +291,29 @@ export function sendToUser(userId: string, message: any) {
 // Broadcast message to multiple users
 export function broadcastToUsers(userIds: string[], message: any) {
   userIds.forEach(userId => sendToUser(userId, message));
+}
+
+/** Send to everyone watching a room, skipping sockets that belong to `skipUserIds` (they get their own event). */
+export function sendToWatchers(roomId: string, message: any, skipUserIds: string[] = []) {
+  const set = watchersByRoom.get(roomId);
+  if (!set) return;
+  const str = JSON.stringify(message);
+  set.forEach((_counts, c) => {
+    const uid = userIdBySocket.get(c);
+    if (uid && skipUserIds.includes(uid)) return;
+    if (c.readyState === WebSocket.OPEN) c.send(str);
+  });
+}
+
+/**
+ * Something changed in a debate (new message, turn, accepted, ended, rated). Tells the two debaters and
+ * everyone watching so their open room refreshes live. `kind` is informational.
+ */
+export function broadcastDebateUpdate(roomId: string, participantIds: (string | null | undefined)[], kind: string) {
+  const msg = { type: 'debate_update', debateRoomId: roomId, kind };
+  const ids = participantIds.filter(Boolean) as string[];
+  ids.forEach((u) => sendToUser(u, msg));
+  sendToWatchers(roomId, msg, ids);
 }
 
 // Send notification when a new debate message is created

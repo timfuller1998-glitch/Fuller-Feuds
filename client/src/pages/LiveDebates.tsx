@@ -1,295 +1,125 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { Radio, Eye, BookOpen, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Radio, Users, Clock, MessageSquare } from "lucide-react";
-import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { parseServerDate } from "@/lib/dates";
+import { stanceLabel, type Stance } from "@/lib/stance";
 
-// Types for live debates
-type DebateRoom = {
-  id: string;
-  topicId: string;
-  topicTitle: string;
-  topicDescription: string;
-  topicCategory: string;
-  participant1Id: string;
-  participant1Name: string;
-  participant1Stance: string;
-  participant2Id: string;
-  participant2Name: string;
-  participant2Stance: string;
-  status: string;
-  startedAt: string;
-  messageCount: number;
+/** One public debate, from GET /api/debates/live or /api/debates/finished. */
+type PublicDebate = {
+  id: string; topicId: string; topicTitle: string; status: string; phase: string;
+  participant1Id: string; participant1Name: string; participant1Avatar: string | null; participant1Stance: string | null;
+  participant2Id: string; participant2Name: string; participant2Avatar: string | null; participant2Stance: string | null;
+  messageCount: number; startedAt: string | null; lastActivityAt: string | null; endedAt: string | null;
 };
 
-type LiveStream = {
-  id: string;
-  topicId: string;
-  topicTitle: string;
-  title: string;
-  description: string;
-  moderatorId: string;
-  moderatorName: string;
-  status: string;
-  startedAt: string;
-  viewerCount: number;
-  participantCount: number;
-};
+function ago(iso: string | null): string {
+  if (!iso) return "";
+  const s = Math.max(0, (Date.now() - parseServerDate(iso).getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
+function Side({ name, avatar, stance, align }: { name: string; avatar: string | null; stance: string | null; align: "left" | "right" }) {
+  const label = stance && stanceLabel[stance as Stance];
+  return (
+    <div className={`flex items-center gap-2 min-w-0 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
+      <Avatar className="h-9 w-9 shrink-0">
+        {avatar ? <AvatarImage src={avatar} alt={name} /> : null}
+        <AvatarFallback className="text-xs">{name.slice(0, 2).toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <div className="font-serif font-semibold truncate">{name}</div>
+        {label ? <div className="font-ui text-[0.65rem] uppercase tracking-[0.1em] text-[hsl(var(--gold))]">{label}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function DebateRow({ d, live }: { d: PublicDebate; live: boolean }) {
+  return (
+    <Card className="border-foreground/20" data-testid={`${live ? "live" : "finished"}-debate-${d.id}`}>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <Link href={`/topic/${d.topicId}`} className="font-serif text-lg font-bold leading-snug hover:underline">
+            {d.topicTitle}
+          </Link>
+          {live ? (
+            <Badge className="shrink-0 gap-1 bg-primary text-primary-foreground">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-foreground animate-pulse" /> {d.phase === "voting" ? "Rating" : "Live"}
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="shrink-0">Finished</Badge>
+          )}
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <Side name={d.participant1Name} avatar={d.participant1Avatar} stance={d.participant1Stance} align="left" />
+          <span className="font-ui text-xs font-bold tracking-[0.15em] text-primary">VS</span>
+          <Side name={d.participant2Name} avatar={d.participant2Avatar} stance={d.participant2Stance} align="right" />
+        </div>
+        <div className="flex items-center justify-between gap-3 border-t pt-3">
+          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <MessageSquare className="w-3.5 h-3.5" /> {d.messageCount} {d.messageCount === 1 ? "message" : "messages"}
+            <span aria-hidden>·</span> {live ? `active ${ago(d.lastActivityAt)}` : `ended ${ago(d.endedAt)}`}
+          </span>
+          <Link href={`/debate-room/${d.id}`}>
+            <Button size="sm" variant={live ? "default" : "outline"} data-testid={`button-${live ? "watch" : "read"}-${d.id}`}>
+              {live ? <><Eye className="w-4 h-4 mr-1.5" /> Watch</> : <><BookOpen className="w-4 h-4 mr-1.5" /> Read</>}
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function LiveDebates() {
-  const [, setLocation] = useLocation();
-
-  // Fetch active debate rooms
-  const { data: debateRooms, isLoading: loadingRooms } = useQuery<DebateRoom[]>({
-    queryKey: ["/api/debate-rooms", { status: "active" }],
-    queryFn: async () => {
-      const response = await fetch("/api/debate-rooms?status=active");
-      if (!response.ok) throw new Error("Failed to fetch debate rooms");
-      return response.json();
-    },
-  });
-
-  // Fetch live streams
-  const { data: liveStreams, isLoading: loadingStreams } = useQuery<LiveStream[]>({
-    queryKey: ["/api/live-streams", { status: "live" }],
-    queryFn: async () => {
-      const response = await fetch("/api/live-streams?status=live");
-      if (!response.ok) throw new Error("Failed to fetch live streams");
-      return response.json();
-    },
-  });
-
-  const isLoading = loadingRooms || loadingStreams;
-  const totalLive = (debateRooms?.length || 0) + (liveStreams?.length || 0);
-
-  // Format time since started
-  const getTimeSince = (startedAt: string) => {
-    const minutes = Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ago`;
-  };
+  // Refreshes on its own every 15s; debate updates over the socket also refresh it.
+  const live = useQuery<PublicDebate[]>({ queryKey: ["/api/debates/live"], refetchInterval: 15000, staleTime: 5000 });
+  const finished = useQuery<PublicDebate[]>({ queryKey: ["/api/debates/finished"], refetchInterval: 60000, staleTime: 30000 });
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 sm:p-3 rounded-lg bg-destructive/10">
-          <Radio className="w-5 h-5 sm:w-6 sm:h-6 text-destructive-foreground0" />
+    <div className="max-w-3xl mx-auto space-y-6" data-testid="page-live-debates">
+      <header className="text-center space-y-2 border-b-[3px] border-double border-foreground pb-4">
+        <div className="font-ui text-xs uppercase tracking-[0.2em] text-[hsl(var(--gold))] flex items-center justify-center gap-2">
+          <Radio className="w-4 h-4" /> On the floor now
         </div>
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="heading-live-debates">
-            Live Debates
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Join debates happening right now
-          </p>
-        </div>
-      </div>
+        <h1 className="font-serif text-3xl sm:text-4xl font-bold" data-testid="heading-live-debates">Live Debates</h1>
+        <p className="text-sm text-muted-foreground">Watch two people go at it, turn by turn. Messages appear as they're sent.</p>
+      </header>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-        <Card>
-          <CardContent className="pt-4 sm:pt-6">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-destructive/10">
-                <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-destructive-foreground0" />
-              </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-bold" data-testid="stat-live-count">
-                  {totalLive}
-                </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Live Now</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <section className="space-y-3" aria-labelledby="live-now">
+        <h2 id="live-now" className="font-ui text-xs uppercase tracking-[0.15em] text-muted-foreground">Happening now</h2>
+        {live.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : live.isError ? (
+          <p className="text-sm text-destructive">Couldn't load live debates. Try again in a moment.</p>
+        ) : (live.data?.length ?? 0) === 0 ? (
+          <Card className="border-dashed" data-testid="empty-live">
+            <CardContent className="p-6 text-center text-sm text-muted-foreground">
+              No debates are running right now. Open any opinion card, flip it, and tap <span className="font-semibold text-foreground">Challenge to a debate</span> to start one.
+            </CardContent>
+          </Card>
+        ) : (
+          live.data!.map((d) => <DebateRow key={d.id} d={d} live />)
+        )}
+      </section>
 
-        <Card>
-          <CardContent className="pt-4 sm:pt-6">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-info/10">
-                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-info" />
-              </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-bold" data-testid="stat-debate-rooms">
-                  {debateRooms?.length || 0}
-                </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Debate Rooms</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4 sm:pt-6">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-lg bg-ai/10">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-ai" />
-              </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-bold" data-testid="stat-live-streams">
-                  {liveStreams?.length || 0}
-                </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Live Streams</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Content */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading live debates...</p>
-          </div>
-        </div>
-      ) : totalLive === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Radio className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-lg font-medium mb-2">No live debates right now</p>
-            <p className="text-muted-foreground">
-              Check back later or start your own debate
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          {/* Live Streams Section */}
-          {liveStreams && liveStreams.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-ai" />
-                <h2 className="text-xl font-semibold">Live Streams</h2>
-                <Badge variant="destructive" className="ml-2">
-                  <Radio className="w-3 h-3 mr-1" />
-                  LIVE
-                </Badge>
-              </div>
-              <div className="grid grid-cols-1 gap-4" data-testid="list-live-streams">
-                {liveStreams.map((stream) => (
-                  <Card
-                    key={stream.id}
-                    className="cursor-pointer hover-elevate active-elevate-2"
-                    onClick={() => setLocation(`/topic/${stream.topicId}`)}
-                    data-testid={`card-live-stream-${stream.id}`}
-                  >
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="destructive" className="animate-pulse">
-                              <Radio className="w-3 h-3 mr-1" />
-                              LIVE
-                            </Badge>
-                            <Badge variant="secondary">{stream.topicTitle}</Badge>
-                          </div>
-                          <h3 className="text-lg font-semibold">{stream.title}</h3>
-                          {stream.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {stream.description}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Users className="w-4 h-4" />
-                              <span>{stream.viewerCount} viewers</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <MessageSquare className="w-4 h-4" />
-                              <span>{stream.participantCount} participants</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              <span>{getTimeSince(stream.startedAt)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Debate Rooms Section */}
-          {debateRooms && debateRooms.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-info" />
-                <h2 className="text-xl font-semibold">One-on-One Debates</h2>
-              </div>
-              <div className="grid grid-cols-1 gap-4" data-testid="list-debate-rooms">
-                {debateRooms.map((room) => (
-                  <Card
-                    key={room.id}
-                    className="cursor-pointer hover-elevate active-elevate-2"
-                    onClick={() => setLocation(`/topic/${room.topicId}`)}
-                    data-testid={`card-debate-room-${room.id}`}
-                  >
-                    <CardContent className="pt-6">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Badge variant="secondary">{room.topicCategory}</Badge>
-                          <Badge variant="outline" className="text-success border-success">
-                            <Radio className="w-3 h-3 mr-1 animate-pulse" />
-                            Active
-                          </Badge>
-                        </div>
-                        <h3 className="text-lg font-semibold">{room.topicTitle}</h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {room.topicDescription}
-                        </p>
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-3 border-t">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
-                                <Users className="w-4 h-4 text-success" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium">{room.participant1Name}</p>
-                                <Badge variant="outline" className="text-xs">
-                                  {room.participant1Stance}
-                                </Badge>
-                              </div>
-                            </div>
-                            <span className="text-muted-foreground">vs</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center">
-                                <Users className="w-4 h-4 text-destructive-foreground0" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium">{room.participant2Name}</p>
-                                <Badge variant="outline" className="text-xs">
-                                  {room.participant2Stance}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <MessageSquare className="w-4 h-4" />
-                              <span>{room.messageCount} messages</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              <span>{getTimeSince(room.startedAt)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <section className="space-y-3" aria-labelledby="finished">
+        <h2 id="finished" className="font-ui text-xs uppercase tracking-[0.15em] text-muted-foreground">Recently finished</h2>
+        {finished.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : (finished.data?.length ?? 0) === 0 ? (
+          <p className="text-sm text-muted-foreground" data-testid="empty-finished">Nothing finished yet.</p>
+        ) : (
+          finished.data!.map((d) => <DebateRow key={d.id} d={d} live={false} />)
+        )}
+      </section>
     </div>
   );
 }
