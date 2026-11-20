@@ -23,16 +23,25 @@ interface SwipeableCardStackProps {
   chromeReserve?: number;
   renderBadge?: (topic: DeckTopic, index: number) => ReactNode;
   testId?: string;
+  /** Endless deck: no counter, caller appends more via onNearEnd (Home sections). */
+  infinite?: boolean;
+  onNearEnd?: (remaining: number) => void;
+  onTopChange?: (topic: DeckTopic) => void;
+  /** Key per card; defaults to topic id (endless decks repeat topics, so they pass a per-cycle key). */
+  getKey?: (topic: DeckTopic) => string;
 }
 
 const topicKey = (t: DeckTopic) => t.id;
 
 /** Topic deck: the generic CardDeck with TopicCard faces (TopicCard renders its own front and back). */
-export default function SwipeableCardStack({ topics, onEmpty, maxWidth, chromeReserve, renderBadge, testId }: SwipeableCardStackProps) {
+export default function SwipeableCardStack({ topics, onEmpty, maxWidth, chromeReserve, renderBadge, testId, infinite, onNearEnd, onTopChange, getKey }: SwipeableCardStackProps) {
   return (
     <CardDeck<DeckTopic>
       items={topics}
-      getKey={topicKey}
+      getKey={getKey ?? topicKey}
+      infinite={infinite}
+      onNearEnd={onNearEnd}
+      onIndexChange={onTopChange ? (_i, t) => onTopChange(t) : undefined}
       onEmpty={onEmpty}
       maxWidth={maxWidth}
       chromeReserve={chromeReserve}

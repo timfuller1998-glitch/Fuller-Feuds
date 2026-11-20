@@ -1,20 +1,26 @@
 import { ChevronDown, LucideIcon } from "lucide-react";
-import SwipeableCardStack from "./SwipeableCardStack";
+import SwipeableCardStack, { type DeckTopic } from "./SwipeableCardStack";
 import type { TopicWithCounts } from "@shared/schema";
+import type { HomeSectionKey } from "@shared/homeFeed";
+import { useInfiniteHomeDeck } from "@/hooks/useInfiniteHomeDeck";
 
 interface StackSectionProps {
   title: string;
   icon: LucideIcon;
   sectionKey: string;
-  topics: TopicWithCounts[];
+  /** Fixed list (e.g. home search results). Omit and pass feedSection for an endless, ranked deck. */
+  topics?: TopicWithCounts[];
+  /** Endless deck fed by /api/feed/home (no numbering; loads more as you swipe). */
+  feedSection?: HomeSectionKey;
   /** When true, show a small chevron hint that another section is below. */
   showNextHint?: boolean;
 }
 
-export default function StackSection({ title, icon: Icon, sectionKey, topics, showNextHint }: StackSectionProps) {
-  const handleEmpty = () => {
-  };
+const deckKey = (t: DeckTopic) => (t.deckKey as string) || t.id;
 
+function SectionShell({ title, icon: Icon, sectionKey, count, showNextHint, children }: {
+  title: string; icon: LucideIcon; sectionKey: string; count?: number; showNextHint?: boolean; children: React.ReactNode;
+}) {
   return (
     <section
       className="h-full snap-start shrink-0 flex flex-col items-center px-4"
@@ -29,22 +35,11 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, sh
             {title}
           </h2>
         </div>
-        <span className="text-xl font-semibold text-muted-foreground">
-          {topics.length}
-        </span>
+        {count != null ? <span className="text-xl font-semibold text-muted-foreground">{count}</span> : null}
       </div>
 
       <div className="flex-1 w-full flex items-center justify-center min-h-0 overflow-visible">
-        {topics.length > 0 ? (
-          <SwipeableCardStack
-            topics={topics}
-            onEmpty={handleEmpty}
-          />
-        ) : (
-          <div className="text-center text-muted-foreground">
-            <p>No topics available</p>
-          </div>
-        )}
+        {children}
       </div>
 
       {showNextHint ? (
@@ -55,5 +50,42 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, sh
         <div className="h-3 flex-shrink-0" />
       )}
     </section>
+  );
+}
+
+function EndlessDeck({ feedSection }: { feedSection: HomeSectionKey }) {
+  const { items, total, error, loadMore, onTopChange, endless } = useInfiniteHomeDeck(feedSection);
+  if (items.length === 0) {
+    return (
+      <div className="text-center text-muted-foreground" data-testid={`deck-loading-${feedSection}`}>
+        <p>{error ? "Couldn't load topics. Pull down to try again." : total === 0 ? "No topics available" : "Loading…"}</p>
+      </div>
+    );
+  }
+  return (
+    <SwipeableCardStack
+      topics={items}
+      getKey={deckKey}
+      infinite={endless}
+      onNearEnd={() => { void loadMore(); }}
+      onTopChange={(t) => onTopChange(t as any)}
+      testId={`deck-${feedSection}`}
+    />
+  );
+}
+
+export default function StackSection({ title, icon, sectionKey, topics, feedSection, showNextHint }: StackSectionProps) {
+  return (
+    <SectionShell title={title} icon={icon} sectionKey={sectionKey} count={feedSection ? undefined : topics?.length} showNextHint={showNextHint}>
+      {feedSection ? (
+        <EndlessDeck feedSection={feedSection} />
+      ) : topics && topics.length > 0 ? (
+        <SwipeableCardStack topics={topics} />
+      ) : (
+        <div className="text-center text-muted-foreground">
+          <p>No topics available</p>
+        </div>
+      )}
+    </SectionShell>
   );
 }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import StackSection from "@/components/StackSection";
 import { useAuth } from "@/hooks/useAuth";
 import type { TopicWithCounts } from "@shared/schema";
+import { HOME_SECTIONS, type HomeSectionKey } from "@shared/homeFeed";
 import { 
   TrendingUp,
   Radio,
@@ -39,6 +40,12 @@ interface OpinionSectionData {
 }
 
 type AnySectionData = SectionData | OpinionSectionData;
+
+/** "Hot Debates" -> "hot-debates" (the /api/feed/home section key). */
+function feedKeyFor(title: string): HomeSectionKey | undefined {
+  const k = title.toLowerCase().replace(/\s+/g, "-");
+  return (HOME_SECTIONS as readonly string[]).includes(k) ? (k as HomeSectionKey) : undefined;
+}
 
 export default function Home() {
   const { user } = useAuth();
@@ -312,7 +319,9 @@ export default function Home() {
             title={section.title}
             icon={section.icon}
             sectionKey={section.title.toLowerCase().replace(/\s+/g, '-')}
-            topics={section.topics}
+            // Home sections are endless, ranked decks (no numbering); search results stay a fixed list.
+            topics={homeFilter ? section.topics : undefined}
+            feedSection={homeFilter ? undefined : feedKeyFor(section.title)}
             showNextHint={index < topicSections.length - 1}
           />
         ))
