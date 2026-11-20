@@ -662,3 +662,13 @@
 .dark .level-card .level-track, .medium .level-card .level-track { background: hsl(var(--foreground) / 0.14); }
 .level-card .level-fill { background: hsl(var(--gold)); }
 .level-card .level-dot-off { background: hsl(var(--foreground) / 0.16); }
+
+/* Opinion strength meter (Fuller Feuds Dev, Nov 20 2026).
+   Track uses a visible ink wash in dark/dusk, gold fill like the skill bars. */
+.opinion-strength-track { background: hsl(var(--primary) / 0.14); }
+.dark .opinion-strength-track,
+.medium .opinion-strength-track { background: hsl(var(--foreground) / 0.16); }
+.opinion-strength-fill { background: hsl(var(--gold)); transition: width 0.25s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .opinion-strength-fill { transition: none; }
+}

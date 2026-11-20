@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Copy, Check, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { OpinionStructure, BareOpinionTip, useBareOpinionGuard } from "@/components/OpinionStructure";
 
 interface AdoptOpinionDialogProps {
   open: boolean;
@@ -70,6 +71,8 @@ export function AdoptOpinionDialog({
     }
   }, [open, currentOpinion, opinionToAdopt]);
 
+  const bareOpinion = useBareOpinionGuard(editedContent);
+
   const handleFullyAdopt = () => {
     if (opinionToAdopt) {
       setEditedContent(opinionToAdopt.content);
@@ -94,7 +97,7 @@ export function AdoptOpinionDialog({
       });
       return;
     }
-    onAdopt(editedContent, editedStance);
+    bareOpinion.guard(() => onAdopt(editedContent, editedStance));
   };
 
   if (!opinionToAdopt) return null;
@@ -183,6 +186,7 @@ export function AdoptOpinionDialog({
                   className="min-h-[160px] sm:min-h-[300px]"
                   data-testid="textarea-opinion-content"
                 />
+                <OpinionStructure text={editedContent} />
               </div>
 
               <div className="space-y-2">
@@ -218,7 +222,13 @@ export function AdoptOpinionDialog({
           </Card>
         </div>
 
-        <DialogFooter className="px-4 py-3 sm:px-6 border-t flex-shrink-0 flex-row justify-end gap-2 bg-background">
+        <DialogFooter className="px-4 py-3 sm:px-6 border-t flex-shrink-0 flex-col sm:flex-col items-stretch gap-2 bg-background">
+          <BareOpinionTip
+            open={bareOpinion.showTip}
+            onKeepWriting={bareOpinion.keepWriting}
+            onPostAnyway={bareOpinion.postAnyway}
+          />
+          <div className="flex flex-row justify-end gap-2">
           <Button 
             variant="ghost" 
             onClick={() => onOpenChange(false)}
@@ -234,6 +244,7 @@ export function AdoptOpinionDialog({
           >
             {isPending ? "Adopting..." : currentOpinion ? "Update Opinion" : "Create Opinion"}
           </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

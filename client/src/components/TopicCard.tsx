@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import { LoginPromptDialog } from "@/components/LoginPromptDialog";
+import { OpinionStructure, BareOpinionTip, useBareOpinionGuard } from "@/components/OpinionStructure";
 import type { FallacyType } from "@shared/fallacies";
 import { CARD_GESTURE_LOCK_PX, cardGestureJustHappened, markCardGesture } from "@/lib/cardGesture";
 
@@ -281,8 +282,11 @@ export default function TopicCard({
     }
   };
 
+  const opinionContent = opinionForm.watch("content");
+  const bareOpinion = useBareOpinionGuard(opinionContent ?? "");
+
   const onSubmitOpinion = (data: z.infer<typeof opinionFormSchema>) => {
-    createOpinionMutation.mutate(data);
+    bareOpinion.guard(() => createOpinionMutation.mutate(data));
   };
 
   const handleFlagSubmit = (fallacyType: FallacyType) => {
@@ -736,9 +740,15 @@ export default function TopicCard({
                         data-testid="textarea-opinion-content"
                       />
                     </FormControl>
+                    <OpinionStructure text={field.value ?? ""} topicTitle={title} />
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+              <BareOpinionTip
+                open={bareOpinion.showTip}
+                onKeepWriting={bareOpinion.keepWriting}
+                onPostAnyway={bareOpinion.postAnyway}
               />
               <div className="flex justify-end gap-2">
                 <Button
