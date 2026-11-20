@@ -138,7 +138,7 @@ function AppWithSidebar({
         </header>
         <FirstRunTutorial user={user} isAuthenticated={isAuthenticated} suppressed={location === "/onboarding"} />
         <FeedbackDialog />
-        <main className={`flex-1 min-h-0 overflow-x-hidden px-4 pt-5 sm:px-6 sm:pt-7 md:px-8 pb-10 ${location === "/" ? "overflow-y-hidden relative" : "overflow-y-auto"}`}>
+        <main className={`flex-1 min-h-0 overflow-x-hidden ${location === "/" ? "overflow-y-hidden relative p-0" : "overflow-y-auto px-4 pt-5 sm:px-6 sm:pt-7 md:px-8 pb-10"}`}>
           <div className={`max-w-7xl mx-auto w-full ${location === "/" ? "h-full relative" : ""}`}>
             <Router />
           </div>

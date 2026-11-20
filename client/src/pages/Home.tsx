@@ -269,9 +269,9 @@ export default function Home() {
     : sections.filter((s): s is SectionData => s.type !== 'opinions');
 
   return (
-    <div className="absolute inset-0 -mx-3 -my-3 sm:-mx-4 sm:-my-4 md:-mx-6 md:-my-6 -mb-20 overflow-y-auto snap-y snap-mandatory -webkit-overflow-scrolling-touch">
+    <div className="absolute inset-0 overflow-y-auto overflow-x-hidden snap-y snap-mandatory -webkit-overflow-scrolling-touch">
       {homeFilter && (
-        <div className="sticky top-0 z-20 flex justify-center pt-2 pointer-events-none">
+        <div className="absolute top-0 left-0 right-0 z-20 flex justify-center pt-2 pointer-events-none">
           <div className="pointer-events-auto inline-flex items-center gap-2 border border-foreground bg-background px-3 py-1 font-ui text-xs uppercase tracking-[0.08em]" data-testid="chip-home-filter">
             <SearchIcon className="h-3.5 w-3.5" />
             <span>{topics.length} {topics.length === 1 ? "topic" : "topics"} matching “{homeFilter}”</span>
@@ -281,7 +281,7 @@ export default function Home() {
       )}
       {/* Stack Sections */}
       {homeFilter && topicSections.length === 0 ? (
-        <section className="min-h-[100dvh] snap-start flex items-center justify-center px-4">
+        <section className="h-full snap-start shrink-0 flex items-center justify-center px-4">
           <Card>
             <CardContent className="py-12 text-center space-y-3" data-testid="empty-home-filter">
               <SearchIcon className="w-10 h-10 text-muted-foreground mx-auto" />
@@ -294,7 +294,7 @@ export default function Home() {
           </Card>
         </section>
       ) : topicSections.length === 0 ? (
-        <section className="min-h-[100dvh] snap-start flex items-center justify-center">
+        <section className="h-full snap-start shrink-0 flex items-center justify-center">
           <Card>
             <CardContent className="py-12 text-center">
               <Grid className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
@@ -319,7 +319,7 @@ export default function Home() {
       )}
 
       {/* Hero Section - Footer */}
-      <section className="min-h-[100dvh] snap-start flex flex-col items-center justify-center px-4 py-8">
+      <section className="h-full snap-start shrink-0 flex flex-col items-center justify-center px-4 py-8">
         <div className="text-center space-y-3 sm:space-y-4">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
             Every opinion. One fair fight.

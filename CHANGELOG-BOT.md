@@ -1,3 +1,10 @@
+## 2026-11-19 (19:35 CST) — Fit home sections between the header and footer
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/home-section-fit`
+- **What:** A snapped home section is now the height of the visible area between the header and the fixed footer (the app shell already uses dvh), instead of `100dvh` plus leftover main padding. The title, card pile, and down-chevron all stay on screen; you can no longer scroll a section just enough to tuck the title under the header. The deck sizes itself to that column and shrinks a little on short viewports so the controls still fit.
+- **Typecheck:** 52.
+
 ## 2026-11-19 (19:22 CST) — Don't replace real AI summaries when OpenAI is out of credits
 
 - **By:** Fuller Feuds Dev
