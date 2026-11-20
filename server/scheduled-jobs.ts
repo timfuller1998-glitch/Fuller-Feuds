@@ -1,6 +1,8 @@
 import cron from 'node-cron';
-import { sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { db } from './db.js';
+import { opinions, cumulativeOpinions } from '../shared/schema.js';
+import { LexiconAnalysisService } from './services/lexiconAnalysisService.js';
 import { log } from './utils/logger.js';
 import { TopicService } from './services/topicService.js';
 import { OpinionService } from './services/opinionService.js';
@@ -76,10 +78,90 @@ export async function runDbKeepAlive(): Promise<boolean> {
   }
 }
 
+
+/** Fill taste/passion scores for older opinions that only have political scores. */
+export async function backfillMissingTastePassion(): Promise<number> {
+  const rows = await db
+    .select()
+    .from(opinions)
+    .where(
+      and(
+        or(isNull(opinions.tasteScore), isNull(opinions.passionScore)),
+        sql`${opinions.status} IN ('approved', 'pending')`
+      )
+    );
+
+  if (rows.length === 0) {
+    log('[CRON] Taste/passion backfill: nothing to do');
+    return 0;
+  }
+
+  const lexicon = new LexiconAnalysisService();
+  let updated = 0;
+  for (const op of rows) {
+    try {
+      const local = lexicon.analyzeOpinionLocally(op.content);
+      await db
+        .update(opinions)
+        .set({
+          tasteScore: op.tasteScore ?? local.taste.score,
+          passionScore: op.passionScore ?? local.passion.score,
+          analysisConfidence: op.analysisConfidence || local.confidence,
+          analyzedAt: op.analyzedAt ?? (sql`now()` as any),
+        })
+        .where(eq(opinions.id, op.id));
+      updated++;
+    } catch (error) {
+      log(`[CRON] Taste/passion backfill failed for ${op.id}: ${error}`);
+    }
+  }
+  log(`[CRON] Taste/passion backfill updated ${updated} of ${rows.length} opinions`);
+  return updated;
+}
+
+/** Regenerate stored summaries that are missing sentence-level opinion citations. */
+export async function backfillMissingSummarySentences(): Promise<{ updated: number; errors: string[] }> {
+  const missing = await db
+    .select({ topicId: cumulativeOpinions.topicId })
+    .from(cumulativeOpinions)
+    .where(or(isNull(cumulativeOpinions.summarySentences), sql`${cumulativeOpinions.summarySentences} = 'null'::jsonb`));
+
+  const errors: string[] = [];
+  let updated = 0;
+  const service = new CumulativeOpinionService();
+  for (const row of missing) {
+    try {
+      await service.generateCumulativeOpinion(row.topicId);
+      updated++;
+      log(`[AI Summary] Backfilled sentence citations for topic ${row.topicId}`);
+    } catch (error) {
+      const msg = `Failed sentence backfill for ${row.topicId}: ${error}`;
+      log(`[AI Summary] ${msg}`);
+      errors.push(msg);
+    }
+  }
+  log(`[CRON] Summary sentence backfill: ${updated} updated, ${errors.length} failed, ${missing.length} missing`);
+  return { updated, errors };
+}
+
 export function startScheduledJobs() {
   cron.schedule('17 */12 * * *', () => { void runDbKeepAlive(); }, { timezone: 'UTC' });
   log('[CRON] Scheduled Supabase keep-alive every 12 hours');
   setTimeout(() => { void runDbKeepAlive(); }, 60_000); // once shortly after each deploy/restart
+  setTimeout(() => {
+    void (async () => {
+      try {
+        await backfillMissingTastePassion();
+      } catch (error) {
+        log(`[CRON ERROR] Taste/passion backfill failed: ${error}`);
+      }
+      try {
+        await backfillMissingSummarySentences();
+      } catch (error) {
+        log(`[CRON ERROR] Summary sentence backfill failed: ${error}`);
+      }
+    })();
+  }, 90_000);
 
   cron.schedule('0 2 * * *', async () => {
     log('[CRON] Starting daily AI summary update at 2:00 AM');

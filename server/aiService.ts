@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { Opinion, Topic, CumulativeOpinion } from '../shared/schema.js';
+import type { Opinion, Topic, CumulativeOpinion, SummarySentence } from '../shared/schema.js';
 
 // Temporarily disable OpenAI for testing - remove this when you have API key
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({
@@ -9,11 +9,69 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
 interface OpinionAnalysis {
   summary: string;
   keyPoints: string[];
+  summarySentences: SummarySentence[];
   supportingPercentage: number;
   opposingPercentage: number;
   neutralPercentage: number;
   totalOpinions: number;
   confidence: 'high' | 'medium' | 'low';
+}
+
+function pickRelatedOpinionIds(text: string, opinions: Array<{ id: string; content: string }>, limit = 3): string[] {
+  const words = new Set(text.toLowerCase().split(/\W+/).filter((w) => w.length > 4));
+  const scored = opinions
+    .map((o) => {
+      const owords = (o.content || "").toLowerCase().split(/\W+/);
+      const score = owords.reduce((n, w) => n + (words.has(w) ? 1 : 0), 0);
+      return { id: o.id, score };
+    })
+    .sort((a, b) => b.score - a.score);
+  return scored.filter((s) => s.score > 0).slice(0, limit).map((s) => s.id);
+}
+
+export function sentencesFromSummary(summary: string, opinions: Array<{ id: string; content: string }>): SummarySentence[] {
+  const paragraphs = summary.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
+  const blocks = paragraphs.length > 1
+    ? paragraphs
+    : summary.split(/(?<=[.!?])\s+/g).map((s) => s.trim()).filter(Boolean);
+  return blocks.map((text) => ({
+    text,
+    referencedOpinionIds: pickRelatedOpinionIds(text, opinions),
+  }));
+}
+
+function normalizeSummarySentences(
+  raw: unknown,
+  opinions: Array<{ id: string; content: string }>,
+  fallbackSummary: string,
+): SummarySentence[] {
+  const allowed = new Set(opinions.map((o) => o.id));
+  if (Array.isArray(raw)) {
+    const parsed = raw
+      .map((item) => {
+        if (item == null) return null;
+        if (typeof item === "string") {
+          const t = item.trim();
+          return t ? { text: t, referencedOpinionIds: pickRelatedOpinionIds(t, opinions) } : null;
+        }
+        if (typeof item === "object" && item !== null && "text" in item) {
+          const text = String((item as { text?: unknown }).text ?? "").trim();
+          if (!text) return null;
+          const ids = (item as { referencedOpinionIds?: unknown }).referencedOpinionIds;
+          const referencedOpinionIds = Array.isArray(ids)
+            ? [...new Set(ids.filter((id): id is string => typeof id === "string" && allowed.has(id)))]
+            : [];
+          if (referencedOpinionIds.length === 0) {
+            return { text, referencedOpinionIds: pickRelatedOpinionIds(text, opinions) };
+          }
+          return { text, referencedOpinionIds };
+        }
+        return null;
+      })
+      .filter(Boolean) as SummarySentence[];
+    if (parsed.length) return parsed;
+  }
+  return sentencesFromSummary(fallbackSummary, opinions);
 }
 
 interface PoliticalLeaningAnalysis {
@@ -112,13 +170,15 @@ export class AIService {
       const opposingPercentage = totalVotes > 0 ? Math.round((totalDislikes / totalVotes) * 100) : 0;
       const neutralPercentage = totalVotes === 0 ? 100 : 0;
 
+      const summary = `Mock AI summary: ${totalOpinions} opinions on "${topic.title}" with ${supportingPercentage}% support, ${opposingPercentage}% opposition.`;
       return {
-        summary: `Mock AI summary: ${totalOpinions} opinions on "${topic.title}" with ${supportingPercentage}% support, ${opposingPercentage}% opposition.`,
+        summary,
         keyPoints: [
           'Mock key point: Community has mixed opinions',
           'Mock key point: Further discussion needed',
           'Mock key point: Data shows divided viewpoints'
         ],
+        summarySentences: sentencesFromSummary(summary, opinions),
         supportingPercentage,
         opposingPercentage,
         neutralPercentage,
@@ -131,6 +191,7 @@ export class AIService {
       return {
         summary: "No opinions available yet for this topic.",
         keyPoints: [],
+        summarySentences: [],
         supportingPercentage: 0,
         opposingPercentage: 0,
         neutralPercentage: 0,
@@ -157,8 +218,8 @@ export class AIService {
     }
 
     // Prepare opinions for AI analysis
-    const opinionTexts = opinions.map(opinion => 
-      `Content: ${opinion.content}`
+    const opinionTexts = opinions.map(opinion =>
+      `Opinion ID ${opinion.id}:\n${opinion.content}`
     ).join('\n\n');
 
     // Build distribution context for AI
@@ -207,8 +268,19 @@ ${opinionTexts}
 Please provide a comprehensive analysis in the following JSON format:
 {
   "summary": "A balanced 2-3 paragraph summary of the key themes and arguments",
-  "keyPoints": ["array", "of", "3-5", "most", "important", "points", "from", "all", "sides"]
+  "keyPoints": ["array", "of", "3-5", "most", "important", "points", "from", "all", "sides"],
+  "summarySentences": [
+    {
+      "text": "First paragraph of the summary",
+      "referencedOpinionIds": ["id-of-an-opinion-this-paragraph-draws-from"]
+    }
+  ]
 }
+
+For summarySentences:
+- Use 2-4 paragraphs that together match the summary.
+- Each paragraph's referencedOpinionIds must be IDs from the opinions listed above, and only opinions that paragraph actually draws on (1-4 per paragraph).
+- Do not invent IDs.
 
 Focus on:
 1. Identifying common themes and concerns
@@ -234,7 +306,7 @@ Return only valid JSON.`;
           }
         ],
         temperature: 0.3,
-        max_tokens: 1500
+        max_tokens: 2000
       });
 
       const responseContent = completion.choices[0]?.message?.content;
@@ -250,9 +322,11 @@ Return only valid JSON.`;
         throw new Error("Invalid AI response format");
       }
 
+      const summary = aiAnalysis.summary || "Unable to generate summary at this time.";
       return {
-        summary: aiAnalysis.summary || "Unable to generate summary at this time.",
+        summary,
         keyPoints: Array.isArray(aiAnalysis.keyPoints) ? aiAnalysis.keyPoints : [],
+        summarySentences: normalizeSummarySentences(aiAnalysis.summarySentences, opinions, summary),
         supportingPercentage,
         opposingPercentage,
         neutralPercentage,
@@ -266,14 +340,16 @@ Return only valid JSON.`;
       // Fallback analysis without AI
       const majorityVote = totalLikes > totalDislikes ? 'supportive' : totalDislikes > totalLikes ? 'opposing' : 'neutral';
 
+      const summary = `Based on ${totalOpinions} opinion(s), the discussion around "${topic.title}" shows ${supportingPercentage}% support, ${opposingPercentage}% opposition, and ${neutralPercentage}% neutral positions. The majority sentiment appears to be "${majorityVote}".`;
       return {
-        summary: `Based on ${totalOpinions} opinion(s), the discussion around "${topic.title}" shows ${supportingPercentage}% support, ${opposingPercentage}% opposition, and ${neutralPercentage}% neutral positions. The majority sentiment appears to be "${majorityVote}".`,
+        summary,
         keyPoints: [
           `${totalOpinions} total opinions collected`,
           `${supportingPercentage}% expressing support`,
           `${opposingPercentage}% expressing opposition`,
           `${neutralPercentage}% taking neutral positions`
         ],
+        summarySentences: sentencesFromSummary(summary, opinions),
         supportingPercentage,
         opposingPercentage,
         neutralPercentage,
