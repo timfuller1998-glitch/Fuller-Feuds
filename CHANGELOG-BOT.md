@@ -1,3 +1,10 @@
+## 2026-11-19 (20:20 CST) — Start a debate from a YouTube, X, or article link
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `feat/topic-source-links`
+- **What:** Topics can have an optional source URL (`source_url`, migration `0013`). Create Topic and the search-bar create form have a source field and a "Draft from link" button: the server fetches public page title / og description, YouTube oEmbed, or X oEmbed, then uses OpenAI to draft a neutral title and description that the user can edit before publishing. Failed or private/login-walled fetches fail gracefully. The source link is shown on the topic page. Private/internal URLs are rejected.
+- **Typecheck:** 52.
+
 ## 2026-11-19 (20:00 CST) — Let users flag opinions as likely AI-written
 
 - **By:** Fuller Feuds Dev

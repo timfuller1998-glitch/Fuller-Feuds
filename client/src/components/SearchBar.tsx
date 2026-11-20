@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { TopicSimilarityModal } from "./TopicSimilarityModal";
+import { SourceLinkFields } from "@/components/SourceLinkFields";
 
 interface SearchBarProps {
   onSearch?: (query: string) => void;
@@ -36,6 +37,8 @@ export default function SearchBar({
   const [topicCategories, setTopicCategories] = useState<string[]>([]);
   const [categoryInput, setCategoryInput] = useState("");
   const [references, setReferences] = useState<string[]>([]);
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [topicDescription, setTopicDescription] = useState("");
   const [pendingEnterKey, setPendingEnterKey] = useState<string | null>(null);
   const [dismissedQuery, setDismissedQuery] = useState<string | null>(null);
   const [pendingSimilarityCheck, setPendingSimilarityCheck] = useState<string | null>(null);
@@ -209,7 +212,7 @@ export default function SearchBar({
 
   // Create topic mutation
   const createTopicMutation = useMutation({
-    mutationFn: async (data: { title: string; initialOpinion: string; stance: string; categories: string[]; references?: string[] }) => {
+    mutationFn: async (data: { title: string; initialOpinion: string; stance: string; categories: string[]; references?: string[]; description?: string; sourceUrl?: string }) => {
       const response = await apiRequest("POST", "/api/topics", data);
       return response.json();
     },
@@ -226,6 +229,8 @@ export default function SearchBar({
       setTopicCategories([]);
       setCategoryInput("");
       setReferences([]);
+      setSourceUrl("");
+      setTopicDescription("");
       setLocation(`/topic/${data.id}`);
     },
     onError: (error) => {
@@ -262,6 +267,8 @@ export default function SearchBar({
       stance: stance,
       categories: topicCategories,
       references: validReferences.length > 0 ? validReferences : undefined,
+      description: topicDescription.trim() || undefined,
+      sourceUrl: sourceUrl.trim() || undefined,
     });
   };
 
@@ -564,6 +571,20 @@ export default function SearchBar({
                   </p>
                 </div>
 
+                <SourceLinkFields
+                  compact
+                  sourceUrl={sourceUrl}
+                  onSourceUrlChange={setSourceUrl}
+                  description={topicDescription}
+                  onDescriptionChange={setTopicDescription}
+                  onDraft={(preview) => {
+                    if (preview.draftTitle) {
+                      setQuery(preview.draftTitle);
+                      setTopicTitle(preview.draftTitle);
+                    }
+                  }}
+                />
+
                 {/* Reference Links Section */}
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-2">
@@ -625,6 +646,8 @@ export default function SearchBar({
                       setTopicCategories([]);
                       setCategoryInput("");
                       setReferences([]);
+      setSourceUrl("");
+      setTopicDescription("");
                       setDismissedQuery(queryToDismiss);
                     }}
                     className="flex-1"

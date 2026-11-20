@@ -89,6 +89,7 @@ export const topics = pgTable("topics", {
   isActive: boolean("is_active").default(true),
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'hidden', 'archived'
   embedding: jsonb("embedding"), // OpenAI embedding vector (1536 dimensions) stored as JSON array
+  sourceUrl: text("source_url"), // Optional link to the article, video, or post being debated
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -447,6 +448,7 @@ export const insertTopicSchema = createInsertSchema(topics).omit({
   initialOpinion: z.string().optional(),
   references: z.array(z.string()).optional(),
   stance: z.string().optional(), // Accept but ignore - will be removed in future
+  sourceUrl: z.string().url().optional().nullable(),
 });
 
 export const opinionStanceValues = ["for", "against", "neutral"] as const;
