@@ -17,6 +17,7 @@ import SwipeableCardStack from "@/components/SwipeableCardStack";
 import LeaderboardsDialog, { useLeaderboards, bestRank } from "@/components/LeaderboardsDialog";
 import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
 import { useAuth } from "@/hooks/useAuth";
+import { SkillTiers } from "@/components/SkillTiers";
 import * as LucideIcons from "lucide-react";
 import {
   Users,
@@ -267,8 +268,11 @@ export default function Profile() {
     enabled: !!userId,
   });
 
-  const earnedBadges = userBadges.filter((b: any) => b.unlockedAt);
-  const lockedBadges = userBadges.filter((b: any) => !b.unlockedAt);
+  // XP skill tiers (category "skill") get their own section; the lists below are milestone badges.
+  const milestoneBadges = userBadges.filter((b: any) => b.category !== "skill");
+  const selectedBadgeId: string | null = userBadges.find((b: any) => b.isSelected)?.badgeId ?? null;
+  const earnedBadges = milestoneBadges.filter((b: any) => b.unlockedAt);
+  const lockedBadges = milestoneBadges.filter((b: any) => !b.unlockedAt);
   const { data: leaderboards } = useLeaderboards(userId);
   const topRank = bestRank(leaderboards);
 
@@ -489,6 +493,13 @@ export default function Profile() {
 
   const renderBadges = () => (
     <div className="space-y-6" data-testid="section-badges">
+      <SkillTiers
+        userId={userId ?? ""}
+        isOwnProfile={!!isOwnProfile}
+        selectedBadgeId={selectedBadgeId}
+        onSelect={(id) => selectBadgeMutation.mutate(id)}
+        selecting={selectBadgeMutation.isPending}
+      />
       {[{ title: "Earned", list: earnedBadges }, { title: "Locked", list: lockedBadges }].map(({ title, list }) =>
         list.length === 0 ? null : (
           <div key={title} className="space-y-2" data-testid={`badges-${title.toLowerCase()}`}>
@@ -800,7 +811,7 @@ export default function Profile() {
                     onClick={() => setActiveTab("badges")}
                     data-testid="button-badges"
                   >
-                    {earnedBadges.length}/{userBadges.length || earnedBadges.length} earned
+                    {earnedBadges.length}/{milestoneBadges.length || earnedBadges.length} earned
                   </button>
                 </CardContent>
               </Card>

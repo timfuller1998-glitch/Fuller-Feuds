@@ -4,7 +4,9 @@ Scoped ideas that are approved for later but **not built yet**. Each entry says 
 
 ## Ad-free opt-in toggle (future paid subscription)
 
-_Added Nov 20, 2026 by Fuller Feuds Dev at Timothy's request. Not built._
+_Added Nov 20, 2026 by Fuller Feuds Dev at Timothy's request._
+
+> **Update Nov 20, 2026:** the v1 switch is **built** (Settings → Ads, `PUT /api/users/me/ad-free`, columns from migration `0015`, `isSupporter` / `canUseAdFree` in `shared/supporter.ts`, `useAdsEnabled()` + `<AdSlot>` on the client). Admins can use it now; everyone else sees it disabled with "Coming with supporter subscription." The paid subscription itself is still **not built**.
 
 **Now (v1):** a per-account "Ad-free" switch so Timothy can turn ads off on his own account. The site has no ad slots yet, so this ships alongside (or after) the first ads.
 
@@ -21,10 +23,10 @@ _Added Nov 20, 2026 by Fuller Feuds Dev at Timothy's request. Not built._
 **Later: paid subscription hooks (placeholders only)**
 - `isSupporter(user)` helper in `shared/` that returns true if `subscription_tier` is set and not expired. v1 always returns false, except admins are treated as ad-free.
 - Bonus badges: add supporter-only entries to `shared/badgeDefinitions.ts` with a new `requirementType: "subscription"` (e.g. "Supporter", "Founding Supporter"). They stay hidden until subscriptions exist.
-- 2x debate credit: in the badge-progress code that counts debates (`debate_count` requirement, see `server/lib/debateFlow.ts` / badge award logic), apply a `debateCreditMultiplier(user)` that returns 2 for supporters and 1 otherwise. Credit only completed debates, to avoid farming.
+- 2x debate credit: badges are now XP-tiered per skill (`shared/xpTiers.ts`, Bronze 200 → Platinum 20,000), so double credit would mean a `debateCreditMultiplier(user)` (2 for supporters, 1 otherwise) applied to the debate-earned XP in `BadgeRepository.getSkillXp`. Credit only completed debates, to avoid farming. The tiers replace the old "which badges get 2x" question.
 - Payments (Stripe or similar), pricing, refunds, and the upsell UI are out of scope until Timothy decides.
 
 **Open questions for Timothy**
 - Price and billing period when it becomes paid.
-- Does ad-free also hide "sponsored" topics, or only display ads?
-- Should 2x credit apply to all debate badges or only some tiers?
+
+**Deferred (Timothy, Nov 20):** Sponsored topics will be built as a separate feature. How the subscription treats them (hidden or not for ad-free supporters) gets decided then. Ad-free only covers display ads for now.

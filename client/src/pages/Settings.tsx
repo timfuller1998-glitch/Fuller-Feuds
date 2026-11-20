@@ -12,7 +12,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { Save, User, Cloudy, Sun, Moon, AtSign, HelpCircle } from "lucide-react";
+import { Save, User, Cloudy, Sun, Moon, AtSign, HelpCircle, Megaphone } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { canUseAdFree } from "@shared/supporter";
 import { HandleField, type HandleStatus } from "@/components/HandleField";
 import { useToast } from "@/hooks/use-toast";
 import { openTutorial } from "@/lib/tutorial";
@@ -61,6 +63,33 @@ export default function Settings() {
     },
     staleTime: 60_000,
     retry: false,
+  });
+  const adFreeAllowed = canUseAdFree(currentUser as any);
+  const [adFree, setAdFree] = useState<boolean>(false);
+  useEffect(() => {
+    setAdFree((currentUser as any)?.adFree === true);
+  }, [(currentUser as any)?.adFree]);
+  const adFreeMutation = useMutation({
+    mutationFn: async (next: boolean) => {
+      const res = await fetch("/api/users/me/ad-free", {
+        method: "PUT",
+        body: JSON.stringify({ adFree: next }),
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.message || "Could not save");
+      return j as { adFree: boolean };
+    },
+    onMutate: (next) => setAdFree(next),
+    onSuccess: (j) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: j.adFree ? "Ads hidden on your account" : "Ads back on for your account" });
+    },
+    onError: (e: any) => {
+      setAdFree((currentUser as any)?.adFree === true);
+      toast({ title: "Couldn't save", description: e?.message, variant: "destructive" });
+    },
   });
   const currentHandle: string | null = (currentUser as any)?.handle ?? null;
   const [handle, setHandle] = useState("");
@@ -433,6 +462,36 @@ export default function Settings() {
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Ads */}
+      <Card data-testid="card-settings-ads">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Megaphone className="w-5 h-5" />
+            Ads
+          </CardTitle>
+          <CardDescription>Choose whether ads show on your account.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <label htmlFor="switch-ad-free" className={`text-sm font-medium ${adFreeAllowed ? "" : "text-muted-foreground"}`}>
+                Hide ads on my account
+              </label>
+              <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-ad-free-note">
+                {adFreeAllowed ? "You can turn ads off for your account." : "Coming with supporter subscription."}
+              </p>
+            </div>
+            <Switch
+              id="switch-ad-free"
+              checked={adFreeAllowed && adFree}
+              disabled={!adFreeAllowed || adFreeMutation.isPending}
+              onCheckedChange={(v) => adFreeMutation.mutate(v)}
+              data-testid="switch-ad-free"
+            />
           </div>
         </CardContent>
       </Card>

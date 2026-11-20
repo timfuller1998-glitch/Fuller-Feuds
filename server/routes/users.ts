@@ -11,6 +11,7 @@ import { invalidateUserCache, invalidateUserBadgesCache, invalidateUserDebateSta
 import { isSecurityError } from '../utils/securityErrors.js';
 import { sql } from 'drizzle-orm';
 import { db } from '../db.js';
+import { canUseAdFree } from '../../shared/supporter.js';
 
 const router = Router();
 const badgeRepository = new BadgeRepository();
@@ -117,6 +118,36 @@ router.put('/me/tutorial', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error('Error saving tutorial state:', error);
     res.status(500).json({ message: 'Failed to save tutorial state' });
+  }
+});
+
+// PUT /api/users/me/ad-free { adFree: boolean } - admins now, supporters once subscriptions exist
+router.put('/me/ad-free', isAuthenticated, async (req, res) => {
+  try {
+    const me = req.user as Express.User;
+    const adFree = req.body?.adFree;
+    if (typeof adFree !== 'boolean') {
+      return res.status(400).json({ message: 'adFree must be true or false' });
+    }
+    const rows: any = await db.execute(sql`
+      select role, subscription_tier, subscription_expires_at from users where id = ${me.id}
+    `);
+    const u = (rows.rows ?? rows)[0];
+    if (!u) return res.status(404).json({ message: 'User not found' });
+    const allowed = canUseAdFree({
+      role: u.role,
+      subscriptionTier: u.subscription_tier,
+      subscriptionExpiresAt: u.subscription_expires_at,
+    });
+    if (!allowed) {
+      return res.status(403).json({ message: 'Ad-free comes with the supporter subscription' });
+    }
+    await db.execute(sql`update users set ad_free = ${adFree}, updated_at = now() where id = ${me.id}`);
+    await invalidateUserCache(String(me.id));
+    res.json({ adFree });
+  } catch (error) {
+    console.error('Error saving ad-free setting:', error);
+    res.status(500).json({ message: 'Failed to save ad-free setting' });
   }
 });
 
@@ -347,6 +378,18 @@ router.get('/:userId/badges', async (req, res) => {
   } catch (error) {
     console.error("Error fetching user badges:", error);
     res.status(500).json({ message: "Failed to fetch user badges" });
+  }
+});
+
+// GET /api/users/:userId/skills - XP per skill with current and next tier (computed live)
+router.get('/:userId/skills', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    if (!userId) return res.status(400).json({ message: "User ID is required" });
+    res.json(await badgeRepository.getUserSkills(userId));
+  } catch (error) {
+    console.error("Error fetching user skills:", error);
+    res.status(500).json({ message: "Failed to fetch user skills" });
   }
 });
 
