@@ -90,11 +90,17 @@ export const getCardDimensions = (
 ) => {
   let width = Math.min(parentWidth > 0 ? parentWidth : window.innerWidth - 34, maxWidth);
   let height = (width * 7) / 5; // 5:7 playing-card ratio
-  // Prefer the bounded parent column (home section between header and footer). Fall back
-  // to the window minus chromeReserve on pages where the deck's parent grows with the card.
+  const naturalHeight = height;
   const fromWindow = Math.max(260, window.innerHeight - chromeReserve);
   const columnChrome = includeControls ? IN_COLUMN_CHROME : IN_COLUMN_CHROME_NO_CONTROLS;
-  const fromParent = parentHeight > 80 ? parentHeight - columnChrome : Number.POSITIVE_INFINITY;
+  // Only treat the parent as a height cap when it is shorter than the card itself
+  // (a reserved flex slot like Home's snap column). A wrapper that grows with the
+  // card is at least as tall as the already window-capped card and must not shrink
+  // it in a loop — comparing to naturalHeight + chrome was too tight and could
+  // latch onto a mid-layout parent, then shrink the card and the parent together.
+  const slotBudget = Math.min(naturalHeight, fromWindow);
+  const parentIsBounded = parentHeight > 80 && parentHeight < slotBudget - 8;
+  const fromParent = parentIsBounded ? parentHeight - columnChrome : Number.POSITIVE_INFINITY;
   const maxHeight = Math.max(200, Math.min(fromWindow, fromParent));
   if (height > maxHeight) { height = maxHeight; width = (height * 5) / 7; }
   return { width, height };

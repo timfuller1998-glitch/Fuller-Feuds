@@ -19,6 +19,8 @@ interface SwipeableCardStackProps {
   topics: DeckTopic[];
   onEmpty?: () => void;
   maxWidth?: number;
+  /** Forwarded to CardDeck. Use 0 on scrolling pages so the default 400×560 card is not capped to the viewport. */
+  chromeReserve?: number;
   renderBadge?: (topic: DeckTopic, index: number) => ReactNode;
   testId?: string;
 }
@@ -26,13 +28,14 @@ interface SwipeableCardStackProps {
 const topicKey = (t: DeckTopic) => t.id;
 
 /** Topic deck: the generic CardDeck with TopicCard faces (TopicCard renders its own front and back). */
-export default function SwipeableCardStack({ topics, onEmpty, maxWidth, renderBadge, testId }: SwipeableCardStackProps) {
+export default function SwipeableCardStack({ topics, onEmpty, maxWidth, chromeReserve, renderBadge, testId }: SwipeableCardStackProps) {
   return (
     <CardDeck<DeckTopic>
       items={topics}
       getKey={topicKey}
       onEmpty={onEmpty}
       maxWidth={maxWidth}
+      chromeReserve={chromeReserve}
       renderBadge={renderBadge}
       testId={testId}
       renderFront={(card, ctx) => (
