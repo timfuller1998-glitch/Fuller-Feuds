@@ -18,7 +18,7 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, sh
 
   return (
     <section
-      className="h-[100dvh] snap-start flex flex-col items-center px-4"
+      className="h-full snap-start shrink-0 flex flex-col items-center px-4"
       data-testid={`section-${sectionKey}`}
     >
       <div className="w-full flex justify-between items-center pt-3 pb-1 flex-shrink-0">

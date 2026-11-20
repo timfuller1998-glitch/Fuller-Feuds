@@ -77,12 +77,25 @@ function FlipFaces({ flipped, onToggle, front, back }: { flipped: boolean; onTog
   );
 }
 
-export const getCardDimensions = (maxWidth: number, chromeReserve = 290) => {
-  let width = Math.min(window.innerWidth - 34, maxWidth); // 17px gutter each side
+/** Button row (32) + gap-3 (12) + stacked-back overhang (~16) inside a bounded deck column. */
+const IN_COLUMN_CHROME = 60;
+const IN_COLUMN_CHROME_NO_CONTROLS = 16;
+
+export const getCardDimensions = (
+  maxWidth: number,
+  chromeReserve = 290,
+  parentHeight = 0,
+  parentWidth = 0,
+  includeControls = true,
+) => {
+  let width = Math.min(parentWidth > 0 ? parentWidth : window.innerWidth - 34, maxWidth);
   let height = (width * 7) / 5; // 5:7 playing-card ratio
-  // On short screens, cap by viewport height so the whole deck fits above the footer
-  // instead of being clipped. chromeReserve covers header, title, and controls.
-  const maxHeight = Math.max(260, window.innerHeight - chromeReserve);
+  // Prefer the bounded parent column (home section between header and footer). Fall back
+  // to the window minus chromeReserve on pages where the deck's parent grows with the card.
+  const fromWindow = Math.max(260, window.innerHeight - chromeReserve);
+  const columnChrome = includeControls ? IN_COLUMN_CHROME : IN_COLUMN_CHROME_NO_CONTROLS;
+  const fromParent = parentHeight > 80 ? parentHeight - columnChrome : Number.POSITIVE_INFINITY;
+  const maxHeight = Math.max(200, Math.min(fromWindow, fromParent));
   if (height > maxHeight) { height = maxHeight; width = (height * 5) / 7; }
   return { width, height };
 };
@@ -432,15 +445,33 @@ export default function CardDeck<T>({
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const [forceUnflipSignal, setForceUnflipSignal] = useState(0);
   const [dimensions, setDimensions] = useState(() => getCardDimensions(maxWidth, chromeReserve));
+  const rootRef = useRef<HTMLDivElement>(null);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastWheelRef = useRef(0);
   const n = topics.length;
 
   useEffect(() => {
-    const onResize = () => setDimensions(getCardDimensions(maxWidth, chromeReserve));
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [maxWidth, chromeReserve]);
+    const measure = () => {
+      const parent = rootRef.current?.parentElement;
+      const next = getCardDimensions(
+        maxWidth,
+        chromeReserve,
+        parent?.clientHeight ?? 0,
+        parent?.clientWidth ?? 0,
+        n > 1,
+      );
+      setDimensions((prev) => (prev.width === next.width && prev.height === next.height ? prev : next));
+    };
+    measure();
+    const parent = rootRef.current?.parentElement;
+    const ro = parent ? new ResizeObserver(measure) : null;
+    if (parent && ro) ro.observe(parent);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [maxWidth, chromeReserve, n]);
 
   useEffect(() => () => { if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current); }, []);
 
@@ -568,7 +599,8 @@ export default function CardDeck<T>({
 
   return (
     <div
-      className="flex flex-col items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+      ref={rootRef}
+      className="flex flex-col items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl min-h-0"
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onWheel={handleWheel}
