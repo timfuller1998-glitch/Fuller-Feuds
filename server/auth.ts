@@ -6,6 +6,34 @@ import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { UserRepository } from "./repositories/userRepository.js";
 import { checkHandle, isHandleConflict } from "./lib/handles.js";
+import { getSiteConfig } from "./lib/siteSettings.js";
+import { clientIp } from "./lib/clientIp.js";
+import { claimInviteCode, finalizeInvitedSignup, normalizeCode, releaseInviteCode, type InviteRow } from "./lib/invites.js";
+
+// Sign-up rate limits (founding members, Nov 20 2026), in memory per IP: 20 attempts an hour (slows invite-code
+// guessing) and 5 new accounts an hour.
+const HOUR = 60 * 60 * 1000;
+const signupAttempts = new Map<string, number[]>();
+const signupCreated = new Map<string, number[]>();
+function recent(map: Map<string, number[]>, ip: string): number[] {
+  const now = Date.now();
+  const hits = (map.get(ip) || []).filter((t) => now - t < HOUR);
+  map.set(ip, hits);
+  if (map.size > 5000) map.clear();
+  return hits;
+}
+function allowSignupAttempt(ip: string): boolean {
+  const hits = recent(signupAttempts, ip);
+  if (hits.length >= 20) return false;
+  hits.push(Date.now());
+  return true;
+}
+const canCreateAccount = (ip: string) => recent(signupCreated, ip).length < 5;
+const recordAccountCreated = (ip: string) => recent(signupCreated, ip).push(Date.now());
+function cleanRef(v: unknown): string | null {
+  const s = String(v ?? "").trim().toLowerCase().replace(/[^a-z0-9_.-]/g, "").slice(0, 80);
+  return s || null;
+}
 
 const userRepository = new UserRepository();
 
@@ -113,6 +141,19 @@ export async function setupAuth(app: Express) {
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
+      if (req.body?.is18Plus !== true) {
+        return res.status(400).json({ message: "You must confirm you're 18 or older to join" });
+      }
+      const ip = clientIp(req);
+      if (!allowSignupAttempt(ip) || !canCreateAccount(ip)) {
+        return res.status(429).json({ message: "Too many sign-ups from this network. Please try again later." });
+      }
+      // Founding mode: sign-up needs a single-use invite code (checked before anything else is created).
+      const site = await getSiteConfig();
+      const inviteCode = normalizeCode(req.body?.inviteCode);
+      if (site.foundingMode && !inviteCode) {
+        return res.status(403).json({ message: "Fuller Feuds is invite-only right now. Apply at /apply for an invite code.", code: "INVITE_REQUIRED" });
+      }
 
       // Check if user already exists
       const existingUser = await userRepository.findByEmail(email);
@@ -132,14 +173,41 @@ export async function setupAuth(app: Express) {
       // Hash password
       const passwordHash = await bcrypt.hash(password, 10);
 
+      // Reserve the invite code last, right before creating the account; released again if creation fails.
+      let invite: InviteRow | null = null;
+      if (inviteCode) {
+        invite = await claimInviteCode(inviteCode);
+        if (!invite && site.foundingMode) {
+          return res.status(403).json({ message: "That invite code isn't valid or has already been used.", code: "INVITE_INVALID" });
+        }
+      }
+
       // Create user
-      const user = await userRepository.create({
-        email,
-        passwordHash,
-        firstName: firstName || "",
-        lastName: lastName || "",
-        handle: chosenHandle,
-      });
+      let user;
+      try {
+        user = await userRepository.create({
+          email,
+          passwordHash,
+          firstName: firstName || "",
+          lastName: lastName || "",
+          handle: chosenHandle,
+          signupRef: cleanRef(req.body?.ref),
+          ageConfirmedAt: new Date(),
+        });
+      } catch (createErr) {
+        if (invite) await releaseInviteCode(invite.id).catch(() => {});
+        throw createErr;
+      }
+      recordAccountCreated(ip);
+      let founder: { founderNumber: number | null; codes: string[] } = { founderNumber: null, codes: [] };
+      if (invite) {
+        try {
+          founder = await finalizeInvitedSignup(user.id, invite, { foundingMode: site.foundingMode });
+        } catch (e) {
+          // The account exists and the code stays used; log so an admin can fix the perks by hand.
+          console.error("Founder setup failed after sign-up:", e);
+        }
+      }
 
       // Log user in
       req.login(user, (err) => {
@@ -157,6 +225,8 @@ export async function setupAuth(app: Express) {
             lastName: user.lastName,
             handle: user.handle,
           },
+          founderNumber: founder.founderNumber,
+          inviteCodes: founder.codes,
         });
       });
     } catch (error: any) {

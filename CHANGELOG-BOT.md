@@ -1,3 +1,16 @@
+## 2026-11-20 (14:00 CST, America/Chicago) — Founding members: invite-only sign-up, /apply, admin Founders tab (branch feat/founding-members)
+Made by the Fuller Feuds Dev bot (Grok Bot), approved by Timothy (recruiting plan decisions 1–9).
+- Migration `0016_founding_members.sql` (additive): `site_settings` (founding_mode on, public_launch off), `founder_applications`, `invite_codes`, `founder_posts`, `users` columns (invited_by_user_id, invite_code_id, signup_ref, age_confirmed_at, founder_number, founder_lifetime_ad_free), `debate_rooms.is_showcase`, and the `founding_member` badge.
+- Founding mode: `/api/register` needs a single-use invite code while the admin switch is on, records who invited whom and the `?ref=` source, requires an 18+ confirmation, and is rate-limited (20 attempts / 5 accounts per hour per IP, Cloudflare client IP). Existing accounts sign in as before.
+- Founders: a code used during founding mode makes the account a numbered founder (#1–#100) with the Founding Member badge, the lifetime ad-free perk stored (only active after the admin "Public launch" switch; ads keep showing until then), and 3 invite codes of their own when admitted by an admin (application or direct code).
+- `/apply` public page (linked from sign-in, sign-up and the signed-out sidebar): plan questions, steelman prompt, optional politics/religion questions with a balance note, 18+ and pledge, honeypot, 3/hour limit, duplicate-email check. `?ref=` tags are remembered for 30 days.
+- Admin "Founders" tab: switches, every application with rubric-suggested scores (optional OpenAI second opinion that fails quietly with no credits), best picks highlighted in gold, red flags, viewpoint mix tally, final score/note, Accept / Waitlist / Decline. Accept creates the code and shows a ready-to-copy subject + body to send by hand. Direct invite codes for Timothy's own network, code list with revoke, and a Saturday showcase switch that pins a debate to the top of /live.
+- Founders' Room at `/founders`: small board only founders and admins can read or post in. Settings shows a Founding Member card with invite codes; the profile shows "Founding Member #n".
+- Terms/Privacy: accounts are 18+, and a section on applications and invite data.
+- Production data (approved): backed up then deleted the 111 seeded accounts, their 110 opinions, 2 counterpoints on those opinions, 1 counterpoint like, 22 badges, 98 profiles, 100 topic interactions and 9 vote-count fallback summaries that cited them. Backup: /workspace/ff-backups/seeded-users-2026-11-20/ on the bot box. Remaining users: @timf, @TIMOTHYF (admins), @EmilyF.
+- Draft starter topics for approval: `docs/STARTER_TOPICS.md` (not published).
+- Tests: local end to end (apply → scores → accept → code → sign up → Founder #1 + badge + 3 codes; no code / bad code / reused code refused; public launch turns on founder ad-free). Screenshots: /workspace/ff-videos/nov20/founders/.
+
 ## 2026-11-20 (12:40 CST) — Fix the back-swipe landing jitter
 
 - **By:** Fuller Feuds Dev

@@ -2,6 +2,7 @@ import { db } from '../db.js';
 import { badges, userBadges, users } from '../../shared/schema.js';
 import { eq, and, asc, sql } from 'drizzle-orm';
 import { BADGE_DEFINITIONS } from '../../shared/badgeDefinitions.js';
+import { FOUNDING_BADGE_ID, FOUNDER_CAP } from '../../shared/founders.js';
 import {
   SKILL_BADGE_DEFINITIONS,
   XP_SKILLS,
@@ -207,10 +208,11 @@ export class BadgeRepository {
     const stats = await this.getUserStats(userId);
 
     const [user] = await db
-      .select({ selectedBadgeId: users.selectedBadgeId })
+      .select({ selectedBadgeId: users.selectedBadgeId, founderNumber: users.founderNumber })
       .from(users)
       .where(eq(users.id, userId));
     const selectedBadgeId = user?.selectedBadgeId;
+    const founderNumber = user?.founderNumber ?? null;
 
     const allBadges = await db.select().from(badges).orderBy(asc(badges.category), asc(badges.tier));
     const unlocked = await db
@@ -231,8 +233,13 @@ export class BadgeRepository {
       if (top) shownBadgeId = top.id;
     }
 
-    return allBadges.map((badge) => ({
+    // Founding Member (migration 0016) is awarded on founder sign-up only: hidden unless earned, and numbered.
+    const visible = allBadges.filter((b) => b.id !== FOUNDING_BADGE_ID || unlockedMap.has(b.id));
+    return visible.map((badge) => ({
       ...badge,
+      ...(badge.id === FOUNDING_BADGE_ID && founderNumber != null
+        ? { name: `Founding Member #${founderNumber}`, description: `Founding member #${founderNumber} of the first ${FOUNDER_CAP}` }
+        : {}),
       badgeId: badge.id,
       unlockedAt: unlockedMap.get(badge.id) || null,
       isSelected: shownBadgeId === badge.id,

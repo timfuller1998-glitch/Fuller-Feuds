@@ -28,7 +28,8 @@ import {
   Trash2,
   BookOpen,
   Sparkles,
-  Database
+  Database,
+  Crown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -42,6 +43,7 @@ import { AuditLog } from "@/components/admin/AuditLog";
 import { DataSeeding } from "@/components/admin/DataSeeding";
 import { FeedbackRequests } from "@/components/admin/FeedbackRequests";
 import { AiOpinionFlags } from "@/components/admin/AiOpinionFlags";
+import { FoundingMembers } from "@/components/admin/FoundingMembers";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +63,11 @@ export default function AdminDashboard() {
   const isAdmin = user?.role === "admin";
   const { data: requestCounts } = useQuery<{ counts: Record<string, number> }>({
     queryKey: ['/api/admin/feedback'],
+    enabled: adminQueriesEnabled && isAdmin,
+  });
+
+  const { data: founderSettings } = useQuery<{ stats: { pending: number } }>({
+    queryKey: ['/api/admin/founders/settings'],
     enabled: adminQueriesEnabled && isAdmin,
   });
 
@@ -277,6 +284,15 @@ export default function AdminDashboard() {
             <LayoutDashboard className="h-4 w-4 mr-2" />
             Overview
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="founders" data-testid="tab-founders">
+              <Crown className="h-4 w-4 mr-2" />
+              Founders
+              {(founderSettings?.stats?.pending ?? 0) > 0 && (
+                <Badge variant="destructive" className="ml-2" data-testid="badge-founders-pending">{founderSettings!.stats.pending}</Badge>
+              )}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="h-4 w-4 mr-2" />
             Users
@@ -323,6 +339,12 @@ export default function AdminDashboard() {
         <TabsContent value="overview">
           <DashboardOverview queriesEnabled={adminQueriesEnabled} />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="founders">
+            <FoundingMembers />
+          </TabsContent>
+        )}
 
         {/* Users Tab */}
         <TabsContent value="users">

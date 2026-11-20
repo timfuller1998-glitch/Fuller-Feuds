@@ -226,6 +226,11 @@ export function sanitizeUserData<T extends Record<string, any>>(
     adFree,
     subscriptionTier,
     subscriptionExpiresAt,
+    invitedByUserId,
+    inviteCodeId,
+    signupRef,
+    ageConfirmedAt,
+    founderLifetimeAdFree,
     ...publicData
   } = user;
 

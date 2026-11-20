@@ -45,6 +45,9 @@ router.get('/user', isAuthenticated, async (req, res) => {
       adFree: freshUser.adFree ?? false,
       subscriptionTier: freshUser.subscriptionTier ?? null,
       subscriptionExpiresAt: freshUser.subscriptionExpiresAt ?? null,
+      // Founding members (migration 0016)
+      founderNumber: freshUser.founderNumber ?? null,
+      founderLifetimeAdFree: freshUser.founderLifetimeAdFree ?? false,
     });
   } catch (error) {
     console.error('Error fetching user:', error);

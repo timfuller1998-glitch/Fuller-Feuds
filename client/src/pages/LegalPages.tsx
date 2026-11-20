@@ -64,6 +64,17 @@ export function PrivacyPage() {
           your personal information. We do not use third-party analytics.
         </p>
       </section>
+      <section id="applications">
+        <h2>Founding-member applications and invites</h2>
+        <p>
+          If you apply at /apply we store your answers, your email, the link that brought you to us (for example a
+          “ref” tag), and a one-way hash of your IP address to spot duplicate applications. The political and religious
+          questions are optional; we use them only to keep the founding group balanced, they are seen only by the people
+          reviewing applications, and they are never shown publicly. Your answers may be scored by simple rules and, when
+          available, an AI provider to help us review them; a person makes every decision. Invite codes record who invited
+          whom. Ask us through the <ContactLink /> to delete your application.
+        </p>
+      </section>
       <section>
         <h2>Cookies and local storage</h2>
         <ul>
@@ -118,7 +129,11 @@ export function PrivacyPage() {
       </section>
       <section>
         <h2>Children</h2>
-        <p>Fuller Feuds is not directed at children under 13, and we do not knowingly collect their information.</p>
+        <p>
+          Accounts and founding-member applications are for adults 18 and older. Fuller Feuds is not directed at children,
+          and we do not knowingly collect information from anyone under 18. If you believe a minor has signed up or applied,
+          tell us through the <ContactLink /> and we will remove their information.
+        </p>
       </section>
       <section>
         <h2>Changes and contact</h2>
@@ -140,7 +155,8 @@ export function TermsPage() {
       <section>
         <h2>Your account</h2>
         <p>
-          You must be at least 13 years old. Keep your password safe; you are responsible for activity on your account.
+          You must be at least 18 years old to create an account, and you confirm this when you sign up. Founding members
+          must also be 18 or older. Keep your password safe; you are responsible for activity on your account.
           Give accurate information and don’t impersonate anyone.
         </p>
       </section>

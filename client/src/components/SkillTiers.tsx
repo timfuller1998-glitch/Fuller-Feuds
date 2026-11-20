@@ -253,6 +253,8 @@ export function MilestoneBadges({
           const isShown = levels.some((l) => l.isSelected);
           const showIcon = (current ?? levels[0]).icon;
           const unit = meta.unit ? ` ${meta.unit}` : "";
+          // Founding Member is a one-off numbered badge, not a progress stack.
+          const founderNo = type === "founder" ? (current?.name?.match(/#(\d+)/)?.[1] ?? null) : null;
           return (
             <LevelCard
               key={type}
@@ -260,13 +262,13 @@ export function MilestoneBadges({
               icon={showIcon}
               title={meta.name}
               subtitle={current ? current.name : `Next: ${levels[0].name}`}
-              pill={earnedCount > 0 ? `Level ${earnedCount} of ${total}` : `0 of ${total}`}
+              pill={type === "founder" ? "First 100" : earnedCount > 0 ? `Level ${earnedCount} of ${total}` : `0 of ${total}`}
               earned={earnedCount > 0}
               tierLight={GOLD_L}
               tierDark={GOLD_D}
-              amount={`${fmt(cur)}${unit}`}
+              amount={founderNo ? `#${founderNo}` : `${fmt(cur)}${unit}`}
               pct={pct}
-              progressLabel={next ? `Level ${earnedCount + 1}: ${next.description}` : "All levels earned"}
+              progressLabel={type === "founder" ? "Numbered and never issued again" : next ? `Level ${earnedCount + 1}: ${next.description}` : "All levels earned"}
               dots={levels.map((l, i) => ({
                 key: l.badgeId,
                 title: `Level ${i + 1}: ${l.name}`,

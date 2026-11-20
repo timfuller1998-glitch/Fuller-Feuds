@@ -41,7 +41,9 @@ import {
   Grid,
   Shield,
   Clock,
-  Star
+  Star,
+  Crown,
+  PenLine
 } from "lucide-react";
 import type { Topic } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
@@ -237,6 +239,26 @@ export default function AppSidebar({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {(user?.founderNumber != null || user?.role === 'admin') && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/founders"}>
+                    <Link href="/founders" onClick={handleLinkClick} data-testid="link-nav-founders-room">
+                      <Crown className="w-4 h-4" />
+                      <span>Founders' Room</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {!user && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location === "/apply"}>
+                    <Link href="/apply" onClick={handleLinkClick} data-testid="link-nav-apply">
+                      <PenLine className="w-4 h-4" />
+                      <span>Become a founding member</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               {isAdminOrModerator && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={location === "/admin"}>
