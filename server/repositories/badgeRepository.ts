@@ -2,6 +2,15 @@ import { db } from '../db.js';
 import { badges, userBadges, users } from '../../shared/schema.js';
 import { eq, and, asc, sql } from 'drizzle-orm';
 import { BADGE_DEFINITIONS } from '../../shared/badgeDefinitions.js';
+import {
+  SKILL_BADGE_DEFINITIONS,
+  XP_SKILLS,
+  tierForXp,
+  nextTierForXp,
+  skillBadgeId,
+  type SkillId,
+  type SkillXp,
+} from '../../shared/xpTiers.js';
 
 export interface UserBadgeStats {
   debateCount: number;
@@ -13,6 +22,7 @@ export interface UserBadgeStats {
   fallacyRate: number;
   ratedDebates: number;
   avgRating: number;
+  skillXp: SkillXp;
 }
 
 export class BadgeRepository {
@@ -29,6 +39,91 @@ export class BadgeRepository {
         await db.insert(badges).values(badge);
       }
     }
+    // XP skill tiers come from shared/xpTiers.ts; upsert so a threshold change there takes effect on deploy.
+    for (const badge of SKILL_BADGE_DEFINITIONS) {
+      await db
+        .insert(badges)
+        .values(badge)
+        .onConflictDoUpdate({
+          target: badges.id,
+          set: {
+            name: badge.name,
+            description: badge.description,
+            icon: badge.icon,
+            category: badge.category,
+            tier: badge.tier,
+            requirement: badge.requirement,
+            requirementType: badge.requirementType,
+          },
+        });
+    }
+  }
+
+  /**
+   * XP per skill, computed live from existing activity (no XP table, so history counts with no backfill).
+   * Earning rules are listed in shared/xpTiers.ts (XP_SKILLS[].rules) and must match this query.
+   */
+  async getSkillXp(userId: string): Promise<SkillXp> {
+    const result: any = await db.execute(sql`
+      WITH my_rooms AS (
+        SELECT id, status, participant2_id, invitee_id FROM debate_rooms
+        WHERE (participant1_id = ${userId} OR participant2_id = ${userId})
+          AND COALESCE(invite_status, 'accepted') = 'accepted'
+      ),
+      ratings AS (
+        SELECT COALESCE(SUM(logical_reasoning), 0)::int AS logic,
+               COALESCE(SUM(politeness), 0)::int AS polite,
+               COALESCE(SUM(openness_to_change), 0)::int AS open
+        FROM debate_votes WHERE voted_for_user_id = ${userId} AND voter_id <> ${userId}
+      )
+      SELECT
+        r.logic, r.polite, r.open,
+        (SELECT COUNT(*)::int FROM my_rooms) AS debates,
+        (SELECT COUNT(*)::int FROM my_rooms WHERE status IN ('ended', 'archived')) AS finished,
+        (SELECT COUNT(*)::int FROM my_rooms WHERE invitee_id = ${userId} OR (invitee_id IS NULL AND participant2_id = ${userId})) AS accepted,
+        (SELECT COUNT(*)::int FROM debate_messages WHERE user_id = ${userId}) AS messages,
+        (SELECT COUNT(*)::int FROM debate_messages m WHERE m.user_id = ${userId}
+           AND NOT EXISTS (SELECT 1 FROM debate_message_flags f WHERE f.message_id = m.id)) AS clean_messages,
+        (SELECT COUNT(*)::int FROM opinion_sentence_counterpoints
+           WHERE author_user_id = ${userId} AND COALESCE(status, 'approved') NOT IN ('hidden', 'flagged', 'removed')) AS counterpoints,
+        (SELECT COUNT(*)::int FROM opinions WHERE user_id = ${userId} AND COALESCE(status, 'approved') NOT IN ('hidden', 'flagged')) AS opinions,
+        (SELECT COUNT(*)::int FROM opinion_votes v JOIN opinions o ON o.id = v.opinion_id
+           WHERE o.user_id = ${userId} AND v.vote_type = 'like' AND v.user_id <> ${userId}) AS likes,
+        (SELECT COUNT(*)::int FROM topics WHERE created_by_id = ${userId}) AS topics,
+        (SELECT COUNT(*)::int FROM opinions o JOIN topics t ON t.id = o.topic_id
+           WHERE t.created_by_id = ${userId} AND o.user_id <> ${userId}
+             AND COALESCE(o.status, 'approved') NOT IN ('hidden', 'flagged')) AS topic_opinions
+      FROM ratings r
+    `);
+    const r = (result.rows ?? result)[0] ?? {};
+    const n = (k: string) => Number(r[k] || 0);
+    return {
+      critical_thinking: 20 * n('logic') + 5 * n('clean_messages') + 10 * n('counterpoints'),
+      civility: 20 * n('polite') + 10 * n('finished'),
+      open_mind: 20 * n('open') + 15 * n('accepted'),
+      debating: 50 * n('debates') + 5 * n('messages'),
+      opinions: 25 * n('opinions') + 5 * n('likes'),
+      topics: 50 * n('topics') + 5 * n('topic_opinions'),
+    };
+  }
+
+  /** Per-skill XP, current tier and next tier for the profile. */
+  async getUserSkills(userId: string) {
+    const xp = await this.getSkillXp(userId);
+    return XP_SKILLS.map((s) => {
+      const tier = tierForXp(xp[s.id]);
+      const next = nextTierForXp(xp[s.id]);
+      return {
+        id: s.id,
+        name: s.name,
+        icon: s.icon,
+        rules: s.rules,
+        xp: xp[s.id],
+        tier: tier ? { id: tier.id, name: tier.name, minXp: tier.minXp, color: tier.color } : null,
+        tierBadgeId: tier ? skillBadgeId(s.id, tier.id) : null,
+        nextTier: next ? { id: next.id, name: next.name, minXp: next.minXp, color: next.color } : null,
+      };
+    });
   }
 
   async getAllBadges(): Promise<any[]> {
@@ -40,6 +135,7 @@ export class BadgeRepository {
    * historical activity counts without any backfill.
    */
   async getUserStats(userId: string): Promise<UserBadgeStats> {
+    const skillXp = await this.getSkillXp(userId);
     const result: any = await db.execute(sql`
       SELECT
         (SELECT COUNT(*)::int FROM debate_rooms WHERE participant1_id = ${userId} OR participant2_id = ${userId}) AS debates,
@@ -68,6 +164,7 @@ export class BadgeRepository {
       fallacyRate: messages > 0 ? (flagged / messages) * 100 : 0,
       ratedDebates: Number(r.rated || 0),
       avgRating: Number(r.avg_rating || 0),
+      skillXp,
     };
   }
 
@@ -81,7 +178,12 @@ export class BadgeRepository {
       case 'follower_count': return { current: stats.followerCount, required: badge.requirement };
       case 'low_fallacy_rate': return { current: stats.debateCount, required: badge.requirement };
       case 'high_rating': return { current: stats.ratedDebates, required: badge.requirement };
-      default: return { current: 0, required: badge.requirement };
+      default:
+        if (badge.requirementType.startsWith('xp_')) {
+          const skill = badge.requirementType.slice(3) as SkillId;
+          return { current: stats.skillXp[skill] ?? 0, required: badge.requirement };
+        }
+        return { current: 0, required: badge.requirement };
     }
   }
 

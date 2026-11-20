@@ -1,3 +1,12 @@
+## 2026-11-20 (10:30 CST) — Ad-free switch in Settings + XP-tiered skill badges
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `feat/ad-free-and-xp-badges`
+- **Ad-free switch:** New **Ads** card in Settings with "Hide ads on my account." Saved in `users.ad_free` (migration `0015`, additive; also adds placeholder `subscription_tier` and `subscription_expires_at`). `PUT /api/users/me/ad-free` only accepts admins now, or anyone `isSupporter(user)` once subscriptions exist (nobody yet); everyone else sees the switch disabled with "Coming with supporter subscription." No payments or subscription flow. The site has no ad slots yet, so `useAdsEnabled()` and `<AdSlot>` are ready for the first ones. The ad fields are hidden from public profiles. Sponsored topics untouched.
+- **XP skill tiers:** Six skills (Critical Thinking, Civility, Open Mind, Debating, Opinions, Topics) earn XP, computed live from existing activity (debate ratings, messages, fallacy flags, counterpoints, opinions, likes, topics), so past activity counts with no backfill and no new XP table. Tiers come from one config table in `shared/xpTiers.ts`: Bronze 200, Silver 1,000, Gold 5,000, Diamond 10,000, Platinum 20,000 (Platinum above Diamond). Each skill × tier is a badge (`skill_<skill>_<tier>`, synced on startup) and can be shown on the avatar. Profile → Badges has a new "Skill tiers" section (tier pill, XP, progress to the next tier, tier dots, "How to earn"). The milestone badges stay as before.
+- **Backlog:** The "which badges get 2x debate credit" question is replaced by the tiers. Sponsored-topic handling is deferred until sponsored topics are built.
+- **Typecheck:** 50 (ceiling 52).
+
 ## 2026-11-20 (09:45 CST) — Debates overhaul: Challenge button, invites that never expire, live viewing
 
 - **By:** Fuller Feuds Dev

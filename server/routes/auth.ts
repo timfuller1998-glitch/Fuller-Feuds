@@ -42,6 +42,9 @@ router.get('/user', isAuthenticated, async (req, res) => {
       followedCategories: freshUser.followedCategories ?? [],
       handle: freshUser.handle ?? null,
       tutorialCompletedAt: freshUser.tutorialCompletedAt ?? null,
+      adFree: freshUser.adFree ?? false,
+      subscriptionTier: freshUser.subscriptionTier ?? null,
+      subscriptionExpiresAt: freshUser.subscriptionExpiresAt ?? null,
     });
   } catch (error) {
     console.error('Error fetching user:', error);

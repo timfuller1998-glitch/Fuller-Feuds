@@ -52,6 +52,10 @@ export const users = pgTable("users", {
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'suspended', 'banned'
   isSynthetic: boolean("is_synthetic").default(false), // True for users created by data seeding
   selectedBadgeId: varchar("selected_badge_id"), // Badge displayed on user avatar
+  // Ad-free switch + future subscription placeholders (migration 0015, additive). No payments yet.
+  adFree: boolean("ad_free").default(false),
+  subscriptionTier: varchar("subscription_tier", { length: 30 }),
+  subscriptionExpiresAt: timestamp("subscription_expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

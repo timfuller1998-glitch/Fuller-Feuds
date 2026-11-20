@@ -223,6 +223,9 @@ export function sanitizeUserData<T extends Record<string, any>>(
     onboardingStep,
     onboardingComplete,
     isSynthetic,
+    adFree,
+    subscriptionTier,
+    subscriptionExpiresAt,
     ...publicData
   } = user;
 
