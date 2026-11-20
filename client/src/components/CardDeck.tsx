@@ -25,6 +25,8 @@ export interface CardFaceContext {
   setFlipped: (flipped: boolean) => void;
   onFlipChange?: (flipped: boolean) => void;
   forceUnflipSignal?: number;
+  /** When true with forceUnflipSignal, snap back to the front with no flip animation (card is off-screen or covered). */
+  instantUnflip?: boolean;
 }
 
 export interface CardDeckProps<T> {
@@ -60,14 +62,16 @@ export interface CardDeckProps<T> {
 }
 
 /** Built-in 3D flip used when the deck owns the flip (renderBack provided). */
-function FlipFaces({ flipped, onToggle, front, back }: { flipped: boolean; onToggle: () => void; front: ReactNode; back: ReactNode }) {
+function FlipFaces({ flipped, onToggle, front, back, instant }: { flipped: boolean; onToggle: () => void; front: ReactNode; back: ReactNode; instant?: boolean }) {
   const start = useRef<{ x: number; y: number } | null>(null);
+  const fade = instant ? "none" : "opacity 0.6s ease-in-out";
+  const spin = instant ? "none" : `transform ${FLIP_DURATION_MS}ms ease-in-out`;
   const face = (rot: number, visible: boolean): React.CSSProperties => ({
     transform: `rotateY(${rot}deg)`, backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
-    opacity: visible ? 1 : 0, pointerEvents: visible ? "auto" : "none", transition: "opacity 0.6s ease-in-out",
+    opacity: visible ? 1 : 0, pointerEvents: visible ? "auto" : "none", transition: fade,
   });
   return (
-    <div className="relative w-full h-full" style={{ perspective: "1000px" }}
+    <div className="relative w-full h-full" style={{ perspective: "1000px" }} data-card-flipped={flipped ? "true" : "false"}
       onPointerDown={(e) => { start.current = { x: e.clientX, y: e.clientY }; }}
       onPointerMove={(e) => {
         const s = start.current;
@@ -80,7 +84,7 @@ function FlipFaces({ flipped, onToggle, front, back }: { flipped: boolean; onTog
         if (cardGestureJustHappened()) return;
         if (!(e.target as HTMLElement).closest('button, a, [role="button"], input, textarea, select')) onToggle();
       }}>
-      <div className="relative w-full h-full" style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)", transition: `transform ${FLIP_DURATION_MS}ms ease-in-out` }}>
+      <div className="relative w-full h-full" style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)", transition: spin }}>
         <div className="absolute inset-0" style={face(0, !flipped)}>{front}</div>
         <div className="absolute inset-0" style={face(180, flipped)}>{back}</div>
       </div>
@@ -222,6 +226,8 @@ interface DeckCardProps {
   /** Leftward drag distance; the rest of the pile rises/settles forward by this much. */
   lift?: MotionValue<number>;
   onDone?: () => void;
+  /** Forward swipe: called once the departing card has slid fully off-screen, before it tucks back under the pile. */
+  onHidden?: () => void;
   /** raised = on top or being laid on top (back swipe); styles that differ for the top card use it so landing changes nothing. */
   children: (isTop: boolean, raised: boolean) => ReactNode;
 }
@@ -231,7 +237,7 @@ interface DeckCardProps {
  * keeps its own content and position; it is never re-used for another topic.
  * Outer values = deck placement/shuffle animation, inner x = finger drag.
  */
-function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, onDrag, pull, lift, enterFromBack, onDone, children }: DeckCardProps) {
+function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, onDrag, pull, lift, enterFromBack, onDone, onHidden, children }: DeckCardProps) {
   const first = useRef(true);
   const narrow = typeof window !== "undefined" && window.innerWidth < 640;
   const s1 = backStyle(1);
@@ -252,6 +258,8 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
   const irot = useTransform(ix, [-300, 300], [-10, 10]);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
+  const hiddenRef = useRef(onHidden);
+  hiddenRef.current = onHidden;
   /** Role on the previous run of the role effect (null on mount). */
   const prevRoleRef = useRef<Role | null>(null);
 
@@ -319,6 +327,9 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         oz.set(20);
         await Promise.all([go(ox, -out, 0.2), go(orot, -9, 0.2), go(os, 0.98, 0.2)]);
         if (cancelled) return;
+        // Card is off-screen: snap any flip back to the front with no visible animation
+        // before the return slide, which is visible beside and below the pile.
+        hiddenRef.current?.();
         // Tuck under the face cards but stay above the blank backs (z=1) so the
         // return slide is visible beside and below the pile. Below "next" (5)
         // and "top" (10) so the 2nd card is never uncovered.
@@ -562,34 +573,52 @@ function CardDeckCore<T>({
     lift.set(0);
   }, [pull, lift]);
 
-  /** Move through the deck; flips the top card back first if it is showing its back. */
+  /** Id of the card that just left the top, so we can snap-unflip it once it's hidden. */
+  const leavingKeyRef = useRef<string | null>(null);
+  const [instantUnflip, setInstantUnflip] = useState<Record<string, boolean>>({});
+  // Set synchronously before the flipped=false render so FlipFaces never animates the snap.
+  const instantIdsRef = useRef<Set<string>>(new Set());
+
+  /** Snap a hidden card back to its front with no flip animation. */
+  const snapUnflip = useCallback((id: string) => {
+    instantIdsRef.current.add(id);
+    setInstantUnflip((p) => (p[id] ? p : { ...p, [id]: true }));
+    setFlipped((p) => (p[id] ? { ...p, [id]: false } : p));
+    setForceUnflipSignal(Date.now());
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        instantIdsRef.current.delete(id);
+        setInstantUnflip((p) => {
+          if (!p[id]) return p;
+          const next = { ...p };
+          delete next[id];
+          return next;
+        });
+      });
+    });
+  }, []);
+
+  /** Move through the deck. A flipped card swipes away as-is; its flip is reset invisibly once it's off-screen or covered. */
   const step = useCallback((dir: 1 | -1) => {
     if (n < 2 || !currentCard || busy) return;
     if ((dir === -1 && !canBack) || (dir === 1 && !canForward)) return;
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     const leaving = currentCard;
-    const run = () => {
-      if (dir === 1) {
-        keyRef.current += 1;
-        setOutgoing({ card: leaving, key: keyRef.current });
-      } else {
-        setIncomingId(getKey(topics[wrap(currentIndex - 1, n)]));
-        // Buttons, keys, and the wheel don't drag, so drive the same pull the finger would:
-        // the top card and the rest of the pile nudge together while the bottom card comes out.
-        if (!reduceMotion && pull.get() < 2) {
-          const narrow = window.innerWidth < 640;
-          animate(pull, pullTargetFor(dimensions.width, narrow), { duration: 0.2, ease: EASE as any });
-        }
-      }
-      setCurrentIndex((i) => wrap(i + dir, n));
-    };
-    if (flipped[getKey(currentCard)]) {
-      setForceUnflipSignal(Date.now());
-      advanceTimerRef.current = setTimeout(run, FLIP_DURATION_MS);
+    leavingKeyRef.current = getKey(leaving);
+    if (dir === 1) {
+      keyRef.current += 1;
+      setOutgoing({ card: leaving, key: keyRef.current });
     } else {
-      run();
+      setIncomingId(getKey(topics[wrap(currentIndex - 1, n)]));
+      // Buttons, keys, and the wheel don't drag, so drive the same pull the finger would:
+      // the top card and the rest of the pile nudge together while the bottom card comes out.
+      if (!reduceMotion && pull.get() < 2) {
+        const narrow = window.innerWidth < 640;
+        animate(pull, pullTargetFor(dimensions.width, narrow), { duration: 0.2, ease: EASE as any });
+      }
     }
-  }, [n, currentCard, flipped, busy, topics, currentIndex, getKey, reduceMotion, pull, dimensions.width, canBack, canForward]);
+    setCurrentIndex((i) => wrap(i + dir, n));
+  }, [n, currentCard, busy, topics, currentIndex, getKey, reduceMotion, pull, dimensions.width, canBack, canForward]);
 
   const handleDragEnd = (info: PanInfo) => {
     const { offset, velocity } = info;
@@ -636,13 +665,15 @@ function CardDeckCore<T>({
     const ctx: CardFaceContext = {
       isTop,
       index: wrap(currentIndex, n),
-      flipped: isTop ? !!flipped[id] : false,
+      // Keep the departing card's face as-is during the swipe; snapUnflip clears this once it's hidden.
+      flipped: !!flipped[id],
       setFlipped: (f) => { if (isTop) setFlipped((p) => ({ ...p, [id]: f })); },
       onFlipChange: isTop ? (f) => setFlipped((p) => ({ ...p, [id]: f })) : undefined,
-      forceUnflipSignal: isTop ? forceUnflipSignal : undefined,
+      forceUnflipSignal: instantUnflip[id] ? forceUnflipSignal : undefined,
+      instantUnflip: !!instantUnflip[id] || instantIdsRef.current.has(id),
     };
     if (!renderBack) return renderFront(card, ctx);
-    return <FlipFaces flipped={ctx.flipped} onToggle={() => ctx.setFlipped(!ctx.flipped)} front={renderFront(card, ctx)} back={renderBack(card, ctx)} />;
+    return <FlipFaces flipped={ctx.flipped} onToggle={() => ctx.setFlipped(!ctx.flipped)} front={renderFront(card, ctx)} back={renderBack(card, ctx)} instant={ctx.instantUnflip} />;
   };
 
   const backs = BACK_LAYERS.filter((d) => d < n);
@@ -704,8 +735,9 @@ function CardDeckCore<T>({
             pull={role === "peek" || role === "top" || role === "next" || role === "in" ? pull : undefined}
             lift={role === "next" || role === "peek" ? lift : undefined}
             enterFromBack={role === "next" && !!outgoing}
+            onHidden={role === "out" ? () => { const id = leavingKeyRef.current; if (id) snapUnflip(id); } : undefined}
             onDone={
-              role === "out" ? () => { setOutgoing(null); resetPileMotion(); } : role === "in" ? () => { resetPileMotion(); setIncomingId(null); } : undefined
+              role === "out" ? () => { setOutgoing(null); resetPileMotion(); } : role === "in" ? () => { const id = leavingKeyRef.current; if (id) snapUnflip(id); resetPileMotion(); setIncomingId(null); } : undefined
             }
           >
             {(isTop, raised) => (

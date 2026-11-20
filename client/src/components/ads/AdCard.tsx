@@ -56,23 +56,35 @@ export function AdCardBack() {
 /** For decks whose cards flip themselves (topic decks): same flip contract as TopicCard. */
 export function AdCardSelfFlip({ slot, ctx }: { slot: number; ctx: CardFaceContext }) {
   const [flipped, setFlipped] = useState(false);
-  useEffect(() => { if (ctx.forceUnflipSignal) setFlipped(false); }, [ctx.forceUnflipSignal]);
+  const [skipFlipTransition, setSkipFlipTransition] = useState(false);
+  useEffect(() => {
+    if (!ctx.forceUnflipSignal) return;
+    // Always snap: this signal now only fires once the card is off-screen or covered.
+    setSkipFlipTransition(true);
+    setFlipped(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setSkipFlipTransition(false));
+    });
+  }, [ctx.forceUnflipSignal]);
   useEffect(() => { ctx.onFlipChange?.(flipped); }, [flipped]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fade = skipFlipTransition ? "none" : "opacity 0.6s ease-in-out";
+  const spin = skipFlipTransition ? "none" : "transform 600ms ease-in-out";
   const face = (rot: number, visible: boolean): React.CSSProperties => ({
     transform: `rotateY(${rot}deg)`, backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
-    opacity: visible ? 1 : 0, pointerEvents: visible ? "auto" : "none", transition: "opacity 0.6s ease-in-out",
+    opacity: visible ? 1 : 0, pointerEvents: visible ? "auto" : "none", transition: fade,
   });
   return (
     <div
       className="relative w-full h-full"
       style={{ perspective: "1000px" }}
+      data-card-flipped={flipped ? "true" : "false"}
       onClick={(e) => {
         if (!ctx.isTop || cardGestureJustHappened()) return;
         if ((e.target as HTMLElement).closest("button, a, [role='button']")) return;
         setFlipped((f) => !f);
       }}
     >
-      <div className="relative w-full h-full" style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "none", transition: "transform 600ms ease-in-out" }}>
+      <div className="relative w-full h-full" style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "none", transition: spin }}>
         <div className="absolute inset-0" style={face(0, !flipped)}><AdCardFace slot={slot} isTop={ctx.isTop} /></div>
         <div className="absolute inset-0" style={face(180, flipped)}><AdCardBack /></div>
       </div>

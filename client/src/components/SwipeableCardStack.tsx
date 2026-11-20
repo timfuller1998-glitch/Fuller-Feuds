@@ -59,6 +59,7 @@ export default function SwipeableCardStack({ topics, onEmpty, maxWidth, chromeRe
           isActive={card.isActive ?? true}
           onFlipChange={ctx.onFlipChange}
           forceUnflipSignal={ctx.forceUnflipSignal}
+          instantUnflip={ctx.instantUnflip}
         />
       )}
     />
