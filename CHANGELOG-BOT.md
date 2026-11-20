@@ -1,3 +1,10 @@
+## 2026-11-20 (07:40 CST) — Let All Categories scroll, and use the default card size
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/all-categories-scroll`
+- **What:** The All Categories page wrapper used `overflow-x-hidden`, and each category section used `overflow-hidden`. Those compute as vertical scroll containers even though they are as tall as their content, so a vertical swipe starting on a card (or in a section) can get trapped and never reach the `main` scroller. Both now use `overflow-x-clip`, which hides sideways overflow without creating that trap. Category decks also drop the 320px width cap and use the site default of 400px. On a 390-wide screen they still shrink to fit the column; on desktop they stay 400px because this scrolling page does not apply the home viewport chrome reserve, and a parent that only grows with the card is no longer treated as a height cap. Vertical swipe over a card still scrolls the page, and a tap still flips the card.
+- **Typecheck:** 52.
+
 ## 2026-11-20 (06:45 CST) — Fix the stuck middle card on later forward swipes
 
 - **By:** Fuller Feuds Dev
