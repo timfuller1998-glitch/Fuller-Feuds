@@ -213,7 +213,8 @@ interface DeckCardProps {
   /** Leftward drag distance; the rest of the pile rises/settles forward by this much. */
   lift?: MotionValue<number>;
   onDone?: () => void;
-  children: (isTop: boolean) => ReactNode;
+  /** raised = on top or being laid on top (back swipe); styles that differ for the top card use it so landing changes nothing. */
+  children: (isTop: boolean, raised: boolean) => ReactNode;
 }
 
 /**
@@ -242,6 +243,8 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
   const irot = useTransform(ix, [-300, 300], [-10, 10]);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
+  /** Role on the previous run of the role effect (null on mount). */
+  const prevRoleRef = useRef<Role | null>(null);
 
   useEffect(() => {
     const out = width * 1.12;
@@ -262,6 +265,13 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         // nudge so they stay tucked under the top card and never peek out beside the incoming one.
         const topNudging = pull && narrow ? followNudge(pull, ox, os, width, 1, anims) : false;
         if (first.current) return;
+        if (prevRoleRef.current === "in") {
+          // Back-swipe landing: the "in" animation already laid this card exactly at rest. Hold it there;
+          // replaying the forward-arrival settle below made it jump right and slide back (landing jitter).
+          if (!topNudging) { ox.set(0); os.set(1); }
+          oy.set(0); orot.set(0);
+          return;
+        }
         if (!topNudging) {
           // Button/key forward starts at rest (x=0). Give the new top the same right
           // offset a finished forward drag would have (out of the departing card's way),
@@ -354,6 +364,7 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
     };
     run();
     first.current = false;
+    prevRoleRef.current = role;
     return () => { cancelled = true; anims.forEach((a) => a.stop()); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
@@ -391,7 +402,7 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         onDragEnd={isTop ? (_e, info) => onDragEnd?.(info, ix.get()) : undefined}
         style={{ x: ix, rotate: irot, touchAction: "pan-y" }}
       >
-        {children(isTop)}
+        {children(isTop, isTop || role === "in")}
       </motion.div>
     </motion.div>
   );
@@ -673,9 +684,9 @@ function CardDeckCore<T>({
               role === "out" ? () => { setOutgoing(null); resetPileMotion(); } : role === "in" ? () => { resetPileMotion(); setIncomingId(null); } : undefined
             }
           >
-            {(isTop) => (
+            {(isTop, raised) => (
               <>
-                <div className={`w-full h-full rounded-xl deck-card-surface ${isTop ? "shadow-xl" : "shadow-md overflow-hidden bg-card"}`}>
+                <div className={`w-full h-full rounded-xl deck-card-surface ${raised ? "shadow-xl" : "shadow-md overflow-hidden bg-card"}`}>
                   {renderFace(card, isTop)}
                 </div>
                 {isTop && renderBadge && (

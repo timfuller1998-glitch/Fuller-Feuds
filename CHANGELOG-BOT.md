@@ -1,3 +1,13 @@
+## 2026-11-20 (12:40 CST) — Fix the back-swipe landing jitter
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/back-swipe-jitter`
+- **Bug (Timothy):** "When swiping back, the cards jitter slightly when they arrive at the top."
+- **Cause:** When the pulled-out card finished landing on top, its role changed from "in" to "top" and the deck re-ran the forward-arrival settle meant for button/key forward moves. That snapped the just-landed card about 70–90 px to the right and slid it back (measured on the live site at 390 and 1280). Two smaller instant changes also happened on landing: in dark/medium the card's back-of-deck brightness filter switched off, and the shadow switched from the pile shadow to the top-card shadow. Introduced Nov 12 (`7cc1406`), not by the ad cards.
+- **Fix (`CardDeck.tsx`, `index.css`):** A card that just landed from a back swipe stays exactly where it landed. The incoming card uses top-card styling (shadow, no brightness filter, fading in over 0.3 s while it flies in), so nothing changes at the moment it lands. Forward swipes are unchanged.
+- **Checked:** Frame-by-frame position traces before and after at 390 (touch) and 1280, landing on an ad card and on a topic card. After the fix the card rests at its landing spot with no further movement, filter or shadow change. The Sponsored counter switch doesn't move the card.
+- **Typecheck:** 50 (ceiling 52).
+
 ## 2026-11-20 (12:00 CST) — AdSense-ready: ad cards in decks, ads.txt, Privacy & Terms
 
 - **By:** Fuller Feuds Dev
