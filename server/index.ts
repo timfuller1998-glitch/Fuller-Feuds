@@ -43,6 +43,15 @@ app.use(express.urlencoded({ extended: false }));
 // Attach request ID for tracing (should be early in the middleware chain)
 app.use(attachRequestId);
 
+// ads.txt for Google AdSense (Fuller Feuds Dev, Nov 20 2026). Set ADSENSE_PUBLISHER_ID on Render
+// ("pub-1234567890123456" or "ca-pub-..."); 404 when unset. See docs/ADSENSE.md.
+app.get('/ads.txt', (_req, res) => {
+  const raw = (process.env.ADSENSE_PUBLISHER_ID || '').trim().replace(/^ca-/, '');
+  if (!/^pub-\d{10,20}$/.test(raw)) return res.status(404).type('text/plain').send('Not found');
+  res.type('text/plain').set('Cache-Control', 'public, max-age=3600')
+    .send(`google.com, ${raw}, DIRECT, f08c47fec0942fa0\n`);
+});
+
 // In development Vite serves /public. In production the built dist/public
 // already includes those files (plus the versioned service-worker.js).
 // Never mount the source /public folder in production — it would shadow the

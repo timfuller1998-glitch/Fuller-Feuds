@@ -8,6 +8,8 @@ _Added Nov 20, 2026 by Fuller Feuds Dev at Timothy's request._
 
 > **Update Nov 20, 2026:** the v1 switch is **built** (Settings → Ads, `PUT /api/users/me/ad-free`, columns from migration `0015`, `isSupporter` / `canUseAdFree` in `shared/supporter.ts`, `useAdsEnabled()` + `<AdSlot>` on the client). Admins can use it now; everyone else sees it disabled with "Coming with supporter subscription." The paid subscription itself is still **not built**.
 
+> **Update Nov 20, 2026 (AdSense):** ads are live-ready as **ad cards inside decks** (one after every 5 cards), plus `/ads.txt`, `/privacy`, `/terms`. Env vars and AdSense console settings: see `docs/ADSENSE.md`. Still to do: create a Display ad unit in AdSense and set `VITE_ADSENSE_SLOT_FEED` on Render, then redeploy.
+
 **Now (v1):** a per-account "Ad-free" switch so Timothy can turn ads off on his own account. The site has no ad slots yet, so this ships alongside (or after) the first ads.
 
 **Where it lives**

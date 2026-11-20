@@ -1,3 +1,14 @@
+## 2026-11-20 (12:00 CST) — AdSense-ready: ad cards in decks, ads.txt, Privacy & Terms
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `feat/adsense-ready`
+- **Ad cards:** Every card deck (Home sections, Trending, Categories, Search, Recent Opinions, topic opinions, counterpoints, profile) now gets one **Sponsored** ad card after every 5 real cards, in decks with 5+ cards. Same size as the deck's cards, dashed gold frame, "Sponsored" / "Advertisement" labels. A tap flips it (back: "Hide ads with a supporter subscription" + Ad settings button); nothing navigates. Swipe forward/back animations are unchanged. The counter skips ad cards (shows "Sponsored"), and pages' `onIndexChange`/`initialIndex` see only real cards. No banners between sections; nothing in debate rooms, Settings, admin, onboarding or auth. The topic AI-summary deck opts out. Ad-free users never get ad cards.
+- **AdSense:** With `VITE_ADSENSE_CLIENT` set at build time, every page's `<head>` has the `google-adsense-account` meta and the async `adsbygoogle.js?client=ca-pub-…` script. Ad cards render a real `<ins class="adsbygoogle">` unit once `VITE_ADSENSE_SLOT_FEED` is also set; until then they show an "Ad space" placeholder.
+- **ads.txt:** `/ads.txt` serves `google.com, pub-…, DIRECT, f08c47fec0942fa0` from `ADSENSE_PUBLISHER_ID`; 404 when unset.
+- **Legal:** New `/privacy` (accounts, data, cookies, Google AdSense and third-party ad cookies, opt-out links) and `/terms` pages, linked from the sidebar, Settings and the Home hero footer. Contact goes through the in-app feedback form.
+- **Docs:** `docs/ADSENSE.md` lists the Render env vars, keeping Auto ads off, and turning on Google's EEA/UK consent message.
+- **Typecheck:** 50 (ceiling 52).
+
 ## 2026-11-20 (11:20 CST) — Remove leftover debug instrumentation
 
 - **By:** Fuller Feuds Dev

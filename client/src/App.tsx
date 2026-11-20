@@ -38,6 +38,7 @@ import RecentOpinions from "@/pages/RecentOpinions";
 import NotFound from "@/pages/not-found";
 import CreateTopicPage from "@/pages/CreateTopicPage";
 import DebateRoomPage from "@/pages/DebateRoomPage";
+import { PrivacyPage, TermsPage } from "@/pages/LegalPages";
 
 function Router() {
   const { isAuthenticated } = useAuth();
@@ -66,6 +67,8 @@ function Router() {
       <Route path="/u/:handle" component={HandleRedirect} />
       <Route path="/live-stream/:id" component={LiveStreamPage} />
       <Route path="/create-topic" component={CreateTopicPage} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/terms" component={TermsPage} />
       <Route component={NotFound} />
     </Switch>
   );
