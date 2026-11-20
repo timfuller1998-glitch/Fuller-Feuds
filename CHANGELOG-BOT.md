@@ -421,3 +421,6 @@ Made by the Fuller Feuds Dev bot (Grok Bot). Not merged — waiting for Timothy'
 - Adopt dialog: fits a 390x844 screen, body scrolls, header and footer stay visible.
 - CardDeck: new optional onIndexChange and initialIndex props (topic decks unaffected).
 - New files: client/src/components/OpinionDeckCard.tsx, client/src/lib/stance.ts.
+
+## 2026-11-20 — Fuller Feuds Dev: backlog note for ad-free toggle
+- Added `docs/BACKLOG.md` with a scoped (not built) plan for an ad-free opt-in toggle in Settings, admin-only for now, with placeholder hooks for supporter badges and 2x debate credit. Docs only, no code changes.
