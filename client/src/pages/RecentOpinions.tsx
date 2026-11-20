@@ -1,27 +1,25 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import OpinionCard from "@/components/OpinionCard";
-import { CardContainer } from "@/components/CardContainer";
+import CardDeck from "@/components/CardDeck";
+import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  MessageCircle,
-  Clock,
-  TrendingUp
-} from "lucide-react";
+import { MessageCircle, Clock, TrendingUp, ChevronRight } from "lucide-react";
 import type { Opinion, Topic, TopicWithCounts } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 
 interface OpinionWithTopic extends Opinion {
   topic?: Topic;
 }
+
+/** Opinions per topic in each deck (the rest are one tap away on the topic page). */
+const DECK_LIMIT = 20;
 
 interface TopicGroup {
   topic: TopicWithCounts;
@@ -128,17 +126,25 @@ export default function RecentOpinionsPage() {
       })()
     : [];
 
-  // Flag mutation
-  const flagMutation = {
-    mutate: async ({ opinionId, reason }: { opinionId: string; reason: string }) => {
-      return apiRequest('POST', `/api/opinions/${opinionId}/flag`, { reason });
-    },
+  const flagMutation = useMutation({
+    mutationFn: ({ opinionId, reason }: { opinionId: string; reason: string }) =>
+      apiRequest('POST', `/api/opinions/${opinionId}/flag`, { reason }),
     onSuccess: () => {
       setFlaggingOpinionId(null);
       setFlagReason("");
+      toast({ title: "Thanks, a moderator will take a look" });
       queryClient.invalidateQueries({ queryKey: ["/api/opinions/recent"] });
     },
-  };
+    onError: (e: any) => toast({ title: "Couldn't flag", description: e?.message, variant: "destructive" }),
+  });
+
+  const voteMutation = useMutation({
+    mutationFn: ({ opinionId, voteType, currentVote }: { opinionId: string; voteType: "like" | "dislike"; currentVote?: string | null }) =>
+      apiRequest("POST", `/api/opinions/${opinionId}/vote`, { voteType: currentVote === voteType ? null : voteType }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/opinions/recent"] }),
+  });
+
+  const [deckIndex, setDeckIndex] = useState<Record<string, number>>({});
 
   if (opinionsLoading) {
     return (
@@ -170,9 +176,9 @@ export default function RecentOpinionsPage() {
   return (
     <div className="space-y-6 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <div className="flex items-center gap-3">
-          <Clock className="w-8 h-8 text-primary" />
+          <Clock className="w-8 h-8 text-primary flex-shrink-0" />
           <div>
             <h1 className="text-3xl font-bold">Recent Opinions</h1>
             <p className="text-muted-foreground">Latest thoughts from the community</p>
@@ -219,49 +225,54 @@ export default function RecentOpinionsPage() {
               </div>
             </div>
 
-            {/* Opinions Horizontal Scroll */}
-            <div 
-              className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
-              style={{ scrollSnapType: 'x mandatory' }}
-            >
-              {group.opinions.slice(0, 5).map((opinion) => (
-                <div 
-                  key={opinion.id} 
-                  className="flex-none w-[320px] sm:w-[380px]"
-                  style={{ scrollSnapAlign: 'start' }}
-                >
-                  <OpinionCard
-                    id={opinion.id}
-                    topicId={opinion.topicId}
-                    userId={opinion.userId}
-                    userName={opinion.author ? `${opinion.author.firstName || ''} ${opinion.author.lastName || ''}`.trim() || 'Anonymous' : 'Anonymous'}
-                    userAvatar={opinion.author?.profileImageUrl ?? undefined}
-                    politicalLeaningScore={opinion.author?.politicalLeaningScore ?? undefined}
-                    economicScore={opinion.author?.economicScore ?? undefined}
-                    authoritarianScore={opinion.author?.authoritarianScore ?? undefined}
-                    content={opinion.content}
-                    debateStatus={opinion.debateStatus}
-                    timestamp={formatDistanceToNow(new Date(opinion.createdAt!), { addSuffix: true })}
-                    likesCount={opinion.likesCount || 0}
-                    dislikesCount={opinion.dislikesCount || 0}
-                    references={opinion.references || []}
-                    fallacyCounts={opinion.fallacyCounts || {}}
-                    isLiked={opinion.userVote?.voteType === 'like'}
-                    isDisliked={opinion.userVote?.voteType === 'dislike'}
-                  />
-                </div>
-              ))}
-              {group.opinions.length > 5 && (
-                <CardContainer style={{ scrollSnapAlign: 'start' }}>
-                  <Card className="h-full flex items-center justify-center hover-elevate active-elevate-2 cursor-pointer" onClick={() => setLocation(`/topic/${group.topic.id}?tab=others`)}>
-                    <CardContent className="text-center py-12">
-                      <MessageCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                      <p className="font-medium">View {group.opinions.length - 5} More</p>
-                      <p className="text-sm text-muted-foreground">Explore all opinions</p>
-                    </CardContent>
-                  </Card>
-                </CardContainer>
+            {/* Opinion pile: same stacked deck and card faces as the topic and profile opinion decks.
+                Vertical swipes scroll the page, a tap flips the card, only buttons navigate. */}
+            <CardDeck<OpinionWithTopic>
+              items={group.opinions.slice(0, DECK_LIMIT)}
+              getKey={(op) => op.id}
+              initialIndex={deckIndex[group.topic.id] ?? 0}
+              onIndexChange={(i) => setDeckIndex((m) => (m[group.topic.id] === i ? m : { ...m, [group.topic.id]: i }))}
+              maxWidth={420}
+              testId={`deck-recent-${group.topic.id}`}
+              ariaLabel={`Recent opinions on ${group.topic.title}`}
+              emptyLabel="No opinions yet."
+              renderFront={(op) => (
+                <OpinionDeckFront
+                  op={op as any}
+                  onSelectParagraph={() => setLocation(`/topic/${op.topicId}?tab=others`)}
+                />
               )}
+              renderBack={(op) => (
+                <OpinionDeckBack
+                  op={op as any}
+                  onVote={(voteType) => {
+                    if (!user) {
+                      toast({ title: "Sign in to vote" });
+                      return;
+                    }
+                    voteMutation.mutate({ opinionId: op.id, voteType, currentVote: op.userVote?.voteType ?? null });
+                  }}
+                  onAdopt={() => setLocation(`/topic/${op.topicId}`)}
+                  onFlag={() => {
+                    if (!user) {
+                      toast({ title: "Sign in to flag" });
+                      return;
+                    }
+                    setFlaggingOpinionId(op.id);
+                  }}
+                  onSeeCounterpoints={(idx) => setLocation(`/opinion/${op.id}/counterpoints?p=${idx}`)}
+                />
+              )}
+            />
+            <div className="flex justify-center">
+              <Link href={`/topic/${group.topic.id}?tab=others`}>
+                <Button variant="outline" size="sm" data-testid={`button-open-topic-${group.topic.id}`}>
+                  {group.opinions.length > DECK_LIMIT
+                    ? `See all ${group.topic.opinionsCount} opinions`
+                    : "Open debate"}
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
             </div>
           </div>
         ))}

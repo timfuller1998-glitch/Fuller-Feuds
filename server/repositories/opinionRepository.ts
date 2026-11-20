@@ -2,7 +2,7 @@ import { db } from '../db.js';
 import { screenName, screenFirstNameSql, screenLastNameSql } from '../lib/screenName.js';
 import { pool } from '../db.js';
 import { opinions, users, userProfiles, opinionVotes, opinionFlags } from '../../shared/schema.js';
-import { eq, desc, and, or, ne, sql } from 'drizzle-orm';
+import { eq, desc, and, or, ne, sql, inArray } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { aggregateFallacyCounts } from '../utils/fallacyUtils.js';
 import { checkUserOwnership, checkModifyPermission } from '../utils/authorization.js';
@@ -765,8 +765,22 @@ export class OpinionRepository {
       .orderBy(desc(opinions.createdAt), desc(opinions.id))
       .limit(limit);
 
+    // The signed-in user's own vote on each opinion (one query), so card backs show it.
+    const voteByOpinion = new Map<string, 'like' | 'dislike'>();
+    if (currentUserId && baseOpinions.length > 0) {
+      const votes = await db
+        .select({ opinionId: opinionVotes.opinionId, voteType: opinionVotes.voteType })
+        .from(opinionVotes)
+        .where(and(
+          eq(opinionVotes.userId, currentUserId),
+          inArray(opinionVotes.opinionId, baseOpinions.map((r) => r.opinion.id)),
+        ));
+      for (const v of votes) voteByOpinion.set(v.opinionId, v.voteType as 'like' | 'dislike');
+    }
+
     return baseOpinions.map(row => ({
       ...row.opinion,
+      userVote: voteByOpinion.has(row.opinion.id) ? { voteType: voteByOpinion.get(row.opinion.id)! } : null,
       author: row.author ? {
         id: row.author.id,
         firstName: row.screenFirst,

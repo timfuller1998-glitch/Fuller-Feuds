@@ -1,3 +1,11 @@
+## 2026-11-20 (11:05 CST) — Recent Opinions uses the stacked card deck
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `feat/recent-opinions-deck`
+- **What:** Each topic on Recent Opinions (`/recent-opinions`) now shows its opinions as the same stacked card pile used on the Topic and Profile opinion decks (`CardDeck`, maxWidth 420, `OpinionDeckFront`/`OpinionDeckBack`), replacing the sideways scroller. Tap flips to the back (votes, See counterpoints, Challenge to a debate, Like/Dislike, Adopt, Flag, Flag as AI-written); vertical swipes scroll the page; horizontal swipes and the arrows change cards; only buttons navigate. Up to 20 opinions per topic, with an "Open debate" / "See all N opinions" button under each deck. Flag now opens the existing flag dialog and really submits (it was a no-op before). The header wraps on phones.
+- **Server:** `GET /api/opinions/recent` now includes the signed-in user's own vote (`userVote`, one batched query) so the card backs show it.
+- **Typecheck:** 50 (ceiling 52).
+
 ## 2026-11-20 (10:45 CST) — Stacked milestone badges become one badge with levels; dark-theme badge colors
 
 - **By:** Fuller Feuds Dev
