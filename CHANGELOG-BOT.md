@@ -1,3 +1,10 @@
+## 2026-11-20 (16:55 CST, America/Chicago) — Back swipe comes around the left (branch fix/back-swipe-from-left)
+Made by the Fuller Feuds Dev bot (Grok Bot). Timothy and his brother found it strange that a back swipe brought the previous card in from the right. He asked for the back swipe to look like the reverse of a card going to the bottom of the pile: even though you swipe right, the card should come around the left side.
+- Forward swipe is unchanged: the top card slides out to the left, drops behind the pile, and tucks back under from the left.
+- Back swipe is now that motion in reverse. The previous card (front side up) slides out from under the pile to the left, then comes over the top and settles in the center. A rightward finger swipe, the ‹ button, and the left arrow all use this path.
+- Phone pile-nudge during a back swipe now shifts right, clearing the left side, instead of left.
+- PR #54 landing stability is unchanged (no replayed settle, no jitter). PR #60 flip-reset is unchanged (a flipped card leaves as-is and snaps back to the front once hidden). Touch rule unchanged.
+
 ## 2026-11-20 (15:40 CST, America/Chicago) — Flipped cards swipe away as-is (branch fix/flipped-card-swipe)
 Made by the Fuller Feuds Dev bot (Grok Bot). Timothy: when a card's back was showing and you swiped it, the card first returned to the center and flipped to the front before going to the back of the pile. He wanted it to go straight to the back in one motion, and come around front-side-up next time, without remembering the flipped state.
 - A flipped card now swipes (or tucks, or is covered by a back-swipe) with its back still showing. The old 600ms "unflip, wait, then move" step is gone, so the card no longer springs back to the center to flip first.
