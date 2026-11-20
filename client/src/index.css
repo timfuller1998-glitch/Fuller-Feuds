@@ -640,9 +640,15 @@
 .medium .deck-card-surface {
   box-shadow: 0 0 0 1px hsl(40 30% 92% / 0.14), 6px 6px 0 0 hsl(0 0% 0% / 0.75);
 }
-.dark [data-deck-role]:not([data-deck-role="top"]) .deck-card-surface,
-.medium [data-deck-role]:not([data-deck-role="top"]) .deck-card-surface {
+.dark [data-deck-role]:not([data-deck-role="top"]):not([data-deck-role="in"]) .deck-card-surface,
+.medium [data-deck-role]:not([data-deck-role="top"]):not([data-deck-role="in"]) .deck-card-surface {
   filter: brightness(1.18) saturate(0.7);
+}
+/* Back swipe: the card being laid on top fades to the top card's tone while it flies in, so nothing
+   changes when it lands (an instant brightness drop at landing read as a jitter). */
+.dark [data-deck-role="in"] .deck-card-surface,
+.medium [data-deck-role="in"] .deck-card-surface {
+  transition: filter 0.3s ease;
 }
 
 /* Level badges (skill tiers + stacked milestones), Fuller Feuds Dev Nov 20 2026.
