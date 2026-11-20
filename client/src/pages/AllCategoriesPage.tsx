@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import SwipeableCardStack from "@/components/SwipeableCardStack";
-import { CardContainer } from "@/components/CardContainer";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { 
@@ -156,7 +155,7 @@ export default function AllCategoriesPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-8 w-full overflow-x-hidden">
+    <div className="space-y-4 sm:space-y-8 w-full overflow-x-clip">
       {/* Page Header */}
       <div className="flex items-start justify-between gap-2 sm:gap-4 flex-wrap">
         <div className="min-w-0">
@@ -198,7 +197,7 @@ export default function AllCategoriesPage() {
             const CategoryIcon = category.icon;
 
             return (
-              <div key={category.name} className="space-y-2 sm:space-y-4 overflow-hidden" data-testid={`section-category-${category.name.toLowerCase()}`}>
+              <div key={category.name} className="space-y-2 sm:space-y-4 overflow-x-clip" data-testid={`section-category-${category.name.toLowerCase()}`}>
                 {/* Category Header */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -224,7 +223,7 @@ export default function AllCategoriesPage() {
                         ...topic,
                         imageUrl: topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800",
                       }))}
-                      maxWidth={320}
+                      chromeReserve={0}
                       testId={`deck-category-${category.name.toLowerCase()}`}
                     />
                     {category.totalCount > 5 && (

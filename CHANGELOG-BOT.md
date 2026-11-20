@@ -7,6 +7,13 @@
 - **Backlog:** The "which badges get 2x debate credit" question is replaced by the tiers. Sponsored-topic handling is deferred until sponsored topics are built.
 - **Typecheck:** 50 (ceiling 52).
 
+## 2026-11-20 (10:07 CST) — Merge All Categories scroll fix with the debates overhaul
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/all-categories-scroll`
+- **What:** Updated this branch with latest main after PR #47 (debates overhaul, live `38ddffb`). The only conflict was CHANGELOG-BOT.md; both entry sets were kept. Typecheck 50 (ceiling 52). Production build passed. Local re-check: All Categories still scrolls (a vertical swipe over a card and a desktop wheel both reach the bottom), cards are 358×501.2 at 390 and 400×560 at 1280, Topic and profile decks still render at the expected sizes, and the new Challenge to a debate button is visible on opinion card backs.
+- **Typecheck:** 50.
+
 ## 2026-11-20 (09:45 CST) — Debates overhaul: Challenge button, invites that never expire, live viewing
 
 - **By:** Fuller Feuds Dev
@@ -18,6 +25,19 @@
 - **QA:** Local end-to-end with Alice, Bob, Carol, and an anonymous viewer: 40/40 checks passed. Screenshots are in `/workspace/ff-videos/nov20/debates/`.
 - **Typecheck:** 50 (ceiling 52).
 
+## 2026-11-20 (07:56 CST) — Don't let a growing deck parent shrink the card
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/all-categories-scroll`
+- **What:** The first "growing parent is not a height cap" check still treated a wrapper as bounded when it was only slightly shorter than the uncapped card plus deck chrome. After a tab switch or a window-height cap, that parent was about as tall as the visible card, so the deck shrank, the parent shrank with it, and profile Topics cards could end up smaller than on main (and sometimes tiny). The parent is now a cap only when it is shorter than the card itself, which is the reserved home snap slot. Topic, Counterpoints, and profile decks keep their window- or column-based size; Home still fits the title, card, and chevron in that slot.
+- **Typecheck:** 52.
+
+## 2026-11-20 (07:40 CST) — Let All Categories scroll, and use the default card size
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/all-categories-scroll`
+- **What:** The All Categories page wrapper used `overflow-x-hidden`, and each category section used `overflow-hidden`. Those compute as vertical scroll containers even though they are as tall as their content, so a vertical swipe starting on a card (or in a section) can get trapped and never reach the `main` scroller. Both now use `overflow-x-clip`, which hides sideways overflow without creating that trap. Category decks also drop the 320px width cap and use the site default of 400px. On a 390-wide screen they still shrink to fit the column; on desktop they stay 400px because this scrolling page does not apply the home viewport chrome reserve, and a parent that only grows with the card is no longer treated as a height cap. Vertical swipe over a card still scrolls the page, and a tap still flips the card.
+- **Typecheck:** 52.
 ## 2026-11-20 (06:45 CST) — Fix the stuck middle card on later forward swipes
 
 - **By:** Fuller Feuds Dev
