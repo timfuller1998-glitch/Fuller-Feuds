@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ArrowLeft, Flag, MessageCircle, Plus, UserPlus, Users, TrendingUp } from "lucide-react";
+import { ArrowLeft, ExternalLink, Flag, MessageCircle, Plus, UserPlus, Users, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { insertOpinionSchema, type Topic as TopicType, type Opinion, type CumulativeOpinion as CumulativeOpinionType, type SummarySentence } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -828,6 +828,18 @@ export default function Topic() {
           <p className="text-base text-muted-foreground leading-relaxed max-w-3xl" data-testid="text-topic-description">
             {headerDescription}
           </p>
+        )}
+        {(topic as any).sourceUrl && (
+          <a
+            href={(topic as any).sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline break-all"
+            data-testid="link-topic-source"
+          >
+            <ExternalLink className="w-4 h-4 shrink-0" />
+            Source: {(topic as any).sourceUrl}
+          </a>
         )}
 
         {/* Stance tally */}

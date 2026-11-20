@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, X, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { LoginDialog } from "@/components/LoginDialog";
+import { SourceLinkFields } from "@/components/SourceLinkFields";
 
 /**
  * Dedicated create-topic page.
@@ -37,6 +38,8 @@ export default function CreateTopicPage() {
   );
   const [categoryInput, setCategoryInput] = useState("");
   const [categoriesReady, setCategoriesReady] = useState(!prefillTitle);
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [topicDescription, setTopicDescription] = useState("");
 
   useEffect(() => {
     setTitle(prefillTitle);
@@ -89,6 +92,8 @@ export default function CreateTopicPage() {
       initialOpinion: string;
       categories: string[];
       stance: string;
+      description?: string;
+      sourceUrl?: string;
     }) => {
       const response = await apiRequest("POST", "/api/topics", data);
       return response.json();
@@ -140,6 +145,8 @@ export default function CreateTopicPage() {
       initialOpinion: initialOpinion.trim(),
       categories: topicCategories,
       stance,
+      description: topicDescription.trim() || undefined,
+      sourceUrl: sourceUrl.trim() || undefined,
     });
   };
 
@@ -187,6 +194,17 @@ export default function CreateTopicPage() {
               </Button>
             </div>
           </div>
+
+          <SourceLinkFields
+            sourceUrl={sourceUrl}
+            onSourceUrlChange={setSourceUrl}
+            description={topicDescription}
+            onDescriptionChange={setTopicDescription}
+            onDraft={(preview) => {
+              if (preview.draftTitle && !title.trim()) setTitle(preview.draftTitle);
+              else if (preview.draftTitle && title.trim()) setTitle(preview.draftTitle);
+            }}
+          />
 
           {!categoriesReady && generateCategoriesMutation.isPending ? (
             <div className="py-8 text-center">

@@ -4,6 +4,7 @@ import { OpinionService } from '../services/opinionService.js';
 import { InteractionRepository } from '../repositories/interactionRepository.js';
 import { CumulativeOpinionService } from '../services/cumulativeOpinionService.js';
 import { AIService } from '../aiService.js';
+import { previewSource, UnsafeUrlError } from '../services/sourcePreviewService.js';
 import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertTopicSchema, insertOpinionSchema } from '../../shared/schema.js';
 import { z } from 'zod';
@@ -242,6 +243,24 @@ router.post('/:id/view', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error('Error tracking topic view:', error);
     res.status(500).json({ error: 'Failed to track view' });
+  }
+});
+
+// POST /api/topics/preview-source - Fetch a public link and draft a neutral title/description
+router.post('/preview-source', isAuthenticated, async (req, res) => {
+  try {
+    const url = typeof req.body?.url === 'string' ? req.body.url : '';
+    if (!url.trim()) return res.status(400).json({ error: 'A URL is required' });
+    const preview = await previewSource(url);
+    res.json(preview);
+  } catch (error: any) {
+    if (error instanceof UnsafeUrlError || error?.status === 400) {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error previewing source:', error);
+    res.status(500).json({
+      error: "Couldn't load that link. You can still add it and write the title yourself.",
+    });
   }
 });
 

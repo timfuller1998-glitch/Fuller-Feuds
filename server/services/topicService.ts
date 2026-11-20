@@ -115,6 +115,7 @@ export class TopicService {
       initialOpinion?: string;
       references?: string[];
       stance?: string; // Accept but ignore
+      sourceUrl?: string | null;
     },
     userId: string,
     requestingUserId?: string,
@@ -141,9 +142,8 @@ export class TopicService {
       // Extract opinion-related fields that shouldn't be in topic data
       const { initialOpinion, references, stance, categories: userCategories, ...topicData } = data;
 
-      // Use initialOpinion as description if provided, otherwise use title as fallback
-      // Description is required by schema, so we always provide one
-      const description = initialOpinion?.trim() || data.title || 'No description provided';
+      // Prefer an explicit topic description (e.g. drafted from a source link), then the opening opinion, then the title.
+      const description = data.description?.trim() || initialOpinion?.trim() || data.title || 'No description provided';
 
       // Handle categories: use provided categories if available, otherwise generate AI categories
       let categories: string[] = [];
@@ -177,11 +177,14 @@ export class TopicService {
       }
 
       // Build topic data with only valid database fields (excluding extended schema fields)
+      const sourceUrl = data.sourceUrl?.trim() || null;
+
       const finalTopicData: TopicInsert = {
         title: data.title,
         description,
         categories,
         createdById: userId,
+        ...(sourceUrl ? { sourceUrl } : {}),
         ...(data.imageUrl !== undefined && { imageUrl: data.imageUrl }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
         ...(data.status !== undefined && { status: data.status }),
