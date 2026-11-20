@@ -77,6 +77,8 @@ export function useInfiniteHomeDeck(section: HomeSectionKey, enabled = true) {
           const i = incoming.findIndex((t) => !tops.has(t.id));
           if (i > 0) incoming = [incoming[i], ...incoming.slice(0, i), ...incoming.slice(i + 1)];
         }
+        // Claim the first card right away: sections load at the same time, so later ones must see it.
+        if (st.items.length === 0 && incoming.length > 0) sectionTops.set(section, incoming[0].id);
         const cycle = st.cycle;
         incoming.forEach((t) => st.cycleIds.add(t.id));
         const added: DeckItem[] = incoming.map((t) => ({ ...t, deckKey: `${t.id}~${cycle}` }));
