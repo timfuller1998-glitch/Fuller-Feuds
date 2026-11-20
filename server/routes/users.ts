@@ -172,6 +172,83 @@ router.get('/active-distribution', async (req, res) => {
   }
 });
 
+
+// GET /api/users/search?q=&limit= - People search by public display name or @handle.
+// Only public fields (no email, role, status or private names); active accounts only.
+const userSearchHits = new Map<string, { count: number; resetAt: number }>();
+const USER_SEARCH_PER_MIN = 120;
+router.get('/search', async (req, res) => {
+  try {
+    // Per signed-in user, else per client IP (Cloudflare's header; req.ip is the proxy behind Cloudflare).
+    const me = (req.user as Express.User | undefined)?.id;
+    const key = me ? `u:${me}` : `ip:${String(req.headers['cf-connecting-ip'] || req.ip || 'anon')}`;
+    const now = Date.now();
+    const hit = userSearchHits.get(key);
+    if (!hit || hit.resetAt < now) {
+      userSearchHits.set(key, { count: 1, resetAt: now + 60_000 });
+      if (userSearchHits.size > 5000) {
+        userSearchHits.forEach((v, k) => { if (v.resetAt < now) userSearchHits.delete(k); });
+      }
+    } else if (++hit.count > USER_SEARCH_PER_MIN) {
+      return res.status(429).json({ message: 'Too many searches, try again in a minute' });
+    }
+
+    const raw = String(req.query.q ?? '').trim().replace(/^@/, '').slice(0, 50);
+    if (raw.length < 2) return res.json([]);
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '8'), 10) || 8, 1), 20);
+    const esc = raw.toLowerCase().replace(/[\\%_]/g, (c) => '\\' + c);
+    const contains = `%${esc}%`;
+    const prefix = `${esc}%`;
+
+    const result: any = await db.execute(sql`
+      with people as (
+        select u.id, u.handle, u.profile_image_url, u.selected_badge_id,
+          case when nullif(trim(p.display_first_name), '') is not null then trim(p.display_first_name) else u.first_name end as first_name,
+          case when nullif(trim(p.display_first_name), '') is not null then nullif(trim(p.display_last_name), '') else u.last_name end as last_name
+        from users u
+        left join user_profiles p on p.user_id = u.id
+        where coalesce(u.status, 'active') = 'active'
+      ),
+      matched as (
+        select *, lower(trim(coalesce(first_name, '') || ' ' || coalesce(last_name, ''))) as full_name
+        from people
+        where lower(coalesce(handle, '')) like ${contains}
+           or lower(trim(coalesce(first_name, '') || ' ' || coalesce(last_name, ''))) like ${contains}
+        limit 200
+      )
+      select m.id, m.handle, m.first_name, m.last_name, m.profile_image_url,
+        (select count(*)::int from user_follows f where f.following_id = m.id) as follower_count,
+        tb.name as badge_name, tb.icon as badge_icon, tb.tier as badge_tier
+      from matched m
+      left join lateral (
+        select b.name, b.icon, b.tier from user_badges ub join badges b on b.id = ub.badge_id
+        where ub.user_id = m.id
+        order by (b.id = m.selected_badge_id) desc, b.tier desc, b.requirement desc
+        limit 1
+      ) tb on true
+      order by
+        (lower(coalesce(m.handle, '')) = ${raw.toLowerCase()}) desc,
+        (lower(coalesce(m.handle, '')) like ${prefix} or m.full_name like ${prefix}) desc,
+        follower_count desc,
+        m.first_name asc nulls last
+      limit ${limit}
+    `);
+    const rows = (result.rows ?? result) as any[];
+    res.json(rows.map((r) => ({
+      id: r.id,
+      handle: r.handle ?? null,
+      firstName: r.first_name ?? null,
+      lastName: r.last_name ?? null,
+      profileImageUrl: r.profile_image_url ?? null,
+      followerCount: Number(r.follower_count || 0),
+      topBadge: r.badge_name ? { name: r.badge_name, icon: r.badge_icon, tier: Number(r.badge_tier || 1) } : null,
+    })));
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ message: 'Failed to search users' });
+  }
+});
+
 // GET /api/users/:id - Get user by ID
 router.get('/:id', async (req, res) => {
   try {
