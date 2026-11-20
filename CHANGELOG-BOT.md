@@ -1,3 +1,10 @@
+## 2026-11-20 (10:07 CST) — Merge All Categories scroll fix with the debates overhaul
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/all-categories-scroll`
+- **What:** Updated this branch with latest main after PR #47 (debates overhaul, live `38ddffb`). The only conflict was CHANGELOG-BOT.md; both entry sets were kept. Typecheck 50 (ceiling 52). Production build passed. Local re-check: All Categories still scrolls (a vertical swipe over a card and a desktop wheel both reach the bottom), cards are 358×501.2 at 390 and 400×560 at 1280, Topic and profile decks still render at the expected sizes, and the new Challenge to a debate button is visible on opinion card backs.
+- **Typecheck:** 50.
+
 ## 2026-11-20 (09:45 CST) — Debates overhaul: Challenge button, invites that never expire, live viewing
 
 - **By:** Fuller Feuds Dev
