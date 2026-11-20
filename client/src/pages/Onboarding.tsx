@@ -28,6 +28,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Topic, Opinion } from "@shared/schema";
 import { HandleField, type HandleStatus } from "@/components/HandleField";
 import { useAuth } from "@/hooks/useAuth";
+import { OpinionStructure, BareOpinionTip, useBareOpinionGuard } from "@/components/OpinionStructure";
 
 interface User {
   id: string;
@@ -890,12 +891,14 @@ function TopicOpinionCard({
   const [stance, setStance] = useState<'for' | 'against' | null>(null);
   const [content, setContent] = useState("");
 
+  const bareOpinion = useBareOpinionGuard(content);
+
   const handleStanceSelect = (selectedStance: 'for' | 'against') => {
     setStance(selectedStance);
     setShowOpinionForm(true);
   };
 
-  const handleSubmit = async () => {
+  const submitOpinion = async () => {
     if (!stance || !content.trim()) return;
 
     await createOpinionMutation.mutateAsync({
@@ -908,6 +911,11 @@ function TopicOpinionCard({
     setShowOpinionForm(false);
     setContent("");
     setStance(null);
+  };
+
+  const handleSubmit = () => {
+    if (!stance || !content.trim()) return;
+    bareOpinion.guard(() => { void submitOpinion(); });
   };
 
   return (
@@ -949,6 +957,12 @@ function TopicOpinionCard({
               rows={3}
               className="text-sm"
               data-testid={`textarea-opinion-${topic.id}`}
+            />
+            <OpinionStructure text={content} topicTitle={topic.title} compact />
+            <BareOpinionTip
+              open={bareOpinion.showTip}
+              onKeepWriting={bareOpinion.keepWriting}
+              onPostAnyway={bareOpinion.postAnyway}
             />
             <div className="flex gap-2">
               <Button

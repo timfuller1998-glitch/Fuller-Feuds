@@ -1,3 +1,10 @@
+## 2026-11-20 (15:20 CST, America/Chicago) — Opinion structure guide and strength meter (branch feat/opinion-structure)
+Made by the Fuller Feuds Dev bot (Grok Bot). Timothy asked for a light guide so people don't just post "yes", then chose a single freeform box with a client-side strength meter ("even if it can be fooled it doesn't actually effect anything since the opinion score comes from other users").
+- In every opinion composer (topic Share/Update dialog, topic-card dialog, create-topic page, search-bar create form, adopt-opinion dialog, and onboarding topic cards) the freeform box stays one field. A compact, collapsible "What to include" guide sits under it: stance, main reason, support, the other side, and an optional "what would change your mind," using the topic question when we have it.
+- A live strength meter (Bare / Basic / Solid / Strong) and chips light up as they type, from strong text signals only: length, stance words, reason words, support (links, numbers, examples, studies, experience), the other side, and openness. No API or OpenAI calls; nothing is stored or scored from the meter.
+- One-word or very bare posts (like just "yes") get a gentle "Add your reason?" tip before submit, with Keep writing or Post anyway. Posting is never blocked.
+- Logic lives in `shared/opinionStrength.ts` with 15 unit tests (`npm run test:shared`). Typecheck stays at 50 (ceiling 52).
+
 ## 2026-11-20 (15:00 CST, America/Chicago) — Home sections open on different cards (branch fix/home-section-first-cards)
 By Fuller Feuds Dev. Follow-up to the endless home decks: on the live site the sections load at the same moment, so several opened on the same topic. Each section now claims its first card as soon as it picks it, and later sections skip claimed ones.
 

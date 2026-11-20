@@ -13,6 +13,7 @@ import { Plus, X, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { LoginDialog } from "@/components/LoginDialog";
 import { SourceLinkFields } from "@/components/SourceLinkFields";
+import { OpinionStructure, BareOpinionTip, useBareOpinionGuard } from "@/components/OpinionStructure";
 
 /**
  * Dedicated create-topic page.
@@ -134,12 +135,13 @@ export default function CreateTopicPage() {
     generateCategoriesMutation.mutate(title.trim());
   };
 
-  const handleCreateTopic = () => {
+  const bareOpinion = useBareOpinionGuard(initialOpinion);
+
+  const submitNewTopic = () => {
     if (!isAuthenticated || !user) {
       setShowLoginDialog(true);
       return;
     }
-    if (!title.trim() || !initialOpinion.trim() || topicCategories.length === 0) return;
     createTopicMutation.mutate({
       title: title.trim(),
       initialOpinion: initialOpinion.trim(),
@@ -148,6 +150,11 @@ export default function CreateTopicPage() {
       description: topicDescription.trim() || undefined,
       sourceUrl: sourceUrl.trim() || undefined,
     });
+  };
+
+  const handleCreateTopic = () => {
+    if (!title.trim() || !initialOpinion.trim() || topicCategories.length === 0) return;
+    bareOpinion.guard(submitNewTopic);
   };
 
   return (
@@ -226,6 +233,15 @@ export default function CreateTopicPage() {
                   data-testid="input-initial-opinion"
                   required
                 />
+                <div className="mt-2 space-y-2">
+                  <OpinionStructure text={initialOpinion} topicTitle={title} />
+                  <BareOpinionTip
+                    open={bareOpinion.showTip}
+                    onKeepWriting={bareOpinion.keepWriting}
+                    onPostAnyway={bareOpinion.postAnyway}
+                    anywayLabel="Create anyway"
+                  />
+                </div>
               </div>
 
               <div>

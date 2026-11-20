@@ -27,6 +27,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDebateContext } from "@/contexts/DebateContext";
 import OpinionCard from "@/components/OpinionCard";
 import { AdoptOpinionDialog } from "@/components/AdoptOpinionDialog";
+import { OpinionStructure, BareOpinionTip, useBareOpinionGuard } from "@/components/OpinionStructure";
 import { LoginPromptDialog } from "@/components/LoginPromptDialog";
 import FallacyBadges from "@/components/FallacyBadges";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
@@ -735,13 +736,16 @@ export default function Topic() {
     },
   });
 
+  const opinionContent = opinionForm.watch("content");
+  const bareOpinion = useBareOpinionGuard(opinionContent ?? "");
+
   const onSubmitOpinion = (data: z.infer<typeof opinionFormSchema>) => {
     if (!isAuthenticated) {
       setLoginAction("opinion");
       setShowLoginPrompt(true);
       return;
     }
-    createOpinionMutation.mutate(data);
+    bareOpinion.guard(() => createOpinionMutation.mutate(data));
   };
   
   const handleShareOpinionClick = () => {
@@ -1438,11 +1442,17 @@ export default function Topic() {
                         {...field}
                       />
                     </FormControl>
+                    <OpinionStructure text={field.value ?? ""} topicTitle={topic?.title} />
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              <BareOpinionTip
+                open={bareOpinion.showTip}
+                onKeepWriting={bareOpinion.keepWriting}
+                onPostAnyway={bareOpinion.postAnyway}
+              />
               <div className="flex gap-2 justify-end pt-4">
                 <Button 
                   type="button" 

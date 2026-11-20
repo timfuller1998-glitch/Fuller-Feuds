@@ -13,6 +13,7 @@ import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { TopicSimilarityModal } from "./TopicSimilarityModal";
 import { SourceLinkFields } from "@/components/SourceLinkFields";
+import { OpinionStructure, BareOpinionTip, useBareOpinionGuard } from "@/components/OpinionStructure";
 
 interface SearchBarProps {
   onSearch?: (query: string) => void;
@@ -257,6 +258,8 @@ export default function SearchBar({
     setTopicCategories(topicCategories.filter(c => c !== category));
   };
 
+  const bareOpinion = useBareOpinionGuard(initialOpinion);
+
   // Handle form submission
   const handleCreateTopic = () => {
     // Use current query from search bar as the title (not the debounced/stale topicTitle)
@@ -266,7 +269,7 @@ export default function SearchBar({
     // Filter out empty references
     const validReferences = references.filter(ref => ref.trim());
     
-    createTopicMutation.mutate({
+    bareOpinion.guard(() => createTopicMutation.mutate({
       title: currentTitle,
       initialOpinion: initialOpinion.trim(),
       stance: stance,
@@ -274,7 +277,7 @@ export default function SearchBar({
       references: validReferences.length > 0 ? validReferences : undefined,
       description: topicDescription.trim() || undefined,
       sourceUrl: sourceUrl.trim() || undefined,
-    });
+    }));
   };
 
   // Handle proceeding with topic creation after similarity warning
@@ -512,6 +515,15 @@ export default function SearchBar({
                     data-testid="input-initial-opinion"
                     required
                   />
+                  <div className="mt-2 space-y-2">
+                    <OpinionStructure text={initialOpinion} topicTitle={query} />
+                    <BareOpinionTip
+                      open={bareOpinion.showTip}
+                      onKeepWriting={bareOpinion.keepWriting}
+                      onPostAnyway={bareOpinion.postAnyway}
+                      anywayLabel="Create anyway"
+                    />
+                  </div>
                 </div>
 
                 <div key={`stance-${showCreateForm}`}>
