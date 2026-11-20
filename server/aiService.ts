@@ -15,6 +15,7 @@ interface OpinionAnalysis {
   neutralPercentage: number;
   totalOpinions: number;
   confidence: 'high' | 'medium' | 'low';
+  usedFallback?: boolean;
 }
 
 function pickRelatedOpinionIds(text: string, opinions: Array<{ id: string; content: string }>, limit = 3): string[] {
@@ -183,7 +184,8 @@ export class AIService {
         opposingPercentage,
         neutralPercentage,
         totalOpinions,
-        confidence: 'medium' as const
+        confidence: 'medium' as const,
+        usedFallback: true
       };
     }
 
@@ -354,7 +356,8 @@ Return only valid JSON.`;
         opposingPercentage,
         neutralPercentage,
         totalOpinions,
-        confidence
+        confidence,
+        usedFallback: true
       };
     }
   }

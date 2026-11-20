@@ -3,7 +3,7 @@ import { opinions, users, userProfiles } from '../../shared/schema.js';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import { CumulativeOpinionRepository } from '../repositories/cumulativeOpinionRepository.js';
 import { TopicRepository } from '../repositories/topicRepository.js';
-import { AIService } from '../aiService.js';
+import { AIService, sentencesFromSummary } from '../aiService.js';
 import type { CumulativeOpinion } from '../../shared/schema.js';
 
 export class CumulativeOpinionService {
@@ -51,6 +51,20 @@ export class CumulativeOpinionService {
 
     // Generate AI analysis using all opinions
     const analysis = await AIService.generateCumulativeOpinion(topic, formattedOpinions);
+    const existing = await this.getCumulativeOpinion(topicId);
+
+    // If OpenAI failed or is unconfigured, do not overwrite a real stored summary
+    // with the vote-count fallback. Keep the existing text and attach sentence citations to it.
+    if (analysis.usedFallback && existing?.summary && !existing.summary.startsWith("Based on ") && !existing.summary.startsWith("Mock AI summary")) {
+      console.warn(`[AI Summary] Keeping existing summary for topic ${topicId} because generation fell back`);
+      return await this.cumulativeOpinionRepo.upsert(topicId, {
+        summary: existing.summary,
+        summarySentences: sentencesFromSummary(existing.summary, formattedOpinions),
+        keyPoints: existing.keyPoints,
+        totalOpinions: analysis.totalOpinions,
+        confidence: existing.confidence,
+      });
+    }
 
     // Save the cumulative opinion
     return await this.cumulativeOpinionRepo.upsert(topicId, {
