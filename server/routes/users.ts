@@ -12,6 +12,7 @@ import { isSecurityError } from '../utils/securityErrors.js';
 import { sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import { canUseAdFree } from '../../shared/supporter.js';
+import { getSiteConfig } from '../lib/siteSettings.js';
 
 const router = Router();
 const badgeRepository = new BadgeRepository();
@@ -130,7 +131,7 @@ router.put('/me/ad-free', isAuthenticated, async (req, res) => {
       return res.status(400).json({ message: 'adFree must be true or false' });
     }
     const rows: any = await db.execute(sql`
-      select role, subscription_tier, subscription_expires_at from users where id = ${me.id}
+      select role, subscription_tier, subscription_expires_at, founder_lifetime_ad_free from users where id = ${me.id}
     `);
     const u = (rows.rows ?? rows)[0];
     if (!u) return res.status(404).json({ message: 'User not found' });
@@ -138,7 +139,8 @@ router.put('/me/ad-free', isAuthenticated, async (req, res) => {
       role: u.role,
       subscriptionTier: u.subscription_tier,
       subscriptionExpiresAt: u.subscription_expires_at,
-    });
+      founderLifetimeAdFree: u.founder_lifetime_ad_free,
+    }, (await getSiteConfig()).publicLaunch);
     if (!allowed) {
       return res.status(403).json({ message: 'Ad-free comes with the supporter subscription' });
     }

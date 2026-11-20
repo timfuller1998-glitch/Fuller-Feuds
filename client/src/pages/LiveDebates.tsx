@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Radio, Eye, BookOpen, MessageSquare } from "lucide-react";
+import { Radio, Eye, BookOpen, MessageSquare, Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ type PublicDebate = {
   participant1Id: string; participant1Name: string; participant1Avatar: string | null; participant1Stance: string | null;
   participant2Id: string; participant2Name: string; participant2Avatar: string | null; participant2Stance: string | null;
   messageCount: number; startedAt: string | null; lastActivityAt: string | null; endedAt: string | null;
+  isShowcase?: boolean;
 };
 
 function ago(iso: string | null): string {
@@ -43,8 +44,13 @@ function Side({ name, avatar, stance, align }: { name: string; avatar: string | 
 
 function DebateRow({ d, live }: { d: PublicDebate; live: boolean }) {
   return (
-    <Card className="border-foreground/20" data-testid={`${live ? "live" : "finished"}-debate-${d.id}`}>
+    <Card className={d.isShowcase ? "border-[hsl(var(--gold))] border-2" : "border-foreground/20"} data-testid={`${live ? "live" : "finished"}-debate-${d.id}`}>
       <CardContent className="p-4 space-y-3">
+        {d.isShowcase ? (
+          <div className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--gold))] flex items-center gap-1.5" data-testid={`badge-showcase-${d.id}`}>
+            <Star className="w-3.5 h-3.5" /> Saturday Showcase
+          </div>
+        ) : null}
         <div className="flex items-start justify-between gap-3">
           <Link href={`/topic/${d.topicId}`} className="font-serif text-lg font-bold leading-snug hover:underline">
             {d.topicTitle}

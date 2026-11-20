@@ -39,6 +39,9 @@ import NotFound from "@/pages/not-found";
 import CreateTopicPage from "@/pages/CreateTopicPage";
 import DebateRoomPage from "@/pages/DebateRoomPage";
 import { PrivacyPage, TermsPage } from "@/pages/LegalPages";
+import ApplyPage from "@/pages/ApplyPage";
+import FoundersRoom from "@/pages/FoundersRoom";
+import { getPendingInvite } from "@/lib/ref";
 
 function Router() {
   const { isAuthenticated } = useAuth();
@@ -67,6 +70,8 @@ function Router() {
       <Route path="/u/:handle" component={HandleRedirect} />
       <Route path="/live-stream/:id" component={LiveStreamPage} />
       <Route path="/create-topic" component={CreateTopicPage} />
+      <Route path="/apply" component={ApplyPage} />
+      <Route path="/founders" component={FoundersRoom} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route component={NotFound} />
@@ -90,6 +95,10 @@ function AppWithSidebar({
   location: string;
 }) {
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  // Invite links (/?invite=CODE) open Create Account with the code filled in.
+  useEffect(() => {
+    if (!isAuthenticated && getPendingInvite()) setLoginDialogOpen(true);
+  }, [isAuthenticated]);
 
   return (
     <div className="flex h-screen h-[100dvh] w-full overflow-x-hidden">

@@ -19,6 +19,7 @@ import leaderboardRoutes from './leaderboards.js';
 import handleRoutes from './handles.js';
 import notificationRoutes from './notifications.js';
 import { feedbackRouter, adminFeedbackRouter } from './feedback.js';
+import { publicFoundersRouter, foundersRouter, adminFoundersRouter } from './founders.js';
 
 const router = express.Router();
 
@@ -31,6 +32,7 @@ router.use('/counterpoints', counterpointRoutes);
 router.use('/debates', debateRoutes);
 router.use('/debate-rooms', debateRoomRoutes);
 router.use('/admin/feedback', adminFeedbackRouter);
+router.use('/admin/founders', adminFoundersRouter);
 router.use('/admin', moderationRoutes);
 router.use('/admin/audit', auditRoutes);
 router.use('/stats', statsRoutes);
@@ -44,5 +46,7 @@ router.use('/leaderboards', leaderboardRoutes);
 router.use('/handles', handleRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/feedback', feedbackRouter);
+router.use('/founders', foundersRouter);
+router.use('/', publicFoundersRouter);
 
 export default router;

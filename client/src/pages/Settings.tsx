@@ -14,6 +14,8 @@ import { queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Save, User, Cloudy, Sun, Moon, AtSign, HelpCircle, Megaphone } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { FounderCard } from "@/components/FounderCard";
 import { canUseAdFree } from "@shared/supporter";
 import { HandleField, type HandleStatus } from "@/components/HandleField";
 import { useToast } from "@/hooks/use-toast";
@@ -65,7 +67,9 @@ export default function Settings() {
     staleTime: 60_000,
     retry: false,
   });
-  const adFreeAllowed = canUseAdFree(currentUser as any);
+  const { publicLaunch } = useSiteConfig();
+  const founderNumber: number | null = (currentUser as any)?.founderNumber ?? null;
+  const adFreeAllowed = canUseAdFree(currentUser as any, publicLaunch);
   const [adFree, setAdFree] = useState<boolean>(false);
   useEffect(() => {
     setAdFree((currentUser as any)?.adFree === true);
@@ -467,6 +471,8 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {founderNumber != null ? <FounderCard founderNumber={founderNumber} publicLaunch={publicLaunch} /> : null}
+
       {/* Ads */}
       <Card data-testid="card-settings-ads">
         <CardHeader>
@@ -483,7 +489,11 @@ export default function Settings() {
                 Hide ads on my account
               </label>
               <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-ad-free-note">
-                {adFreeAllowed ? "You can turn ads off for your account." : "Coming with supporter subscription."}
+                {adFreeAllowed
+                  ? "You can turn ads off for your account."
+                  : founderNumber != null
+                    ? "Founding members get lifetime ad-free when Fuller Feuds publicly launches."
+                    : "Coming with supporter subscription."}
               </p>
             </div>
             <Switch

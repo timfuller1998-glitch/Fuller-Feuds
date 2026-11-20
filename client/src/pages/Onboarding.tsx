@@ -494,7 +494,14 @@ export default function Onboarding() {
         {/* Header with progress */}
         <div className="space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <h1 className="text-4xl font-bold tracking-tight">Welcome to Fuller Feuds</h1>
+            <div>
+              <h1 className="text-4xl font-bold tracking-tight">Welcome to Fuller Feuds</h1>
+              {(user as any)?.founderNumber != null && (
+                <p className="mt-2 font-ui text-xs font-semibold uppercase tracking-[0.16em] text-[hsl(var(--gold))]" data-testid="text-onboarding-founder">
+                  You're Founding Member #{(user as any).founderNumber}
+                </p>
+              )}
+            </div>
             <Button
               variant="ghost"
               size="sm"

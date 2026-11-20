@@ -28,6 +28,7 @@ export type PublicDebate = {
   participant1Id: string; participant1Name: string; participant1Avatar: string | null; participant1Stance: string | null;
   participant2Id: string; participant2Name: string; participant2Avatar: string | null; participant2Stance: string | null;
   messageCount: number; startedAt: string | null; lastActivityAt: string | null; endedAt: string | null;
+  isShowcase: boolean;
 };
 
 /** Public debates: `live` = in progress (accepted, active), `finished` = ended or archived with at least one message. */
@@ -35,9 +36,10 @@ export async function listPublicDebates(kind: 'live' | 'finished', limit = 30): 
   const where = kind === 'live'
     ? sql`d.status = 'active'`
     : sql`d.status IN ('ended', 'archived') AND EXISTS (SELECT 1 FROM debate_messages m WHERE m.room_id = d.id)`;
-  const order = kind === 'live' ? sql`activity_at DESC NULLS LAST` : sql`ended_at DESC NULLS LAST`;
+  // Showcase debates (featured by an admin, migration 0016) always list first.
+  const order = kind === 'live' ? sql`coalesce(d.is_showcase, false) DESC, activity_at DESC NULLS LAST` : sql`coalesce(d.is_showcase, false) DESC, ended_at DESC NULLS LAST`;
   const r: any = await db.execute(sql`
-    SELECT d.id, d.topic_id, d.status, d.phase, d.participant1_id, d.participant2_id,
+    SELECT d.id, d.topic_id, d.status, d.phase, coalesce(d.is_showcase, false) AS is_showcase, d.participant1_id, d.participant2_id,
            d.participant1_stance, d.participant2_stance,
            (d.started_at AT TIME ZONE 'UTC') AS started_at,
            (coalesce(d.last_message_at, d.started_at) AT TIME ZONE 'UTC') AS activity_at,
@@ -65,5 +67,6 @@ export async function listPublicDebates(kind: 'live' | 'finished', limit = 30): 
     participant2Id: d.participant2_id, participant2Name: d.p2_name, participant2Avatar: d.p2_avatar, participant2Stance: d.participant2_stance,
     messageCount: Number(d.message_count) || 0,
     startedAt: iso(d.started_at), lastActivityAt: iso(d.activity_at), endedAt: iso(d.ended_at),
+    isShowcase: d.is_showcase === true,
   }));
 }

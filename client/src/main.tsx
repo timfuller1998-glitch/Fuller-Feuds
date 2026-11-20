@@ -1,6 +1,10 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { captureUrlParams } from "./lib/ref";
+
+// ?ref= source tracking and ?invite= codes (founding members).
+captureUrlParams();
 
 const CHUNK_RELOAD_KEY = "ff-chunk-reload";
 

@@ -3,7 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MessageCircle, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "wouter";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { getRef, getPendingInvite, clearPendingInvite } from "@/lib/ref";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { HandleField, type HandleStatus } from "@/components/HandleField";
@@ -21,7 +25,20 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
   const [lastName, setLastName] = useState("");
   const [handle, setHandle] = useState("");
   const [handleStatus, setHandleStatus] = useState<HandleStatus>("idle");
+  const [inviteCode, setInviteCode] = useState("");
+  const [is18Plus, setIs18Plus] = useState(false);
+  const { foundingMode } = useSiteConfig();
   const queryClient = useQueryClient();
+
+  // An invite link (/?invite=FF-XXXX-XXXX) opens straight into Create Account with the code filled in.
+  useEffect(() => {
+    if (!open) return;
+    const pending = getPendingInvite();
+    if (pending) {
+      setIsRegister(true);
+      setInviteCode((c) => c || pending);
+    }
+  }, [open]);
   const { toast } = useToast();
 
   const loginMutation = useMutation({
@@ -61,7 +78,7 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string; firstName: string; lastName: string; handle: string }) => {
+    mutationFn: async (data: { email: string; password: string; firstName: string; lastName: string; handle: string; inviteCode: string; is18Plus: boolean; ref: string | null }) => {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -76,11 +93,16 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
 
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      clearPendingInvite();
+      setInviteCode("");
+      setIs18Plus(false);
       toast({
-        title: "Account created!",
-        description: "Welcome to Fuller Feuds.",
+        title: data?.founderNumber ? `Welcome, Founding Member #${data.founderNumber}!` : "Account created!",
+        description: data?.founderNumber
+          ? "Your badge and invite codes are in Settings."
+          : "Welcome to Fuller Feuds.",
       });
       onOpenChange(false);
       // Reset form
@@ -107,7 +129,15 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
         toast({ title: "Pick a handle", description: "Choose an available @handle to continue.", variant: "destructive" });
         return;
       }
-      registerMutation.mutate({ email, password, firstName, lastName, handle });
+      if (foundingMode && !inviteCode.trim()) {
+        toast({ title: "Invite code needed", description: "Fuller Feuds is invite-only for now. Apply for a founding spot at /apply.", variant: "destructive" });
+        return;
+      }
+      if (!is18Plus) {
+        toast({ title: "Please confirm your age", description: "You must be 18 or older to join.", variant: "destructive" });
+        return;
+      }
+      registerMutation.mutate({ email, password, firstName, lastName, handle, inviteCode: inviteCode.trim(), is18Plus, ref: getRef() });
     } else {
       loginMutation.mutate({ email, password });
     }
@@ -135,6 +165,29 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          {isRegister && foundingMode && (
+            <div className="space-y-2 border border-[hsl(var(--gold))]/60 bg-[hsl(var(--gold))]/5 p-3" data-testid="section-invite-code">
+              <Label htmlFor="inviteCode">Invite code</Label>
+              <Input
+                id="inviteCode"
+                type="text"
+                placeholder="FF-XXXX-XXXX"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                autoComplete="off"
+                required
+                disabled={isLoading}
+                className="font-mono tracking-wider"
+                data-testid="input-invite-code"
+              />
+              <p className="text-xs text-muted-foreground">
+                We're invite-only while our founding members settle in.{" "}
+                <Link href="/apply" onClick={() => onOpenChange(false)} className="underline underline-offset-2 text-foreground" data-testid="link-apply-from-signup">
+                  No code? Apply to be a founding member
+                </Link>
+              </p>
+            </div>
+          )}
           {isRegister && (
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -205,11 +258,18 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
             )}
           </div>
 
+          {isRegister && (
+            <div className="flex items-start gap-2">
+              <Checkbox id="is18Plus" checked={is18Plus} onCheckedChange={(v) => setIs18Plus(v === true)} disabled={isLoading} data-testid="checkbox-18-plus" />
+              <Label htmlFor="is18Plus" className="text-sm font-normal leading-snug">I'm 18 or older</Label>
+            </div>
+          )}
+
           <Button
             type="submit"
             className="w-full"
             size="lg"
-            disabled={isLoading || (isRegister && handleStatus !== "available")}
+            disabled={isLoading || (isRegister && (handleStatus !== "available" || !is18Plus || (foundingMode && !inviteCode.trim())))}
             data-testid="button-login-dialog"
           >
             {isLoading ? (
@@ -236,8 +296,19 @@ export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
             </Button>
           </div>
 
+          {!isRegister && foundingMode && (
+            <p className="text-xs text-center text-muted-foreground" data-testid="text-apply-cta">
+              New here? Fuller Feuds is invite-only for now.{" "}
+              <Link href="/apply" onClick={() => onOpenChange(false)} className="underline underline-offset-2 text-foreground" data-testid="link-apply-from-signin">
+                Apply to be a founding member
+              </Link>
+            </p>
+          )}
+
           <p className="text-xs text-center text-muted-foreground">
-            By continuing, you agree to our Terms of Service and Privacy Policy
+            By continuing, you agree to our{" "}
+            <Link href="/terms" onClick={() => onOpenChange(false)} className="underline underline-offset-2">Terms of Use</Link> and{" "}
+            <Link href="/privacy" onClick={() => onOpenChange(false)} className="underline underline-offset-2">Privacy Policy</Link>
           </p>
         </form>
       </DialogContent>

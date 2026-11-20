@@ -231,4 +231,5 @@ export const BADGE_STACKS: Record<string, { name: string; unit: string }> = {
   high_rating: { name: "Opponent Ratings", unit: "rated debates" },
   likes_received: { name: "Likes Received", unit: "likes" },
   follower_count: { name: "Followers", unit: "followers" },
+  founder: { name: "Founding Member", unit: "" },
 };

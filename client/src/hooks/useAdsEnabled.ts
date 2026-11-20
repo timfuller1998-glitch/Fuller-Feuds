@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { canUseAdFree } from "@shared/supporter";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 /**
  * Single gate for every ad slot (Fuller Feuds Dev, Nov 20 2026). Ads show unless the signed-in
@@ -8,7 +9,9 @@ import { canUseAdFree } from "@shared/supporter";
  */
 export function useAdsEnabled(): boolean {
   const { user } = useAuth();
+  const { publicLaunch } = useSiteConfig();
   const u = user as any;
   if (!u) return true;
-  return !(u.adFree === true && canUseAdFree(u));
+  // Founders' lifetime ad-free only counts once the admin "public launch" switch is on.
+  return !(u.adFree === true && canUseAdFree(u, publicLaunch));
 }

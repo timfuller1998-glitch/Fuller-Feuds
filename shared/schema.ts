@@ -56,6 +56,13 @@ export const users = pgTable("users", {
   adFree: boolean("ad_free").default(false),
   subscriptionTier: varchar("subscription_tier", { length: 30 }),
   subscriptionExpiresAt: timestamp("subscription_expires_at"),
+  // Founding members (migration 0016, additive): invite tree, source tracking, 18+ confirmation, founder perks.
+  invitedByUserId: varchar("invited_by_user_id"),
+  inviteCodeId: uuid("invite_code_id"),
+  signupRef: varchar("signup_ref", { length: 80 }),
+  ageConfirmedAt: timestamp("age_confirmed_at"),
+  founderNumber: integer("founder_number"),
+  founderLifetimeAdFree: boolean("founder_lifetime_ad_free").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -180,6 +187,8 @@ export const debateRooms = pgTable("debate_rooms", {
   // Debate overhaul (migration 0014): each side's stance, from their opinion or picked when challenging.
   participant1Stance: varchar("participant1_stance", { length: 10 }),
   participant2Stance: varchar("participant2_stance", { length: 10 }),
+  // Weekly showcase debate featured on /live (migration 0016), set by an admin.
+  isShowcase: boolean("is_showcase").default(false),
 });
 
 // Messages in debate rooms
