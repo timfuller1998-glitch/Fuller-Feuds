@@ -5,6 +5,7 @@ import { debateRooms, debateVotes } from '../../shared/schema.js';
 import { DebateService } from '../services/debateService.js';
 import { BadgeRepository } from '../repositories/badgeRepository.js';
 import { notifyUser } from './notify.js';
+import { broadcastDebateUpdate } from '../websocket.js';
 
 /** Each side gets this many turns in the structured phase; after that both rate each other. */
 export const STRUCTURED_TURNS = 3;
@@ -74,6 +75,7 @@ export async function postDebateMessage(roomId: string, userId: string, content:
       await notifyUser(opponentId, { type: 'your_turn', title: 'Your turn', message: `${me} replied. It's your turn.`, debateRoomId: roomId });
     }
   }
+  broadcastDebateUpdate(roomId, [room.participant1Id, room.participant2Id], 'message');
   return { message, room: updated, opponentId };
 }
 
@@ -114,6 +116,7 @@ export async function respondToInvite(roomId: string, userId: string, action: 'a
       debateRoomId: roomId,
     });
   }
+  broadcastDebateUpdate(roomId, [room.participant1Id, room.participant2Id], `invite_${action}`);
   return (await getRoomRaw(roomId))!;
 }
 
@@ -133,6 +136,7 @@ export async function endDebate(roomId: string, userId: string) {
     const me = await displayNameOf(userId);
     await notifyUser(opponentId, { type: 'debate_ended', title: 'Debate ended', message: `${me} ended the debate. Rate how they debated.`, debateRoomId: roomId });
   }
+  broadcastDebateUpdate(roomId, [room.participant1Id, room.participant2Id], 'ended');
   return (await getRoomRaw(roomId))!;
 }
 
@@ -200,5 +204,6 @@ export async function submitRating(roomId: string, voterId: string, body: any) {
       await notifyUser(uid, { type: 'ratings_in', title: 'Ratings are in', message: 'Both sides rated. See your scores.', debateRoomId: roomId });
     }
   }
+  broadcastDebateUpdate(roomId, [room.participant1Id, room.participant2Id], 'rated');
   return summary;
 }

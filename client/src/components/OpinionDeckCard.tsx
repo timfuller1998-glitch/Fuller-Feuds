@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Flag, MessageSquareReply, RotateCcw, ThumbsDown, ThumbsUp, UserPlus } from "lucide-react";
 import { AiWriteFlagButton } from "@/components/AiWriteFlagButton";
+import { ChallengeButton } from "@/components/ChallengeButton";
 import { InteractiveSentenceText } from "@/components/InteractiveSentenceText";
 import { CardScrollBody } from "@/components/CardScrollBody";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
@@ -144,6 +145,7 @@ export function OpinionDeckBack({ op, onVote, onAdopt, onFlag, onSeeCounterpoint
         <Button size="sm" className="w-full" onClick={() => onSeeCounterpoints(firstWithCounterpoints)} data-testid={`button-see-counterpoints-${op.id}`}>
           <MessageSquareReply className="w-4 h-4 mr-1.5" /> See counterpoints{total > 0 ? ` (${total})` : ""}
         </Button>
+        <ChallengeButton op={op as any} />
         <div className="grid grid-cols-2 gap-2">
           <Button size="sm" variant={vote === "like" ? "default" : "outline"} onClick={() => onVote("like")} data-testid={`button-like-${op.id}`}>
             <ThumbsUp className="w-4 h-4 mr-1.5" /> Like

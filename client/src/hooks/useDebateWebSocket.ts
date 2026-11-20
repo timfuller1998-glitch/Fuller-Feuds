@@ -13,6 +13,7 @@ type WebSocketMessage =
   | { type: 'debate_ended'; debateRoomId: string }
   | { type: 'opponent_typing'; debateRoomId: string; isTyping: boolean; userId: string }
   | { type: 'new_debate_created'; debateRoomId: string; opponentName: string }
+  | { type: 'debate_update'; debateRoomId: string; kind: string }
   | { type: 'notification'; notification: { id: string; type: string; title: string; message: string; debateRoomId?: string | null } };
 
 export function useDebateWebSocket(userId?: string) {
@@ -92,7 +93,7 @@ export function useDebateWebSocket(userId?: string) {
     console.log('[WebSocket] Showing toast notification');
     toast({
       title: "New debate",
-      description: `${data.opponentName} challenged you to a debate. Open the bell to reply.`,
+      description: `${data.opponentName} challenged you to a debate. Tap the green dot in your Debates bar to answer.`,
       duration: 4000,
     });
   }, []);
@@ -125,6 +126,14 @@ export function useDebateWebSocket(userId?: string) {
           case 'authenticated':
             console.log('[WebSocket] Successfully authenticated');
             break;
+          case 'debate_update': {
+            // A debate I'm in changed (message, turn, accepted, ended, rated): refresh that room and my footer.
+            const id = (data as any).debateRoomId;
+            if (id) queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms', id] });
+            queryClient.invalidateQueries({ queryKey: ['/api/debates/grouped'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/debates/live'] });
+            break;
+          }
           case 'new_debate_message':
             if ((data as any).debateRoomId) setOpponentTyping((data as any).debateRoomId, '', false);
             handleNewMessage(data);

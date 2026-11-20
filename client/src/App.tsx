@@ -12,8 +12,6 @@ import { ActiveBackgroundGradient } from "@/components/ActiveBackgroundGradient"
 import { useAuth } from "@/hooks/useAuth";
 import { DebateProvider } from "@/contexts/DebateContext";
 import { DebateFooter } from "@/components/debates/DebateFooter";
-import { AllActiveDebatesPanel } from "@/components/debates/AllActiveDebatesPanel";
-import { ArchivedDebatesPanel } from "@/components/debates/ArchivedDebatesPanel";
 import { OpponentDebateList } from "@/components/debates/OpponentDebateList";
 import { DebateWindowManager } from "@/components/debates/DebateWindowManager";
 import { useDebateWebSocket } from "@/hooks/useDebateWebSocket";
@@ -50,13 +48,14 @@ function Router() {
       {isAuthenticated && <Route path="/onboarding" component={Onboarding} />}
       {isAuthenticated && <Route path="/settings" component={Settings} />}
       {isAuthenticated && <Route path="/admin" component={AdminDashboard} />}
-      {isAuthenticated && <Route path="/debate-room/:id" component={DebateRoomPage} />}
       
       {/* Public routes - visible to everyone */}
       <Route path="/" component={Home} />
       <Route path="/search" component={Search} />
       <Route path="/trending" component={Trending} />
       <Route path="/live" component={LiveDebates} />
+      {/* Debaters debate here; anyone can watch a public debate live (read-only). */}
+      <Route path="/debate-room/:id" component={DebateRoomPage} />
       <Route path="/hot-debates" component={HotDebates} />
       <Route path="/categories" component={AllCategoriesPage} />
       <Route path="/category/:category" component={CategoryPage} />
@@ -147,8 +146,6 @@ function AppWithSidebar({
         {isAuthenticated && (
           <>
             <DebateFooter />
-            <AllActiveDebatesPanel />
-            <ArchivedDebatesPanel />
             <OpponentDebateList />
             <DebateWindowManager />
           </>

@@ -142,6 +142,7 @@ router.post('/:id/start-debate', isAuthenticated, async (req, res) => {
       topicId: opinion.topicId,
       participant1Id: requestingUserId,
       participant2Id: opponentUserId,
+      participant1Stance: ['for', 'against', 'neutral'].includes(req.body?.stance) ? req.body.stance : null,
     });
 
     // Seed an opening message so context is immediate
