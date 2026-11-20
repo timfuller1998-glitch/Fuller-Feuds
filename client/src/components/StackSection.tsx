@@ -1,37 +1,29 @@
-import { LucideIcon } from "lucide-react";
+import { ChevronDown, LucideIcon } from "lucide-react";
 import SwipeableCardStack from "./SwipeableCardStack";
 import type { TopicWithCounts } from "@shared/schema";
-
-interface NextSection {
-  title: string;
-  icon: LucideIcon;
-}
 
 interface StackSectionProps {
   title: string;
   icon: LucideIcon;
   sectionKey: string;
   topics: TopicWithCounts[];
-  nextSection?: NextSection;
+  /** When true, show a small chevron hint that another section is below. */
+  showNextHint?: boolean;
 }
 
-export default function StackSection({ title, icon: Icon, sectionKey, topics, nextSection }: StackSectionProps) {
+export default function StackSection({ title, icon: Icon, sectionKey, topics, showNextHint }: StackSectionProps) {
   const handleEmpty = () => {
-    // Handle empty stack - could trigger refresh or show message
     console.log(`Stack ${sectionKey} is empty`);
   };
-
-  const NextSectionIcon = nextSection?.icon;
 
   return (
     <section
       className="h-[100dvh] snap-start flex flex-col items-center px-4"
       data-testid={`section-${sectionKey}`}
     >
-      {/* Current Section Header - Top */}
-      <div className="w-full flex justify-between items-center py-4 flex-shrink-0">
-        <div className="inline-flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
+      <div className="w-full flex justify-between items-center pt-3 pb-1 flex-shrink-0">
+        <div className="inline-flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-primary/10">
             <Icon className="w-5 h-5 text-primary" />
           </div>
           <h2 className="text-xl font-semibold" data-testid={`text-section-${sectionKey}`}>
@@ -43,7 +35,6 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, ne
         </span>
       </div>
 
-      {/* Card Stack - Middle (centered in remaining space) */}
       <div className="flex-1 w-full flex items-center justify-center min-h-0 overflow-visible">
         {topics.length > 0 ? (
           <SwipeableCardStack
@@ -57,20 +48,13 @@ export default function StackSection({ title, icon: Icon, sectionKey, topics, ne
         )}
       </div>
 
-      {/* Next Section Title - Bottom */}
-      {nextSection && NextSectionIcon && (
-        <div className="w-full flex justify-between items-center py-4 flex-shrink-0">
-          <div className="inline-flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10 opacity-60">
-              <NextSectionIcon className="w-5 h-5 text-primary" />
-            </div>
-            <h2 className="text-xl font-semibold text-muted-foreground">
-              {nextSection.title}
-            </h2>
-          </div>
+      {showNextHint ? (
+        <div className="w-full flex justify-center pb-2 pt-0 flex-shrink-0" aria-hidden="true">
+          <ChevronDown className="w-5 h-5 text-muted-foreground/50" data-testid={`hint-next-section-${sectionKey}`} />
         </div>
+      ) : (
+        <div className="h-3 flex-shrink-0" />
       )}
     </section>
   );
 }
-

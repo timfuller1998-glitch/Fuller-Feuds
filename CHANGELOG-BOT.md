@@ -1,3 +1,10 @@
+## 2026-11-19 (19:20 CST) — Remove duplicate category titles on the home page
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/home-section-titles`
+- **What:** Each home stack no longer repeats the next section's title at the bottom. A small, quiet downward chevron hints that another section is below. Tightened the top header padding so the card has more room and the gaps feel smaller.
+- **Typecheck:** 52.
+
 ## 2026-11-13 (16:00 CST) — Drop the profile page title and stack topics in a card deck
 
 - **By:** Fuller Feuds Dev
