@@ -279,12 +279,6 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         } else {
           go(ox, 0, 0.3); go(os, s1.scale, 0.3);
         }
-        // Forward swipe: as the top card is dragged left, the rest of the pile shifts
-        // right (out of its way) by the same amount as the back-swipe top nudge, and this
-        // card rises/scales into the top slot.
-        if (lift) {
-          followLift(lift, ox, oy, os, width, s1.y, s1.scale, anims, () => !!(pull && pull.get() > 2));
-        }
       } else if (role === "out") {
         // Forward: slide off to the left from wherever the finger released it, then drop behind the deck.
         // Hand the finger offset over to the outer layer and stop the drag's spring-back, so the card
@@ -306,7 +300,8 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         if (!cancelled) doneRef.current?.();
       } else if (role === "peek") {
         // Bottom card hidden behind the plain backs; a rightward drag slides it out from behind.
-        oz.set(0); oy.set(s2.y); os.set(s2.scale);
+        // Reset leftover tuck-under values if this is the same element that just finished "out".
+        oz.set(0); oy.set(s2.y); os.set(s2.scale); ox.set(0); orot.set(0);
         if (pull) {
           const follow = (v: number) => {
             oz.set(v > 2 ? 6 : 0); // above the 2nd card while emerging, hidden behind the backs at rest
@@ -352,6 +347,19 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
     return () => { cancelled = true; anims.forEach((a) => a.stop()); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
+
+  // Subscribe to forward-swipe lift only once this card is sitting in the "next" slot.
+  // A new next card is mounted with enterFromBack during the previous card's tuck-under,
+  // when lift is still leftover from that swipe. If we subscribed then (or never
+  // re-subscribed after outgoing cleared), the card would stay frozen in the 2nd-slot
+  // pose on every later forward swipe and look like a stuck duplicate behind the top card.
+  useEffect(() => {
+    if (role !== "next" || !lift || enterFromBack) return;
+    const anims: { stop: () => void }[] = [];
+    followLift(lift, ox, oy, os, width, s1.y, s1.scale, anims, () => !!(pull && pull.get() > 2));
+    return () => anims.forEach((a) => a.stop());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, lift, enterFromBack, width]);
 
   const isTop = role === "top";
   return (
@@ -638,7 +646,7 @@ export default function CardDeck<T>({
               lift.set(Math.max(0, -info.offset.x));
             }}
             pull={role === "peek" || role === "top" || role === "next" || role === "in" ? pull : undefined}
-            lift={(role === "next" && !outgoing) || role === "peek" ? lift : undefined}
+            lift={role === "next" || role === "peek" ? lift : undefined}
             enterFromBack={role === "next" && !!outgoing}
             onDone={
               role === "out" ? () => { setOutgoing(null); resetPileMotion(); } : role === "in" ? () => { resetPileMotion(); setIncomingId(null); } : undefined
