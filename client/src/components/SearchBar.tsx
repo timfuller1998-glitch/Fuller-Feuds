@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useUserSearch, PersonRow } from "@/components/PeopleResults";
 import { Search, History, Plus, X, Link as LinkIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -107,14 +108,18 @@ export default function SearchBar({
     enabled: !!pendingSimilarityCheck && pendingSimilarityCheck.length >= 3,
   });
 
+  // People matching the query (name or @handle), shown under Topics in the dropdown.
+  const { data: people } = useUserSearch(debouncedQuery.length >= 2 ? debouncedQuery : "", 5);
+  const hasPeople = query.length >= 2 && !!people && people.length > 0;
+
   // Calculate search state variables (must be before useEffect that uses them)
-  const hasResults = topics && topics.length > 0;
-  const hasNoResults = query.length >= 2 && topics !== undefined && topics.length === 0;
+  const hasResults = (topics && topics.length > 0) || hasPeople;
+  const hasNoResults = query.length >= 2 && topics !== undefined && topics.length === 0 && !hasPeople;
 
   // Handle Enter key flow - navigate to search or clear pending state
   useEffect(() => {
     if (pendingEnterKey && debouncedQuery === pendingEnterKey) {
-      if (topics && topics.length > 0) {
+      if ((topics && topics.length > 0) || (people && people.length > 0)) {
         // Has results, navigate to search page
         saveToHistory(pendingEnterKey);
         onSearch?.(pendingEnterKey);
@@ -125,7 +130,7 @@ export default function SearchBar({
       // Clear pending state regardless - the auto-trigger effect will handle topic creation
       setPendingEnterKey(null);
     }
-  }, [pendingEnterKey, debouncedQuery, topics]);
+  }, [pendingEnterKey, debouncedQuery, topics, people]);
 
   // Don't auto-trigger similarity check - let users manually click "Create Topic" in dropdown
   // (Removed auto-trigger since dropdown now uses semantic search and has manual create option)
@@ -431,6 +436,18 @@ export default function SearchBar({
                     )}
                   </div>
                 </button>
+              ))}
+            </div>
+          )}
+
+          {/* People Suggestions */}
+          {hasPeople && (
+            <div className="mb-2" data-testid="suggestions-people">
+              <div className="px-2 py-1 mb-1">
+                <span className="text-xs font-semibold text-muted-foreground">People</span>
+              </div>
+              {people!.slice(0, 5).map((p) => (
+                <PersonRow key={p.id} p={p} compact onNavigate={() => setShowSuggestions(false)} />
               ))}
             </div>
           )}

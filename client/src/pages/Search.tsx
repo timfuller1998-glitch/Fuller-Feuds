@@ -3,10 +3,11 @@ import { useSearch, useLocation } from "wouter";
 import SwipeableCardStack from "@/components/SwipeableCardStack";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search as SearchIcon, History, Filter } from "lucide-react";
+import { Search as SearchIcon, History, Filter, Users, MessageSquare } from "lucide-react";
 import { type Topic } from "@shared/schema";
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
+import { useUserSearch, PersonRow } from "@/components/PeopleResults";
 
 type TopicWithCounts = Topic & {
   opinionsCount?: number;
@@ -58,6 +59,17 @@ export default function Search() {
     enabled: !!searchQuery,
   });
 
+  // People matching the same query (name or @handle).
+  const { data: people = [], isLoading: peopleLoading } = useUserSearch(searchQuery, 20);
+  const [kind, setKind] = useState<"topics" | "people">("topics");
+  useEffect(() => {
+    setKind("topics");
+  }, [searchQuery]);
+  // Land on People when the query only matches people.
+  useEffect(() => {
+    if (!isLoading && !peopleLoading && (topics?.length ?? 0) === 0 && people.length > 0) setKind("people");
+  }, [isLoading, peopleLoading, topics, people.length]);
+
   // Filter by category for tabs
   const allCategories = Array.from(new Set(topics?.flatMap(t => t.categories) || []));
   const filteredTopics = activeTab === "all" 
@@ -76,7 +88,7 @@ export default function Search() {
               Search
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Search for topics, debates, and discussions
+              Search for topics, debates, and people
             </p>
           </div>
         </div>
@@ -112,7 +124,7 @@ export default function Search() {
             <SearchIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-lg font-medium mb-2">Start searching</p>
             <p className="text-muted-foreground">
-              Use the search bar above to find topics and debates
+              Use the search bar above to find topics, debates, and people
             </p>
           </CardContent>
         </Card>
@@ -133,14 +145,59 @@ export default function Search() {
               Search Results
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground">
-              {isLoading ? "Searching..." : `${topics?.length || 0} results for "${searchQuery}"`}
+              {isLoading || peopleLoading
+                ? "Searching..."
+                : `${topics?.length || 0} topics and ${people.length} ${people.length === 1 ? "person" : "people"} for "${searchQuery}"`}
             </p>
           </div>
         </div>
       </div>
 
+      {/* Topics / People switch */}
+      <div className="inline-flex rounded-lg border p-0.5" role="tablist" data-testid="search-kind-switch">
+        {([
+          { id: "topics", label: "Topics", icon: MessageSquare, count: topics?.length ?? 0 },
+          { id: "people", label: "People", icon: Users, count: people.length },
+        ] as const).map((k) => (
+          <button
+            key={k.id}
+            type="button"
+            role="tab"
+            aria-selected={kind === k.id}
+            onClick={() => setKind(k.id)}
+            className={`font-ui inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] ${kind === k.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover-elevate"}`}
+            data-testid={`tab-search-${k.id}`}
+          >
+            <k.icon className="h-3.5 w-3.5" />
+            {k.label} ({k.count})
+          </button>
+        ))}
+      </div>
+
+      {/* People results */}
+      {kind === "people" && (
+        <div className="space-y-2" data-testid="list-people-results">
+          {peopleLoading ? (
+            <p className="text-sm text-muted-foreground">Searching people...</p>
+          ) : people.length > 0 ? (
+            <div className="grid gap-2 md:grid-cols-2">
+              {people.map((p) => (
+                <PersonRow key={p.id} p={p} />
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+                <p className="text-muted-foreground">No people match "{searchQuery}".</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Results Tabs */}
-      {!isLoading && topics && topics.length > 0 && (
+      {kind === "topics" && !isLoading && topics && topics.length > 0 && (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -171,7 +228,7 @@ export default function Search() {
       )}
 
       {/* Loading State */}
-      {isLoading && (
+      {kind === "topics" && isLoading && (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -181,7 +238,7 @@ export default function Search() {
       )}
 
       {/* No Results */}
-      {!isLoading && topics && topics.length === 0 && (
+      {kind === "topics" && !isLoading && topics && topics.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center space-y-4">
             <SearchIcon className="w-12 h-12 text-muted-foreground mx-auto" />

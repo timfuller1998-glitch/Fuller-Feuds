@@ -1,3 +1,12 @@
+## 2026-11-20 (11:30 CST) — Search for people
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `feat/user-search`
+- **What:** The header search dropdown has a **People** section (up to 5) under Topics, and the Search page has a **Topics / People** switch (it opens on People when only people match). Each person shows avatar, public display name, @handle, top badge (their avatar badge, else their highest-tier one) and follower count, and links to their profile. Enter now goes to the Search page when only people match.
+- **API:** New `GET /api/users/search?q=&limit=` (2–50 chars, leading @ ignored, default 8, max 20). Matches the public display name or @handle, never the hidden real name when a display name is set. Active accounts only; returns no email, role, status or other private fields. LIKE wildcards are escaped. Rate-limited to 120/minute per signed-in user, or per client IP (`cf-connecting-ip`) when signed out.
+- **Index:** None added. Production has 114 users, so a scan is instant; a trigram index can come later if the user base grows.
+- **Typecheck:** 50 (ceiling 52).
+
 ## 2026-11-20 (11:05 CST) — Recent Opinions uses the stacked card deck
 
 - **By:** Fuller Feuds Dev
