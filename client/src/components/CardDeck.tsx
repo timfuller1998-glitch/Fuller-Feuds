@@ -127,22 +127,24 @@ const NEAR_END = 4;
 
 /**
  * Shuffle model: moving forward tucks the top card under the deck (slides out to the
- * side, drops behind, settles at the back) while the next card rises into the top spot.
- * Moving back pulls the bottom card out from under the deck and lands it on top.
+ * left, drops behind, settles at the back) while the next card rises into the top spot.
+ * Moving back is that motion in reverse: the previous card slides out from under the
+ * pile to the left, then comes over the top and settles in the center. The finger still
+ * swipes right to go back; the card always travels around the left side.
  * Background cards are plain card backs, offset downward, and never take pointer events.
  */
 const BACK_LAYERS = [2] as const; // blank backs beyond the second card
 const backStyle = (d: number) => ({ y: 7 * d, scale: 1 - 0.035 * d });
 const EASE = [0.22, 1, 0.36, 1] as const;
-// Phone-only: while the bottom card is pulled out, the rest of the pile shifts left and
-// shrinks with the top card so no deeper card is uncovered beside the incoming one.
+// Phone-only: while the previous card emerges to the left, the rest of the pile shifts
+// right and shrinks a touch so the left side is clear and no deeper card is uncovered.
 const NUDGE_X = 0.22;
 const NUDGE_SCALE = 0.05;
 const nudgeProgress = (pull: number, width: number) => Math.min(Math.max(pull, 0) / (width * 0.55), 1);
 const pullTargetFor = (width: number, narrow: boolean) => (narrow ? width * 0.55 : width * 1.12 * 0.92);
 const applyNudge = (ox: MotionValue<number>, os: MotionValue<number>, pull: number, width: number, baseScale: number) => {
   const f = nudgeProgress(pull, width);
-  ox.set(-f * NUDGE_X * width);
+  ox.set(f * NUDGE_X * width);
   os.set(baseScale * (1 - f * NUDGE_SCALE));
 };
 const liftProgress = (lift: number, width: number) => Math.min(Math.max(lift, 0) / (width * 0.45), 1);
@@ -219,7 +221,7 @@ interface DeckCardProps {
   draggable: boolean;
   onDragEnd?: (info: PanInfo, releaseX: number) => void;
   onDrag?: (info: PanInfo) => void;
-  /** Rightward drag distance; the bottom ("peek") card emerges from behind the deck by this much. */
+  /** Rightward drag distance; the bottom ("peek") card emerges to the left from behind the deck by this much. */
   pull?: MotionValue<number>;
   /** Freshly mounted "next" card during a forward swipe: start at the back and rise into the 2nd slot. */
   enterFromBack?: boolean;
@@ -277,7 +279,7 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
     const run = async () => {
       if (role === "top") {
         oz.set(10);
-        // Phones: while the bottom card is being pulled out to the right, nudge the top card left and
+        // Phones: while the previous card emerges to the left, nudge the top card right and
         // shrink it a touch so the emerging card is clearly visible. Deeper cards follow this same
         // nudge so they stay tucked under the top card and never peek out beside the incoming one.
         const topNudging = pull && narrow ? followNudge(pull, ox, os, width, 1, anims) : false;
@@ -339,13 +341,17 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         oz.set(0);
         if (!cancelled) doneRef.current?.();
       } else if (role === "peek") {
-        // Bottom card hidden behind the plain backs; a rightward drag slides it out from behind.
-        // Reset leftover tuck-under values if this is the same element that just finished "out".
+        // Bottom card hidden behind the plain backs; a rightward drag slides it out to the LEFT
+        // (the reverse of a forward tuck-under), still under the face cards. Reset leftover
+        // tuck-under values if this is the same element that just finished "out".
         oz.set(0); oy.set(s2.y); os.set(s2.scale); ox.set(0); orot.set(0);
         if (pull) {
           const follow = (v: number) => {
-            oz.set(v > 2 ? 6 : 0); // above the 2nd card while emerging, hidden behind the backs at rest
-            ox.set(Math.min(Math.max(v, 0) * 0.9, pullTarget)); orot.set(Math.min(Math.max(v, 0), 300) / 300 * 7); };
+            const d = Math.min(Math.max(v, 0) * 0.9, pullTarget);
+            oz.set(v > 2 ? 4 : 0); // under top/next, above the blank backs, so the left edge is visible
+            ox.set(-d);
+            orot.set(-(Math.min(Math.max(v, 0), 300) / 300) * 9);
+          };
           follow(pull.get());
           const unsub = pull.on("change", follow);
           anims.push({ stop: unsub });
@@ -365,19 +371,20 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
           anims.push({ stop: unsub });
         }
       } else if (role === "in") {
-        // Backward (mirror of forward): the bottom card is pulled out from BEHIND the deck to the right
-        // (continuing from wherever the finger's pull left it), then laid over the top card, which only
-        // sinks one step down. The top card never slides away, so the 2nd card is never uncovered.
-        oz.set(6);
-        const target = pullTarget;
-        const left = Math.max(0, target - ox.get());
-        const d1 = Math.max(0.1, 0.22 * (left / target));
-        await Promise.all([go(ox, target, d1), go(orot, 7, d1), go(oy, 4, d1), go(os, 0.98, d1)]);
+        // Backward is the exact reverse of "out": the previous card (front side up) slides out from
+        // under the pile to the left, then comes over the top and settles in the center. Continue from
+        // wherever the finger's pull already moved it. The current top card only sinks one step down,
+        // so the 2nd card is never uncovered.
+        oz.set(4);
+        const already = Math.min(0, ox.get());
+        const remain = Math.max(0, out + already);
+        const d1 = Math.max(0.1, 0.28 * (remain / out));
+        await Promise.all([go(ox, -out, d1), go(orot, -9, d1), go(os, 0.98, d1)]);
         if (cancelled) return;
-        oz.set(15);
+        oz.set(20);
         // Release the pile's back-swipe nudge as this card lands, so deeper cards ease back with it.
-        if (pull) go(pull, 0, 0.28);
-        await Promise.all([go(ox, 0, 0.28), go(orot, 0, 0.28), go(oy, 0, 0.28), go(os, 1, 0.28)]);
+        if (pull) go(pull, 0, 0.2);
+        await Promise.all([go(ox, 0, 0.2), go(orot, 0, 0.2), go(oy, 0, 0.2), go(os, 1, 0.2)]);
         if (cancelled) return;
         if (!cancelled) doneRef.current?.();
       }
@@ -611,7 +618,7 @@ function CardDeckCore<T>({
     } else {
       setIncomingId(getKey(topics[wrap(currentIndex - 1, n)]));
       // Buttons, keys, and the wheel don't drag, so drive the same pull the finger would:
-      // the top card and the rest of the pile nudge together while the bottom card comes out.
+      // the pile nudges aside while the previous card comes out around the left.
       if (!reduceMotion && pull.get() < 2) {
         const narrow = window.innerWidth < 640;
         animate(pull, pullTargetFor(dimensions.width, narrow), { duration: 0.2, ease: EASE as any });
@@ -622,7 +629,7 @@ function CardDeckCore<T>({
 
   const handleDragEnd = (info: PanInfo) => {
     const { offset, velocity } = info;
-    // Drag left = tuck top card under (next), drag right = pull bottom card out on top (previous).
+    // Drag left = tuck top card under (next). Drag right = previous card comes around the left and lands on top.
     let dir: 1 | -1 | 0 = 0;
     if (Math.abs(velocity.x) > SWIPE_VELOCITY_THRESHOLD) dir = velocity.x < 0 ? 1 : -1;
     else if (offset.x <= -SWIPE_OFFSET_THRESHOLD) dir = 1;
