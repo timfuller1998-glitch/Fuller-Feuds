@@ -119,9 +119,9 @@ export class BadgeRepository {
         icon: s.icon,
         rules: s.rules,
         xp: xp[s.id],
-        tier: tier ? { id: tier.id, name: tier.name, minXp: tier.minXp, color: tier.color } : null,
+        tier: tier ? { id: tier.id, name: tier.name, minXp: tier.minXp, color: tier.color, darkColor: tier.darkColor } : null,
         tierBadgeId: tier ? skillBadgeId(s.id, tier.id) : null,
-        nextTier: next ? { id: next.id, name: next.name, minXp: next.minXp, color: next.color } : null,
+        nextTier: next ? { id: next.id, name: next.name, minXp: next.minXp, color: next.color, darkColor: next.darkColor } : null,
       };
     });
   }
@@ -219,11 +219,23 @@ export class BadgeRepository {
       .where(eq(userBadges.userId, userId));
     const unlockedMap = new Map(unlocked.map((ub) => [ub.badgeId, ub.unlockedAt]));
 
+    // Stacked badges (same requirementType at several thresholds) are one badge with levels. If the
+    // avatar shows a lower level of a stack, show the highest level earned in that stack instead.
+    // Display-only: users.selected_badge_id and user_badges are not rewritten.
+    let shownBadgeId = selectedBadgeId ?? null;
+    const selectedRow = allBadges.find((b) => b.id === selectedBadgeId);
+    if (selectedRow && unlockedMap.has(selectedRow.id)) {
+      const top = allBadges
+        .filter((b) => b.requirementType === selectedRow.requirementType && unlockedMap.has(b.id))
+        .sort((a, b) => b.tier - a.tier || b.requirement - a.requirement)[0];
+      if (top) shownBadgeId = top.id;
+    }
+
     return allBadges.map((badge) => ({
       ...badge,
       badgeId: badge.id,
       unlockedAt: unlockedMap.get(badge.id) || null,
-      isSelected: selectedBadgeId === badge.id,
+      isSelected: shownBadgeId === badge.id,
       progress: this.progressFor(badge, stats),
     }));
   }

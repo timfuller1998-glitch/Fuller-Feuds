@@ -220,3 +220,15 @@ export type BadgeRequirementType =
   | "likes_received"
   | "follower_count"
   | "high_rating";
+
+// Stacked milestone badges: every badge with the same requirementType is one badge with levels
+// (lowest requirement = level 1). Display names and units for each stack.
+export const BADGE_STACKS: Record<string, { name: string; unit: string }> = {
+  debate_count: { name: "Debates", unit: "debates" },
+  opinion_count: { name: "Opinions Shared", unit: "opinions" },
+  topic_count: { name: "Topics Created", unit: "topics" },
+  low_fallacy_rate: { name: "Sound Reasoning", unit: "debates" },
+  high_rating: { name: "Opponent Ratings", unit: "rated debates" },
+  likes_received: { name: "Likes Received", unit: "likes" },
+  follower_count: { name: "Followers", unit: "followers" },
+};

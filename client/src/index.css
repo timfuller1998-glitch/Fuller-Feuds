@@ -644,3 +644,15 @@
 .medium [data-deck-role]:not([data-deck-role="top"]) .deck-card-surface {
   filter: brightness(1.18) saturate(0.7);
 }
+
+/* Level badges (skill tiers + stacked milestones), Fuller Feuds Dev Nov 20 2026.
+   --tier-l / --tier-d are set inline per card; dark and medium themes use the lighter --tier-d. */
+.level-card { --tier: var(--tier-l, hsl(var(--muted-foreground))); --tier-ink: #fff; }
+.dark .level-card, .medium .level-card { --tier: var(--tier-d, hsl(var(--muted-foreground))); --tier-ink: hsl(30 13% 10%); }
+.level-card .tier-color { color: var(--tier); }
+.level-card .tier-ring { border-color: var(--tier); background: color-mix(in srgb, var(--tier) 14%, transparent); }
+.level-card .tier-pill { background: var(--tier); color: var(--tier-ink); }
+.level-card .level-track { background: hsl(var(--primary) / 0.14); }
+.dark .level-card .level-track, .medium .level-card .level-track { background: hsl(var(--foreground) / 0.14); }
+.level-card .level-fill { background: hsl(var(--gold)); }
+.level-card .level-dot-off { background: hsl(var(--foreground) / 0.16); }

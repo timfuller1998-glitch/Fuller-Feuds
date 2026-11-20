@@ -17,7 +17,7 @@ import SwipeableCardStack from "@/components/SwipeableCardStack";
 import LeaderboardsDialog, { useLeaderboards, bestRank } from "@/components/LeaderboardsDialog";
 import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
 import { useAuth } from "@/hooks/useAuth";
-import { SkillTiers } from "@/components/SkillTiers";
+import { SkillTiers, MilestoneBadges } from "@/components/SkillTiers";
 import * as LucideIcons from "lucide-react";
 import {
   Users,
@@ -500,86 +500,12 @@ export default function Profile() {
         onSelect={(id) => selectBadgeMutation.mutate(id)}
         selecting={selectBadgeMutation.isPending}
       />
-      {[{ title: "Earned", list: earnedBadges }, { title: "Locked", list: lockedBadges }].map(({ title, list }) =>
-        list.length === 0 ? null : (
-          <div key={title} className="space-y-2" data-testid={`badges-${title.toLowerCase()}`}>
-            <h3 className="font-ui text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-              {title} ({list.length})
-            </h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {list.map((userBadge: any) => {
-                const isUnlocked = !!userBadge.unlockedAt;
-                const isSelected = userBadge.isSelected;
-                const IconComponent = (LucideIcons as any)[userBadge.icon] || Trophy;
-                const cur = Math.min(userBadge.progress?.current ?? 0, userBadge.progress?.required ?? 1);
-                const req = userBadge.progress?.required ?? 1;
-                return (
-                  <div
-                    key={userBadge.badgeId}
-                    className={`relative p-3 border rounded-lg bg-card ${isUnlocked ? "" : "opacity-75"} ${isSelected ? "ring-2 ring-primary" : ""}`}
-                    data-testid={`badge-${userBadge.badgeId}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${isUnlocked ? "bg-primary/10" : "bg-muted"}`}
-                      >
-                        {isUnlocked ? (
-                          <IconComponent className="w-5 h-5 text-primary" />
-                        ) : (
-                          <Lock className="w-5 h-5 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-semibold text-sm">{userBadge.name}</h4>
-                          {isSelected && (
-                            <Badge variant="default" className="text-xs">
-                              <Check className="w-3 h-3 mr-1" />
-                              Shown
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{userBadge.description}</p>
-                        {isUnlocked ? (
-                          <div className="mt-2 flex items-center justify-between gap-2">
-                            <p className="text-xs text-muted-foreground">
-                              Earned{" "}
-                              {new Date(userBadge.unlockedAt).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </p>
-                            {isOwnProfile && (
-                              <Button
-                                size="sm"
-                                variant={isSelected ? "outline" : "secondary"}
-                                className="h-7 text-xs"
-                                onClick={() => selectBadgeMutation.mutate(isSelected ? null : userBadge.badgeId)}
-                                disabled={selectBadgeMutation.isPending}
-                                data-testid={`button-select-badge-${userBadge.badgeId}`}
-                              >
-                                {isSelected ? "Hide" : "Show on avatar"}
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="mt-2 space-y-1">
-                            <Progress value={(cur / req) * 100} className="h-1.5" />
-                            <p className="text-xs text-muted-foreground">
-                              {cur} / {req}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )
-      )}
+      <MilestoneBadges
+        badges={milestoneBadges}
+        isOwnProfile={!!isOwnProfile}
+        onSelect={(id) => selectBadgeMutation.mutate(id)}
+        selecting={selectBadgeMutation.isPending}
+      />
       {earnedBadges.length === 0 && lockedBadges.length === 0 && (
         <Card className="p-8 text-center">
           <Trophy className="w-12 h-12 mx-auto mb-3 opacity-50" />
