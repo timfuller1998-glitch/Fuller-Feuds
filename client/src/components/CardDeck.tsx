@@ -93,11 +93,13 @@ export const getCardDimensions = (
   const naturalHeight = height;
   const fromWindow = Math.max(260, window.innerHeight - chromeReserve);
   const columnChrome = includeControls ? IN_COLUMN_CHROME : IN_COLUMN_CHROME_NO_CONTROLS;
-  // Only treat the parent as a height cap when it is shorter than the natural card
-  // plus deck chrome. A wrapper that grows with the card (All Categories, topic pages)
-  // is about that tall and must not shrink the card in a loop. Home's snap column is
-  // a real, tighter slot and still caps the card so it fits between header and footer.
-  const parentIsBounded = parentHeight > 80 && parentHeight < naturalHeight + columnChrome - 8;
+  // Only treat the parent as a height cap when it is shorter than the card itself
+  // (a reserved flex slot like Home's snap column). A wrapper that grows with the
+  // card is at least as tall as the already window-capped card and must not shrink
+  // it in a loop — comparing to naturalHeight + chrome was too tight and could
+  // latch onto a mid-layout parent, then shrink the card and the parent together.
+  const slotBudget = Math.min(naturalHeight, fromWindow);
+  const parentIsBounded = parentHeight > 80 && parentHeight < slotBudget - 8;
   const fromParent = parentIsBounded ? parentHeight - columnChrome : Number.POSITIVE_INFINITY;
   const maxHeight = Math.max(200, Math.min(fromWindow, fromParent));
   if (height > maxHeight) { height = maxHeight; width = (height * 5) / 7; }

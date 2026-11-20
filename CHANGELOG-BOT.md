@@ -1,3 +1,10 @@
+## 2026-11-20 (07:56 CST) — Don't let a growing deck parent shrink the card
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/all-categories-scroll`
+- **What:** The first "growing parent is not a height cap" check still treated a wrapper as bounded when it was only slightly shorter than the uncapped card plus deck chrome. After a tab switch or a window-height cap, that parent was about as tall as the visible card, so the deck shrank, the parent shrank with it, and profile Topics cards could end up smaller than on main (and sometimes tiny). The parent is now a cap only when it is shorter than the card itself, which is the reserved home snap slot. Topic, Counterpoints, and profile decks keep their window- or column-based size; Home still fits the title, card, and chevron in that slot.
+- **Typecheck:** 52.
+
 ## 2026-11-20 (07:40 CST) — Let All Categories scroll, and use the default card size
 
 - **By:** Fuller Feuds Dev
