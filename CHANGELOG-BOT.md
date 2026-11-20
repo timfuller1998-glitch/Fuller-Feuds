@@ -1,3 +1,12 @@
+## 2026-11-20 (10:45 CST) — Stacked milestone badges become one badge with levels; dark-theme badge colors
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `feat/stacked-badges-dark`
+- **Levels:** Milestone badges that measure the same thing at several thresholds now show as one badge with levels: Debates (4 levels: 1/10/50/100), Opinions Shared (4: 1/10/50/100), Topics Created (3: 1/10/25), Sound Reasoning (2), Opponent Ratings (2), Likes Received (2: 5/50), Followers (2: 1/10). Thresholds are unchanged. Each card shows the current level's name, "Level N of M", the count, progress to the next level, and level dots, matching the Skill tiers cards. Stack names are in `BADGE_STACKS` (`shared/badgeDefinitions.ts`).
+- **No data changes:** `user_badges` and `users.selected_badge_id` are untouched. If someone's avatar shows a lower level of a stack (e.g. First Opinion), the avatar and profile now show the highest level they've earned in that stack (e.g. Opinionated). The same applies to XP skill tiers (Bronze → Silver once earned). "Show on avatar" on a stack picks its highest earned level.
+- **Dark theme:** Badge cards, progress tracks/bars, level dots, pills and medals now use theme variables (`.level-card` in `index.css`) with lighter tier colors on dark and medium themes, instead of fixed paper colors.
+- **Typecheck:** 50 (ceiling 52).
+
 ## 2026-11-20 (10:30 CST) — Ad-free switch in Settings + XP-tiered skill badges
 
 - **By:** Fuller Feuds Dev

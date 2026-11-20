@@ -5,12 +5,13 @@
 export type XpTierId = "bronze" | "silver" | "gold" | "diamond" | "platinum";
 
 /** Tier ladder, lowest to highest. Timothy ranks platinum ABOVE diamond. */
-export const XP_TIERS: { id: XpTierId; name: string; minXp: number; color: string }[] = [
-  { id: "bronze", name: "Bronze", minXp: 200, color: "#9a5b2e" },
-  { id: "silver", name: "Silver", minXp: 1_000, color: "#7d838c" },
-  { id: "gold", name: "Gold", minXp: 5_000, color: "#b38a2e" },
-  { id: "diamond", name: "Diamond", minXp: 10_000, color: "#3f7a99" },
-  { id: "platinum", name: "Platinum", minXp: 20_000, color: "#5b5e78" },
+// `color` is for the light (paper) theme, `darkColor` for the dark and medium themes.
+export const XP_TIERS: { id: XpTierId; name: string; minXp: number; color: string; darkColor: string }[] = [
+  { id: "bronze", name: "Bronze", minXp: 200, color: "#9a5b2e", darkColor: "#d69a6b" },
+  { id: "silver", name: "Silver", minXp: 1_000, color: "#7d838c", darkColor: "#c2c7ce" },
+  { id: "gold", name: "Gold", minXp: 5_000, color: "#b38a2e", darkColor: "#e3bd5f" },
+  { id: "diamond", name: "Diamond", minXp: 10_000, color: "#3f7a99", darkColor: "#86c3e3" },
+  { id: "platinum", name: "Platinum", minXp: 20_000, color: "#5b5e78", darkColor: "#b3b6d8" },
 ];
 
 export type SkillId = "critical_thinking" | "civility" | "open_mind" | "debating" | "opinions" | "topics";
