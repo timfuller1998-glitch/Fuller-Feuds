@@ -1,3 +1,10 @@
+## 2026-11-20 (06:45 CST) — Fix the stuck middle card on later forward swipes
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `fix/forward-swipe-stuck-card`
+- **What:** After the first forward swipe, the new "next" card was mounted during the previous card's tuck-under and never subscribed to the forward-swipe lift, so it stayed frozen in the 2nd-slot pose. On every later forward swipe it sat wedged behind the departing card and popped away when the swipe finished. It now subscribes to lift once that tuck-under settles, so swipe 2 onward matches swipe 1: one departing card, the next card rising and shifting opposite it, and the proper back layers. Leftover tuck-under motion is also cleared when that card becomes the peek. Back-swipe behavior is unchanged.
+- **Typecheck:** 52.
+
 ## 2026-11-19 (19:35 CST) — Fit home sections between the header and footer
 
 - **By:** Fuller Feuds Dev
