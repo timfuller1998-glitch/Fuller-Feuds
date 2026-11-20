@@ -1,3 +1,6 @@
+## 2026-11-20 (15:00 CST, America/Chicago) — Home sections open on different cards (branch fix/home-section-first-cards)
+By Fuller Feuds Dev. Follow-up to the endless home decks: on the live site the sections load at the same moment, so several opened on the same topic. Each section now claims its first card as soon as it picks it, and later sections skip claimed ones.
+
 ## 2026-11-20 (15:10 CST, America/Chicago) — Endless home decks (branch feat/infinite-home-decks)
 Made by the Fuller Feuds Dev bot (Grok Bot). Timothy: "the cards only ever stack to 5 … make the stacks infinite … not numbered … a basic algorithm to show the most relevant posts with minimal repeating."
 - Home sections (Trending, Hot Debates, New This Week, Most Debated, Diverse Perspectives, My Topics, My Current Debates) are endless: no 5-card cap, no "n / m" counter and no count in the section header. New `POST /api/feed/home` returns the next 10 cards for a section (cursor = topic ids already dealt this cycle); the deck asks for more when about 3 real cards are left.
