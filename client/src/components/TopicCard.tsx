@@ -55,8 +55,10 @@ interface TopicCardProps {
   };
   onFlipChange?: (isFlipped: boolean) => void;
   onBackTimeUpdate?: (timeMs: number) => void;
-  /** When this value changes, the card flips back to the front if currently flipped (e.g. before stack advances). */
+  /** When this value changes, the card flips back to the front if currently flipped. */
   forceUnflipSignal?: number;
+  /** With forceUnflipSignal: snap to the front with no flip animation (card is off-screen or covered). */
+  instantUnflip?: boolean;
 }
 
 export default function TopicCard({
@@ -78,11 +80,13 @@ export default function TopicCard({
   onFlipChange,
   onBackTimeUpdate,
   forceUnflipSignal,
+  instantUnflip,
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [isFlipped, setIsFlipped] = useState(false);
+  const [skipFlipTransition, setSkipFlipTransition] = useState(false);
   const [showOpinionForm, setShowOpinionForm] = useState(false);
   const [showFlagDialog, setShowFlagDialog] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
@@ -223,13 +227,18 @@ export default function TopicCard({
     };
   }, [isFlipped, onBackTimeUpdate]);
 
-  // Parent (e.g. stack) can force flip back to front before changing the top card
+  // Parent can snap the card back to the front once it's off-screen or covered (no visible flip).
   useEffect(() => {
     if (!forceUnflipSignal || forceUnflipSignal <= lastForceUnflipRef.current) return;
     lastForceUnflipRef.current = forceUnflipSignal;
     if (!isFlipped) return;
+    // Always snap: this signal now only fires once the card is off-screen or covered.
+    setSkipFlipTransition(true);
     setIsFlipped(false);
     onFlipChange?.(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setSkipFlipTransition(false));
+    });
   }, [forceUnflipSignal, isFlipped, onFlipChange]);
 
   // Reset opinion index when topOpinions change
@@ -345,13 +354,14 @@ export default function TopicCard({
         className="relative w-full h-full min-h-[20rem]"
         style={{ perspective: "1000px", ...glowStyle }}
         data-testid={`card-topic-${id}`}
+        data-card-flipped={isFlipped ? "true" : "false"}
       >
         {/* Transform wrapper - handles the flip animation */}
         <div
           style={{
             transformStyle: "preserve-3d",
             transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
-            transition: "transform 0.6s ease-in-out",
+            transition: skipFlipTransition ? "none" : "transform 0.6s ease-in-out",
             width: "100%",
             height: "100%",
           }}
@@ -381,7 +391,7 @@ export default function TopicCard({
                 WebkitBackfaceVisibility: "hidden",
                 opacity: isFlipped ? 0 : 1,
                 pointerEvents: isFlipped ? "none" : "auto",
-                transition: "opacity 0.6s ease-in-out",
+                transition: skipFlipTransition ? "none" : "opacity 0.6s ease-in-out",
               }}
             >
             {/* Categories and Diversity Badge */}
@@ -552,7 +562,7 @@ export default function TopicCard({
               WebkitBackfaceVisibility: "hidden",
               opacity: isFlipped ? 1 : 0,
               pointerEvents: isFlipped ? "auto" : "none",
-              transition: "opacity 0.6s ease-in-out",
+              transition: skipFlipTransition ? "none" : "opacity 0.6s ease-in-out",
             }}
           >
             {/* Categories and Diversity Badge */}

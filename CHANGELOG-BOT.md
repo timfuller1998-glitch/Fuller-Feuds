@@ -1,3 +1,10 @@
+## 2026-11-20 (15:40 CST, America/Chicago) — Flipped cards swipe away as-is (branch fix/flipped-card-swipe)
+Made by the Fuller Feuds Dev bot (Grok Bot). Timothy: when a card's back was showing and you swiped it, the card first returned to the center and flipped to the front before going to the back of the pile. He wanted it to go straight to the back in one motion, and come around front-side-up next time, without remembering the flipped state.
+- A flipped card now swipes (or tucks, or is covered by a back-swipe) with its back still showing. The old 600ms "unflip, wait, then move" step is gone, so the card no longer springs back to the center to flip first.
+- Once the card is off-screen (forward swipe, after it has slid out) or covered by the incoming card (back swipe), the flip is reset instantly with no animation. When that card comes around again, it is front side up.
+- Applies to every CardDeck pile: home topics, profile Topics, Recent Opinions, topic AI-summary and opinion decks, counterpoints, and ad cards (both deck-owned FlipFaces and self-flipping TopicCard / AdCardSelfFlip).
+- Back-swipe landing from PR #54 is unchanged (no replayed settle, no jitter). Touch rule unchanged: vertical swipe scrolls, tap flips, only buttons/links navigate.
+
 ## 2026-11-20 (15:20 CST, America/Chicago) — Opinion structure guide and strength meter (branch feat/opinion-structure)
 Made by the Fuller Feuds Dev bot (Grok Bot). Timothy asked for a light guide so people don't just post "yes", then chose a single freeform box with a client-side strength meter ("even if it can be fooled it doesn't actually effect anything since the opinion score comes from other users").
 - In every opinion composer (topic Share/Update dialog, topic-card dialog, create-topic page, search-bar create form, adopt-opinion dialog, and onboarding topic cards) the freeform box stays one field. A compact, collapsible "What to include" guide sits under it: stance, main reason, support, the other side, and an optional "what would change your mind," using the topic question when we have it.
