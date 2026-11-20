@@ -313,14 +313,7 @@ export default function Home() {
             icon={section.icon}
             sectionKey={section.title.toLowerCase().replace(/\s+/g, '-')}
             topics={section.topics}
-            nextSection={
-              index < topicSections.length - 1
-                ? {
-                    title: topicSections[index + 1].title,
-                    icon: topicSections[index + 1].icon,
-                  }
-                : undefined
-            }
+            showNextHint={index < topicSections.length - 1}
           />
         ))
       )}
