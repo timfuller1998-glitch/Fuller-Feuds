@@ -283,8 +283,13 @@ function DeckCard({ cardKey, role, width, reduceMotion, draggable, onDragEnd, on
         oz.set(20);
         await Promise.all([go(ox, -out, 0.2), go(orot, -9, 0.2), go(os, 0.98, 0.2)]);
         if (cancelled) return;
-        oz.set(0); // now strictly behind every other card, including the blank back
+        // Tuck under the face cards but stay above the blank backs (z=1) so the
+        // return slide is visible beside and below the pile. Below "next" (5)
+        // and "top" (10) so the 2nd card is never uncovered.
+        oz.set(4);
         await Promise.all([go(ox, 0, 0.28), go(orot, 0, 0.28), go(oy, s2.y, 0.28), go(os, s2.scale, 0.28)]);
+        if (cancelled) return;
+        oz.set(0);
         if (!cancelled) doneRef.current?.();
       } else if (role === "peek") {
         // Bottom card hidden behind the plain backs; a rightward drag slides it out from behind.
@@ -463,9 +468,10 @@ export default function CardDeck<T>({
   const lift = useMotionValue(0);
   const prevCard = n > 2 ? topics[wrap(currentIndex - 1, n)] : null;
 
-  useEffect(() => {
-    if (outgoing) lift.set(0);
-  }, [outgoing, lift]);
+  const resetPileMotion = useCallback(() => {
+    pull.set(0);
+    lift.set(0);
+  }, [pull, lift]);
 
   /** Move through the deck; flips the top card back first if it is showing its back. */
   const step = useCallback((dir: 1 | -1) => {
@@ -603,7 +609,7 @@ export default function CardDeck<T>({
             lift={(role === "next" && !outgoing) || role === "peek" ? lift : undefined}
             enterFromBack={role === "next" && !!outgoing}
             onDone={
-              role === "out" ? () => setOutgoing(null) : role === "in" ? () => { pull.set(0); setIncomingId(null); } : undefined
+              role === "out" ? () => { setOutgoing(null); resetPileMotion(); } : role === "in" ? () => { resetPileMotion(); setIncomingId(null); } : undefined
             }
           >
             {(isTop) => (
