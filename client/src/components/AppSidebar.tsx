@@ -413,7 +413,6 @@ export default function AppSidebar({
               className="flex-1"
               onClick={() => {
                 onLogout?.();
-                console.log('Logout clicked');
               }}
               data-testid="button-logout"
             >

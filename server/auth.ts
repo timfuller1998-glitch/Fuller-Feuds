@@ -29,10 +29,6 @@ export function getSession() {
   // The secure flag will be evaluated per-request by Express based on trust proxy setting
   const isSecure = process.env.NODE_ENV === "production";
   
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.ts:25',message:'Session config',data:{isSecure,nodeEnv:process.env.NODE_ENV,vercel:process.env.VERCEL,hasSessionSecret:!!process.env.SESSION_SECRET},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-  
   return session({
     secret: process.env.SESSION_SECRET,
     store: sessionStore,

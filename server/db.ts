@@ -28,10 +28,6 @@ console.error(`[DB CONNECTION] Environment check:`, {
   nodeEnv: process.env.NODE_ENV
 });
 
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:12',message:'DATABASE_URL env var check',data:{hasValue:!!connectionString,length:connectionString?.length,isVercel:process.env.VERCEL==='1',nodeEnv:process.env.NODE_ENV},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-// #endregion
-
 if (!connectionString) {
   throw new Error('DATABASE_URL environment variable is required. Please set your Supabase connection string in your .env file (local) or environment variables (production).');
 }
@@ -56,27 +52,20 @@ if (connectionInfo) {
 // Fix: Remove duplicate "DATABASE_URL=" prefix if it exists (copy-paste error)
 if (connectionString.startsWith('DATABASE_URL=')) {
   connectionString = connectionString.replace('DATABASE_URL=', '');
-  console.log('Fixed duplicate prefix, new value:', connectionString.substring(0, 50));
+  console.log('[DB] Removed a duplicate "DATABASE_URL=" prefix from the connection string');
 }
 
 // Trim any whitespace
 const trimmedConnectionString = connectionString.trim();
 
-// #region agent log
-let parsedUrl: URL | null = null;
 try {
-  parsedUrl = new URL(trimmedConnectionString);
+  const parsedUrl = new URL(trimmedConnectionString);
   const maskedUrl = `${parsedUrl.protocol}//${parsedUrl.username ? '***:***@' : ''}${parsedUrl.hostname}:${parsedUrl.port || '5432'}${parsedUrl.pathname}`;
   console.error(`[DB CONNECTION] Parsed hostname: ${parsedUrl.hostname}, port: ${parsedUrl.port || '5432'}, database: ${parsedUrl.pathname?.replace('/','')}`);
   console.error(`[DB CONNECTION] Full connection string (masked): ${maskedUrl}`);
-  
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'Connection string parsed',data:{hostname:parsedUrl.hostname,port:parsedUrl.port||'5432',database:parsedUrl.pathname?.replace('/',''),maskedUrl,isDirectConnection:parsedUrl.hostname.includes('db.')&&parsedUrl.hostname.includes('.supabase.co')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
 } catch(e) {
   console.error(`[DB CONNECTION] Failed to parse connection string: ${e}`);
-  console.error(`[DB CONNECTION] First 100 chars of connection string: ${trimmedConnectionString.substring(0, 100)}`);
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:28',message:'Failed to parse connection string',data:{error:String(e),first50:trimmedConnectionString.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
 }
-// #endregion
 
 // Validate the connection string format
 if (!trimmedConnectionString.startsWith('postgresql://') && !trimmedConnectionString.startsWith('postgres://')) {
@@ -98,13 +87,6 @@ try {
     `(Note: special characters in password must be URL-encoded)`
   );
 }
-
-// #region agent log
-try {
-  const url = new URL(trimmedConnectionString);
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:52',message:'Creating postgres client',data:{hostname:url.hostname,port:url.port||'5432',maxConnections:process.env.DATABASE_MAX_CONNECTIONS||'10',connectTimeout:process.env.DATABASE_CONNECT_TIMEOUT||'10'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-} catch(e) {}
-// #endregion
 
 // Production-ready connection pool configuration
 // Supabase requires SSL connections
@@ -135,17 +117,10 @@ export const pool = client;
 
 // Health check function for monitoring
 export const checkDbConnection = async (): Promise<boolean> => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:64',message:'Health check started',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   try {
     await client`SELECT 1`;
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:66',message:'Health check succeeded',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     return true;
   } catch (error) {
-    // #region agent log
     const errorData = error instanceof Error ? {message:error.message,code:(error as any).code,errno:(error as any).errno,syscall:(error as any).syscall,hostname:(error as any).hostname} : {error:String(error)};
     console.error('[DB CONNECTION] Health check failed:', errorData);
     if ((error as any).hostname) {
@@ -165,8 +140,6 @@ export const checkDbConnection = async (): Promise<boolean> => {
         console.error(`[DB CONNECTION] Get your connection string from: Supabase Dashboard → Settings → Database → Connection string`);
       }
     }
-    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'db.ts:69',message:'Health check failed',data:errorData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     console.error('Database connection failed:', error);
     return false;
   }

@@ -31,7 +31,6 @@ export default function ThemeToggle() {
       theme === "light" ? "medium" : theme === "medium" ? "dark" : "light";
     setTheme(newTheme);
     updateTheme(newTheme);
-    console.log("Theme toggled to:", newTheme);
   };
 
   // Show appropriate icon based on current theme

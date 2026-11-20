@@ -120,7 +120,6 @@ export default function CumulativeOpinion({
           className="w-full"
           onClick={() => {
             onViewDetails?.(topicId);
-            console.log('View cumulative details clicked:', topicId);
           }}
           data-testid={`button-view-details-${topicId}`}
         >

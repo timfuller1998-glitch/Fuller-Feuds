@@ -609,7 +609,6 @@ Return only valid JSON.`;
       });
 
       const responseContent = completion.choices[0]?.message?.content;
-      console.log(`[AI Analysis] Raw OpenAI response:`, responseContent);
       
       if (!responseContent) {
         console.error("[AI Analysis] ERROR: No response from OpenAI");
@@ -619,7 +618,6 @@ Return only valid JSON.`;
       let aiAnalysis;
       try {
         aiAnalysis = JSON.parse(responseContent);
-        console.log(`[AI Analysis] Parsed AI analysis:`, JSON.stringify(aiAnalysis, null, 2));
       } catch (parseError) {
         console.error("[AI Analysis] ERROR: Failed to parse AI 2D political analysis:", responseContent);
         console.error("[AI Analysis] Parse error details:", parseError);

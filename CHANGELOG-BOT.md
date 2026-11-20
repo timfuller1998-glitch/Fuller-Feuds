@@ -1,3 +1,16 @@
+## 2026-11-20 (11:20 CST) — Remove leftover debug instrumentation
+
+- **By:** Fuller Feuds Dev
+- **Branch:** `chore/remove-debug-instrumentation`
+- **Agent-log calls:** Removed all 25 leftover `fetch('http://127.0.0.1:7242/ingest/...')` calls and their 24 `#region agent log` blocks: `server/db.ts` (7), `server/vite.ts` (6), `server/static-files.ts` (6, plus 6 `[DEBUG]` console lines printed on every start), `server/routes/topics.ts` (4, on every topic search), `server/auth.ts` (1), `scripts/copy-static.js` (1). None of these remain in the repo or the built bundle.
+- **Leftover debug logs:** Removed 25 `console.log` lines and blocks.
+  - **Server:** `[OpinionRepository]` dumps of every new opinion's full data (5), `[Onboarding Progress]` (2), raw and parsed OpenAI political-compass responses (2).
+  - **Client:** Onboarding response/refetch dumps (7), `[Onboarding Redirect]` dev dump (1), WebSocket new-debate event chatter (3), "Theme toggled", "Logout clicked", "View cumulative details clicked", "Stack … is empty", and the sidebar's `onNavigate` console stub.
+  - **Startup logs:** `server/db.ts` no longer prints the first 50 or 100 characters of the database URL (which could include the password) when fixing a prefix or failing to parse it. Masked host/port startup lines stay.
+- **Kept:** Error logging, server startup logs, cache/AI-fallback notices, the opt-in `LOG_REQUESTS` request log, service worker and WebSocket connect/reconnect logs, and the placeholder handlers on the unused LiveStreamDebate component.
+- **Behavior:** Unchanged. Smoke tested home, Recent Opinions, topic search (dropdown and page) and people search, with no page errors.
+- **Typecheck:** 50 (ceiling 52).
+
 ## 2026-11-20 (11:30 CST) — Search for people
 
 - **By:** Fuller Feuds Dev

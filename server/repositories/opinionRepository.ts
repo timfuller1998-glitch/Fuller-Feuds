@@ -134,7 +134,6 @@ export class OpinionRepository {
     }
     
     // Log the exact data being inserted
-    console.log('[OpinionRepository] About to insert opinion with data:', JSON.stringify(finalData));
     
     // Explicitly ensure no timestamp fields are included
     const insertData: any = {};
@@ -153,12 +152,10 @@ export class OpinionRepository {
     }
     
     // Log the exact data being inserted
-    console.log('[OpinionRepository] About to insert opinion with data:', JSON.stringify(insertData));
     
     let created;
     try {
       created = await db.insert(opinions).values(insertData).returning();
-      console.log('[OpinionRepository] Successfully inserted opinion:', created[0]?.id);
     } catch (error) {
       console.error('[OpinionRepository] ERROR during opinion insert:', error);
       console.error('[OpinionRepository] Data that caused error:', JSON.stringify(insertData, null, 2));
@@ -177,7 +174,6 @@ export class OpinionRepository {
     // Update user profile opinion counts (this logic should move to service layer)
     // Use raw SQL to avoid any drizzle/postgres-js Date object handling issues
     try {
-      console.log('[OpinionRepository] About to update userProfile with raw SQL for userId:', opinion.userId);
       
       // Use raw SQL query to avoid any Date object issues with drizzle
       await pool`
@@ -190,7 +186,6 @@ export class OpinionRepository {
           updated_at = NOW()
       `;
       
-      console.log('[OpinionRepository] Successfully updated userProfile');
     } catch (error) {
       console.error('[OpinionRepository] ERROR during userProfiles insert:', error);
       console.error('[OpinionRepository] Error stack:', error instanceof Error ? error.stack : 'No stack');

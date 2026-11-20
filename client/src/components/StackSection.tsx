@@ -13,7 +13,6 @@ interface StackSectionProps {
 
 export default function StackSection({ title, icon: Icon, sectionKey, topics, showNextHint }: StackSectionProps) {
   const handleEmpty = () => {
-    console.log(`Stack ${sectionKey} is empty`);
   };
 
   return (

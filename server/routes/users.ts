@@ -620,7 +620,6 @@ router.put('/onboarding/progress', isAuthenticated, async (req, res) => {
       return res.status(400).json({ message: "step must be a number and complete must be a boolean" });
     }
 
-    console.log(`[Onboarding Progress] Updating user ${userId}: step=${step}, complete=${complete}`);
     
     // Update onboarding progress in the database
     const updatedUser = await userRepository.updateOnboardingProgress(
@@ -635,11 +634,6 @@ router.put('/onboarding/progress', isAuthenticated, async (req, res) => {
     // Invalidate user cache after update
     await invalidateUserCache(userId);
     
-    console.log(`[Onboarding Progress] Updated user:`, {
-      id: updatedUser.id,
-      onboardingStep: updatedUser.onboardingStep,
-      onboardingComplete: updatedUser.onboardingComplete
-    });
     
     res.status(200).json({ 
       success: true,

@@ -69,20 +69,11 @@ try {
   // Try server/static first (created by copy-static.js during build)
   const staticPath = path.resolve(import.meta.dirname, "static");
   const indexPath = path.join(staticPath, "index.html");
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:71',message:'Module load - checking server/static',data:{staticPath,indexPath,dirname:import.meta.dirname,exists:fs.existsSync(staticPath),indexExists:fs.existsSync(indexPath)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
   if (fs.existsSync(indexPath)) {
     // Actually read the file to ensure it's included in build
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:75',message:'Reading server/static/index.html',data:{indexPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     fs.readFileSync(indexPath, "utf-8");
   }
 } catch (error: any) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:79',message:'Error checking server/static',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
   // Ignore - file might not exist during build, that's OK
 }
 
@@ -90,20 +81,11 @@ try {
   // Also try dist/public (where vite builds to)
   const distPublicPath = path.resolve(process.cwd(), "dist", "public");
   const distIndexPath = path.join(distPublicPath, "index.html");
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:86',message:'Module load - checking dist/public',data:{distPublicPath,distIndexPath,cwd:process.cwd(),exists:fs.existsSync(distPublicPath),indexExists:fs.existsSync(distIndexPath)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
   if (fs.existsSync(distIndexPath)) {
     // Actually read the file to ensure it's included in build
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:90',message:'Reading dist/public/index.html',data:{distIndexPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     fs.readFileSync(distIndexPath, "utf-8");
   }
 } catch (error: any) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'vite.ts:94',message:'Error checking dist/public',data:{error:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
   // Ignore - file might not exist during build, that's OK
 }
 
