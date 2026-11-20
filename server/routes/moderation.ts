@@ -11,6 +11,7 @@ import { db } from '../db.js';
 import { moderationActions, users } from '../../shared/schema.js';
 import { desc, eq } from 'drizzle-orm';
 import { runAISummaryUpdate } from '../scheduled-jobs.js';
+import { AiFlagService } from '../services/aiFlagService.js';
 
 const router = Router();
 
@@ -22,6 +23,7 @@ async function blockedTarget(req: any, targetId: string): Promise<string | null>
   return t && (t.role === 'admin' || t.role === 'moderator') ? 'Only an admin can moderate staff accounts' : null;
 }
 const moderationService = new ModerationService();
+const aiFlagService = new AiFlagService();
 const topicService = new TopicService();
 
 // User moderation routes
@@ -222,6 +224,16 @@ router.get('/flagged-opinions', requireModerator, async (req, res) => {
   } catch (error) {
     console.error("Error fetching flagged opinions:", error);
     res.status(500).json({ message: "Failed to fetch flagged opinions" });
+  }
+});
+
+router.get('/ai-flags', requireModerator, async (req, res) => {
+  try {
+    const items = await aiFlagService.listForAdmins();
+    res.json({ items });
+  } catch (error) {
+    console.error("Error listing admin AI flags:", error);
+    res.status(500).json({ message: "Failed to list AI flags" });
   }
 });
 

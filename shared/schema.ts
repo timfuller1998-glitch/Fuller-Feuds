@@ -681,3 +681,15 @@ export const feedbackRequests = pgTable("feedback_requests", {
   index("idx_feedback_status_created").on(table.status, table.createdAt),
 ]);
 export type FeedbackRequest = typeof feedbackRequests.$inferSelect;
+
+// User reports that an opinion looks AI-written (migration 0012). No automatic detector yet.
+export const opinionAiFlags = pgTable("opinion_ai_flags", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  opinionId: uuid("opinion_id").notNull().references(() => opinions.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("unique_opinion_ai_flag").on(table.opinionId, table.userId),
+  index("idx_opinion_ai_flags_opinion").on(table.opinionId),
+]);
+export type OpinionAiFlag = typeof opinionAiFlags.$inferSelect;

@@ -41,6 +41,7 @@ import { ContentFilters } from "@/components/admin/ContentFilters";
 import { AuditLog } from "@/components/admin/AuditLog";
 import { DataSeeding } from "@/components/admin/DataSeeding";
 import { FeedbackRequests } from "@/components/admin/FeedbackRequests";
+import { AiOpinionFlags } from "@/components/admin/AiOpinionFlags";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -602,8 +603,9 @@ export default function AdminDashboard() {
 
         {/* Pending Challenges Tab */}
         {isAdmin && (
-          <TabsContent value="requests">
+          <TabsContent value="requests" className="space-y-8">
             <FeedbackRequests />
+            <AiOpinionFlags />
           </TabsContent>
         )}
 

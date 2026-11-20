@@ -14,12 +14,14 @@ import { insertOpinionSchema } from '../../shared/schema.js';
 import { z } from 'zod';
 import { invalidateVoteCache } from '../services/cacheInvalidation.js';
 import { UnauthorizedError, ForbiddenError, AuthorizationError, DataAccessError } from '../utils/securityErrors.js';
+import { AiFlagService } from '../services/aiFlagService.js';
 
 const router = Router();
 const opinionService = new OpinionService();
 const debateService = new DebateService();
 const moderationService = new ModerationService();
 const counterpointService = new CounterpointService();
+const aiFlagService = new AiFlagService();
 
 // GET /api/opinions/recent - Get recent opinions
 router.get('/recent', async (req, res) => {
@@ -111,6 +113,17 @@ router.post('/topics/:topicId', isAuthenticated, async (req, res) => {
       error: "Failed to create opinion",
       message: errorMessage
     });
+  }
+});
+
+// GET /api/opinions/ai-flags/mine - Opinion IDs the current user has flagged as likely AI-written
+router.get('/ai-flags/mine', isAuthenticated, async (req, res) => {
+  try {
+    const ids = await aiFlagService.flagsForUser(req.user!.id);
+    res.json({ opinionIds: ids });
+  } catch (error) {
+    console.error('Error listing AI flags:', error);
+    res.status(500).json({ message: 'Failed to list AI flags' });
   }
 });
 
@@ -236,6 +249,39 @@ router.post('/:opinionId/flag', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error("Error flagging opinion:", error);
     res.status(500).json({ message: "Failed to flag opinion" });
+  }
+});
+
+// POST /api/opinions/:opinionId/ai-flag - Flag an opinion as likely AI-written (one per user)
+router.post('/:opinionId/ai-flag', isAuthenticated, async (req, res) => {
+  try {
+    const result = await aiFlagService.flag(req.params.opinionId, req.user!.id);
+    res.json({ flagged: true, already: result.already });
+  } catch (error: any) {
+    const status = error?.status;
+    if (status === 400 || status === 404) return res.status(status).json({ message: error.message });
+    console.error('Error adding AI flag:', error);
+    res.status(500).json({ message: 'Failed to flag opinion as AI-written' });
+  }
+});
+
+router.delete('/:opinionId/ai-flag', isAuthenticated, async (req, res) => {
+  try {
+    await aiFlagService.unflag(req.params.opinionId, req.user!.id);
+    res.json({ flagged: false });
+  } catch (error) {
+    console.error('Error removing AI flag:', error);
+    res.status(500).json({ message: 'Failed to remove AI flag' });
+  }
+});
+
+router.get('/:opinionId/ai-flag', isAuthenticated, async (req, res) => {
+  try {
+    const flagged = await aiFlagService.hasFlag(req.params.opinionId, req.user!.id);
+    res.json({ flagged });
+  } catch (error) {
+    console.error('Error checking AI flag:', error);
+    res.status(500).json({ message: 'Failed to check AI flag' });
   }
 });
 
