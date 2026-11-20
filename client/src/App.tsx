@@ -97,7 +97,6 @@ function AppWithSidebar({
           avatar: user.profileImageUrl,
           isOnline: true
         } : undefined}
-        onNavigate={(path) => console.log('Navigate to:', path)}
         onLogout={async () => {
           try {
             await fetch("/api/logout", {
@@ -191,18 +190,6 @@ function MainApp() {
     const isOnOnboardingPage = location === "/onboarding";
     // Explicitly check for true - server always returns a boolean (true or false)
     const hasCompletedOnboarding = user.onboardingComplete === true;
-
-    // Debug logging to help diagnose the issue
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Onboarding Redirect]', {
-        location,
-        onboardingComplete: user.onboardingComplete,
-        hasCompletedOnboarding,
-        isOnOnboardingPage,
-        hasChecked: hasCheckedOnboardingRef.current,
-        userId: user.id
-      });
-    }
 
     // PRIORITY 1: If user has completed onboarding, handle redirect away from onboarding page
     if (hasCompletedOnboarding) {

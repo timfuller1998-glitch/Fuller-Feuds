@@ -277,7 +277,6 @@ export default function Onboarding() {
         complete: true
       });
       
-      console.log("Onboarding completion response:", response);
       
       // Verify the response contains the updated values
       if (response && typeof response === 'object') {
@@ -286,7 +285,6 @@ export default function Onboarding() {
           alert("Failed to save onboarding completion. Please try again.");
           return;
         }
-        console.log("Response shows onboardingComplete:", response.onboardingComplete);
       }
       
       // Wait a moment for the database to commit
@@ -305,14 +303,12 @@ export default function Onboarding() {
         exact: true
       });
       
-      console.log("Refetch result:", refetchResult);
       
       // Wait a bit more to ensure React state has updated
       await new Promise(resolve => setTimeout(resolve, 300));
       
       // Verify the user data is updated before navigating
       const updatedUser = queryClient.getQueryData(["/api/auth/user"]) as any;
-      console.log("Updated user data after refetch:", updatedUser);
       
       // Double-check that onboarding is actually completed
       if (updatedUser && updatedUser.onboardingComplete !== true) {
@@ -338,7 +334,6 @@ export default function Onboarding() {
         complete: true
       });
       
-      console.log("Onboarding skip response:", response);
       
       // Invalidate the query cache to mark it as stale
       queryClient.invalidateQueries({ 
@@ -352,14 +347,12 @@ export default function Onboarding() {
         exact: true
       });
       
-      console.log("Refetch result:", refetchResult);
       
       // Wait a bit more to ensure React state has updated
       await new Promise(resolve => setTimeout(resolve, 200));
       
       // Verify the user data is updated before navigating
       const updatedUser = queryClient.getQueryData(["/api/auth/user"]);
-      console.log("Updated user data after refetch:", updatedUser);
       
       // Now navigate - the App component will handle redirect if still needed
       navigate("/");

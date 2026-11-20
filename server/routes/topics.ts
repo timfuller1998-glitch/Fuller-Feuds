@@ -39,9 +39,6 @@ router.get('/', async (req, res) => {
 
 // GET /api/topics/search-similar - Search for similar topics
 router.get('/search-similar', async (req, res) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'topics.ts:35',message:'search-similar route entry',data:{query:req.query.query||req.query.q,limit:req.query.limit},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   try {
     // Accept both 'q' and 'query' for backwards compatibility
     const queryParam = (req.query.query || req.query.q) as string | undefined;
@@ -51,24 +48,12 @@ router.get('/search-similar', async (req, res) => {
       return res.status(400).json({ error: 'Query parameter (q or query) is required' });
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'topics.ts:45',message:'Calling topicService.searchTopics',data:{queryParam,limit},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
-
     const topics = await topicService.searchTopics(queryParam, {
       limit: limit ? parseInt(limit as string, 10) : undefined,
     });
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'topics.ts:49',message:'searchTopics succeeded',data:{resultCount:topics?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
-
     res.json(topics);
   } catch (error) {
-    // #region agent log
-    const errorData = error instanceof Error ? {message:error.message,code:(error as any).code,errno:(error as any).errno,syscall:(error as any).syscall,hostname:(error as any).hostname,stack:error.stack?.substring(0,200)} : {error:String(error)};
-    fetch('http://127.0.0.1:7242/ingest/cc7b491d-1059-46da-b282-4faf14617785',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'topics.ts:51',message:'Error searching topics',data:errorData,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     console.error('Error searching topics:', error);
     res.status(500).json({ error: 'Failed to search topics' });
   }
