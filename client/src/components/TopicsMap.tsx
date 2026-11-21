@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import {
   type MapTreeNode,
-  findNodeByFocus,
   pathToNode,
   ROOT_ID,
 } from "@shared/topicTaxonomy";
@@ -24,6 +23,12 @@ interface LayoutItem {
   node: MapTreeNode;
 }
 
+interface Camera {
+  x: number;
+  y: number;
+  k: number;
+}
+
 interface TopicsMapProps {
   tree: MapTreeNode;
   focusId: string;
@@ -33,20 +38,20 @@ interface TopicsMapProps {
   className?: string;
 }
 
-const MIN_K = 0.4;
-const MAX_K = 6;
+const MIN_K = 0.22;
+const MAX_K = 8;
 const TAP_PX = 14;
+const FRAME_PAD = 56;
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
 
-function lodFromK(k: number): 0 | 1 | 2 | 3 {
-  // Default view (k = 1) shows the current center and its children only.
-  // Subs and topics resolve as the user zooms in.
-  if (k < 1.25) return 0;
-  if (k < 1.85) return 1;
-  if (k < 2.5) return 2;
+function lodFromK(k: number, baseK: number): 0 | 1 | 2 | 3 {
+  const r = k / Math.max(baseK, 0.2);
+  if (r < 1.35) return 0;
+  if (r < 2.4) return 1;
+  if (r < 3.8) return 2;
   return 3;
 }
 
@@ -62,18 +67,12 @@ function measurePill(name: string, type: MapTreeNode["type"]): { w: number; h: n
   return { w, h: type === "major" ? 34 : 28 };
 }
 
-function layoutRadial(tree: MapTreeNode, focusId: string): Map<string, LayoutItem> {
-  const focus = findNodeByFocus(tree, focusId) || tree;
-  const path = pathToNode(tree, focus.id);
-  const parent = path.length > 1 ? path[path.length - 2] : undefined;
+/** Persistent world layout: always rooted at the tree origin, never re-rooted. */
+function layoutWorld(tree: MapTreeNode): Map<string, LayoutItem> {
   const items = new Map<string, LayoutItem>();
+  items.set(tree.id, { id: tree.id, x: 0, y: 0, depth: 0, node: tree });
 
-  items.set(focus.id, { id: focus.id, x: 0, y: 0, depth: 0, parentId: parent?.id, node: focus });
-  if (parent) {
-    items.set(parent.id, { id: parent.id, x: 0, y: -155, depth: -1, node: parent });
-  }
-
-  const children = focus.children;
+  const children = tree.children;
   const n = children.length;
   const R = Math.max(200, (n * 78) / (2 * Math.PI) * 2.15);
 
@@ -81,7 +80,7 @@ function layoutRadial(tree: MapTreeNode, focusId: string): Map<string, LayoutIte
     const a = n === 0 ? 0 : (2 * Math.PI * i) / n - Math.PI / 2;
     const x = Math.cos(a) * R;
     const y = Math.sin(a) * R;
-    items.set(child.id, { id: child.id, x, y, depth: 1, parentId: focus.id, node: child });
+    items.set(child.id, { id: child.id, x, y, depth: 1, parentId: tree.id, node: child });
 
     const grands = child.children;
     if (!grands.length) return;
@@ -149,6 +148,48 @@ export function peekStoredMapView(): MapViewState | null {
   return readStoredView();
 }
 
+function frameNode(
+  layout: Map<string, LayoutItem>,
+  nodeId: string,
+  viewport: HTMLDivElement | null,
+): Camera {
+  if (!viewport) return { x: 0, y: 0, k: 1 };
+  const focus = layout.get(nodeId) || layout.get(ROOT_ID);
+  if (!focus) return { x: 0, y: 0, k: 1 };
+
+  const members: LayoutItem[] = [focus];
+  layout.forEach((it) => {
+    if (it.parentId === focus.id) members.push(it);
+  });
+  // Leaves have no children — include the parent so a connecting branch stays in view.
+  if (members.length === 1 && focus.parentId) {
+    const parent = layout.get(focus.parentId);
+    if (parent) members.push(parent);
+  }
+
+  // Center the tapped pill. Size the zoom so the pill, its children, and
+  // the connecting lines stay in view even though that box is off-center.
+  const cx = focus.x;
+  const cy = focus.y;
+  let halfW = 40;
+  let halfH = 40;
+  members.forEach((it) => {
+    const { w, h } = measurePill(it.node.name, it.node.type);
+    const extra = it.node.type !== "topic" && it.node.type !== "root" && it.node.count > 0 ? 14 : 0;
+    halfW = Math.max(halfW, Math.abs(it.x - w / 2 - cx), Math.abs(it.x + w / 2 - cx));
+    halfH = Math.max(halfH, Math.abs(it.y - h / 2 - cy), Math.abs(it.y + h / 2 + extra - cy));
+  });
+  const k = clamp(
+    Math.min(
+      viewport.clientWidth / (halfW * 2 + FRAME_PAD * 2),
+      viewport.clientHeight / (halfH * 2 + FRAME_PAD * 2),
+    ),
+    MIN_K,
+    MAX_K,
+  );
+  return { x: cx, y: cy, k };
+}
+
 export default function TopicsMap({
   tree,
   focusId,
@@ -159,13 +200,16 @@ export default function TopicsMap({
 }: TopicsMapProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<SVGGElement>(null);
-  const cam = useRef({ x: 0, y: 0, k: 1 });
+  const cam = useRef<Camera>({ x: 0, y: 0, k: 1 });
+  const baseKRef = useRef(1);
   const layoutRef = useRef<Map<string, LayoutItem>>(new Map());
-  const nodeEls = useRef<Map<string, SVGGElement>>(new Map());
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinch = useRef<{ dist: number; k: number; lx: number; ly: number } | null>(null);
   const drag = useRef<{ x: number; y: number; cx: number; cy: number; moved: boolean } | null>(null);
   const pannedRef = useRef(false);
+  const animRaf = useRef(0);
+  const readyRef = useRef(false);
+  const restoredRef = useRef(false);
   const onFocusRef = useRef(onFocus);
   const onOpenTopicRef = useRef(onOpenTopic);
   const focusIdRef = useRef(focusId);
@@ -178,28 +222,8 @@ export default function TopicsMap({
     return new Set(pathToNode(tree, highlight).map((n) => n.id));
   }, [tree, focusId, highlightId]);
 
-  const items = useMemo(() => layoutRadial(tree, focusId), [tree, focusId]);
+  const items = useMemo(() => layoutWorld(tree), [tree]);
 
-
-  const fitCamera = (layout: Map<string, LayoutItem>) => {
-    const box = viewportRef.current;
-    if (!box) return { x: 0, y: 0, k: 1 };
-    const visible = [...layout.values()].filter((it) => it.depth <= 1);
-    if (!visible.length) return { x: 0, y: 0, k: 1 };
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    visible.forEach((it) => {
-      const { w, h } = measurePill(it.node.name, it.node.type);
-      minX = Math.min(minX, it.x - w / 2);
-      maxX = Math.max(maxX, it.x + w / 2);
-      minY = Math.min(minY, it.y - h / 2);
-      maxY = Math.max(maxY, it.y + h / 2);
-    });
-    const pad = 36;
-    const bw = Math.max(maxX - minX, 80);
-    const bh = Math.max(maxY - minY, 80);
-    const k = clamp(Math.min(box.clientWidth / (bw + pad * 2), box.clientHeight / (bh + pad * 2)), 0.45, 1.08);
-    return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, k };
-  };
   const applyCamera = () => {
     const { x, y, k } = cam.current;
     const el = cameraRef.current;
@@ -208,8 +232,37 @@ export default function TopicsMap({
     const w = box.clientWidth;
     const h = box.clientHeight;
     el.setAttribute("transform", `translate(${w / 2} ${h / 2}) scale(${k}) translate(${-x} ${-y})`);
-    const lod = lodFromK(k);
+    const lod = lodFromK(k, baseKRef.current);
     if (box.getAttribute("data-lod") !== String(lod)) box.setAttribute("data-lod", String(lod));
+  };
+
+  const cancelAnim = () => {
+    if (animRaf.current) {
+      cancelAnimationFrame(animRaf.current);
+      animRaf.current = 0;
+    }
+  };
+
+  const animateCameraTo = (target: Camera, duration = 420) => {
+    cancelAnim();
+    const ms = reduceMotion.current ? 0 : duration;
+    if (ms === 0) {
+      cam.current = { ...target };
+      applyCamera();
+      return;
+    }
+    const from = { ...cam.current };
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const t = easeInOutCubic(clamp((now - t0) / ms, 0, 1));
+      cam.current.x = from.x + (target.x - from.x) * t;
+      cam.current.y = from.y + (target.y - from.y) * t;
+      cam.current.k = from.k + (target.k - from.k) * t;
+      applyCamera();
+      if (t < 1) animRaf.current = requestAnimationFrame(step);
+      else animRaf.current = 0;
+    };
+    animRaf.current = requestAnimationFrame(step);
   };
 
   const screenToLayout = (sx: number, sy: number) => {
@@ -231,7 +284,6 @@ export default function TopicsMap({
     applyCamera();
   };
 
-  const restoredRef = useRef(false);
   useEffect(() => {
     reduceMotion.current = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const v = readStoredView();
@@ -240,6 +292,8 @@ export default function TopicsMap({
       restoredRef.current = true;
       applyCamera();
     }
+    // Initial restore only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -251,53 +305,29 @@ export default function TopicsMap({
     return () => ro.disconnect();
   }, []);
 
-  // Animate node positions when the focus (and therefore the layout) changes.
   useEffect(() => {
-    const prev = layoutRef.current;
     layoutRef.current = items;
-    const ids = new Set(items.keys());
-    const start = new Map<string, { x: number; y: number }>();
-    ids.forEach((id) => {
-      const was = prev.get(id);
-      const now = items.get(id)!;
-      start.set(id, was ? { x: was.x, y: was.y } : { x: now.x, y: now.y });
-    });
+    const box = viewportRef.current;
+    if (!box || items.size === 0) return;
+    baseKRef.current = frameNode(items, ROOT_ID, box).k;
 
-    const skipReset = restoredRef.current;
-    restoredRef.current = false;
-    const duration = reduceMotion.current || skipReset ? 0 : 380;
-    if (duration === 0) {
-      ids.forEach((id) => {
-        const el = nodeEls.current.get(id);
-        const now = items.get(id)!;
-        if (el) el.setAttribute("transform", `translate(${now.x} ${now.y})`);
-      });
-      if (!skipReset) cam.current = fitCamera(items);
+    if (!readyRef.current) {
+      readyRef.current = true;
+      if (restoredRef.current) {
+        restoredRef.current = false;
+        applyCamera();
+        return;
+      }
+      cam.current = frameNode(items, focusId, box);
       applyCamera();
       return;
     }
 
-    const fromCam = { ...cam.current };
-    const toCam = fitCamera(items);
-    const t0 = performance.now();
-    let raf = 0;
-    const step = (now: number) => {
-      const t = easeInOutCubic(clamp((now - t0) / duration, 0, 1));
-      ids.forEach((id) => {
-        const el = nodeEls.current.get(id);
-        const a = start.get(id)!;
-        const b = items.get(id)!;
-        if (el) el.setAttribute("transform", `translate(${a.x + (b.x - a.x) * t} ${a.y + (b.y - a.y) * t})`);
-      });
-      cam.current.x = fromCam.x + (toCam.x - fromCam.x) * t;
-      cam.current.y = fromCam.y + (toCam.y - fromCam.y) * t;
-      cam.current.k = fromCam.k + (toCam.k - fromCam.k) * t;
-      applyCamera();
-      if (t < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [items]);
+    animateCameraTo(frameNode(items, focusId, box));
+    return () => cancelAnim();
+    // items only changes when the tree itself changes; focusId drives the camera.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, items]);
 
   useEffect(() => {
     const box = viewportRef.current;
@@ -305,11 +335,13 @@ export default function TopicsMap({
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      cancelAnim();
       const factor = Math.exp(-e.deltaY * 0.0015);
       zoomAround(e.clientX, e.clientY, cam.current.k * factor);
     };
 
     const onDown = (e: PointerEvent) => {
+      cancelAnim();
       box.setPointerCapture(e.pointerId);
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.current.size === 1) {
@@ -417,7 +449,7 @@ export default function TopicsMap({
     activateNode(item.node);
   };
 
-  const links: { id: string; x1: number; y1: number; x2: number; y2: number; depth: number; onPath: boolean }[] = [];
+  const links: { id: string; x1: number; y1: number; x2: number; y2: number; depth: number; onPath: boolean; forced: boolean }[] = [];
   items.forEach((item) => {
     if (!item.parentId) return;
     const parent = items.get(item.parentId);
@@ -430,6 +462,7 @@ export default function TopicsMap({
       y2: item.y,
       depth: Math.max(item.depth, 0),
       onPath: pathIds.has(item.id) && pathIds.has(parent.id),
+      forced: item.id === focusId || item.parentId === focusId,
     });
   });
 
@@ -439,7 +472,7 @@ export default function TopicsMap({
     <div
       ref={viewportRef}
       className={`topics-map relative h-full w-full overflow-hidden ${className}`}
-      data-lod="1"
+      data-lod="0"
       data-testid="topics-map"
     >
       <svg role="img" aria-label="Explore Topics map">
@@ -448,7 +481,7 @@ export default function TopicsMap({
             {links.map((l) => (
               <line
                 key={l.id}
-                className={`tm-link ${l.onPath ? "tm-path" : ""} tm-lod-${Math.max(l.depth, 0)}`}
+                className={`tm-link ${l.onPath ? "tm-path" : ""} tm-lod-${Math.max(l.depth, 0)} ${l.forced ? "tm-forced" : ""}`}
                 x1={l.x1}
                 y1={l.y1}
                 x2={l.x2}
@@ -460,20 +493,16 @@ export default function TopicsMap({
             {ordered.map((item) => {
               const { node } = item;
               const { w, h } = measurePill(node.name, node.type);
-              const isFocus = node.id === focusId || (focusId === ROOT_ID && node.id === ROOT_ID);
+              const isFocus = node.id === focusId;
+              const isChildOfFocus = item.parentId === focusId;
               const isHighlight = Boolean(highlightId && (node.id === highlightId || node.topicId === highlightId));
               const lodClass = item.depth <= 1 ? "tm-lod-1" : item.depth === 2 ? "tm-lod-2" : "tm-lod-3";
-              const label = node.type === "topic" ? node.name : node.name;
               const fontSize = node.type === "topic" ? 12 : node.type === "root" ? 12 : node.type === "major" ? 11 : 10;
               return (
                 <g
                   key={node.id}
-                  ref={(el) => {
-                    if (el) nodeEls.current.set(node.id, el);
-                    else nodeEls.current.delete(node.id);
-                  }}
                   transform={`translate(${item.x} ${item.y})`}
-                  className={`tm-node ${lodClass} ${isFocus ? "is-focus" : ""} ${isHighlight ? "is-highlight" : ""}`}
+                  className={`tm-node ${lodClass} ${isFocus || isChildOfFocus ? "tm-forced" : ""} ${isFocus ? "is-focus" : ""} ${isHighlight ? "is-highlight" : ""}`}
                   data-testid={`map-node-${node.id}`}
                   data-map-type={node.type}
                   tabIndex={0}
@@ -500,7 +529,7 @@ export default function TopicsMap({
                     y={node.type === "topic" && node.alsoIn?.length ? -2 : 4}
                     fontSize={fontSize}
                   >
-                    {label.length > 36 ? `${label.slice(0, 34)}…` : label}
+                    {labelSafe(node.name)}
                   </text>
                   {node.type !== "topic" && node.type !== "root" && node.count > 0 && (
                     <text className="tm-count" textAnchor="middle" y={h / 2 + 12}>
@@ -525,4 +554,8 @@ export default function TopicsMap({
       </svg>
     </div>
   );
+}
+
+function labelSafe(name: string) {
+  return name.length > 36 ? `${name.slice(0, 34)}…` : name;
 }

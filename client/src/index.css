@@ -818,3 +818,8 @@
 .topics-map[data-lod="2"] .tm-lod-3 { opacity: 0.7; }
 .topics-map[data-lod="3"] .tm-lod-2,
 .topics-map[data-lod="3"] .tm-lod-3 { opacity: 1; }
+.topics-map .tm-node.tm-forced,
+.topics-map .tm-link.tm-forced {
+  opacity: 1 !important;
+  pointer-events: auto;
+}

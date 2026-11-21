@@ -78,11 +78,8 @@ export default function TopicsMapPage() {
   const focusSearchResult = (node: MapTreeNode) => {
     setSearch("");
     setHighlightId(node.id);
-    // Focus the parent so the result sits on the ring, not as a lone center topic.
-    const p = pathToNode(tree!, node.id);
-    const next = node.type === "topic" && p.length > 1 ? p[p.length - 2].id : node.id;
-    setFocusId(next);
-    replaceQuery({ focus: next === ROOT_ID ? null : next });
+    setFocusId(node.id);
+    replaceQuery({ focus: node.id === ROOT_ID ? null : node.id });
   };
 
   const goParent = () => {
