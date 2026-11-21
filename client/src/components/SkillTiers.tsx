@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import * as LucideIcons from "lucide-react";
+import { getBadgeIcon } from "@/lib/badgeIcons";
 import { Check, Trophy, Lock } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { XP_TIERS } from "@shared/xpTiers";
@@ -65,7 +65,7 @@ function LevelCard(props: {
   selecting: boolean;
   selectTestId: string;
 }) {
-  const Icon = (LucideIcons as any)[props.icon] || Trophy;
+  const Icon = getBadgeIcon(props.icon);
   const scope = props.earned ? ({ "--tier-l": props.tierLight, "--tier-d": props.tierDark } as CSSProperties) : undefined;
   return (
     <div

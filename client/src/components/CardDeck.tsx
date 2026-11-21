@@ -733,9 +733,15 @@ function CardDeckCore<T>({
             width={cardWidth}
             reduceMotion={reduceMotion}
             draggable={n > 1 && !busy}
-            onDragEnd={handleDragEnd}
+            onDragEnd={(info) => {
+              rootRef.current?.removeAttribute("data-deck-dragging");
+              handleDragEnd(info);
+            }}
             onDrag={(info) => {
-              if (Math.abs(info.offset.x) >= CARD_GESTURE_LOCK_PX || Math.abs(info.offset.y) >= CARD_GESTURE_LOCK_PX) markCardGesture();
+              if (Math.abs(info.offset.x) >= CARD_GESTURE_LOCK_PX || Math.abs(info.offset.y) >= CARD_GESTURE_LOCK_PX) {
+                markCardGesture();
+                rootRef.current?.setAttribute("data-deck-dragging", "true");
+              }
               pull.set(Math.max(0, info.offset.x));
               lift.set(Math.max(0, -info.offset.x));
             }}

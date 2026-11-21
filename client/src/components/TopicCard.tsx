@@ -352,6 +352,7 @@ export default function TopicCard({
       <div
         ref={cardRef}
         className="relative w-full h-full min-h-[20rem]"
+        data-card-glow={glowStyle && Object.keys(glowStyle).length ? "true" : undefined}
         style={{ perspective: "1000px", ...glowStyle }}
         data-testid={`card-topic-${id}`}
         data-card-flipped={isFlipped ? "true" : "false"}
@@ -367,7 +368,7 @@ export default function TopicCard({
           }}
         >
           <Card
-            className="hover-elevate active-elevate-2 overflow-visible cursor-pointer relative w-full h-full bg-card"
+            className="no-default-hover-elevate overflow-visible cursor-pointer relative w-full h-full bg-card"
             onPointerDown={(e) => { pointerStartRef.current = { x: e.clientX, y: e.clientY }; }}
             onPointerMove={(e) => {
               const s = pointerStartRef.current;

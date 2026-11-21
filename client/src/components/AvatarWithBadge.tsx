@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import * as LucideIcons from "lucide-react";
+import { getBadgeIcon } from "@/lib/badgeIcons";
 import { useQuery } from "@tanstack/react-query";
 
 interface AvatarWithBadgeProps {
@@ -168,12 +168,6 @@ export function AvatarWithBadge({
   });
 
   const selectedBadge = userBadges.find((b: any) => b.isSelected);
-
-  const getBadgeIcon = (iconName: string) => {
-    // Dynamically resolve icon from lucide-react
-    const IconComponent = (LucideIcons as any)[iconName];
-    return IconComponent || LucideIcons.Trophy;
-  };
 
   // Determine display name
   const displayName = name || `${firstName || ''} ${lastName || ''}`.trim();

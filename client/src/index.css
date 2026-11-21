@@ -86,7 +86,7 @@
   --font-ui: Inter, system-ui, sans-serif;
   --font-sans: "Source Serif 4", Georgia, serif;
   --font-serif: "Playfair Display", Georgia, serif;
-  --font-mono: JetBrains Mono, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --radius: 0rem;
 
   --shadow-2xs: none;
@@ -640,15 +640,47 @@
 .medium .deck-card-surface {
   box-shadow: 0 0 0 1px hsl(40 30% 92% / 0.14), 6px 6px 0 0 hsl(0 0% 0% / 0.75);
 }
-.dark [data-deck-role]:not([data-deck-role="top"]):not([data-deck-role="in"]) .deck-card-surface,
-.medium [data-deck-role]:not([data-deck-role="top"]):not([data-deck-role="in"]) .deck-card-surface {
-  filter: brightness(1.18) saturate(0.7);
+/* Deeper cards used to use filter: brightness/saturate, which forced a new bitmap on every
+   frame of a swipe and felt like ~10fps on a phone. A static wash overlay looks the same
+   and stays compositor-cheap, including the fade on a back-swipe landing. */
+.dark [data-deck-role] .deck-card-surface,
+.medium [data-deck-role] .deck-card-surface {
+  isolation: isolate;
 }
-/* Back swipe: the card being laid on top fades to the top card's tone while it flies in, so nothing
-   changes when it lands (an instant brightness drop at landing read as a jitter). */
-.dark [data-deck-role="in"] .deck-card-surface,
-.medium [data-deck-role="in"] .deck-card-surface {
-  transition: filter 0.3s ease;
+.dark [data-deck-role] .deck-card-surface::before,
+.medium [data-deck-role] .deck-card-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: hsl(40 30% 96% / 0.16);
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.dark [data-deck-role]:not([data-deck-role="top"]):not([data-deck-role="in"]) .deck-card-surface::before,
+.medium [data-deck-role]:not([data-deck-role="top"]):not([data-deck-role="in"]) .deck-card-surface::before {
+  opacity: 1;
+  transition: none;
+}
+/* Promote layers only while a card is actually moving. */
+[data-deck-dragging] [data-deck-card],
+[data-testid="card-deck"]:has([data-deck-role="out"]) [data-deck-card],
+[data-testid="card-deck"]:has([data-deck-role="in"]) [data-deck-card] {
+  will-change: transform;
+}
+/* Soft political glows and backdrop-blur are expensive mid-swipe; flatten them while moving. */
+[data-deck-dragging] [data-card-glow],
+[data-testid="card-deck"]:has([data-deck-role="out"]) [data-card-glow],
+[data-testid="card-deck"]:has([data-deck-role="in"]) [data-card-glow] {
+  box-shadow: none !important;
+}
+[data-deck-dragging] .backdrop-blur-sm,
+[data-testid="card-deck"]:has([data-deck-role="out"]) .backdrop-blur-sm,
+[data-testid="card-deck"]:has([data-deck-role="in"]) .backdrop-blur-sm {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Level badges (skill tiers + stacked milestones), Fuller Feuds Dev Nov 20 2026.

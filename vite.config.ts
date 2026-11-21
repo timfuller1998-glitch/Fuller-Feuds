@@ -12,14 +12,16 @@ function adsenseHead(): Plugin {
       if (!/^ca-pub-\d{10,20}$/.test(client)) return [];
       return [
         { tag: "meta", attrs: { name: "google-adsense-account", content: client }, injectTo: "head" },
+        { tag: "link", attrs: { rel: "preconnect", href: "https://pagead2.googlesyndication.com", crossorigin: "anonymous" }, injectTo: "head" },
         {
           tag: "script",
           attrs: {
             async: true,
             src: `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${client}`,
             crossorigin: "anonymous",
+            fetchpriority: "low",
           },
-          injectTo: "head",
+          injectTo: "body",
         },
       ];
     },
@@ -43,6 +45,18 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("recharts") || id.includes("/d3-") || id.includes("victory-vendor")) return "charts";
+          if (id.includes("framer-motion")) return "motion";
+          if (id.includes("@radix-ui")) return "radix";
+          if (id.includes("@tanstack")) return "query";
+          if (id.includes("/react-dom/") || id.includes("/react/") || id.includes("scheduler")) return "react";
+        },
+      },
+    },
   },
   server: {
     fs: {

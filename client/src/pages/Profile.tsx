@@ -18,7 +18,6 @@ import LeaderboardsDialog, { useLeaderboards, bestRank } from "@/components/Lead
 import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
 import { useAuth } from "@/hooks/useAuth";
 import { SkillTiers, MilestoneBadges } from "@/components/SkillTiers";
-import * as LucideIcons from "lucide-react";
 import {
   Users,
   User,

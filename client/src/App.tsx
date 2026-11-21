@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation, useSearch } from "wouter";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, lazy, Suspense, type ComponentType } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,27 +20,30 @@ import { UpdateNotification } from "@/components/UpdateNotification";
 import { registerServiceWorker } from "@/utils/registerSW";
 import { LoginDialog } from "@/components/LoginDialog";
 import Home from "@/pages/Home";
-import Profile from "@/pages/Profile";
-import HandleRedirect from "@/pages/HandleRedirect";
-import Settings from "@/pages/Settings";
-import Topic from "@/pages/Topic";
-import Trending from "@/pages/Trending";
-import LiveDebates from "@/pages/LiveDebates";
-import HotDebates from "@/pages/HotDebates";
-import Search from "@/pages/Search";
-import AllCategoriesPage from "@/pages/AllCategoriesPage";
-import CategoryPage from "@/pages/CategoryPage";
-import LiveStreamPage from "@/pages/LiveStreamPage";
-import AdminDashboard from "@/pages/AdminDashboard";
-import CounterpointsPage from "@/pages/CounterpointsPage";
-import Onboarding from "@/pages/Onboarding";
-import RecentOpinions from "@/pages/RecentOpinions";
-import NotFound from "@/pages/not-found";
-import CreateTopicPage from "@/pages/CreateTopicPage";
-import DebateRoomPage from "@/pages/DebateRoomPage";
-import { PrivacyPage, TermsPage } from "@/pages/LegalPages";
-import ApplyPage from "@/pages/ApplyPage";
-import FoundersRoom from "@/pages/FoundersRoom";
+
+const lazyPage = <T extends { default: ComponentType<any> }>(fn: () => Promise<T>) => lazy(fn);
+const Profile = lazyPage(() => import("@/pages/Profile"));
+const HandleRedirect = lazyPage(() => import("@/pages/HandleRedirect"));
+const Settings = lazyPage(() => import("@/pages/Settings"));
+const Topic = lazyPage(() => import("@/pages/Topic"));
+const Trending = lazyPage(() => import("@/pages/Trending"));
+const LiveDebates = lazyPage(() => import("@/pages/LiveDebates"));
+const HotDebates = lazyPage(() => import("@/pages/HotDebates"));
+const Search = lazyPage(() => import("@/pages/Search"));
+const AllCategoriesPage = lazyPage(() => import("@/pages/AllCategoriesPage"));
+const CategoryPage = lazyPage(() => import("@/pages/CategoryPage"));
+const LiveStreamPage = lazyPage(() => import("@/pages/LiveStreamPage"));
+const AdminDashboard = lazyPage(() => import("@/pages/AdminDashboard"));
+const CounterpointsPage = lazyPage(() => import("@/pages/CounterpointsPage"));
+const Onboarding = lazyPage(() => import("@/pages/Onboarding"));
+const RecentOpinions = lazyPage(() => import("@/pages/RecentOpinions"));
+const NotFound = lazyPage(() => import("@/pages/not-found"));
+const CreateTopicPage = lazyPage(() => import("@/pages/CreateTopicPage"));
+const DebateRoomPage = lazyPage(() => import("@/pages/DebateRoomPage"));
+const PrivacyPage = lazy(() => import("@/pages/LegalPages").then((m) => ({ default: m.PrivacyPage })));
+const TermsPage = lazy(() => import("@/pages/LegalPages").then((m) => ({ default: m.TermsPage })));
+const ApplyPage = lazyPage(() => import("@/pages/ApplyPage"));
+const FoundersRoom = lazyPage(() => import("@/pages/FoundersRoom"));
 import { getPendingInvite } from "@/lib/ref";
 
 function Router() {
@@ -85,6 +88,7 @@ function AppWithSidebar({
   searchQuery, 
   handleSearch,
   isAuthenticated,
+  authReady = true,
   location
 }: {
   user: any;
@@ -92,6 +96,7 @@ function AppWithSidebar({
   searchQuery: string;
   handleSearch: (query: string) => void;
   isAuthenticated: boolean;
+  authReady?: boolean;
   location: string;
 }) {
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
@@ -135,7 +140,7 @@ function AppWithSidebar({
               className="w-full"
             />
           </div>
-          {!isAuthenticated && (
+          {authReady && !isAuthenticated && (
             <button 
               onClick={() => setLoginDialogOpen(true)}
               className="flex-shrink-0 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 font-ui text-[0.78rem] font-semibold uppercase tracking-[0.08em]" 
@@ -150,7 +155,9 @@ function AppWithSidebar({
         <FeedbackDialog />
         <main className={`flex-1 min-h-0 overflow-x-hidden ${location === "/" ? "overflow-y-hidden relative p-0" : "overflow-y-auto px-4 pt-5 sm:px-6 sm:pt-7 md:px-8 pb-10"}`}>
           <div className={`max-w-7xl mx-auto w-full ${location === "/" ? "h-full relative" : ""}`}>
-            <Router />
+            <Suspense fallback={null}>
+              <Router />
+            </Suspense>
           </div>
         </main>
         {/* Only show debate messenger UI for authenticated users */}
@@ -265,7 +272,7 @@ function MainApp() {
 
   // Onboarding page doesn't need sidebar
   if (isAuthenticated && location === "/onboarding") {
-    return <Router />;
+    return <Suspense fallback={null}><Router /></Suspense>;
   }
 
   return (
@@ -278,6 +285,7 @@ function MainApp() {
           searchQuery={searchQuery}
           handleSearch={handleSearch}
           isAuthenticated={isAuthenticated}
+          authReady={!isUserLoading}
           location={location}
         />
       </SidebarProvider>
@@ -286,21 +294,6 @@ function MainApp() {
 }
 
 function AppContent() {
-  const { isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      // Same markup/CSS as the pre-React launch screen in client/index.html
-      <div className="ff-launch" role="status" aria-label="Loading Fuller Feuds" data-testid="launch-screen">
-        <div className="ff-launch-logo"><img src="/launch-logo-512.png" alt="" /></div>
-        <p className="ff-launch-word">Fuller <span>Feuds</span></p>
-        <div className="ff-launch-rule" />
-        <p className="ff-launch-tag">Every opinion. One fair fight.</p>
-        <div className="ff-launch-bar"><i /></div>
-      </div>
-    );
-  }
-
   return <MainApp />;
 }
 
