@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation, useSearch } from "wouter";
+import { Switch, Route, useLocation, useSearch, useParams } from "wouter";
 import { useEffect, useState, useRef, lazy, Suspense, type ComponentType } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -30,8 +30,7 @@ const Trending = lazyPage(() => import("@/pages/Trending"));
 const LiveDebates = lazyPage(() => import("@/pages/LiveDebates"));
 const HotDebates = lazyPage(() => import("@/pages/HotDebates"));
 const Search = lazyPage(() => import("@/pages/Search"));
-const AllCategoriesPage = lazyPage(() => import("@/pages/AllCategoriesPage"));
-const CategoryPage = lazyPage(() => import("@/pages/CategoryPage"));
+const TopicsMapPage = lazyPage(() => import("@/pages/TopicsMapPage"));
 const LiveStreamPage = lazyPage(() => import("@/pages/LiveStreamPage"));
 const AdminDashboard = lazyPage(() => import("@/pages/AdminDashboard"));
 const CounterpointsPage = lazyPage(() => import("@/pages/CounterpointsPage"));
@@ -45,6 +44,18 @@ const TermsPage = lazy(() => import("@/pages/LegalPages").then((m) => ({ default
 const ApplyPage = lazyPage(() => import("@/pages/ApplyPage"));
 const FoundersRoom = lazyPage(() => import("@/pages/FoundersRoom"));
 import { getPendingInvite } from "@/lib/ref";
+
+
+function CategoryToMapRedirect() {
+  const params = useParams<{ category?: string }>();
+  const [, setLocation] = useLocation();
+  const category = params.category ? decodeURIComponent(params.category) : "";
+  useEffect(() => {
+    const focus = category ? `?focus=${encodeURIComponent(category)}` : "";
+    setLocation(`/categories${focus}`, { replace: true } as any);
+  }, [category, setLocation]);
+  return null;
+}
 
 function Router() {
   const { isAuthenticated } = useAuth();
@@ -64,8 +75,8 @@ function Router() {
       {/* Debaters debate here; anyone can watch a public debate live (read-only). */}
       <Route path="/debate-room/:id" component={DebateRoomPage} />
       <Route path="/hot-debates" component={HotDebates} />
-      <Route path="/categories" component={AllCategoriesPage} />
-      <Route path="/category/:category" component={CategoryPage} />
+      <Route path="/categories" component={TopicsMapPage} />
+      <Route path="/category/:category" component={CategoryToMapRedirect} />
       <Route path="/recent-opinions" component={RecentOpinions} />
       <Route path="/topic/:id" component={Topic} />
       <Route path="/opinion/:id/counterpoints" component={CounterpointsPage} />
@@ -153,8 +164,8 @@ function AppWithSidebar({
         </header>
         <FirstRunTutorial user={user} isAuthenticated={isAuthenticated} suppressed={location === "/onboarding"} />
         <FeedbackDialog />
-        <main className={`flex-1 min-h-0 overflow-x-hidden ${location === "/" ? "overflow-y-hidden relative p-0" : "overflow-y-auto px-4 pt-5 sm:px-6 sm:pt-7 md:px-8 pb-10"}`}>
-          <div className={`max-w-7xl mx-auto w-full ${location === "/" ? "h-full relative" : ""}`}>
+        <main className={`flex-1 min-h-0 overflow-x-hidden ${location === "/" || location === "/categories" ? "overflow-y-hidden relative p-0" : "overflow-y-auto px-4 pt-5 sm:px-6 sm:pt-7 md:px-8 pb-10"}`}>
+          <div className={`w-full ${location === "/" || location === "/categories" ? "h-full relative" : "max-w-7xl mx-auto"}`}>
             <Suspense fallback={null}>
               <Router />
             </Suspense>

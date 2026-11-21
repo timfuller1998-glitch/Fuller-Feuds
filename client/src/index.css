@@ -704,3 +704,117 @@
 @media (prefers-reduced-motion: reduce) {
   .opinion-strength-fill { transition: none; }
 }
+
+
+/* Explore Topics Map — always uses the dark theme palette, even in light mode.
+   Camera motion is a single SVG transform; no layout or filter animation. */
+.topics-map {
+  --tm-bg: hsl(30 14% 9%);
+  --tm-fg: hsl(40 35% 90%);
+  --tm-muted: hsl(38 18% 70%);
+  --tm-line: hsl(4 72% 66%);
+  --tm-pill: hsl(30 13% 16%);
+  --tm-pill-border: hsl(38 22% 70% / 0.35);
+  --tm-hover: hsl(4 72% 66%);
+  background: var(--tm-bg);
+  color: var(--tm-fg);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.topics-map svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+.topics-map svg:active {
+  cursor: grabbing;
+}
+.topics-map .tm-link {
+  fill: none;
+  stroke: var(--tm-line);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.topics-map .tm-link.tm-path {
+  stroke-width: 2.25;
+  opacity: 1;
+}
+.topics-map .tm-pill {
+  fill: var(--tm-pill);
+  stroke: var(--tm-pill-border);
+  stroke-width: 1;
+}
+.topics-map .tm-node {
+  cursor: pointer;
+}
+.topics-map .tm-node:hover .tm-pill,
+.topics-map .tm-node:focus-visible .tm-pill {
+  stroke: var(--tm-hover);
+  stroke-width: 2;
+  fill: hsl(4 72% 66% / 0.18);
+}
+.topics-map .tm-node.is-focus .tm-pill,
+.topics-map .tm-node.is-highlight .tm-pill {
+  stroke: var(--tm-hover);
+  stroke-width: 2.25;
+  fill: hsl(4 72% 66% / 0.28);
+}
+.topics-map .tm-node.is-focus .tm-label,
+.topics-map .tm-node.is-highlight .tm-label {
+  fill: hsl(40 40% 96%);
+}
+.topics-map .tm-label {
+  fill: var(--tm-fg);
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.topics-map .tm-topic-label {
+  fill: var(--tm-fg);
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  pointer-events: none;
+}
+.topics-map .tm-also {
+  fill: var(--tm-muted);
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 8px;
+}
+.topics-map .tm-also-hit {
+  cursor: pointer;
+}
+.topics-map .tm-also-hit:hover .tm-also {
+  fill: var(--tm-hover);
+}
+.topics-map .tm-count {
+  fill: var(--tm-muted);
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+.topics-map[data-lod="0"] .tm-lod-2,
+.topics-map[data-lod="0"] .tm-lod-3 {
+  opacity: 0;
+  pointer-events: none;
+}
+.topics-map[data-lod="1"] .tm-lod-2 { opacity: 0.55; }
+.topics-map[data-lod="1"] .tm-lod-3 {
+  opacity: 0;
+  pointer-events: none;
+}
+.topics-map[data-lod="2"] .tm-lod-2 { opacity: 1; }
+.topics-map[data-lod="2"] .tm-lod-3 { opacity: 0.7; }
+.topics-map[data-lod="3"] .tm-lod-2,
+.topics-map[data-lod="3"] .tm-lod-3 { opacity: 1; }

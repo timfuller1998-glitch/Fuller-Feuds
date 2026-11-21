@@ -7,6 +7,7 @@ import { AIService } from '../aiService.js';
 import { previewSource, UnsafeUrlError } from '../services/sourcePreviewService.js';
 import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertTopicSchema, insertOpinionSchema } from '../../shared/schema.js';
+import { buildMapTree, buildSyntheticTopics } from '../../shared/topicTaxonomy.js';
 import { z } from 'zod';
 import { UnauthorizedError, ForbiddenError, AuthorizationError, DataAccessError } from '../utils/securityErrors.js';
 
@@ -56,6 +57,32 @@ router.get('/search-similar', async (req, res) => {
   } catch (error) {
     console.error('Error searching topics:', error);
     res.status(500).json({ error: 'Failed to search topics' });
+  }
+});
+
+
+// GET /api/topics/map - Public radial-map tree (signed-out visitors welcome)
+router.get('/map', async (req, res) => {
+  try {
+    const wantSynthetic = req.query.synthetic === '1';
+    if (wantSynthetic && process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ error: 'Synthetic map trees are not available in production' });
+    }
+    if (wantSynthetic) {
+      const count = Math.min(800, Math.max(50, parseInt(String(req.query.count || '420'), 10) || 420));
+      return res.json(buildMapTree(buildSyntheticTopics(count)));
+    }
+    const topics = await topicService.getTopics({ limit: 2000 });
+    const compact = (topics || []).map((t: any) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description ?? null,
+      categories: Array.isArray(t.categories) ? t.categories : [],
+    }));
+    res.json(buildMapTree(compact));
+  } catch (error) {
+    console.error('Error building topics map:', error);
+    res.status(500).json({ error: 'Failed to build topics map' });
   }
 });
 

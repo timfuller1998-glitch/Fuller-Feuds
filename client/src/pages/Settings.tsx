@@ -409,7 +409,7 @@ export default function Settings() {
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Choose how categories are sorted on the Browse All page
+                      This used to sort the Browse All list. The Explore Topics map is arranged spatially, so this setting is unused for now.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
