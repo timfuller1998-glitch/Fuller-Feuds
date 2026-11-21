@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageCircle, Users, Sparkles, Activity, Flag, Plus, ArrowRight, Loader2, Heart, Skull, Flame, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { Sparkles, Activity, Loader2, Heart, Skull, Flame, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -17,10 +17,8 @@ import { insertOpinionSchema, type Opinion } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import FallacyFlagDialog from "@/components/FallacyFlagDialog";
 import { LoginPromptDialog } from "@/components/LoginPromptDialog";
 import { OpinionStructure, BareOpinionTip, useBareOpinionGuard } from "@/components/OpinionStructure";
-import type { FallacyType } from "@shared/fallacies";
 import { CARD_GESTURE_LOCK_PX, cardGestureJustHappened, markCardGesture } from "@/lib/cardGesture";
 
 const opinionFormSchema = insertOpinionSchema.omit({
@@ -88,7 +86,6 @@ export default function TopicCard({
   const [isFlipped, setIsFlipped] = useState(false);
   const [skipFlipTransition, setSkipFlipTransition] = useState(false);
   const [showOpinionForm, setShowOpinionForm] = useState(false);
-  const [showFlagDialog, setShowFlagDialog] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [loginAction, setLoginAction] = useState<"like" | "opinion" | "debate" | "interact">("interact");
   const [timeOnBack, setTimeOnBack] = useState(0);
@@ -169,27 +166,6 @@ export default function TopicCard({
     },
   });
 
-  // Flag mutation
-  const flagMutation = useMutation({
-    mutationFn: async (fallacyType: FallacyType) => {
-      return apiRequest('POST', `/api/topics/${id}/flag`, { fallacyType });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Flag submitted",
-        description: "Thank you for helping keep debates productive.",
-      });
-      setShowFlagDialog(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit flag",
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleFlip = (e: React.MouseEvent) => {
     // Only flip if clicking on the main content area, not on interactive buttons/links.
     // A scroll or deck swipe must not count as a tap.
@@ -258,16 +234,6 @@ export default function TopicCard({
     setShowOpinionForm(true);
   };
 
-  const handleFlag = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isAuthenticated) {
-      setLoginAction("interact");
-      setShowLoginPrompt(true);
-      return;
-    }
-    setShowFlagDialog(true);
-  };
-
   const handleNavigate = (e: React.MouseEvent) => {
     e.stopPropagation();
     setLocation(`/topic/${id}`);
@@ -298,52 +264,26 @@ export default function TopicCard({
     bareOpinion.guard(() => createOpinionMutation.mutate(data));
   };
 
-  const handleFlagSubmit = (fallacyType: FallacyType) => {
-    flagMutation.mutate(fallacyType);
-  };
-
-  // Interactive elements component (used on both sides)
-  const InteractiveElements = () => (
-    <div className="flex items-center justify-between gap-2 pt-3 border-t mt-auto">
-      <div className="flex items-center gap-3 text-xs sm:text-sm text-muted-foreground">
-        <div className="flex items-center gap-1">
-          <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-          <span data-testid={`text-opinions-count-${id}`}>{opinionsCount}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-          <span data-testid={`text-participants-count-${id}`}>{participantCount}</span>
-        </div>
-      </div>
-      <div className="flex items-center gap-1">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={handleAddOpinion}
-          className="h-7 px-2"
-          data-testid={`button-add-opinion-${id}`}
-        >
-          <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={handleFlag}
-          className="h-7 px-2"
-          data-testid={`button-flag-${id}`}
-        >
-          <Flag className="w-3 h-3 sm:w-4 sm:h-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={handleNavigate}
-          className="h-7 px-2"
-          data-testid={`button-navigate-${id}`}
-        >
-          <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
-        </Button>
-      </div>
+  // Same split red bar on the front and back: open the topic, or add an opinion.
+  const CardActionBar = () => (
+    <div className="flex w-full flex-shrink-0 overflow-hidden rounded-md">
+      <Button
+        size="sm"
+        className="h-auto min-h-9 min-w-0 flex-1 flex-col rounded-none rounded-l-md gap-0 px-1.5 py-1.5 text-center text-[0.65rem] leading-tight tracking-[0.06em] whitespace-normal sm:text-xs"
+        onClick={handleNavigate}
+        data-testid={`button-open-full-page-${id}`}
+      >
+        Open full page
+      </Button>
+      <div className="w-px shrink-0 self-stretch bg-primary-foreground/25" aria-hidden="true" />
+      <Button
+        size="sm"
+        className="h-auto min-h-9 min-w-0 flex-1 flex-col rounded-none rounded-r-md gap-0 px-1.5 py-1.5 text-center text-[0.65rem] leading-tight tracking-[0.06em] whitespace-normal sm:text-xs"
+        onClick={handleAddOpinion}
+        data-testid={`button-add-opinion-${id}`}
+      >
+        Add your opinion
+      </Button>
     </div>
   );
 
@@ -550,7 +490,9 @@ export default function TopicCard({
               )}
             </div>
 
-            <InteractiveElements />
+            <div className="mt-auto pt-3 flex-shrink-0">
+              <CardActionBar />
+            </div>
           </div>
 
           {/* Back Side */}
@@ -673,26 +615,16 @@ export default function TopicCard({
               </div>
             </div>
 
-            <div className="px-4 pb-3 flex flex-col gap-2 flex-shrink-0">
-              <div className="flex justify-center gap-4 text-xs text-muted-foreground">
-                <span>{opinionsCount} {opinionsCount === 1 ? "opinion" : "opinions"}</span>
-                <span>{participantCount} {participantCount === 1 ? "participant" : "participants"}</span>
+            <div className="mt-auto pt-3 flex flex-col gap-2 flex-shrink-0">
+              <div className="flex justify-center gap-3 sm:gap-4 text-xs text-muted-foreground">
+                <span data-testid={`text-opinions-count-${id}`}>{opinionsCount} {opinionsCount === 1 ? "opinion" : "opinions"}</span>
+                <span data-testid={`text-participants-count-${id}`}>{participantCount} {participantCount === 1 ? "participant" : "participants"}</span>
                 {topOpinions && topOpinions.length > 0 && (
                   <span>Top: {topOpinions[0].likesCount || 0} likes</span>
                 )}
               </div>
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={handleNavigate}
-                data-testid={`button-open-full-page-${id}`}
-              >
-                Open full page
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
+              <CardActionBar />
             </div>
-
-            <InteractiveElements />
           </div>
         </Card>
         </div>
@@ -783,15 +715,6 @@ export default function TopicCard({
           </Form>
         </DialogContent>
       </Dialog>
-
-      {/* Flag Dialog */}
-      <FallacyFlagDialog
-        open={showFlagDialog}
-        onOpenChange={setShowFlagDialog}
-        onSubmit={handleFlagSubmit}
-        isPending={flagMutation.isPending}
-        entityType="topic"
-      />
 
       {/* Login Prompt Dialog */}
       <LoginPromptDialog
