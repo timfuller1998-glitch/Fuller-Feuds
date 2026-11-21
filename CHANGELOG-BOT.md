@@ -1,3 +1,11 @@
+## 2026-11-20 (18:27 CST, America/Chicago) — Topic cards get a split Open / Add opinion bar (branch ui/topic-card-action-bar)
+Made by the Fuller Feuds Dev bot (Grok Bot). Timothy wanted the topic card cleaned up: the back had a big red "Open full page" button that the front lacked, and the bottom-right + / flag / view-full controls felt cluttered. He asked to replace that bottom bar with the same red button, split with a button for adding an opinion, and on the back to keep only the stats sitting above the red bar.
+- Front and back now share the same full-width split red bar: "Open full page" goes to the topic page; "Add your opinion" opens the existing composer (and the sign-in prompt for visitors). Both halves are buttons, so a tap acts and does not flip the card. A tap on the rest of the card still flips it. Vertical swipe still scrolls.
+- The small + / flag / arrow control row is gone. Flagging a topic stays on the full topic page (the Flag button was already there).
+- The back keeps the "X opinions / Y participants / Top: Z likes" row above the bar, and no longer repeats the old control row under it.
+- Applies everywhere TopicCard is used (home piles, profile Topics, search, and so on). Ad cards are unchanged. Opinion cards use a different component and were left alone.
+- Typecheck: 50 (ceiling 52).
+
 ## 2026-11-20 (18:05 CST, America/Chicago) — Smoother card swipes and faster home load (branch perf/swipe-and-load)
 Made by the Fuller Feuds Dev bot (Grok Bot). Timothy loved the left-side back swipe (PR #61) but said the cards looked like 10fps instead of a smooth 60+, and that the site loaded slowly. Motion path is unchanged (forward tuck, back swipe around the left, flip-reset, landing stability).
 - **Swipe smoothness:** Deeper/moving cards no longer use CSS `filter: brightness/saturate` (that re-rasterized a new bitmap every frame). They use a cheap static-color overlay instead, which fades out as a card becomes the top card. Political glow `box-shadow` and `backdrop-filter` blur are flattened while a card is dragging or playing the out/in animation. `will-change: transform` is set only while a card is moving. Drag tracking sets a DOM attribute (no React setState on pointermove). Off-screen home piles are not mounted until they are near the viewport, so only the first two sections render at first.
