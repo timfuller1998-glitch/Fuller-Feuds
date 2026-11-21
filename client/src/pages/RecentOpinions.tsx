@@ -212,7 +212,7 @@ export default function RecentOpinionsPage() {
                     key={cat} 
                     variant="secondary" 
                     className="cursor-pointer hover-elevate"
-                    onClick={() => setLocation(`/category/${encodeURIComponent(cat)}`)}
+                    onClick={() => setLocation(`/categories?focus=${encodeURIComponent(cat)}`)}
                     data-testid={`badge-category-${cat.toLowerCase()}`}
                   >
                     {cat}

@@ -315,7 +315,7 @@ export default function AppSidebar({
                 <SidebarMenuButton asChild isActive={location === "/categories"}>
                   <Link href="/categories" onClick={handleLinkClick} data-testid="link-browse-all-categories">
                     <Grid className="w-4 h-4" />
-                    <span>Browse All</span>
+                    <span>Explore Topics</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -338,7 +338,7 @@ export default function AppSidebar({
                           className="flex-shrink-0"
                         />
                         <Link 
-                          href={`/category/${category.title}`} 
+                          href={`/categories?focus=${encodeURIComponent(category.title)}`} 
                           onClick={handleLinkClick}
                           className="flex items-center gap-2 flex-1 min-w-0 hover-elevate active-elevate-2 rounded-md px-2 py-1 -mx-2 -my-1"
                           data-testid={`link-saved-category-${category.title.toLowerCase()}`}
@@ -383,7 +383,7 @@ export default function AppSidebar({
                           <Star className="w-4 h-4" />
                         </Button>
                         <Link 
-                          href={`/category/${category.title}`} 
+                          href={`/categories?focus=${encodeURIComponent(category.title)}`} 
                           onClick={handleLinkClick}
                           className="flex items-center gap-2 flex-1 min-w-0 hover-elevate active-elevate-2 rounded-md px-2 py-1 -mx-2 -my-1"
                           data-testid={`link-recent-category-${category.title.toLowerCase()}`}

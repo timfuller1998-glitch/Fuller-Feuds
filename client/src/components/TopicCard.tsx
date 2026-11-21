@@ -344,7 +344,7 @@ export default function TopicCard({
                   className="bg-background/80 backdrop-blur-sm cursor-pointer hover-elevate"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setLocation(`/category/${encodeURIComponent(category)}`);
+                    setLocation(`/categories?focus=${encodeURIComponent(category)}`);
                   }}
                   data-testid={`badge-category-${category.toLowerCase()}`}
                 >
@@ -517,7 +517,7 @@ export default function TopicCard({
                   className="bg-background/80 backdrop-blur-sm cursor-pointer hover-elevate"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setLocation(`/category/${encodeURIComponent(category)}`);
+                    setLocation(`/categories?focus=${encodeURIComponent(category)}`);
                   }}
                   data-testid={`badge-category-back-${category.toLowerCase()}`}
                 >

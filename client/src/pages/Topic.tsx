@@ -810,7 +810,7 @@ export default function Topic() {
               key={String(cat)} 
               variant="secondary"
               className="cursor-pointer hover-elevate"
-              onClick={() => navigate(`/category/${encodeURIComponent(String(cat))}`)}
+              onClick={() => navigate(`/categories?focus=${encodeURIComponent(String(cat))}`)}
               data-testid={`badge-category-${String(cat).toLowerCase()}`}
             >
               {cat}
