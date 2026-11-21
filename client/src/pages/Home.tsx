@@ -5,261 +5,62 @@ import { Button } from "@/components/ui/button";
 import StackSection from "@/components/StackSection";
 import { useAuth } from "@/hooks/useAuth";
 import type { TopicWithCounts } from "@shared/schema";
-import { HOME_SECTIONS, type HomeSectionKey } from "@shared/homeFeed";
-import { 
+import type { HomeSectionKey } from "@shared/homeFeed";
+import {
   TrendingUp,
-  Radio,
   Flame,
   MessageCircle,
   Grid,
-  Clock,
   Calendar,
   MessageSquare,
   Users,
   Search as SearchIcon,
-  X
+  X,
+  type LucideIcon,
 } from "lucide-react";
-import climateImage from '@assets/generated_images/Climate_change_debate_thumbnail_3b0bbda7.png';
 
-interface SectionData {
-  title: string;
-  icon: any;
-  topics: TopicWithCounts[];
-  totalCount: number;
-  linkPath?: string;
-  type?: 'topics'; // default type
-}
+const PUBLIC_SECTIONS: { title: string; icon: LucideIcon; feed: HomeSectionKey }[] = [
+  { title: "Trending", icon: TrendingUp, feed: "trending" },
+  { title: "Hot Debates", icon: Flame, feed: "hot-debates" },
+  { title: "New This Week", icon: Calendar, feed: "new-this-week" },
+  { title: "Most Debated", icon: MessageSquare, feed: "most-debated" },
+  { title: "Diverse Perspectives", icon: Users, feed: "diverse-perspectives" },
+];
 
-interface OpinionSectionData {
-  title: string;
-  icon: any;
-  opinions: any[];
-  totalCount: number;
-  linkPath?: string;
-  type: 'opinions';
-}
-
-type AnySectionData = SectionData | OpinionSectionData;
-
-/** "Hot Debates" -> "hot-debates" (the /api/feed/home section key). */
-function feedKeyFor(title: string): HomeSectionKey | undefined {
-  const k = title.toLowerCase().replace(/\s+/g, "-");
-  return (HOME_SECTIONS as readonly string[]).includes(k) ? (k as HomeSectionKey) : undefined;
-}
+const USER_SECTIONS: { title: string; icon: LucideIcon; feed: HomeSectionKey }[] = [
+  { title: "My Topics", icon: MessageCircle, feed: "my-topics" },
+  { title: "My Current Debates", icon: MessageCircle, feed: "my-current-debates" },
+];
 
 export default function Home() {
   const { user } = useAuth();
   // Enter in the header search on "/" sets ?filter=... (see SearchBar); the home deck then shows only matches.
   const homeFilter = (new URLSearchParams(useSearch()).get("filter") || "").trim();
 
-  // Fetch all topics
+  // Only fetch the full topic list when the user is actually filtering — the default
+  // home sections load themselves from /api/feed/home and should not wait on this.
   const { data: apiTopics, isLoading: topicsLoading } = useQuery<TopicWithCounts[]>({
     queryKey: ["/api/topics"],
-  });
-
-  // Fetch user's active debate rooms
-  const { data: activeDebateRooms } = useQuery<any[]>({
-    queryKey: ["/api/users/me/debate-rooms"],
-    enabled: !!user,
-  });
-
-  // Fetch recent opinions
-  const { data: recentOpinions, isLoading: opinionsLoading } = useQuery<any[]>({
-    queryKey: ["/api/opinions/recent"],
+    enabled: !!homeFilter,
   });
 
   const topicsSource = Array.isArray(apiTopics) ? apiTopics : [];
-  const recentOpinionsList = Array.isArray(recentOpinions) ? recentOpinions : [];
-  const activeDebateRoomsList = Array.isArray(activeDebateRooms) ? activeDebateRooms : [];
-
-  // Use real API topics with default image fallback
-  const allTopics = topicsSource.map(topic => ({
-    ...topic,
-    imageUrl: topic.imageUrl || climateImage,
-    isActive: topic.isActive || false
-  }));
   const filterTerms = homeFilter.toLowerCase().split(/\s+/).filter(Boolean);
-  const topics = filterTerms.length === 0 ? allTopics : allTopics.filter(t => {
+  const topics = filterTerms.length === 0 ? topicsSource : topicsSource.filter((t) => {
     const hay = [t.title, (t as any).description, ...((t as any).categories || [])].filter(Boolean).join(" ").toLowerCase();
-    return filterTerms.every(term => hay.includes(term));
+    return filterTerms.every((term) => hay.includes(term));
   });
 
-  // Create sections data
-  const sections: AnySectionData[] = [];
+  const sections = homeFilter
+    ? PUBLIC_SECTIONS.length && topics.length
+      ? [{ title: "Search results", icon: SearchIcon, topics, feed: undefined as HomeSectionKey | undefined }]
+      : []
+    : [
+        ...PUBLIC_SECTIONS.map((s) => ({ ...s, topics: undefined as TopicWithCounts[] | undefined })),
+        ...(user ? USER_SECTIONS.map((s) => ({ ...s, topics: undefined as TopicWithCounts[] | undefined })) : []),
+      ];
 
-  // 1. Trending - Most popular by participant count
-  if (topics.length > 0) {
-    const trendingTopics = [...topics]
-      .sort((a, b) => b.participantCount - a.participantCount)
-      .slice(0, 5);
-    sections.push({
-      title: "Trending",
-      icon: TrendingUp,
-      topics: trendingTopics,
-      totalCount: topics.length,
-      linkPath: "/trending"
-    });
-  }
-
-  // 2. Hot Debates - Topics with most recent activity
-  if (topics.length > 0) {
-    // Group opinions by topic to find topics with recent activity
-    const topicActivity = new Map<string, Date>();
-    if (recentOpinionsList.length > 0) {
-      recentOpinionsList.forEach(opinion => {
-        const currentDate = topicActivity.get(opinion.topicId);
-        const opinionDate = new Date(opinion.createdAt || 0);
-        if (!currentDate || opinionDate > currentDate) {
-          topicActivity.set(opinion.topicId, opinionDate);
-        }
-      });
-    }
-
-    const hotTopics = topics
-      .filter(topic => topicActivity.has(topic.id) || topics.length <= 5)
-      .sort((a, b) => {
-        const dateA = topicActivity.get(a.id)?.getTime() || 0;
-        const dateB = topicActivity.get(b.id)?.getTime() || 0;
-        if (dateA !== dateB) {
-          return dateB - dateA;
-        }
-        // Fallback to participant count if no activity
-        return b.participantCount - a.participantCount;
-      })
-      .slice(0, 5);
-
-    if (hotTopics.length > 0 || topics.length > 0) {
-      sections.push({
-        title: "Hot Debates",
-        icon: Flame,
-        topics: hotTopics.length > 0 ? hotTopics : topics.slice(0, 5),
-        totalCount: topicActivity.size || topics.length,
-        linkPath: "/hot-debates"
-      });
-    }
-  }
-
-  // 3. New This Week - Topics created in the last 7 days
-  if (topics.length > 0) {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    
-    const newTopics = topics
-      .filter(topic => {
-        const createdAt = new Date(topic.createdAt || 0);
-        return createdAt >= oneWeekAgo;
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.createdAt || 0).getTime();
-        const dateB = new Date(b.createdAt || 0).getTime();
-        return dateB - dateA;
-      })
-      .slice(0, 5);
-
-    // Show section even if no new topics this week, use newest topics instead
-    const topicsToShow = newTopics.length > 0 
-      ? newTopics 
-      : [...topics].sort((a, b) => {
-          const dateA = new Date(a.createdAt || 0).getTime();
-          const dateB = new Date(b.createdAt || 0).getTime();
-          return dateB - dateA;
-        }).slice(0, 5);
-
-    sections.push({
-      title: "New This Week",
-      icon: Calendar,
-      topics: topicsToShow,
-      totalCount: newTopics.length || topics.length
-    });
-  }
-
-  // 4. Most Debated - Sort by opinionsCount
-  if (topics.length > 0) {
-    const mostDebated = [...topics]
-      .sort((a, b) => (b.opinionsCount || 0) - (a.opinionsCount || 0))
-      .slice(0, 5);
-    sections.push({
-      title: "Most Debated",
-      icon: MessageSquare,
-      topics: mostDebated,
-      totalCount: topics.length
-    });
-  }
-
-  // 5. Diverse Perspectives - Filter by diversityScore
-  if (topics.length > 0) {
-    const diverseTopics = topics
-      .filter(topic => (topic.diversityScore || 0) > 0)
-      .sort((a, b) => (b.diversityScore || 0) - (a.diversityScore || 0))
-      .slice(0, 5);
-
-    // Show section even if no diverse topics, use topics with most participants instead
-    const topicsToShow = diverseTopics.length > 0
-      ? diverseTopics
-      : [...topics].sort((a, b) => b.participantCount - a.participantCount).slice(0, 5);
-
-    sections.push({
-      title: "Diverse Perspectives",
-      icon: Users,
-      topics: topicsToShow,
-      totalCount: diverseTopics.length || topics.length
-    });
-  }
-
-  // 6. My Topics - Topics where user has participated
-  if (user && recentOpinionsList.length > 0 && topics.length > 0) {
-    const myTopicIds = new Set(
-      recentOpinionsList
-        .filter(opinion => opinion.userId === user.id)
-        .map(opinion => opinion.topicId)
-    );
-    const myTopics = topics
-      .filter(topic => myTopicIds.has(topic.id))
-      .slice(0, 5);
-
-    if (myTopics.length > 0) {
-      sections.push({
-        title: "My Topics",
-        icon: MessageCircle,
-        topics: myTopics,
-        totalCount: myTopicIds.size
-      });
-    }
-  }
-
-  // 7. My Current Debates - Active debate rooms as topic previews
-  if (user && activeDebateRoomsList.length > 0 && topics.length > 0) {
-    const debateTopicIds = new Set(activeDebateRoomsList.map(room => room.topicId).filter(Boolean));
-    const debateTopics = topics
-      .filter(topic => debateTopicIds.has(topic.id))
-      .slice(0, 5);
-
-    if (debateTopics.length > 0) {
-      sections.push({
-        title: "My Current Debates",
-        icon: MessageCircle,
-        topics: debateTopics,
-        totalCount: debateTopicIds.size
-      });
-    }
-  }
-
-  // 5. Recent Opinions - Display recent opinions directly
-  if (recentOpinionsList.length > 0) {
-    sections.push({
-      title: "Recent Opinions",
-      icon: Clock,
-      opinions: recentOpinionsList.slice(0, 5),
-      totalCount: recentOpinionsList.length,
-      linkPath: "/recent-opinions",
-      type: 'opinions'
-    });
-  }
-
-  // Show loading only while initial data is loading
-  const isLoading = topicsLoading || opinionsLoading;
-  
-  if (isLoading) {
+  if (homeFilter && topicsLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
@@ -269,11 +70,6 @@ export default function Home() {
       </div>
     );
   }
-
-  // Filter to only topic sections (exclude opinion sections for now)
-  const topicSections: SectionData[] = homeFilter
-    ? (topics.length ? [{ title: "Search results", icon: SearchIcon, topics, totalCount: topics.length }] : [])
-    : sections.filter((s): s is SectionData => s.type !== 'opinions');
 
   return (
     <div className="absolute inset-0 overflow-y-auto overflow-x-hidden snap-y snap-mandatory -webkit-overflow-scrolling-touch">
@@ -286,8 +82,7 @@ export default function Home() {
           </div>
         </div>
       )}
-      {/* Stack Sections */}
-      {homeFilter && topicSections.length === 0 ? (
+      {homeFilter && sections.length === 0 ? (
         <section className="h-full snap-start shrink-0 flex items-center justify-center px-4">
           <Card>
             <CardContent className="py-12 text-center space-y-3" data-testid="empty-home-filter">
@@ -300,7 +95,7 @@ export default function Home() {
             </CardContent>
           </Card>
         </section>
-      ) : topicSections.length === 0 ? (
+      ) : sections.length === 0 ? (
         <section className="h-full snap-start shrink-0 flex items-center justify-center">
           <Card>
             <CardContent className="py-12 text-center">
@@ -313,21 +108,20 @@ export default function Home() {
           </Card>
         </section>
       ) : (
-        topicSections.map((section, index) => (
+        sections.map((section, index) => (
           <StackSection
             key={section.title + homeFilter}
             title={section.title}
             icon={section.icon}
-            sectionKey={section.title.toLowerCase().replace(/\s+/g, '-')}
-            // Home sections are endless, ranked decks (no numbering); search results stay a fixed list.
+            sectionKey={section.title.toLowerCase().replace(/\s+/g, "-")}
             topics={homeFilter ? section.topics : undefined}
-            feedSection={homeFilter ? undefined : feedKeyFor(section.title)}
-            showNextHint={index < topicSections.length - 1}
+            feedSection={homeFilter ? undefined : (section as { feed?: HomeSectionKey }).feed}
+            showNextHint={index < sections.length - 1}
+            eager={index < 2}
           />
         ))
       )}
 
-      {/* Hero Section - Footer */}
       <section className="h-full snap-start shrink-0 flex flex-col items-center justify-center px-4 py-8">
         <div className="text-center space-y-3 sm:space-y-4">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">

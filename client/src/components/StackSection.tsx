@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState, type Ref, type ReactNode } from "react";
 import { ChevronDown, LucideIcon } from "lucide-react";
 import SwipeableCardStack, { type DeckTopic } from "./SwipeableCardStack";
 import type { TopicWithCounts } from "@shared/schema";
@@ -14,15 +15,19 @@ interface StackSectionProps {
   feedSection?: HomeSectionKey;
   /** When true, show a small chevron hint that another section is below. */
   showNextHint?: boolean;
+  /** Mount the deck immediately. Later sections wait until they are near the viewport. */
+  eager?: boolean;
 }
 
 const deckKey = (t: DeckTopic) => (t.deckKey as string) || t.id;
 
-function SectionShell({ title, icon: Icon, sectionKey, count, showNextHint, children }: {
-  title: string; icon: LucideIcon; sectionKey: string; count?: number; showNextHint?: boolean; children: React.ReactNode;
+function SectionShell({ title, icon: Icon, sectionKey, count, showNextHint, children, shellRef }: {
+  title: string; icon: LucideIcon; sectionKey: string; count?: number; showNextHint?: boolean; children: ReactNode;
+  shellRef?: Ref<HTMLElement>;
 }) {
   return (
     <section
+      ref={shellRef as Ref<HTMLElement>}
       className="h-full snap-start shrink-0 flex flex-col items-center px-4"
       data-testid={`section-${sectionKey}`}
     >
@@ -53,8 +58,8 @@ function SectionShell({ title, icon: Icon, sectionKey, count, showNextHint, chil
   );
 }
 
-function EndlessDeck({ feedSection }: { feedSection: HomeSectionKey }) {
-  const { items, total, error, loadMore, onTopChange, endless } = useInfiniteHomeDeck(feedSection);
+function EndlessDeck({ feedSection, enabled = true }: { feedSection: HomeSectionKey; enabled?: boolean }) {
+  const { items, total, error, loadMore, onTopChange, endless } = useInfiniteHomeDeck(feedSection, enabled);
   if (items.length === 0) {
     return (
       <div className="text-center text-muted-foreground" data-testid={`deck-loading-${feedSection}`}>
@@ -74,11 +79,25 @@ function EndlessDeck({ feedSection }: { feedSection: HomeSectionKey }) {
   );
 }
 
-export default function StackSection({ title, icon, sectionKey, topics, feedSection, showNextHint }: StackSectionProps) {
+export default function StackSection({ title, icon, sectionKey, topics, feedSection, showNextHint, eager = false }: StackSectionProps) {
+  const ref = useRef<HTMLElement | null>(null);
+  const [active, setActive] = useState(eager);
+  useEffect(() => {
+    if (active) return;
+    const node = ref.current;
+    if (!node) return;
+    const root = node.parentElement;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setActive(true);
+    }, { root, rootMargin: "80% 0px", threshold: 0 });
+    io.observe(node);
+    return () => io.disconnect();
+  }, [active]);
+
   return (
-    <SectionShell title={title} icon={icon} sectionKey={sectionKey} count={feedSection ? undefined : topics?.length} showNextHint={showNextHint}>
+    <SectionShell shellRef={ref} title={title} icon={icon} sectionKey={sectionKey} count={feedSection ? undefined : topics?.length} showNextHint={showNextHint}>
       {feedSection ? (
-        <EndlessDeck feedSection={feedSection} />
+        active ? <EndlessDeck feedSection={feedSection} enabled={active} /> : <div className="text-muted-foreground text-sm">Loading…</div>
       ) : topics && topics.length > 0 ? (
         <SwipeableCardStack topics={topics} />
       ) : (

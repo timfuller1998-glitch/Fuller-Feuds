@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import * as LucideIcons from "lucide-react";
-import { Trophy, Users } from "lucide-react";
+import { getBadgeIcon } from "@/lib/badgeIcons";
+import { Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserHandle } from "@/components/UserHandle";
 
@@ -40,7 +40,7 @@ export function useUserSearch(q: string, limit = 8) {
 /** One person row: avatar, name, @handle, top badge, followers. The whole row is a profile link. */
 export function PersonRow({ p, compact = false, onNavigate }: { p: PersonResult; compact?: boolean; onNavigate?: () => void }) {
   const name = personName(p);
-  const Icon = p.topBadge ? (LucideIcons as any)[p.topBadge.icon] || Trophy : null;
+  const Icon = p.topBadge ? getBadgeIcon(p.topBadge.icon) : null;
   return (
     <Link
       href={`/profile/${p.id}`}
