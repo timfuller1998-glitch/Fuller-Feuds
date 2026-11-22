@@ -21,7 +21,26 @@ import { registerServiceWorker } from "@/utils/registerSW";
 import { LoginDialog } from "@/components/LoginDialog";
 import Home from "@/pages/Home";
 
-const lazyPage = <T extends { default: ComponentType<any> }>(fn: () => Promise<T>) => lazy(fn);
+// If a deploy replaced the hashed chunk files while this tab was open, the old
+// chunk 404s and the page renders blank. Reload once to pick up the new build.
+const lazyPage = <T extends { default: ComponentType<any> }>(fn: () => Promise<T>) =>
+  lazy(() =>
+    fn()
+      .then((mod) => {
+        try { sessionStorage.removeItem("ff-chunk-reload"); } catch { /* ignore */ }
+        return mod;
+      })
+      .catch((err) => {
+        let reloaded = false;
+        try { reloaded = sessionStorage.getItem("ff-chunk-reload") === "1"; } catch { /* ignore */ }
+        if (!reloaded) {
+          try { sessionStorage.setItem("ff-chunk-reload", "1"); } catch { /* ignore */ }
+          window.location.reload();
+          return new Promise<T>(() => {});
+        }
+        throw err;
+      }),
+  );
 const Profile = lazyPage(() => import("@/pages/Profile"));
 const HandleRedirect = lazyPage(() => import("@/pages/HandleRedirect"));
 const Settings = lazyPage(() => import("@/pages/Settings"));
@@ -164,7 +183,11 @@ function AppWithSidebar({
         </header>
         <FirstRunTutorial user={user} isAuthenticated={isAuthenticated} suppressed={location === "/onboarding"} />
         <FeedbackDialog />
-        <main className={`flex-1 min-h-0 overflow-x-hidden ${location === "/" || location === "/categories" ? "overflow-y-hidden relative p-0" : "overflow-y-auto px-4 pt-5 sm:px-6 sm:pt-7 md:px-8 pb-10"}`}>
+        {/* Always `relative`: Radix renders hidden absolutely-positioned native inputs
+            for checkboxes/radios/selects. Without a positioned main they anchor to an
+            ancestor outside this scroll box and stretch the whole document, so on
+            iPhone a swipe scrolls the page off into blank space (forms look half loaded). */}
+        <main className={`relative flex-1 min-h-0 overflow-x-hidden ${location === "/" || location === "/categories" ? "overflow-y-hidden p-0" : "overflow-y-auto px-4 pt-5 sm:px-6 sm:pt-7 md:px-8 pb-10"}`}>
           <div className={`w-full ${location === "/" || location === "/categories" ? "h-full relative" : "max-w-7xl mx-auto"}`}>
             <Suspense fallback={null}>
               <Router />
