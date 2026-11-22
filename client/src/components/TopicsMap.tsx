@@ -5,10 +5,9 @@ import {
   ROOT_ID,
 } from "@shared/topicTaxonomy";
 import {
-  layoutWorld,
-  measureLayoutBox,
+  CLUSTER_PAD,
+  layoutClusters,
   measurePill,
-  planLabels,
   shortLabel,
   type LayoutItem,
 } from "@shared/topicsMapLayout";
@@ -37,7 +36,7 @@ interface TopicsMapProps {
   className?: string;
 }
 
-const MIN_K = 0.08;
+const MIN_K = 0.02;
 const MAX_K = 10;
 const TAP_PX = 14;
 const FRAME_PAD = 56;
@@ -54,12 +53,45 @@ function lodFromK(k: number, baseK: number): 0 | 1 | 2 | 3 {
   return 3;
 }
 
-/** Lowest zoom in a lod band, used so label hiding is stable during a gesture. */
-function kFloorForLod(lod: number, baseK: number) {
-  if (lod <= 0) return Math.max(baseK, 0.2);
-  if (lod === 1) return 1.35 * baseK;
-  if (lod === 2) return 2.4 * baseK;
-  return 3.8 * baseK;
+/** An umbrella pops open once its children would sit this far out, as a share of the short screen side. */
+const POP_OPEN_FRAC = 0.18;
+/** ...and merges back below this (hysteresis so it doesn't flicker at the edge). */
+const POP_CLOSE_FRAC = 0.13;
+/** Children only pop once they'd render at least this big (so topic text is readable). */
+const READ_SCALE = 0.62;
+/** Zoomed out, pills keep about this on-screen size where they have room (semantic zoom). */
+const LABEL_FLOOR = 0.9;
+const POP_MS = 460;
+const MERGE_MS = 340;
+/** Gentle float: max on-screen drift in px, capped in layout units so pills never meet (pad is 28). */
+const DRIFT_PX = 3.5;
+const DRIFT_MAX_LAYOUT = CLUSTER_PAD * 0.38;
+
+/** Largest boost a merged umbrella can take and still stay inside its own cluster circle. */
+function closedCap(it: LayoutItem) {
+  const self = it.self || 1;
+  return Math.max(1, ((it.cluster || self) - DRIFT_MAX_LAYOUT) / self);
+}
+/** Largest boost an open umbrella can take without touching its popped children. */
+function openCap(it: LayoutItem, childReach: number) {
+  const self = it.self || 1;
+  if (!it.ring) return 1;
+  return Math.max(1, (it.ring - childReach - CLUSTER_PAD / 2 - DRIFT_MAX_LAYOUT) / self);
+}
+
+function easeOutBack(t: number) {
+  const c1 = 1.55;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+function hash01(id: string, salt: number) {
+  let h = 2166136261 ^ salt;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 10000) / 10000;
 }
 
 function easeInOutCubic(t: number) {
@@ -109,28 +141,42 @@ function frameNode(
     if (parent) members.push(parent);
   }
 
-  // Center the tapped pill. Size the zoom so the pill, its children, and
-  // the connecting lines stay in view even though that box is off-center.
-  const cx = focus.x;
-  const cy = focus.y;
-  let halfW = 40;
-  let halfH = 40;
+  // Frame the box around the tapped pill and its children so the popped
+  // branch uses the whole screen and never spills past a narrow phone edge.
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let maxHalfW = 40;
   members.forEach((it) => {
-    const { w, h } = measureLayoutBox(it.node);
-    halfW = Math.max(halfW, Math.abs(it.x - w / 2 - cx), Math.abs(it.x + w / 2 - cx));
-    halfH = Math.max(halfH, Math.abs(it.y - h / 2 - cy), Math.abs(it.y + h / 2 - cy));
+    minX = Math.min(minX, it.x);
+    maxX = Math.max(maxX, it.x);
+    minY = Math.min(minY, it.y);
+    maxY = Math.max(maxY, it.y);
+    maxHalfW = Math.max(maxHalfW, it.w / 2);
   });
-  const fitK = Math.min(
-    viewport.clientWidth / (halfW * 2 + FRAME_PAD * 2),
-    viewport.clientHeight / (halfH * 2 + FRAME_PAD * 2),
+  const vw = viewport.clientWidth;
+  const vh = viewport.clientHeight;
+  // Pill sizes are roughly constant on screen when zoomed out, so pad in screen px.
+  const padX = FRAME_PAD / 2 + maxHalfW * READ_SCALE;
+  const padY = FRAME_PAD / 2 + 26;
+  let fitK = Math.min(
+    Math.max(vw - padX * 2, 80) / Math.max(maxX - minX, 1),
+    Math.max(vh - padY * 2, 80) / Math.max(maxY - minY, 1),
   );
-  // If fitting every child would shrink the focused pill until it is hard to
-  // read, zoom in anyway. Outermost branches can sit just off-screen; the
-  // user can pan, and the connecting lines still show the way.
-  const pill = measurePill(focus.node.name, focus.node.type);
-  const readableK = focus.depth > 0 ? 112 / Math.max(pill.w, 72) : 0;
-  const k = clamp(Math.max(fitK, readableK), MIN_K, MAX_K);
-  return { x: cx, y: cy, k };
+  // Topic leaves can't be boosted, so make sure they're readable when they pop.
+  // On a small screen, zoom in a little past "fit everything" if that's what it
+  // takes for the popped children to be readable (edges can be panned to).
+  const kids = members.filter((m) => m.parentId === focus.id);
+  if (kids.length) {
+    const kidCap = Math.min(...kids.map(closedCap));
+    const readK = READ_SCALE / kidCap;
+    if (readK > fitK) fitK = Math.min(readK, fitK * 1.5);
+  }
+  const leafKids = members.some((m) => m.parentId === focus.id && m.node.type === "topic");
+  const k = clamp(Math.min(fitK, leafKids || focus.node.type === "topic" ? 1.1 : 2), MIN_K, MAX_K);
+  const kk = leafKids ? Math.max(k, READ_SCALE) : k;
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, k: kk };
 }
 
 export default function TopicsMap({
@@ -147,6 +193,16 @@ export default function TopicsMap({
   const baseKRef = useRef(1);
   const layoutRef = useRef<Map<string, LayoutItem>>(new Map());
   const nodeEls = useRef<Map<string, SVGGElement>>(new Map());
+  const linkEls = useRef<Map<string, SVGLineElement>>(new Map());
+  const loopRaf = useRef(0);
+  const lastTick = useRef(0);
+  const presence = useRef<Map<string, number>>(new Map());
+  const boostRef = useRef<Map<string, number>>(new Map());
+  const openSet = useRef<Set<string>>(new Set());
+  const shownRef = useRef<Map<string, string>>(new Map());
+  const focusFrameK = useRef(1);
+  const forcedActive = useRef(true);
+  const userMovedRef = useRef(false);
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinch = useRef<{ dist: number; k: number; lx: number; ly: number } | null>(null);
   const drag = useRef<{ x: number; y: number; cx: number; cy: number; moved: boolean } | null>(null);
@@ -170,23 +226,52 @@ export default function TopicsMap({
   highlightIdRef.current = highlightId;
   pathIdsRef.current = pathIds;
 
-  const items = useMemo(() => layoutWorld(tree), [tree]);
+  const items = useMemo(() => layoutClusters(tree), [tree]);
   layoutRef.current = items;
 
-  const lodKeyRef = useRef("");
+  // Per-node data for semantic zoom + float, computed once per tree.
+  const motion = useMemo(() => {
+    const order = [...items.values()].sort((a, b) => a.depth - b.depth || a.id.localeCompare(b.id));
+    const kids = new Map<string, LayoutItem[]>();
+    items.forEach((it) => {
+      if (!it.parentId) return;
+      const list = kids.get(it.parentId) || [];
+      list.push(it);
+      kids.set(it.parentId, list);
+    });
+    const childDist = new Map<string, number>();
+    kids.forEach((list, id) => {
+      const p = items.get(id);
+      if (!p || !list.length) return;
+      let sum = 0;
+      list.forEach((c) => (sum += Math.hypot(c.x - p.x, c.y - p.y)));
+      childDist.set(id, sum / list.length);
+    });
+    const maxKid = new Map<string, number>();
+    const kidRead = new Map<string, number>();
+    kids.forEach((list, id) => {
+      maxKid.set(id, Math.max(...list.map((c) => c.cluster || c.self || 0)));
+      // Zoom at which the smallest-capacity child would render at READ_SCALE.
+      kidRead.set(id, Math.max(...list.map((c) => READ_SCALE / closedCap(c))));
+    });
+    // Siblings share one boost cap so merged umbrellas stay the same size as each other.
+    const groupCap = new Map<string, number>();
+    kids.forEach((list, id) => groupCap.set(id, Math.min(...list.map(closedCap))));
+    const wob = new Map<string, [number, number, number, number]>();
+    items.forEach((it) => {
+      wob.set(it.id, [
+        0.45 + hash01(it.id, 1) * 0.35,
+        0.38 + hash01(it.id, 2) * 0.35,
+        hash01(it.id, 3) * Math.PI * 2,
+        hash01(it.id, 4) * Math.PI * 2,
+      ]);
+    });
+    return { order, childDist, wob, maxKid, kidRead, groupCap, kids };
+  }, [items]);
+  const motionRef = useRef(motion);
+  motionRef.current = motion;
 
-  const applyLabelLod = (lod: number) => {
-    const plan = planLabels(layoutRef.current, {
-      k: kFloorForLod(lod, baseKRef.current),
-      focusId: focusIdRef.current,
-      highlightId: highlightIdRef.current,
-      pathIds: pathIdsRef.current,
-    });
-    nodeEls.current.forEach((el, id) => {
-      el.classList.toggle("tm-crowded", plan.hidden.has(id));
-      el.classList.toggle("tm-abbrev", plan.abbrev.has(id));
-    });
-  };
+
 
   const applyCamera = () => {
     const { x, y, k } = cam.current;
@@ -198,10 +283,159 @@ export default function TopicsMap({
     el.setAttribute("transform", `translate(${w / 2} ${h / 2}) scale(${k}) translate(${-x} ${-y})`);
     const lod = lodFromK(k, baseKRef.current);
     if (box.getAttribute("data-lod") !== String(lod)) box.setAttribute("data-lod", String(lod));
-    const key = `${lod}|${focusIdRef.current}|${highlightIdRef.current || ""}`;
-    if (lodKeyRef.current !== key) {
-      lodKeyRef.current = key;
-      applyLabelLod(lod);
+    kickLoop();
+  };
+
+  /** Which umbrellas are popped open at the current zoom (with hysteresis). */
+  const updateOpen = () => {
+    const { order, childDist, kidRead } = motionRef.current;
+    const k = cam.current.k;
+    const box = viewportRef.current;
+    const minDim = box ? Math.min(box.clientWidth, box.clientHeight) : 400;
+    const vx = box ? box.clientWidth / 2 / k : Infinity;
+    const vy = box ? box.clientHeight / 2 / k : Infinity;
+    const cx = cam.current.x;
+    const cy = cam.current.y;
+    const fk = focusFrameK.current;
+    forcedActive.current = forcedActive.current ? k >= fk * 0.6 : k >= fk * 0.72;
+    const forced = forcedActive.current ? pathIdsRef.current : null;
+    const open = openSet.current;
+    for (const it of order) {
+      const d = childDist.get(it.id);
+      if (d == null) continue;
+      if (!it.parentId) {
+        open.add(it.id);
+        continue;
+      }
+      if (!open.has(it.parentId)) {
+        open.delete(it.id);
+        continue;
+      }
+      // Pop only umbrellas you are zoomed in on: past the depth's zoom and near the view.
+      const was = open.has(it.id);
+      const margin = was ? 1.5 : 1.05;
+      const near = Math.abs(it.x - cx) < vx * margin && Math.abs(it.y - cy) < vy * margin;
+      const spread = d * k >= minDim * (was ? POP_CLOSE_FRAC : POP_OPEN_FRAC);
+      const readable = k >= (kidRead.get(it.id) || 0) * (was ? 0.85 : 1);
+      const want = (forced && forced.has(it.id)) || (spread && readable && near);
+      if (want) open.add(it.id);
+      else open.delete(it.id);
+    }
+  };
+
+  const setShown = (id: string, el: Element, value: string) => {
+    if (shownRef.current.get(id) === value) return;
+    shownRef.current.set(id, value);
+    (el as SVGElement).style.visibility = value;
+  };
+
+  const kickLoop = () => {
+    if (loopRaf.current || typeof window === "undefined") return;
+    lastTick.current = performance.now();
+    loopRaf.current = requestAnimationFrame(tick);
+  };
+
+  /** One frame of pop/merge + float. Only SVG transforms/attributes; no React state. */
+  const tick = (now: number) => {
+    loopRaf.current = 0;
+    const dt = Math.min(64, Math.max(0, now - lastTick.current));
+    lastTick.current = now;
+    updateOpen();
+    const { order, wob, groupCap, kids } = motionRef.current;
+    const open = openSet.current;
+    const pres = presence.current;
+    const rm = reduceMotion.current;
+    const drift = !rm && !document.hidden;
+    const k = cam.current.k;
+    const amp = drift ? Math.min(DRIFT_PX / k, DRIFT_MAX_LAYOUT) : 0;
+    const t = now / 1000;
+    const box = viewportRef.current;
+    const halfW = box ? (box.clientWidth / 2 + 260) / k : Infinity;
+    const halfH = box ? (box.clientHeight / 2 + 200) / k : Infinity;
+    const rendered = new Map<string, { x: number; y: number }>();
+    const boosts = boostRef.current;
+    const want = LABEL_FLOOR / k;
+    let animating = false;
+
+    for (const it of order) {
+      const el = nodeEls.current.get(it.id);
+      const link = linkEls.current.get(it.id);
+      const target = !it.parentId || open.has(it.parentId) ? 1 : 0;
+      let p = pres.get(it.id) ?? 0;
+      if (p !== target) {
+        if (rm) p = target;
+        else {
+          const step = dt / (target > p ? POP_MS : MERGE_MS);
+          p = target > p ? Math.min(target, p + step) : Math.max(target, p - step);
+        }
+        pres.set(it.id, p);
+        if (p !== target) animating = true;
+      }
+      const parentPos = it.parentId ? rendered.get(it.parentId) || { x: it.x, y: it.y } : { x: it.x, y: it.y };
+      if (p <= 0) {
+        rendered.set(it.id, parentPos);
+        if (el) setShown(it.id, el, "hidden");
+        if (link) setShown(`l:${it.id}`, link, "hidden");
+        continue;
+      }
+      const e = p >= 1 ? 1 : rm ? p : easeOutBack(p);
+      let ax = it.x;
+      let ay = it.y;
+      if (amp && it.parentId) {
+        const w = wob.get(it.id)!;
+        ax += Math.sin(t * w[0] + w[2]) * amp;
+        ay += Math.cos(t * w[1] + w[3]) * amp;
+      }
+      const x = parentPos.x + (ax - parentPos.x) * e;
+      const y = parentPos.y + (ay - parentPos.y) * e;
+      rendered.set(it.id, { x, y });
+      // Skip DOM writes for settled pills far off-screen.
+      const off = p >= 1 && (Math.abs(it.x - cam.current.x) > halfW || Math.abs(it.y - cam.current.y) > halfH);
+      // Semantic zoom: grow pills toward a readable on-screen size when zoomed
+      // out, but never past their own free space (so nothing can overlap).
+      const sib = it.parentId ? groupCap.get(it.parentId) ?? closedCap(it) : closedCap(it);
+      let cap: number;
+      if (open.has(it.id)) {
+        // How far the popped children reach toward this pill: a merged child only
+        // as far as its own (boosted) pill, an open child its whole cluster.
+        const kidCap = Math.min(groupCap.get(it.id) ?? 1, Math.max(1, want));
+        let reach = 0;
+        for (const c of kids.get(it.id) || []) {
+          reach = Math.max(reach, open.has(c.id) ? c.cluster || 0 : (c.self || 0) * kidCap);
+        }
+        cap = Math.min(openCap(it, reach), sib);
+      } else cap = Math.min(closedCap(it), sib);
+      const bTarget = Math.max(1, Math.min(want, cap));
+      let b = boosts.get(it.id) ?? bTarget;
+      if (b !== bTarget) {
+        b = rm ? bTarget : b + (bTarget - b) * Math.min(1, dt / 140);
+        if (Math.abs(b - bTarget) < 0.002) b = bTarget;
+        else animating = true;
+        boosts.set(it.id, b);
+      } else if (!boosts.has(it.id)) boosts.set(it.id, b);
+      if (el) {
+        setShown(it.id, el, "visible");
+        if (!off) {
+          const s = (p >= 1 ? 1 : 0.3 + 0.7 * e) * b;
+          el.setAttribute("transform", s === 1 ? `translate(${x} ${y})` : `translate(${x} ${y}) scale(${s})`);
+          const op = p >= 1 ? "" : String(Math.min(1, p * 1.6));
+          if (el.style.opacity !== op) el.style.opacity = op;
+        }
+      }
+      if (link) {
+        setShown(`l:${it.id}`, link, "visible");
+        if (!off) {
+          link.setAttribute("x1", String(parentPos.x));
+          link.setAttribute("y1", String(parentPos.y));
+          link.setAttribute("x2", String(x));
+          link.setAttribute("y2", String(y));
+          const op = p >= 1 ? "" : String(p);
+          if (link.style.opacity !== op) link.style.opacity = op;
+        }
+      }
+    }
+    if (animating || drift) {
+      if (!document.hidden) loopRaf.current = requestAnimationFrame(tick);
     }
   };
 
@@ -259,6 +493,7 @@ export default function TopicsMap({
     if (v && v.focusId === focusId && Number.isFinite(v.k)) {
       cam.current = { x: v.x, y: v.y, k: clamp(v.k, MIN_K, MAX_K) };
       restoredRef.current = true;
+      userMovedRef.current = true;
       applyCamera();
     }
     // Initial restore only.
@@ -266,9 +501,38 @@ export default function TopicsMap({
   }, []);
 
   useEffect(() => {
+    const onVis = () => {
+      if (!document.hidden) kickLoop();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      if (loopRaf.current) cancelAnimationFrame(loopRaf.current);
+      loopRaf.current = 0;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // New highlight / focus path may force a branch open.
+    kickLoop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathIds, motion]);
+
+  useEffect(() => {
     const box = viewportRef.current;
     if (!box) return;
-    const ro = new ResizeObserver(() => applyCamera());
+    const ro = new ResizeObserver(() => {
+      // Until the user pans or zooms, keep the current focus framed as the
+      // viewport settles (phones often resize right after first paint).
+      if (!userMovedRef.current && layoutRef.current.size && !animRaf.current) {
+        baseKRef.current = frameNode(layoutRef.current, ROOT_ID, box).k;
+        const f = frameNode(layoutRef.current, focusIdRef.current, box);
+        focusFrameK.current = f.k;
+        cam.current = f;
+      }
+      applyCamera();
+    });
     ro.observe(box);
     applyCamera();
     return () => ro.disconnect();
@@ -276,24 +540,30 @@ export default function TopicsMap({
 
   useEffect(() => {
     layoutRef.current = items;
-    lodKeyRef.current = "";
     const box = viewportRef.current;
     if (!box || items.size === 0) return;
     baseKRef.current = frameNode(items, ROOT_ID, box).k;
 
     if (!readyRef.current) {
       readyRef.current = true;
+      const first = frameNode(items, focusId, box);
+      focusFrameK.current = first.k;
+      forcedActive.current = true;
       if (restoredRef.current) {
         restoredRef.current = false;
         applyCamera();
         return;
       }
-      cam.current = frameNode(items, focusId, box);
+      cam.current = first;
       applyCamera();
       return;
     }
 
-    animateCameraTo(frameNode(items, focusId, box));
+    const target = frameNode(items, focusId, box);
+    userMovedRef.current = false;
+    focusFrameK.current = target.k;
+    forcedActive.current = true;
+    animateCameraTo(target);
     return () => cancelAnim();
     // items only changes when the tree itself changes; focusId drives the camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -306,6 +576,7 @@ export default function TopicsMap({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       cancelAnim();
+      userMovedRef.current = true;
       const factor = Math.exp(-e.deltaY * 0.0015);
       zoomAround(e.clientX, e.clientY, cam.current.k * factor);
     };
@@ -337,6 +608,7 @@ export default function TopicsMap({
         const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
         const midX = (pts[0].x + pts[1].x) / 2;
         const midY = (pts[0].y + pts[1].y) / 2;
+        userMovedRef.current = true;
         const nextK = clamp(pinch.current.k * (dist / pinch.current.dist), MIN_K, MAX_K);
         cam.current.k = nextK;
         const boxRect = box.getBoundingClientRect();
@@ -350,6 +622,7 @@ export default function TopicsMap({
         const dy = e.clientY - drag.current.y;
         if (Math.hypot(dx, dy) > TAP_PX) {
           drag.current.moved = true;
+          userMovedRef.current = true;
           pannedRef.current = true;
           cam.current.x = drag.current.cx - dx / cam.current.k;
           cam.current.y = drag.current.cy - dy / cam.current.k;
@@ -451,6 +724,11 @@ export default function TopicsMap({
             {links.map((l) => (
               <line
                 key={l.id}
+                ref={(el) => {
+                  const cid = l.id.slice(l.id.indexOf("->") + 2);
+                  if (el) linkEls.current.set(cid, el);
+                  else linkEls.current.delete(cid);
+                }}
                 className={`tm-link ${l.onPath ? "tm-path" : ""} tm-lod-${Math.max(l.depth, 0)} ${l.forced ? "tm-forced" : ""}`}
                 x1={l.x1}
                 y1={l.y1}

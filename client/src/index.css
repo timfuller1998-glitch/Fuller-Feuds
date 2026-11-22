@@ -738,6 +738,7 @@
   stroke-linecap: round;
   opacity: 0.85;
   pointer-events: none;
+  vector-effect: non-scaling-stroke;
 }
 .topics-map .tm-link.tm-path {
   stroke-width: 2.25;
@@ -804,27 +805,11 @@
   letter-spacing: 0.06em;
   pointer-events: none;
 }
-.topics-map[data-lod="0"] .tm-lod-2,
-.topics-map[data-lod="0"] .tm-lod-3 {
+/* Semantic zoom: pills and branches start hidden; the map's rAF loop pops
+   them in (inline visibility/opacity/transform) when their umbrella opens. */
+.topics-map .tm-node,
+.topics-map .tm-link {
   visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-.topics-map[data-lod="1"] .tm-lod-2 { opacity: 1; }
-.topics-map[data-lod="1"] .tm-lod-3 {
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-.topics-map[data-lod="2"] .tm-lod-2,
-.topics-map[data-lod="2"] .tm-lod-3,
-.topics-map[data-lod="3"] .tm-lod-2,
-.topics-map[data-lod="3"] .tm-lod-3 { opacity: 1; }
-.topics-map .tm-node.tm-forced,
-.topics-map .tm-link.tm-forced {
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto;
 }
 .topics-map .tm-label-short { display: none; }
 .topics-map .tm-node.tm-abbrev .tm-label-full { display: none; }

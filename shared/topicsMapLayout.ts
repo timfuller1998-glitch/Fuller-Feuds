@@ -14,6 +14,12 @@ export interface LayoutItem {
   w: number;
   h: number;
   node: MapTreeNode;
+  /** Cluster layout only: radius of the pill's own bounding circle. */
+  self?: number;
+  /** Cluster layout only: distance from this pill to its children. */
+  ring?: number;
+  /** Cluster layout only: radius of the circle holding this pill and all descendants. */
+  cluster?: number;
 }
 
 export interface LabelPlan {
@@ -360,6 +366,95 @@ export function layoutWorld(tree: MapTreeNode, pad = PILL_PAD): Map<string, Layo
   }
 
   return placeItems(slots, radiusOf);
+}
+
+/** Gap between neighboring cluster circles; leaves room for the gentle float. */
+export const CLUSTER_PAD = 56;
+const CLUSTER_GAP = 0.9; // radians left open toward the parent
+
+function selfRadius(node: MapTreeNode) {
+  const { w, h } = measurePill(node.name, node.type);
+  const below = node.type !== "topic" && node.type !== "root" && node.count > 0 ? 18 : node.type === "topic" && node.alsoIn?.length ? 8 : 0;
+  return Math.hypot(w / 2, h / 2 + below);
+}
+
+/**
+ * Nested-cluster layout for semantic zoom. Each pill's children sit on a
+ * compact ring around it (fanned away from its own parent), and every subtree
+ * fits inside a bounding circle. Sibling circles get disjoint angular sectors,
+ * so no two pills — or two whole subtrees — can overlap at any depth.
+ */
+export function layoutClusters(tree: MapTreeNode, pad = CLUSTER_PAD): Map<string, LayoutItem> {
+  const selfR = new Map<string, number>();
+  const ringR = new Map<string, number>();
+  const clusterR = new Map<string, number>();
+
+  const sectorSum = (cs: number[], R: number) =>
+    cs.reduce((sum, c) => sum + 2 * Math.asin(Math.min(1, (c + pad / 2) / R)), 0);
+
+  const measure = (node: MapTreeNode): number => {
+    const self = selfRadius(node);
+    selfR.set(node.id, self);
+    if (!node.children.length) {
+      clusterR.set(node.id, self);
+      return self;
+    }
+    const cs = node.children.map(measure);
+    const maxC = Math.max(...cs);
+    const arc = node.type === "root" ? Math.PI * 2 : Math.PI * 2 - CLUSTER_GAP;
+    let lo = self + maxC + pad;
+    if (sectorSum(cs, lo) > arc) {
+      let hi = lo * 2;
+      while (sectorSum(cs, hi) > arc) hi *= 2;
+      for (let i = 0; i < 40; i++) {
+        const mid = (lo + hi) / 2;
+        if (sectorSum(cs, mid) > arc) lo = mid;
+        else hi = mid;
+      }
+      lo = hi;
+    }
+    ringR.set(node.id, lo);
+    const c = lo + maxC;
+    clusterR.set(node.id, c);
+    return c;
+  };
+  measure(tree);
+
+  const out = new Map<string, LayoutItem>();
+  const place = (node: MapTreeNode, x: number, y: number, depth: number, angle: number, parentId?: string) => {
+    const box = measureLayoutBox(node);
+    out.set(node.id, {
+      id: node.id,
+      x,
+      y,
+      depth,
+      parentId,
+      angle,
+      radius: Math.hypot(x, y),
+      w: box.w,
+      h: box.h,
+      node,
+      self: selfR.get(node.id),
+      ring: ringR.get(node.id),
+      cluster: clusterR.get(node.id),
+    });
+    if (!node.children.length) return;
+    const R = ringR.get(node.id)!;
+    const widths = node.children.map((c) => 2 * Math.asin(Math.min(1, (clusterR.get(c.id)! + pad / 2) / R)));
+    const total = widths.reduce((a, b) => a + b, 0);
+    const isRoot = !parentId;
+    // Root fills the full circle; others fan out centered on the outward direction.
+    const stretch = isRoot ? (Math.PI * 2) / total : 1;
+    let a = isRoot ? -Math.PI / 2 - (widths[0]! * stretch) / 2 : angle - total / 2;
+    node.children.forEach((child, i) => {
+      const wdt = widths[i]! * stretch;
+      const ca = a + wdt / 2;
+      a += wdt;
+      place(child, x + Math.cos(ca) * R, y + Math.sin(ca) * R, depth + 1, ca, node.id);
+    });
+  };
+  place(tree, 0, 0, 0, -Math.PI / 2);
+  return out;
 }
 
 export interface Overlap {
