@@ -31,17 +31,29 @@ function clampFinite(n: number, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-/** Estimated axis-aligned pill size, slightly generous so letter-spacing stays inside. */
+/** Label font size per pill type (px at zoom 1). Keep in sync with the map's CSS fonts. */
+export function pillFontSize(type: MapTreeNode["type"]): number {
+  if (type === "root") return 15;
+  if (type === "major") return 13;
+  if (type === "sub") return 12;
+  return 12.5;
+}
+
+/**
+ * Estimated axis-aligned pill size, slightly generous so text stays inside.
+ * Fonts match the site: Anton for the hub, Playfair Display (bold) for
+ * categories, Source Serif 4 for topics.
+ */
 export function measurePill(name: string, type: MapTreeNode["type"]): { w: number; h: number } {
+  const fs = pillFontSize(type);
   if (type === "topic") {
-    const w = Math.min(300, Math.max(80, name.length * 8.2 + 28));
+    const w = Math.min(280, Math.max(80, name.length * fs * 0.54 + 30));
     return { w, h: 30 };
   }
   if (type === "root") {
-    return { w: Math.max(160, name.length * 9.4 + 40), h: 42 };
+    return { w: Math.max(150, name.length * fs * 0.56 + 44), h: 42 };
   }
-  // Uppercase + letter-spacing is wider than a typical UI font metric.
-  const w = Math.min(260, Math.max(96, name.length * 10.2 + 40));
+  const w = Math.min(240, Math.max(84, name.length * fs * 0.6 + 36));
   return { w, h: type === "major" ? 36 : 30 };
 }
 

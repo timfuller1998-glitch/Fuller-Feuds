@@ -8,6 +8,7 @@ import {
   CLUSTER_PAD,
   layoutClusters,
   measurePill,
+  pillFontSize,
   shortLabel,
   type LayoutItem,
 } from "@shared/topicsMapLayout";
@@ -193,7 +194,8 @@ export default function TopicsMap({
   const baseKRef = useRef(1);
   const layoutRef = useRef<Map<string, LayoutItem>>(new Map());
   const nodeEls = useRef<Map<string, SVGGElement>>(new Map());
-  const linkEls = useRef<Map<string, SVGLineElement>>(new Map());
+  const linkEls = useRef<Map<string, SVGPathElement>>(new Map());
+  const linkDir = useRef<Map<string, string>>(new Map());
   const loopRaf = useRef(0);
   const lastTick = useRef(0);
   const presence = useRef<Map<string, number>>(new Map());
@@ -335,6 +337,57 @@ export default function TopicsMap({
     loopRaf.current = requestAnimationFrame(tick);
   };
 
+  /**
+   * Organic branch: a tapered, gently bent cubic from parent to child, drawn as
+   * one filled path (thick at the parent, fine at the child) with a gradient
+   * that fades toward the child. Widths are in screen px so zoom doesn't fatten it.
+   */
+  const writeBranch = (
+    el: SVGPathElement,
+    id: string,
+    px: number,
+    py: number,
+    cx: number,
+    cy: number,
+    k: number,
+    t: number,
+    sway: boolean,
+    onPath: boolean,
+  ) => {
+    const dx = cx - px;
+    const dy = cy - py;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const nx = -uy;
+    const ny = ux;
+    const w = motionRef.current.wob.get(id);
+    const side = w && w[2] > Math.PI ? 1 : -1;
+    const bendBase = 0.1 + (w ? (w[3] / (Math.PI * 2)) * 0.08 : 0);
+    const bend = len * (bendBase + (sway && w ? Math.sin(t * w[1] * 0.7 + w[2]) * 0.025 : 0)) * side;
+    const c1x = px + dx * 0.33 + nx * bend;
+    const c1y = py + dy * 0.33 + ny * bend;
+    const c2x = px + dx * 0.68 + nx * bend * 0.55;
+    const c2y = py + dy * 0.68 + ny * bend * 0.55;
+    const s = 1 / k;
+    const w0 = (onPath ? 2.2 : 1.3) * s;
+    const w1 = (onPath ? 1.5 : 0.85) * s;
+    const w2 = (onPath ? 0.95 : 0.55) * s;
+    const w3 = (onPath ? 0.5 : 0.3) * s;
+    const f = (n: number) => n.toFixed(1);
+    el.setAttribute(
+      "d",
+      `M${f(px + nx * w0)} ${f(py + ny * w0)}C${f(c1x + nx * w1)} ${f(c1y + ny * w1)} ${f(c2x + nx * w2)} ${f(c2y + ny * w2)} ${f(cx + nx * w3)} ${f(cy + ny * w3)}` +
+        `L${f(cx - nx * w3)} ${f(cy - ny * w3)}C${f(c2x - nx * w2)} ${f(c2y - ny * w2)} ${f(c1x - nx * w1)} ${f(c1y - ny * w1)} ${f(px - nx * w0)} ${f(py - ny * w0)}Z`,
+    );
+    // Pick the gradient that runs parent → child along the dominant axis.
+    const dir = Math.abs(ux) >= Math.abs(uy) ? (ux >= 0 ? "r" : "l") : uy >= 0 ? "d" : "u";
+    if (linkDir.current.get(id) !== dir) {
+      linkDir.current.set(id, dir);
+      el.setAttribute("fill", `url(#tm-g-${dir})`);
+    }
+  };
+
   /** One frame of pop/merge + float. Only SVG transforms/attributes; no React state. */
   const tick = (now: number) => {
     loopRaf.current = 0;
@@ -425,10 +478,7 @@ export default function TopicsMap({
       if (link) {
         setShown(`l:${it.id}`, link, "visible");
         if (!off) {
-          link.setAttribute("x1", String(parentPos.x));
-          link.setAttribute("y1", String(parentPos.y));
-          link.setAttribute("x2", String(x));
-          link.setAttribute("y2", String(y));
+          writeBranch(link, it.id, parentPos.x, parentPos.y, x, y, k, t, drift, pathIdsRef.current.has(it.id) && pathIdsRef.current.has(it.parentId!));
           const op = p >= 1 ? "" : String(p);
           if (link.style.opacity !== op) link.style.opacity = op;
         }
@@ -719,21 +769,33 @@ export default function TopicsMap({
       data-testid="topics-map"
     >
       <svg role="img" aria-label="Explore Topics map">
+        <defs>
+          {(
+            [
+              ["r", 0, 0, 1, 0],
+              ["l", 1, 0, 0, 0],
+              ["d", 0, 0, 0, 1],
+              ["u", 0, 1, 0, 0],
+            ] as const
+          ).map(([d, x1, y1, x2, y2]) => (
+            <linearGradient key={d} id={`tm-g-${d}`} x1={x1} y1={y1} x2={x2} y2={y2}>
+              <stop offset="0" className="tm-stop-a" />
+              <stop offset="1" className="tm-stop-b" />
+            </linearGradient>
+          ))}
+        </defs>
         <g ref={cameraRef} data-testid="topics-map-camera">
           <g data-links>
             {links.map((l) => (
-              <line
+              <path
                 key={l.id}
                 ref={(el) => {
                   const cid = l.id.slice(l.id.indexOf("->") + 2);
                   if (el) linkEls.current.set(cid, el);
                   else linkEls.current.delete(cid);
                 }}
-                className={`tm-link ${l.onPath ? "tm-path" : ""} tm-lod-${Math.max(l.depth, 0)} ${l.forced ? "tm-forced" : ""}`}
-                x1={l.x1}
-                y1={l.y1}
-                x2={l.x2}
-                y2={l.y2}
+                className="tm-link"
+                fill="url(#tm-g-r)"
               />
             ))}
           </g>
@@ -745,7 +807,7 @@ export default function TopicsMap({
               const isChildOfFocus = item.parentId === focusId;
               const isHighlight = Boolean(highlightId && (node.id === highlightId || node.topicId === highlightId));
               const lodClass = item.depth <= 1 ? "tm-lod-1" : item.depth === 2 ? "tm-lod-2" : "tm-lod-3";
-              const fontSize = node.type === "topic" ? 12 : node.type === "root" ? 12 : node.type === "major" ? 11 : 10;
+              const fontSize = pillFontSize(node.type);
               return (
                 <g
                   key={node.id}
