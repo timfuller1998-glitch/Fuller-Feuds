@@ -1,3 +1,9 @@
+## 2026-11-22 (03:47 CST, America/Chicago) — Profile political compass actually analyzed (branch fix/profile-compass)
+Made by the Fuller Feuds Dev bot (Grok Bot). Follow-up to the AI fix: the profile compass map stayed in the center because the per-user compass analysis was never implemented (a TODO stub that only logged).
+- `analyzeUserPoliticalCompass` now analyzes the user's last 50 opinions with the configured model and saves economic and authoritarian scores, confidence, quadrant, and `last_analyzed_at`. If the AI call falls back, nothing is saved. It still runs every 5th opinion, and the startup repair also analyzes profiles that were never analyzed (up to 25 per run, only when OpenAI is working).
+- Data: 14 opinions with placeholder 0/0 political scores from failed calls were cleared and rescored by the scoring job with gpt-6-luna. All 6 topic summaries were regenerated with real AI text, and their compass/tint distributions were filled in.
+- Typecheck: 50 (ceiling 52). Shared tests: 23 pass. Build OK.
+
 ## 2026-11-22 (03:27 CST, America/Chicago) — AI features back: current OpenAI model, no silent fallbacks, self-healing backfill (branch fix/openai-model-and-ai-backfill)
 Made by the Fuller Feuds Dev bot (Grok Bot). Timothy added OpenAI credits but still saw no summaries, compass map, or opinion tint.
 - Root cause 1, credits: OpenAI returned 429 `insufficient_quota` ("You have no credits remaining"), last seen at 8:00 PM CT on Nov 21. Each failure was caught and replaced with a placeholder. Summaries became the vote-count text ("Based on N opinion(s)… 0% support…"), the nightly job still logged "Refreshed", and 14 of 15 opinions were saved with fake neutral 0/0 political scores, which also drive the tint. Because they looked scored, the 5-minute scoring job and the admin "Analyze Opinions" button never retried them.

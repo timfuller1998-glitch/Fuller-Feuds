@@ -152,6 +152,19 @@ export async function repairFallbackSummaries(maxTopics = 40): Promise<{ regener
       log(`[AI Summary] Repair failed for ${row.topicId}: ${error}`);
     }
   }
+  // Profile compasses that were never analyzed (the analysis used to be a stub).
+  let profiles = 0;
+  if (health.ok) {
+    const never: any = await db.execute(sql`
+      SELECT p.user_id FROM user_profiles p
+      WHERE p.last_analyzed_at IS NULL
+        AND EXISTS (SELECT 1 FROM opinions o WHERE o.user_id = p.user_id AND o.status IN ('approved','pending'))
+      LIMIT 25`);
+    for (const r of (never.rows ?? never)) {
+      if (await opinionService.analyzeUserPoliticalCompass(r.user_id)) profiles++;
+    }
+  }
+  log(`[CRON] Profile compass backfill: ${profiles} analyzed`);
   log(`[CRON] Summary repair: ${regenerated} regenerated, ${failed} failed, ${distributions} distributions filled (AI ${health.ok ? 'ok' : 'unavailable: ' + health.error})`);
   return { regenerated, failed, distributions };
 }
