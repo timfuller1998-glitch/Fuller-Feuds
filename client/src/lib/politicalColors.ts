@@ -32,11 +32,9 @@ export function get2DPoliticalCompassColor(economicScore: number, authoritarianS
   const distanceFromCenter = Math.sqrt(x * x + y * y);
   const intensity = Math.min(distanceFromCenter, 1); // 0 to 1
   
-  // Base colors for each quadrant (Hue, Saturation, Lightness)
-  // Red (authoritarian capitalist): H=0, x > 0, y > 0
-  // Blue (authoritarian socialist): H=220, x < 0, y > 0
-  // Yellow (libertarian capitalist): H=50, x > 0, y < 0
-  // Green (libertarian socialist): H=140, x < 0, y < 0
+  // Standard Political Compass layout and colours (x: Left -100 → Right +100, y: Libertarian -100 → Authoritarian +100):
+  // Auth-Left (top left) red H=0, Auth-Right (top right) blue H=220,
+  // Lib-Left (bottom left) green H=140, Lib-Right (bottom right) yellow H=50
   
   let hue: number;
   let saturation: number;
@@ -46,22 +44,22 @@ export function get2DPoliticalCompassColor(economicScore: number, authoritarianS
   // Tie-breaking: 0 on either axis is treated as the positive side (capitalist/authoritarian)
   // This matches the backend quadrant classification logic
   if (x >= 0 && y >= 0) {
-    // Authoritarian Capitalist (Red) - top right
-    hue = 0;
-    saturation = 35 + (intensity * 15); // 35-50% - softer saturation
-    lightness = 75; // Higher lightness for softer colors
-  } else if (x < 0 && y >= 0) {
-    // Authoritarian Socialist (Blue) - top left
+    // Authoritarian Right (Blue) - top right
     hue = 220;
     saturation = 35 + (intensity * 15); // 35-50% - softer saturation
     lightness = 75; // Higher lightness for softer colors
+  } else if (x < 0 && y >= 0) {
+    // Authoritarian Left (Red) - top left
+    hue = 0;
+    saturation = 35 + (intensity * 15); // 35-50% - softer saturation
+    lightness = 75; // Higher lightness for softer colors
   } else if (x >= 0 && y < 0) {
-    // Libertarian Capitalist (Yellow) - bottom right
+    // Libertarian Right (Yellow) - bottom right
     hue = 50;
     saturation = 35 + (intensity * 15); // 35-50% - softer saturation
     lightness = 75; // Higher lightness for softer colors
   } else {
-    // Libertarian Socialist (Green) - bottom left
+    // Libertarian Left (Green) - bottom left
     hue = 140;
     saturation = 35 + (intensity * 15); // 35-50% - softer saturation
     lightness = 75; // Higher lightness for softer colors
@@ -128,8 +126,8 @@ export function getOpinionGradientStyle(
  * based on the distribution of opinions across political quadrants
  */
 export function getTopicCornerGradient(distribution: {
-  authoritarianCapitalist: number;  // % of opinions (Red) - top-right corner
-  authoritarianSocialist: number;   // % of opinions (Blue) - top-left corner
+  authoritarianCapitalist: number;  // % of opinions (Blue, Auth-Right) - top-right corner
+  authoritarianSocialist: number;   // % of opinions (Red, Auth-Left) - top-left corner
   libertarianCapitalist: number;    // % of opinions (Yellow) - bottom-right corner
   libertarianSocialist: number;     // % of opinions (Green) - bottom-left corner
 }): React.CSSProperties {
@@ -138,8 +136,8 @@ export function getTopicCornerGradient(distribution: {
   const toOpacity = (percent: number) => ((percent / 100) * 0.4).toFixed(2);
 
   // Softer color variants with higher lightness
-  const topLeft = `rgba(100, 150, 255, ${toOpacity(distribution.authoritarianSocialist)})`;      // Soft Blue
-  const topRight = `rgba(255, 120, 130, ${toOpacity(distribution.authoritarianCapitalist)})`;     // Soft Red
+  const topLeft = `rgba(255, 120, 130, ${toOpacity(distribution.authoritarianSocialist)})`;      // Soft Red (Auth-Left)
+  const topRight = `rgba(100, 150, 255, ${toOpacity(distribution.authoritarianCapitalist)})`;    // Soft Blue (Auth-Right)
   const bottomLeft = `rgba(100, 200, 150, ${toOpacity(distribution.libertarianSocialist)})`;      // Soft Green
   const bottomRight = `rgba(255, 220, 100, ${toOpacity(distribution.libertarianCapitalist)})`;    // Soft Yellow
 
@@ -163,8 +161,8 @@ export function getTopicCornerGradient(distribution: {
  * Glow emanates from corners outward based on political distribution
  */
 export function getTopicCornerGlow(distribution: {
-  authoritarianCapitalist: number;  // % of opinions (Red) - top-right corner
-  authoritarianSocialist: number;   // % of opinions (Blue) - top-left corner
+  authoritarianCapitalist: number;  // % of opinions (Blue, Auth-Right) - top-right corner
+  authoritarianSocialist: number;   // % of opinions (Red, Auth-Left) - top-left corner
   libertarianCapitalist: number;    // % of opinions (Yellow) - bottom-right corner
   libertarianSocialist: number;     // % of opinions (Green) - bottom-left corner
 }): React.CSSProperties {
@@ -172,8 +170,8 @@ export function getTopicCornerGlow(distribution: {
   const toIntensity = (percent: number) => Math.max(0, Math.min(1, percent / 100));
   
   // Base colors for each quadrant (RGB values)
-  const topLeftColor = { r: 100, g: 150, b: 255 };      // Soft Blue
-  const topRightColor = { r: 255, g: 120, b: 130 };     // Soft Red
+  const topLeftColor = { r: 255, g: 120, b: 130 };     // Soft Red (Auth-Left)
+  const topRightColor = { r: 100, g: 150, b: 255 };    // Soft Blue (Auth-Right)
   const bottomLeftColor = { r: 100, g: 200, b: 150 };  // Soft Green
   const bottomRightColor = { r: 255, g: 220, b: 100 };  // Soft Yellow
 
@@ -189,13 +187,13 @@ export function getTopicCornerGlow(distribution: {
   // Build box-shadow for each corner positioned outward
   const shadows: string[] = [];
   
-  // Top-left (Blue) - Authoritarian Socialist
+  // Top-left (Red) - Authoritarian Left
   const tlIntensity = toIntensity(distribution.authoritarianSocialist);
   if (tlIntensity > 0) {
     shadows.push(getGlowShadow(tlIntensity, topLeftColor, -20, -20));
   }
 
-  // Top-right (Red) - Authoritarian Capitalist
+  // Top-right (Blue) - Authoritarian Right
   const trIntensity = toIntensity(distribution.authoritarianCapitalist);
   if (trIntensity > 0) {
     shadows.push(getGlowShadow(trIntensity, topRightColor, 20, -20));

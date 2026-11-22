@@ -534,7 +534,7 @@ ECONOMIC AXIS (-100 to +100):
 +21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
 +51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
 
-NOTE: -100 = Socialist, +100 = Capitalist
+NOTE: -100 = economic Left (Socialist), +100 = economic Right (Capitalist). This matches the standard Political Compass: Left on the left, Right on the right.
 
 AUTHORITARIAN AXIS (-100 to +100):
 -100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
@@ -701,7 +701,7 @@ ECONOMIC AXIS (-100 to +100):
 +21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
 +51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
 
-NOTE: -100 = Socialist, +100 = Capitalist
+NOTE: -100 = economic Left (Socialist), +100 = economic Right (Capitalist). This matches the standard Political Compass: Left on the left, Right on the right.
 
 AUTHORITARIAN AXIS (-100 to +100):
 -100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
@@ -821,7 +821,7 @@ ECONOMIC AXIS (-100 to +100):
 +21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
 +51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
 
-NOTE: -100 = Socialist, +100 = Capitalist
+NOTE: -100 = economic Left (Socialist), +100 = economic Right (Capitalist). This matches the standard Political Compass: Left on the left, Right on the right.
 
 AUTHORITARIAN AXIS (-100 to +100):
 -100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)

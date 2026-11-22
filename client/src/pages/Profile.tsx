@@ -34,7 +34,13 @@ import {
   Settings,
   Search,
   Swords,
+  Trash2,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function asList(data: any): any[] {
   if (Array.isArray(data)) return data;
@@ -289,6 +295,26 @@ export default function Profile() {
     },
   });
 
+  const { toast } = useToast();
+  const [deleteOpinionId, setDeleteOpinionId] = useState<string | null>(null);
+  const deleteOpinionMutation = useMutation({
+    mutationFn: async (opinionId: string) => {
+      const res = await apiRequest("DELETE", `/api/opinions/${opinionId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      setDeleteOpinionId(null);
+      setOpinionIndex(0);
+      queryClient.invalidateQueries({ queryKey: ["/api/profile", userId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
+      toast({ title: "Opinion deleted" });
+    },
+    onError: (error: any) => {
+      setDeleteOpinionId(null);
+      toast({ title: "Couldn't delete opinion", description: error?.message || "Please try again.", variant: "destructive" });
+    },
+  });
+
   const voteMutation = useMutation({
     mutationFn: ({
       opinionId,
@@ -325,12 +351,13 @@ export default function Profile() {
     new Date(dateString).toLocaleDateString("en-US", { year: "numeric", month: "long" });
 
   const get2DPoliticalDescription = (economicScore: number, authoritarianScore: number) => {
+    // Standard Political Compass: negative economic score = Left, positive = Right.
     let economicLabel = "";
     const absEconomic = Math.abs(economicScore);
-    if (absEconomic >= 85) economicLabel = economicScore < 0 ? "extreme capitalist" : "extreme socialist";
-    else if (absEconomic >= 60) economicLabel = economicScore < 0 ? "very capitalist" : "very socialist";
-    else if (absEconomic >= 30) economicLabel = economicScore < 0 ? "capitalist" : "socialist";
-    else if (absEconomic >= 15) economicLabel = economicScore < 0 ? "moderate capitalist" : "moderate socialist";
+    if (absEconomic >= 85) economicLabel = economicScore < 0 ? "extreme left" : "extreme right";
+    else if (absEconomic >= 60) economicLabel = economicScore < 0 ? "very left" : "very right";
+    else if (absEconomic >= 30) economicLabel = economicScore < 0 ? "left" : "right";
+    else if (absEconomic >= 15) economicLabel = economicScore < 0 ? "moderate left" : "moderate right";
     else economicLabel = "economically centrist";
 
     let authoritarianLabel = "";
@@ -850,15 +877,47 @@ export default function Profile() {
                   )}
                 />
                 {opinions[opinionIndex] && (
-                  <div className="flex justify-center">
+                  <div className="flex justify-center gap-2">
                     <Link href={`/topic/${opinions[opinionIndex].topicId}`}>
                       <Button variant="outline" size="sm" data-testid="button-open-opinion-topic">
                         Open debate
                         <ChevronRight className="w-4 h-4 ml-1" />
                       </Button>
                     </Link>
+                    {isOwnProfile && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeleteOpinionId(opinions[opinionIndex].id)}
+                        data-testid="button-delete-profile-opinion"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete
+                      </Button>
+                    )}
                   </div>
                 )}
+                <AlertDialog open={!!deleteOpinionId} onOpenChange={(open) => { if (!open) setDeleteOpinionId(null); }}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this opinion?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This permanently removes the opinion, along with its votes, flags and counterpoints. This can't be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-testid="button-cancel-delete-profile-opinion">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteOpinionId && deleteOpinionMutation.mutate(deleteOpinionId)}
+                        disabled={deleteOpinionMutation.isPending}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        data-testid="button-confirm-delete-profile-opinion"
+                      >
+                        {deleteOpinionMutation.isPending ? "Deleting..." : "Delete"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </>
             ) : (
               <Card className="p-8 text-center">

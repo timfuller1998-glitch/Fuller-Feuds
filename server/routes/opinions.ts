@@ -380,6 +380,26 @@ router.delete('/admin/:opinionId', requireAdmin, async (req, res) => {
   }
 });
 
+// DELETE /api/opinions/:opinionId - the author (or an admin) deletes an opinion.
+// Votes, flags, AI flags and counterpoints go with it (ON DELETE CASCADE).
+router.delete('/:opinionId', isAuthenticated, async (req, res) => {
+  try {
+    const requestingUserId = (req.user as Express.User)?.id;
+    if (!requestingUserId) return res.status(401).json({ error: 'User not authenticated' });
+    await opinionService.deleteOpinion(req.params.opinionId, requestingUserId, req.userRole, req);
+    res.json({ message: 'Opinion deleted' });
+  } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
+    if (error instanceof Error && /not found/i.test(error.message)) {
+      return res.status(404).json({ error: 'Opinion not found' });
+    }
+    console.error('Error deleting opinion:', error);
+    res.status(500).json({ message: 'Failed to delete opinion' });
+  }
+});
+
 // GET /api/opinions/:opinionId/counterpoints/counts - Counterpoint counts per paragraph index
 router.get('/:opinionId/counterpoints/counts', async (req, res) => {
   try {

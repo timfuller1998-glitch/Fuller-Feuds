@@ -205,7 +205,9 @@ router.get('/:id', async (req, res) => {
       req
     );
 
-    if (!topic) {
+    // Deleted topics (admin delete sets status 'hidden') are not found, except for moderators/admins.
+    const isStaff = requestingUserRole === 'admin' || requestingUserRole === 'moderator';
+    if (!topic || ((topic as any).status === 'hidden' && !isStaff)) {
       return res.status(404).json({ error: 'Topic not found' });
     }
 
