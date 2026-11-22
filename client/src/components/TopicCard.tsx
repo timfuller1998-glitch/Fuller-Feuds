@@ -1,34 +1,16 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sparkles, Activity, Loader2, Heart, Skull, Flame, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
 import { getTopicCornerGlow } from "@/lib/politicalColors";
-import { insertOpinionSchema, type Opinion } from "@shared/schema";
+import { type Opinion } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoginPromptDialog } from "@/components/LoginPromptDialog";
-import { OpinionStructure, BareOpinionTip, useBareOpinionGuard } from "@/components/OpinionStructure";
+import { OpinionComposerDialog } from "@/components/OpinionComposerDialog";
 import { CARD_GESTURE_LOCK_PX, cardGestureJustHappened, markCardGesture } from "@/lib/cardGesture";
-
-const opinionFormSchema = insertOpinionSchema.omit({
-  topicId: true,
-  userId: true,
-}).extend({
-  content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
-  debateStatus: z.enum(["open", "closed", "private"], { required_error: "Please select debate availability" }),
-  references: z.array(z.string().url("Must be a valid URL")).optional().default([]),
-});
 
 interface TopicCardProps {
   id: string;
@@ -82,7 +64,6 @@ export default function TopicCard({
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
-  const { toast } = useToast();
   const [isFlipped, setIsFlipped] = useState(false);
   const [skipFlipTransition, setSkipFlipTransition] = useState(false);
   const [showOpinionForm, setShowOpinionForm] = useState(false);
@@ -114,57 +95,29 @@ export default function TopicCard({
     enabled: isFlipped && !!id,
   });
 
-  // Fetch top-rated opinions for preview
-  const { data: topOpinions } = useQuery<Opinion[]>({
-    queryKey: ["/api/topics", id, "opinions", "preview"],
+  // All opinions on this topic (one request per card, as before). Same query key as the
+  // topic page, so the cache is shared and saving an opinion refreshes both.
+  const { data: allOpinions } = useQuery<Opinion[]>({
+    queryKey: ["/api/topics", id, "opinions"],
     queryFn: async () => {
       const response = await fetch(`/api/topics/${id}/opinions`);
       if (!response.ok) {
         if (response.status === 404) return [];
         throw new Error("Failed to fetch opinions");
       }
-      const opinions = await response.json();
-      // Sort by likesCount and take top 3
-      return opinions
-        .sort((a: Opinion, b: Opinion) => (b.likesCount || 0) - (a.likesCount || 0))
-        .slice(0, 3);
+      return response.json();
     },
     enabled: !!id && isActive,
   });
-
-  // Opinion form
-  const opinionForm = useForm<z.infer<typeof opinionFormSchema>>({
-    resolver: zodResolver(opinionFormSchema),
-    defaultValues: {
-      content: "",
-      debateStatus: "open",
-      references: [],
-    },
-  });
-
-  // Create opinion mutation
-  const createOpinionMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof opinionFormSchema>) => {
-      return apiRequest('POST', `/api/topics/${id}/opinions`, data);
-    },
-    onSuccess: () => {
-      toast({
-        title: "Opinion shared",
-        description: "Your opinion has been successfully posted.",
-      });
-      opinionForm.reset();
-      setShowOpinionForm(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to share opinion",
-        variant: "destructive",
-      });
-    },
-  });
+  // Top 3 by likes for the preview carousel.
+  const topOpinions = useMemo(
+    () => allOpinions
+      ? [...allOpinions].sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0)).slice(0, 3)
+      : undefined,
+    [allOpinions],
+  );
+  // The signed-in user's own opinion here, if any (same rule as the topic page).
+  const myOpinion = isAuthenticated && user?.id ? allOpinions?.find((o) => o.userId === user.id) ?? null : null;
 
   const handleFlip = (e: React.MouseEvent) => {
     // Only flip if clicking on the main content area, not on interactive buttons/links.
@@ -257,13 +210,6 @@ export default function TopicCard({
     }
   };
 
-  const opinionContent = opinionForm.watch("content");
-  const bareOpinion = useBareOpinionGuard(opinionContent ?? "");
-
-  const onSubmitOpinion = (data: z.infer<typeof opinionFormSchema>) => {
-    bareOpinion.guard(() => createOpinionMutation.mutate(data));
-  };
-
   // Same split red bar on the front and back: open the topic, or add an opinion.
   const CardActionBar = () => (
     <div className="flex w-full flex-shrink-0 overflow-hidden rounded-md">
@@ -282,7 +228,7 @@ export default function TopicCard({
         onClick={handleAddOpinion}
         data-testid={`button-add-opinion-${id}`}
       >
-        Add your opinion
+        {myOpinion ? "Update opinion" : "Add your opinion"}
       </Button>
     </div>
   );
@@ -631,90 +577,13 @@ export default function TopicCard({
       </div>
 
       {/* Opinion Creation Dialog */}
-      <Dialog open={showOpinionForm} onOpenChange={setShowOpinionForm}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Share Your Opinion</DialogTitle>
-            <DialogDescription>
-              Share your thoughts on this topic.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...opinionForm}>
-            <form onSubmit={opinionForm.handleSubmit(onSubmitOpinion)} className="space-y-4">
-              <FormField
-                control={opinionForm.control}
-                name="debateStatus"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Debate Availability</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-debate-status">
-                          <SelectValue placeholder="Select debate availability" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="open" data-testid="option-debate-open">
-                          Open for Debate - Others can challenge this opinion
-                        </SelectItem>
-                        <SelectItem value="closed" data-testid="option-debate-closed">
-                          Not Debatable - Opinion is public but read-only
-                        </SelectItem>
-                        <SelectItem value="private" data-testid="option-debate-private">
-                          Private - Only visible to you
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={opinionForm.control}
-                name="content"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Opinion</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Share your thoughts on this topic..."
-                        className="min-h-[200px]"
-                        {...field}
-                        data-testid="textarea-opinion-content"
-                      />
-                    </FormControl>
-                    <OpinionStructure text={field.value ?? ""} topicTitle={title} />
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <BareOpinionTip
-                open={bareOpinion.showTip}
-                onKeepWriting={bareOpinion.keepWriting}
-                onPostAnyway={bareOpinion.postAnyway}
-              />
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowOpinionForm(false)}
-                  disabled={createOpinionMutation.isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createOpinionMutation.isPending}
-                  data-testid="button-submit-opinion"
-                >
-                  {createOpinionMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {createOpinionMutation.isPending ? 'Sharing...' : 'Share Opinion'}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <OpinionComposerDialog
+        open={showOpinionForm}
+        onOpenChange={setShowOpinionForm}
+        topicId={id}
+        topicTitle={title}
+        existingOpinion={myOpinion}
+      />
 
       {/* Login Prompt Dialog */}
       <LoginPromptDialog

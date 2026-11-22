@@ -27,7 +27,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDebateContext } from "@/contexts/DebateContext";
 import OpinionCard from "@/components/OpinionCard";
 import { AdoptOpinionDialog } from "@/components/AdoptOpinionDialog";
-import { OpinionStructure, BareOpinionTip, useBareOpinionGuard } from "@/components/OpinionStructure";
+import { OpinionComposerDialog } from "@/components/OpinionComposerDialog";
 import { LoginPromptDialog } from "@/components/LoginPromptDialog";
 import FallacyBadges from "@/components/FallacyBadges";
 import FallacyFlagDialog from "@/components/FallacyFlagDialog";
@@ -70,16 +70,6 @@ function CounterpointAuthor({ author }: { author?: { id?: string; firstName?: st
 }
 
 const candidateName = (p: DebateCandidate) => `${p.firstName || ""} ${p.lastName || ""}`.trim() || "Anonymous";
-
-const opinionFormSchema = insertOpinionSchema.omit({
-  topicId: true,
-  userId: true,
-}).extend({
-  content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
-  debateStatus: z.enum(["open", "closed", "private"], { required_error: "Please select debate availability" }),
-  references: z.array(z.string().url("Must be a valid URL")).optional().default([]),
-  stance: z.enum(["for", "against", "neutral"], { required_error: "Pick a stance", invalid_type_error: "Pick a stance" }),
-});
 
 type CounterpointCountRow = { sentenceIndex: number; count: number };
 
@@ -509,45 +499,6 @@ export default function Topic() {
     };
   }, [topic, opinions?.length]);
 
-  // Create opinion mutation
-  const createOpinionMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof opinionFormSchema>) => {
-      if (userOpinion) {
-        return apiRequest('PATCH', `/api/opinions/${userOpinion.id}`, data);
-      }
-      return apiRequest('POST', `/api/topics/${id}/opinions`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "opinions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/topics", id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/topics"] }); // Invalidate topics list for updated counts
-      queryClient.invalidateQueries({ queryKey: ["/api/stats/platform"] });
-      opinionForm.reset();
-      setShowOpinionForm(false);
-      
-      // Poll for summary updates after opinion creation
-      // Start polling after a short delay to give AI time to start processing
-      let pollAttempts = 0;
-      const maxAttempts = 15; // 15 attempts = 45 seconds max
-      const pollInterval = 3000; // 3 seconds
-      
-      const pollForSummary = setInterval(() => {
-        pollAttempts++;
-        queryClient.invalidateQueries({ queryKey: ["/api/topics", id, "cumulative"] });
-        
-        if (pollAttempts >= maxAttempts) {
-          clearInterval(pollForSummary);
-        }
-      }, pollInterval);
-      
-      // Clear interval when component unmounts or after max time
-      setTimeout(() => clearInterval(pollForSummary), pollInterval * maxAttempts);
-    },
-    onError: (error: any) => {
-      console.error("Failed to save opinion:", error);
-    },
-  });
-
   // Vote mutation
   const voteMutation = useMutation({
     mutationFn: async ({ opinionId, voteType, currentVote }: { opinionId: string; voteType: 'like' | 'dislike'; currentVote?: 'like' | 'dislike' | null }) => {
@@ -727,26 +678,6 @@ export default function Topic() {
     },
   });
 
-  const opinionForm = useForm<z.infer<typeof opinionFormSchema>>({
-    resolver: zodResolver(opinionFormSchema),
-    defaultValues: {
-      content: "",
-      debateStatus: "open",
-      references: [],
-    },
-  });
-
-  const opinionContent = opinionForm.watch("content");
-  const bareOpinion = useBareOpinionGuard(opinionContent ?? "");
-
-  const onSubmitOpinion = (data: z.infer<typeof opinionFormSchema>) => {
-    if (!isAuthenticated) {
-      setLoginAction("opinion");
-      setShowLoginPrompt(true);
-      return;
-    }
-    bareOpinion.guard(() => createOpinionMutation.mutate(data));
-  };
   
   const handleShareOpinionClick = () => {
     if (!isAuthenticated) {
@@ -955,13 +886,7 @@ export default function Topic() {
                         variant="outline"
                         size="sm"
                         className="w-full"
-                        onClick={() => {
-                          opinionForm.setValue("content", userOpinion.content);
-                          opinionForm.setValue("debateStatus", (userOpinion.debateStatus || "open") as any);
-                          opinionForm.setValue("references", userOpinion.references || []);
-                          opinionForm.setValue("stance", (userOpinion.stance ?? undefined) as any);
-                          setShowOpinionForm(true);
-                        }}
+                        onClick={() => setShowOpinionForm(true)}
                         data-testid="button-update-opinion"
                       >
                         Update
@@ -1366,114 +1291,14 @@ export default function Topic() {
         </SheetContent>
       </Sheet>
 
-      {/* Opinion Form Dialog */}
-      <Dialog open={showOpinionForm} onOpenChange={setShowOpinionForm}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{userOpinion ? 'Update Your Opinion' : 'Share Your Opinion'}</DialogTitle>
-            <DialogDescription>
-              {userOpinion ? 'Modify your existing opinion on this topic.' : 'Share your thoughts on this topic.'}
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...opinionForm}>
-            <form onSubmit={opinionForm.handleSubmit(onSubmitOpinion)} className="space-y-4">
-              <FormField
-                control={opinionForm.control}
-                name="stance"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Stance</FormLabel>
-                    <FormControl>
-                      <ToggleGroup
-                        type="single"
-                        value={field.value ?? ""}
-                        onValueChange={(v) => { if (v) field.onChange(v); }}
-                        className="grid grid-cols-3 gap-2"
-                        data-testid="picker-stance"
-                      >
-                        <ToggleGroupItem value="for" variant="outline" className="data-[state=on]:bg-stance-for data-[state=on]:text-primary-foreground" data-testid="option-stance-for">For</ToggleGroupItem>
-                        <ToggleGroupItem value="against" variant="outline" className="data-[state=on]:bg-stance-against data-[state=on]:text-primary-foreground" data-testid="option-stance-against">Against</ToggleGroupItem>
-                        <ToggleGroupItem value="neutral" variant="outline" className="data-[state=on]:bg-stance-neutral data-[state=on]:text-primary-foreground" data-testid="option-stance-neutral">Neutral</ToggleGroupItem>
-                      </ToggleGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={opinionForm.control}
-                name="debateStatus"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Debate Availability</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-debate-status">
-                          <SelectValue placeholder="Select debate availability" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="open" data-testid="option-debate-open">
-                          Open for Debate - Others can challenge this opinion
-                        </SelectItem>
-                        <SelectItem value="closed" data-testid="option-debate-closed">
-                          Not Debatable - Opinion is public but read-only
-                        </SelectItem>
-                        <SelectItem value="private" data-testid="option-debate-private">
-                          Private - Only visible to you
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={opinionForm.control}
-                name="content"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Opinion</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Share your thoughts..."
-                        className="min-h-[120px]"
-                        data-testid="input-opinion-content"
-                        {...field}
-                      />
-                    </FormControl>
-                    <OpinionStructure text={field.value ?? ""} topicTitle={topic?.title} />
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <BareOpinionTip
-                open={bareOpinion.showTip}
-                onKeepWriting={bareOpinion.keepWriting}
-                onPostAnyway={bareOpinion.postAnyway}
-              />
-              <div className="flex gap-2 justify-end pt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setShowOpinionForm(false)}
-                  data-testid="button-cancel-opinion"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={createOpinionMutation.isPending}
-                  data-testid="button-submit-opinion"
-                >
-                  {createOpinionMutation.isPending ? 'Saving...' : userOpinion ? 'Update Opinion' : 'Share Opinion'}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      {/* Opinion composer (shared with topic cards) */}
+      <OpinionComposerDialog
+        open={showOpinionForm}
+        onOpenChange={setShowOpinionForm}
+        topicId={id!}
+        topicTitle={topic?.title}
+        existingOpinion={userOpinion ?? null}
+      />
 
       {/* Topic Flag Dialog */}
       <FallacyFlagDialog

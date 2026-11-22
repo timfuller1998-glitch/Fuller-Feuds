@@ -1,3 +1,11 @@
+## 2026-11-21 (22:29 CST, America/Chicago) — Topic cards open the same opinion composer as the topic page, and say "Update opinion" when you already have one (branch fix/card-opinion-composer)
+Made by the Fuller Feuds Dev bot (Grok Bot). Timothy noticed that "Add your opinion" on topic cards opened a slightly different form from the topic page, and that it should say "Update opinion" if you already have one.
+- New shared `OpinionComposerDialog`, now used by both the topic page and topic cards (front and back). The card's old copy of the form is gone. It was missing the For/Against/Neutral stance picker, and its form rules differed. Both places now show the same stance picker, debate availability, opinion box with the structure guide and strength meter, bare-opinion tip, and Share/Update button. It also polls for the AI summary refresh after saving.
+- If you're signed in and already have an opinion on the topic, the card button reads "Update opinion" and opens the composer in update mode, prefilled with your stance, availability, and text. Saving edits that opinion, the same as on the topic page.
+- No extra requests: each card already loaded the topic's opinions for its preview carousel. It now keeps the full list (the preview still shows the top 3 by likes) and finds your opinion in it. The card uses the same cache key as the topic page, so saving from either place refreshes both, and opening the topic from a card loads its opinions instantly.
+- Signed-out behavior is unchanged: the button still opens the sign-in prompt.
+- Typecheck: 50 (ceiling 52). Shared tests: 23 pass. Build OK.
+
 ## 2026-11-21 (21:52 CST, America/Chicago) — Founding application: show the minimums and what's still missing (branch fix/apply-minimums)
 Made by the Fuller Feuds Dev bot (Grok Bot). Timothy's brother thought he sent his founding application from his iPhone, but nothing reached the Founders dashboard. He also said there was a minimum.
 - What happened: no application was ever received. There are no founder_applications rows, and Render logs show no POST /api/applications. His iPhone visit at 9:45 PM CT only made the normal signed-out page requests. Send Application stays greyed out until every requirement is met, but it never said which ones were missing, so tapping it did nothing. The dashboard was correct to be empty.
