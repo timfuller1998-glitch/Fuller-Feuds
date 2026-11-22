@@ -104,7 +104,9 @@ const applicationSchema = z.object({
   politics: z.enum(POLITICS_OPTIONS).optional().nullable(),
   religion: z.enum(RELIGION_OPTIONS).optional().nullable(),
   steelmanPrompt: z.enum(STEELMAN_PROMPTS),
-  steelman: z.string().trim().min(40, 'Your steelman needs a little more (aim for about 150 words)').max(4000),
+  // Same minimum the form shows: at least 8 words (aim for about 150).
+  steelman: z.string().trim().max(4000)
+    .refine((v) => v.split(/\s+/).filter(Boolean).length >= 8, 'Your steelman needs at least 8 words (aim for about 150)'),
   mindChange: z.string().trim().min(20, 'Tell us a bit more about changing your mind').max(3000),
   frequency: z.enum(FREQUENCY_OPTIONS.map((f) => f.value) as [string, ...string[]]),
   is18Plus: z.literal(true, { errorMap: () => ({ message: 'Founding members must be 18 or older' }) }),

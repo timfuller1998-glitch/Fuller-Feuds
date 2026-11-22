@@ -77,8 +77,18 @@ export default function ApplyPage() {
     setInterests((cur) => (cur.includes(i) ? cur.filter((x) => x !== i) : cur.length >= 3 ? cur : [...cur, i]));
 
   const steelWords = wordCount(steelman);
-  const ready = displayName.trim().length >= 2 && /\S+@\S+\.\S+/.test(email) && interests.length > 0 && steelWords >= 8 &&
-    mindChange.trim().length >= 20 && !!frequency && is18Plus && pledge;
+  const mindChars = mindChange.trim().length;
+  // Plain-language list of what still blocks Send (shown under the button).
+  const missing: string[] = [];
+  if (displayName.trim().length < 2) missing.push("name");
+  if (!/\S+@\S+\.\S+/.test(email)) missing.push("email");
+  if (interests.length === 0) missing.push("at least one interest");
+  if (steelWords < 8) missing.push("steelman (8+ words)");
+  if (mindChars < 20) missing.push("changed-your-mind answer (20+ characters)");
+  if (!frequency) missing.push("how often you could debate");
+  if (!is18Plus) missing.push("18+ checkbox");
+  if (!pledge) missing.push("founders' pledge checkbox");
+  const ready = missing.length === 0;
 
   if (done) {
     return (
@@ -184,11 +194,14 @@ export default function ApplyPage() {
             </RadioGroup>
             <Textarea value={steelman} onChange={(e) => setSteelman(e.target.value)} maxLength={4000} rows={8} placeholder="Make their best case…" data-testid="input-apply-steelman" />
             <p className={`text-xs ${steelWords >= 120 ? "text-muted-foreground" : "text-muted-foreground/80"}`} data-testid="text-steelman-words">
-              {steelWords} words{steelWords < 120 ? " · aim for about 150" : ""}
+              {steelWords} words · needs at least 8 words{steelWords < 120 ? " · aim for about 150" : ""}
             </p>
           </Field>
           <Field label="Tell us about a time you changed your mind on something that mattered." htmlFor="apply-mind">
             <Textarea id="apply-mind" value={mindChange} onChange={(e) => setMindChange(e.target.value)} maxLength={3000} rows={5} data-testid="input-apply-mind" />
+            <p className="text-xs text-muted-foreground" data-testid="text-mind-chars">
+              Needs at least 20 characters{mindChars < 20 ? ` (${mindChars} so far)` : " ✓"}
+            </p>
           </Field>
           <Field label="How often could you realistically debate?">
             <RadioGroup value={frequency} onValueChange={setFrequency} className="flex flex-wrap gap-4" data-testid="group-apply-frequency">
@@ -218,6 +231,11 @@ export default function ApplyPage() {
           <Button type="submit" size="lg" className="w-full" disabled={!ready || submit.isPending} data-testid="button-apply-submit">
             {submit.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending…</> : "Send application"}
           </Button>
+          {missing.length > 0 && !submit.isPending && (
+            <p className="text-sm text-center text-primary" role="status" data-testid="text-apply-missing">
+              Still needed: {missing.join(", ")}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground text-center">
             We use your answers only to review your application. See our <Link href="/privacy" className="underline underline-offset-2">Privacy Policy</Link>.
           </p>
