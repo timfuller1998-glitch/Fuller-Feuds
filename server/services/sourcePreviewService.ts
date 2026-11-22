@@ -1,6 +1,7 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import OpenAI from 'openai';
+import { chatParams } from '../lib/aiConfig.js';
 
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_BYTES = 512 * 1024;
@@ -173,10 +174,7 @@ async function draftWithAi(sourceUrl: string, pageTitle: string, pageDescription
   if (!openai) return null;
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      response_format: { type: 'json_object' },
-      temperature: 0.4,
-      max_tokens: 300,
+      ...chatParams({ maxTokens: 300, temperature: 0.4, json: true }),
       messages: [
         {
           role: 'system',

@@ -1,4 +1,5 @@
 import { RUBRIC_MAX, BEST_PICK_THRESHOLD, type RubricScores } from '../../shared/founders.js';
+import { chatParams } from './aiConfig.js';
 
 // Suggested scores for founding-member applications (Fuller Feuds Dev, Nov 20 2026).
 // These are only suggestions shown to the admin next to each application; Timothy makes every decision.
@@ -109,9 +110,7 @@ export async function scoreWithAI(a: ApplicationAnswers, prompt: string | null):
     const { default: OpenAI } = await import('openai');
     const client = new OpenAI({ apiKey: key, timeout: 15_000, maxRetries: 0 });
     const res = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      temperature: 0,
-      response_format: { type: 'json_object' },
+      ...chatParams({ maxTokens: 1000, temperature: 0, json: true }),
       messages: [
         {
           role: 'system',

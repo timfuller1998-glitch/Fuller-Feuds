@@ -57,23 +57,38 @@ export class CumulativeOpinionService {
     // with the vote-count fallback. Keep the existing text and attach sentence citations to it.
     if (analysis.usedFallback && existing?.summary && !existing.summary.startsWith("Based on ") && !existing.summary.startsWith("Mock AI summary")) {
       console.warn(`[AI Summary] Keeping existing summary for topic ${topicId} because generation fell back`);
-      return await this.cumulativeOpinionRepo.upsert(topicId, {
+      const kept = await this.cumulativeOpinionRepo.upsert(topicId, {
         summary: existing.summary,
         summarySentences: sentencesFromSummary(existing.summary, formattedOpinions),
         keyPoints: existing.keyPoints,
         totalOpinions: analysis.totalOpinions,
         confidence: existing.confidence,
       });
+      await this.refreshDistribution(topicId);
+      return Object.assign(kept, { usedFallback: true });
     }
 
     // Save the cumulative opinion
-    return await this.cumulativeOpinionRepo.upsert(topicId, {
+    const saved = await this.cumulativeOpinionRepo.upsert(topicId, {
       summary: analysis.summary,
       summarySentences: analysis.summarySentences,
       keyPoints: analysis.keyPoints,
       totalOpinions: analysis.totalOpinions,
       confidence: analysis.confidence,
     });
+    // The compass/tint distribution is only written onto an existing summary row, so a topic whose
+    // first summary was created after its opinions never got one. Fill it in now.
+    await this.refreshDistribution(topicId);
+    return analysis.usedFallback ? Object.assign(saved, { usedFallback: true }) : saved;
+  }
+
+  private async refreshDistribution(topicId: string): Promise<void> {
+    try {
+      const { OpinionService } = await import('./opinionService.js');
+      await new OpinionService().recalculateTopicDistributionNow(topicId);
+    } catch (error) {
+      console.error(`[AI Summary] Distribution update failed for topic ${topicId}:`, error);
+    }
   }
 
   async refreshCumulativeOpinion(topicId: string): Promise<CumulativeOpinion> {

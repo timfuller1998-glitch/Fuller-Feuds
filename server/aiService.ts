@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import type { Opinion, Topic, CumulativeOpinion, SummarySentence } from '../shared/schema.js';
+import { chatParams, recordAIFailure, EMBEDDING_MODEL } from './lib/aiConfig.js';
 
 // Temporarily disable OpenAI for testing - remove this when you have API key
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({
@@ -100,7 +101,7 @@ export class AIService {
 
     try {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        ...chatParams({ maxTokens: 100, temperature: 0.5 }),
         messages: [
           {
             role: "system",
@@ -111,8 +112,6 @@ export class AIService {
             content: `Generate exactly 3 relevant category tags for this debate topic: "${topicTitle}". Return ONLY a JSON array like ["Category1", "Category2", "Category3"]`
           }
         ],
-        temperature: 0.5,
-        max_tokens: 100
       });
 
       const responseContent = completion.choices[0]?.message?.content?.trim();
@@ -127,7 +126,7 @@ export class AIService {
 
       return categories.slice(0, 3);
     } catch (error) {
-      console.error("Error generating categories:", error);
+      console.error(`[AI] Category generation failed: ${recordAIFailure(error)}`);
       // Fallback to generic categories
       return ["Politics", "Society", "General"];
     }
@@ -296,7 +295,7 @@ Return only valid JSON.`;
 
     try {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        ...chatParams({ maxTokens: 2000, temperature: 0.3, json: true }),
         messages: [
           {
             role: "system",
@@ -307,8 +306,6 @@ Return only valid JSON.`;
             content: prompt
           }
         ],
-        temperature: 0.3,
-        max_tokens: 2000
       });
 
       const responseContent = completion.choices[0]?.message?.content;
@@ -337,7 +334,7 @@ Return only valid JSON.`;
       };
 
     } catch (error) {
-      console.error("Error generating AI analysis:", error);
+      console.error(`[AI Summary] OpenAI call failed for "${topic.title}", using vote-count fallback: ${recordAIFailure(error)}`);
       
       // Fallback analysis without AI
       const majorityVote = totalLikes > totalDislikes ? 'supportive' : totalDislikes > totalLikes ? 'opposing' : 'neutral';
@@ -431,7 +428,7 @@ Return only valid JSON.`;
 
     try {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        ...chatParams({ maxTokens: 500, temperature: 0.2, json: true }),
         messages: [
           {
             role: "system",
@@ -442,8 +439,6 @@ Return only valid JSON.`;
             content: prompt
           }
         ],
-        temperature: 0.2,
-        max_tokens: 500
       });
 
       const responseContent = completion.choices[0]?.message?.content;
@@ -467,7 +462,7 @@ Return only valid JSON.`;
       };
 
     } catch (error) {
-      console.error("Error analyzing political leaning:", error);
+      console.error(`[AI] Political leaning call failed: ${recordAIFailure(error)}`);
       
       // Fallback analysis without AI - simple heuristic based on likes/dislikes
       const totalLikes = opinions.reduce((sum, op) => sum + (op.likesCount || 0), 0);
@@ -591,9 +586,8 @@ Return only valid JSON.`;
     try {
       console.log(`[AI Analysis] Starting 2D political compass analysis for ${recentOpinions.length} opinions`);
       
-      // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
       const completion = await openai.chat.completions.create({
-        model: "gpt-5",
+        ...chatParams({ maxTokens: 500, json: true }),
         messages: [
           {
             role: "system",
@@ -604,8 +598,6 @@ Return only valid JSON.`;
             content: prompt
           }
         ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 500
       });
 
       const responseContent = completion.choices[0]?.message?.content;
@@ -654,7 +646,7 @@ Return only valid JSON.`;
       };
 
     } catch (error) {
-      console.error("Error analyzing 2D political compass:", error);
+      console.error(`[AI Analysis] 2D compass call failed: ${recordAIFailure(error)}`);
       
       // Fallback analysis without AI - use existing scores if available
       const opinionsWithScores = opinions.filter(op => op.topicEconomicScore != null && op.topicAuthoritarianScore != null);
@@ -686,12 +678,10 @@ Return only valid JSON.`;
    * Returns economic and authoritarian scores from -100 to +100
    * @param opinionContent - The text content of the opinion
    * @param topicTitle - The title of the topic being discussed
-   * @param model - The OpenAI model to use (default: gpt-4o-mini for cost efficiency)
    */
   static async analyzeOpinionPoliticalStance(
     opinionContent: string,
     topicTitle: string,
-    model: "gpt-4o-mini" | "gpt-5" = "gpt-4o-mini"
   ): Promise<{ economicScore: number; authoritarianScore: number }> {
     const prompt = `
 Analyze this opinion on the topic "${topicTitle}" and determine its political position on a 2-dimensional political compass.
@@ -734,17 +724,12 @@ AUTHORITARIAN indicators:
 
 Return only valid JSON with economicScore and authoritarianScore fields.`;
 
-    // Return neutral scores if OpenAI is not configured
-    if (!openai) {
-      console.log('OpenAI not configured - returning neutral scores for opinion analysis');
-      return { economicScore: 0, authoritarianScore: 0 };
-    }
+    // Never store made-up neutral scores: callers leave the opinion unscored so it is retried later.
+    if (!openai) throw new Error('OpenAI not configured (OPENAI_API_KEY missing)');
 
     try {
-      console.log(`[Opinion Analysis] Analyzing opinion using model: ${model}`);
-      // GPT-5 limitations: only supports temperature=1 (default) and no response_format parameter
       const completion = await openai.chat.completions.create({
-        model,
+        ...chatParams({ maxTokens: 200, temperature: 0.3, json: true }),
         messages: [
           {
             role: "system",
@@ -755,16 +740,12 @@ Return only valid JSON with economicScore and authoritarianScore fields.`;
             content: prompt
           }
         ],
-        ...(model !== "gpt-5" ? { response_format: { type: "json_object" } } : {}),
-        max_completion_tokens: 200,
-        ...(model !== "gpt-5" ? { temperature: 0.3 } : {})
       });
 
       const responseContent = completion.choices[0]?.message?.content;
       
       if (!responseContent) {
-        console.error("[Opinion Analysis] No response from OpenAI");
-        return { economicScore: 0, authoritarianScore: 0 };
+        throw new Error("Empty response from OpenAI");
       }
 
       // Extract JSON from response (GPT-5 might wrap it in markdown code blocks)
@@ -790,9 +771,9 @@ Return only valid JSON with economicScore and authoritarianScore fields.`;
       };
 
     } catch (error) {
-      console.error("[Opinion Analysis] Error analyzing opinion political stance:", error);
-      // Return neutral scores on error
-      return { economicScore: 0, authoritarianScore: 0 };
+      const msg = recordAIFailure(error);
+      console.error(`[Opinion Analysis] OpenAI call failed: ${msg}`);
+      throw new Error(`AI scoring failed: ${msg}`);
     }
   }
 
@@ -807,15 +788,8 @@ Return only valid JSON with economicScore and authoritarianScore fields.`;
     topic: Topic,
     opinions: Array<{ id: string; content: string }>
   ): Promise<Array<{ opinionId: string; economicScore: number; authoritarianScore: number }>> {
-    // Return neutral scores if OpenAI is not configured
-    if (!openai) {
-      console.log('OpenAI not configured - returning neutral scores for batch analysis');
-      return opinions.map(o => ({
-        opinionId: o.id,
-        economicScore: 0,
-        authoritarianScore: 0
-      }));
-    }
+    // Never store made-up neutral scores: on failure the opinions stay unscored and are retried next run.
+    if (!openai) throw new Error('OpenAI not configured (OPENAI_API_KEY missing)');
 
     if (opinions.length === 0) {
       return [];
@@ -873,7 +847,7 @@ Return only valid JSON with an "opinions" array containing all results.`;
       console.log(`[Batch Opinion Analysis] Analyzing ${opinions.length} opinions using batch API`);
       
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        ...chatParams({ maxTokens: 2000, temperature: 0.3, json: true }),
         messages: [
           {
             role: "system",
@@ -884,20 +858,12 @@ Return only valid JSON with an "opinions" array containing all results.`;
             content: prompt
           }
         ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 2000, // More tokens for batch analysis
-        temperature: 0.3
       });
 
       const responseContent = completion.choices[0]?.message?.content;
       
       if (!responseContent) {
-        console.error("[Batch Opinion Analysis] No response from OpenAI");
-        return opinions.map(o => ({
-          opinionId: o.id,
-          economicScore: 0,
-          authoritarianScore: 0
-        }));
+        throw new Error("Empty response from OpenAI");
       }
 
       // Parse JSON response
@@ -923,23 +889,15 @@ Return only valid JSON with an "opinions" array containing all results.`;
         });
       }
 
-      // Return results for all opinions (use neutral scores if not in response)
-      return opinions.map(opinion => {
-        const analysis = analysisMap.get(opinion.id) || { economicScore: 0, authoritarianScore: 0 };
-        return {
-          opinionId: opinion.id,
-          ...analysis
-        };
-      });
+      // Only return opinions the model actually scored; any it skipped stay unscored for the next run.
+      return opinions
+        .filter(opinion => analysisMap.has(opinion.id))
+        .map(opinion => ({ opinionId: opinion.id, ...analysisMap.get(opinion.id)! }));
 
     } catch (error) {
-      console.error("[Batch Opinion Analysis] Error analyzing opinions:", error);
-      // Return neutral scores on error
-      return opinions.map(o => ({
-        opinionId: o.id,
-        economicScore: 0,
-        authoritarianScore: 0
-      }));
+      const msg = recordAIFailure(error);
+      console.error(`[Batch Opinion Analysis] OpenAI call failed: ${msg}`);
+      throw new Error(`AI scoring failed: ${msg}`);
     }
   }
 
@@ -954,7 +912,7 @@ Return only valid JSON with an "opinions" array containing all results.`;
 
     try {
       const response = await openai.embeddings.create({
-        model: "text-embedding-3-small",
+        model: EMBEDDING_MODEL,
         input: text.trim(),
         encoding_format: "float"
       });

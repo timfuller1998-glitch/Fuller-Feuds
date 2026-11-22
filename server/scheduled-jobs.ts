@@ -9,6 +9,7 @@ import { OpinionService } from './services/opinionService.js';
 import { CumulativeOpinionService } from './services/cumulativeOpinionService.js';
 import { DebateService } from './services/debateService.js';
 import { OpinionBatchService } from './services/opinionBatchService.js';
+import { checkAIHealth, getAIStatus } from './lib/aiConfig.js';
 
 const topicService = new TopicService();
 const opinionService = new OpinionService();
@@ -39,12 +40,18 @@ export async function runAISummaryUpdate(): Promise<{
       if (opinions.length > 0) {
         const existingCumulative = await cumulativeOpinionService.getCumulativeOpinion(topic.id);
         
-        if (existingCumulative) {
-          await cumulativeOpinionService.refreshCumulativeOpinion(topic.id);
+        const result: any = existingCumulative
+          ? await cumulativeOpinionService.refreshCumulativeOpinion(topic.id)
+          : await cumulativeOpinionService.generateCumulativeOpinion(topic.id);
+        if (result?.usedFallback) {
+          // OpenAI failed: say so instead of counting it as a success.
+          const msg = `AI summary failed for "${topic.title}": ${getAIStatus().lastFailure?.error ?? 'unknown error'}`;
+          log(`[AI Summary] ${msg}`);
+          errors.push(msg);
+        } else if (existingCumulative) {
           refreshed++;
           log(`[AI Summary] Refreshed summary for topic: ${topic.title}`);
         } else {
-          await cumulativeOpinionService.generateCumulativeOpinion(topic.id);
           generated++;
           log(`[AI Summary] Generated summary for topic: ${topic.title}`);
         }
@@ -119,6 +126,36 @@ export async function backfillMissingTastePassion(): Promise<number> {
   return updated;
 }
 
+/**
+ * Self-heal after an OpenAI outage (e.g. out of credits): once the API works again, regenerate summaries
+ * that were saved as the vote-count fallback, and fill in missing compass/tint distributions.
+ * Capped per run to respect the AI cost guardrails.
+ */
+export async function repairFallbackSummaries(maxTopics = 40): Promise<{ regenerated: number; failed: number; distributions: number }> {
+  const health = await checkAIHealth();
+  const rows = await db
+    .select({ topicId: cumulativeOpinions.topicId, summary: cumulativeOpinions.summary, pd: cumulativeOpinions.politicalDistribution })
+    .from(cumulativeOpinions);
+  let regenerated = 0, failed = 0, distributions = 0;
+  for (const row of rows) {
+    const isFallback = !row.summary || row.summary.startsWith('Based on ') || row.summary.startsWith('Mock AI summary');
+    try {
+      if (isFallback && health.ok && regenerated + failed < maxTopics) {
+        const r: any = await cumulativeOpinionService.generateCumulativeOpinion(row.topicId);
+        if (r?.usedFallback) failed++; else regenerated++;
+      } else if (!row.pd) {
+        await opinionService.recalculateTopicDistributionNow(row.topicId);
+        distributions++;
+      }
+    } catch (error) {
+      failed++;
+      log(`[AI Summary] Repair failed for ${row.topicId}: ${error}`);
+    }
+  }
+  log(`[CRON] Summary repair: ${regenerated} regenerated, ${failed} failed, ${distributions} distributions filled (AI ${health.ok ? 'ok' : 'unavailable: ' + health.error})`);
+  return { regenerated, failed, distributions };
+}
+
 /** Regenerate stored summaries that are missing sentence-level opinion citations. */
 export async function backfillMissingSummarySentences(): Promise<{ updated: number; errors: string[] }> {
   const missing = await db
@@ -160,13 +197,18 @@ export function startScheduledJobs() {
       } catch (error) {
         log(`[CRON ERROR] Summary sentence backfill failed: ${error}`);
       }
+      try {
+        await repairFallbackSummaries();
+      } catch (error) {
+        log(`[CRON ERROR] Summary repair failed: ${error}`);
+      }
     })();
   }, 90_000);
 
   cron.schedule('0 2 * * *', async () => {
     log('[CRON] Starting daily AI summary update at 2:00 AM');
     const result = await runAISummaryUpdate();
-    log(`[CRON] Daily AI summary update completed - Generated: ${result.generated}, Refreshed: ${result.refreshed}, Skipped: ${result.skipped}`);
+    log(`[CRON] Daily AI summary update completed - Generated: ${result.generated}, Refreshed: ${result.refreshed}, Skipped: ${result.skipped}, Failed: ${result.errors.length}`);
   }, {
     timezone: process.env.CRON_TZ || 'UTC'
   });
