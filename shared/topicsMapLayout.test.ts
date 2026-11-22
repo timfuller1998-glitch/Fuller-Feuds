@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   angularSpan,
   findOverlaps,
+  layoutClusters,
   layoutWorld,
   leafWeight,
   PILL_PAD,
@@ -120,5 +121,26 @@ describe("topicsMapLayout", () => {
     assert.ok(items.size > 400, `expected a large layout, got ${items.size}`);
     const maxR = Math.max(...[...items.values()].map((it) => it.radius));
     assert.ok(maxR < 12000, `synthetic tree radius exploded to ${maxR.toFixed(0)}`);
+  });
+
+  it("cluster layout (semantic zoom) never overlaps pills on live or synthetic trees", () => {
+    for (const [label, tree] of [
+      ["live", loadLiveTree()],
+      ["synthetic-420", buildMapTree(buildSyntheticTopics(420))],
+    ] as const) {
+      const items = layoutClusters(tree);
+      const hits = findOverlaps(items, PILL_PAD);
+      assert.equal(hits.length, 0, `${label}: ${hits.slice(0, 4).map((h) => `${h.a}×${h.b}`).join(", ")}`);
+    }
+  });
+
+  it("cluster layout keeps children closer to their parent than the parent's own ring", () => {
+    const items = layoutClusters(loadLiveTree());
+    const root = items.get("root")!;
+    for (const item of items.values()) {
+      if (!item.ring || item.depth !== 1) continue;
+      // A major's children ring must be well inside the root's ring so they pop open on-screen.
+      assert.ok(item.ring < root.ring!, `${item.id} ring ${item.ring.toFixed(0)} vs root ${root.ring!.toFixed(0)}`);
+    }
   });
 });
