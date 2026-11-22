@@ -383,7 +383,11 @@ export class OpinionRepository {
     const { userRole, currentUserId } = options || {};
     const isModOrAdmin = userRole === 'admin' || userRole === 'moderator';
 
-    const whereConditions = [eq(opinions.userId, userId)];
+    const whereConditions = [
+      eq(opinions.userId, userId),
+      // Hide opinions whose topic was deleted (admin delete hides the topic) or no longer exists.
+      sql`EXISTS (SELECT 1 FROM topics t WHERE t.id = ${opinions.topicId} AND t.status <> 'hidden')`,
+    ];
 
     if (!isModOrAdmin) {
       whereConditions.push(eq(opinions.status, 'approved'));

@@ -115,7 +115,7 @@ export const opinions = pgTable("opinions", {
   debateStatus: debateStatusEnum("debate_status").default("open").notNull(),
   stance: varchar("stance", { length: 10 }).$type<"for" | "against" | "neutral">(), // nullable = unstated; CHECK in migration 0006
   references: text("references").array().default(sql`ARRAY[]::text[]`), // Reference links/URLs
-  topicEconomicScore: integer("topic_economic_score"), // -100 (capitalist) to +100 (socialist) - this opinion's political stance on economic axis
+  topicEconomicScore: integer("topic_economic_score"), // -100 (economic Left / socialist) to +100 (economic Right / capitalist) - standard Political Compass x-axis
   topicAuthoritarianScore: integer("topic_authoritarian_score"), // -100 (libertarian) to +100 (authoritarian) - this opinion's political stance on authoritarian axis
   tasteScore: integer("taste_score"), // -100 to +100 (revulsion to delight)
   passionScore: integer("passion_score"), // -100 to +100 (academic to aggressive)
@@ -411,7 +411,7 @@ export const userProfiles = pgTable("user_profiles", {
   categorySortPreference: varchar("category_sort_preference", { length: 20 }).default("popular"), // 'popular', 'alphabetical', 'newest', 'oldest'
   politicalLeaning: varchar("political_leaning", { length: 50 }), // 'progressive', 'moderate', 'conservative', etc.
   leaningScore: integer("leaning_score").default(0), // DEPRECATED: Legacy single-axis score (kept for backward compatibility)
-  economicScore: integer("economic_score").default(0), // -100 (socialist) to +100 (capitalist)
+  economicScore: integer("economic_score").default(0), // -100 (economic Left / socialist) to +100 (economic Right / capitalist) - standard Political Compass x-axis
   authoritarianScore: integer("authoritarian_score").default(0), // -100 (libertarian) to +100 (authoritarian)
   opinionCount: integer("opinion_count").default(0), // Count of opinions posted (triggers AI analysis every 5)
   leaningConfidence: varchar("leaning_confidence", { length: 20 }).default("low"), // 'high', 'medium', 'low'

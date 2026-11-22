@@ -17,8 +17,8 @@ function getActiveBackgroundGradient(distribution: PoliticalDistribution): React
   const toOpacity = (percent: number) => ((percent / 100) * 0.20).toFixed(3);
 
   // Softer color variants with higher lightness - same as topic cards
-  const topLeft = `rgba(100, 150, 255, ${toOpacity(distribution.authoritarianSocialist)})`;      // Soft Blue
-  const topRight = `rgba(255, 120, 130, ${toOpacity(distribution.authoritarianCapitalist)})`;     // Soft Red
+  const topLeft = `rgba(255, 120, 130, ${toOpacity(distribution.authoritarianSocialist)})`;      // Soft Red (Auth-Left)
+  const topRight = `rgba(100, 150, 255, ${toOpacity(distribution.authoritarianCapitalist)})`;    // Soft Blue (Auth-Right)
   const bottomLeft = `rgba(100, 200, 150, ${toOpacity(distribution.libertarianSocialist)})`;      // Soft Green
   const bottomRight = `rgba(255, 220, 100, ${toOpacity(distribution.libertarianCapitalist)})`;    // Soft Yellow
 

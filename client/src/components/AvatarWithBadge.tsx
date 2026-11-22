@@ -61,7 +61,7 @@ const hslToHex = (h: number, s: number, l: number): string => {
 // 2D political compass color blending function
 const get2DPoliticalCompassColor = (economicScore: number, authoritarianScore: number): string => {
   // Normalize scores to -1 to 1 range for easier calculation
-  const x = economicScore / 100;  // -1 (capitalist) to +1 (socialist)
+  const x = economicScore / 100;  // -1 (economic Left) to +1 (economic Right)
   const y = authoritarianScore / 100;  // -1 (libertarian) to +1 (authoritarian)
   
   // Calculate distance from center (0,0) - used for intensity
@@ -69,11 +69,11 @@ const get2DPoliticalCompassColor = (economicScore: number, authoritarianScore: n
   const intensity = Math.min(distanceFromCenter, 1); // 0 to 1
   
   // Base colors for each quadrant (Hue, Saturation, Lightness)
-  // FLIPPED COLORS:
-  // Red (authoritarian capitalist): H=0, x < 0, y > 0
-  // Blue (authoritarian socialist): H=220, x > 0, y > 0
-  // Green (libertarian capitalist): H=140, x < 0, y < 0
-  // Yellow (libertarian socialist): H=50, x > 0, y < 0
+  // Standard Political Compass colours:
+  // Red (authoritarian left): H=0, x < 0, y > 0
+  // Blue (authoritarian right): H=220, x > 0, y > 0
+  // Green (libertarian left): H=140, x < 0, y < 0
+  // Yellow (libertarian right): H=50, x > 0, y < 0
   
   let hue: number;
   let saturation: number;
@@ -81,22 +81,22 @@ const get2DPoliticalCompassColor = (economicScore: number, authoritarianScore: n
   
   // Determine quadrant and base color
   if (x < 0 && y >= 0) {
-    // Authoritarian Capitalist (Red) - top left
+    // Authoritarian Left (Red) - top left
     hue = 0;
     saturation = 70 + (intensity * 25); // 70-95%
     lightness = 55;
   } else if (x >= 0 && y >= 0) {
-    // Authoritarian Socialist (Blue) - top right
+    // Authoritarian Right (Blue) - top right
     hue = 220;
     saturation = 70 + (intensity * 25); // 70-95%
     lightness = 55;
   } else if (x < 0 && y < 0) {
-    // Libertarian Capitalist (Green) - bottom left
+    // Libertarian Left (Green) - bottom left
     hue = 140;
     saturation = 65 + (intensity * 30); // 65-95%
     lightness = 50;
   } else {
-    // Libertarian Socialist (Yellow) - bottom right
+    // Libertarian Right (Yellow) - bottom right
     hue = 50;
     saturation = 70 + (intensity * 25); // 70-95%
     lightness = 55;

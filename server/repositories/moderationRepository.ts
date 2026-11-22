@@ -211,8 +211,10 @@ export class ModerationRepository {
       reason: 'Opinion deleted by admin',
     });
     
-    // Perform the actual deletion
-    await opinionRepo.delete(opinionId);
+    // Perform the actual deletion. Pass the admin as the requester: without it the ownership
+    // check threw "Authentication required to modify opinion" and every admin delete returned 500.
+    // Votes, flags, AI flags and counterpoints are removed by ON DELETE CASCADE.
+    await opinionRepo.delete(opinionId, adminId, 'admin');
   }
 
   async createBannedPhrase(phrase: InsertBannedPhrase): Promise<BannedPhrase> {

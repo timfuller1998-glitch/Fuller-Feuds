@@ -35,7 +35,7 @@ export function PoliticalCompassChart({
 
   // Dynamic color calculation matching avatar ring system
   const getQuadrantColor = (economicPos: number, authoritarianPos: number) => {
-    const x = economicPos / 100;  // -1 (capitalist) to +1 (socialist)
+    const x = economicPos / 100;  // -1 (economic Left) to +1 (economic Right)
     const y = authoritarianPos / 100;  // -1 (libertarian) to +1 (authoritarian)
     
     const distanceFromCenter = Math.sqrt(x * x + y * y);
@@ -47,19 +47,19 @@ export function PoliticalCompassChart({
     
     // Determine quadrant and base color
     if (x < 0 && y >= 0) {
-      hue = 0; // Red - Authoritarian Capitalist
+      hue = 0; // Red - Authoritarian Left
       saturation = 70 + (intensity * 25);
       lightness = 55;
     } else if (x >= 0 && y >= 0) {
-      hue = 220; // Blue - Authoritarian Socialist
+      hue = 220; // Blue - Authoritarian Right
       saturation = 70 + (intensity * 25);
       lightness = 55;
     } else if (x < 0 && y < 0) {
-      hue = 140; // Green - Libertarian Capitalist
+      hue = 140; // Green - Libertarian Left
       saturation = 65 + (intensity * 30);
       lightness = 50;
     } else {
-      hue = 50; // Yellow - Libertarian Socialist
+      hue = 50; // Yellow - Libertarian Right
       saturation = 70 + (intensity * 25);
       lightness = 55;
     }
@@ -91,10 +91,10 @@ export function PoliticalCompassChart({
   // Calculate corner colors for gradients using moderate values (±60)
   // This prevents fade-to-black from activating on the gradient backgrounds
   const quadrantColors = {
-    topLeft: getQuadrantColor(-60, 60),        // Red - Authoritarian Capitalist
-    topRight: getQuadrantColor(60, 60),        // Blue - Authoritarian Socialist
-    bottomLeft: getQuadrantColor(-60, -60),    // Green - Libertarian Capitalist
-    bottomRight: getQuadrantColor(60, -60)     // Yellow - Libertarian Socialist
+    topLeft: getQuadrantColor(-60, 60),        // Red - Authoritarian Left
+    topRight: getQuadrantColor(60, 60),        // Blue - Authoritarian Right
+    bottomLeft: getQuadrantColor(-60, -60),    // Green - Libertarian Left
+    bottomRight: getQuadrantColor(60, -60)     // Yellow - Libertarian Right
   };
 
   return (
@@ -144,17 +144,17 @@ export function PoliticalCompassChart({
         <circle cx={userX} cy={userY} r="6" fill="white" stroke="hsl(var(--primary))" strokeWidth="3" opacity="0.9" />
         <circle cx={userX} cy={userY} r="10" fill="hsl(var(--primary))" opacity="0.2" />
 
-        {/* Axis labels */}
-        <text x={padding} y={padding - 10} className={`fill-muted-foreground ${fontSize}`} textAnchor="start">Authoritarian</text>
-        <text x={padding} y={height - padding + 20} className={`fill-muted-foreground ${fontSize}`} textAnchor="start">Libertarian</text>
-        <text x={padding - 10} y={padding + chartHeight / 2} className={`fill-muted-foreground ${fontSize}`} textAnchor="end">Capitalist</text>
-        <text x={padding + chartWidth + 10} y={padding + chartHeight / 2} className={`fill-muted-foreground ${fontSize}`} textAnchor="start">Socialist</text>
+        {/* Axis labels: standard Political Compass (Left/Right on x, Authoritarian top, Libertarian bottom) */}
+        <text x={padding + chartWidth / 2} y={padding - 10} className={`fill-muted-foreground ${fontSize}`} textAnchor="middle">Authoritarian</text>
+        <text x={padding + chartWidth / 2} y={height - padding + 20} className={`fill-muted-foreground ${fontSize}`} textAnchor="middle">Libertarian</text>
+        <text x={padding - 6} y={padding + chartHeight / 2 + 4} className={`fill-muted-foreground ${fontSize}`} textAnchor="end">Left</text>
+        <text x={padding + chartWidth + 6} y={padding + chartHeight / 2 + 4} className={`fill-muted-foreground ${fontSize}`} textAnchor="start">Right</text>
       </svg>
 
       {/* Score display */}
       <div className={`text-center ${fontSize} text-muted-foreground`}>
-        <div>Economic: {economicScore !== null && economicScore !== undefined ? economicScore : 0}</div>
-        <div>Authoritarian: {authoritarianScore !== null && authoritarianScore !== undefined ? authoritarianScore : 0}</div>
+        <div>Economic (Left − / Right +): {economicScore !== null && economicScore !== undefined ? economicScore : 0}</div>
+        <div>Social (Libertarian − / Authoritarian +): {authoritarianScore !== null && authoritarianScore !== undefined ? authoritarianScore : 0}</div>
       </div>
     </div>
   );

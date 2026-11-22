@@ -9,7 +9,7 @@ import { opinions, cumulativeOpinions, userProfiles } from '../../shared/schema.
 import { eq, and, sql, asc, desc, inArray } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
-import { invalidateOpinionCache, invalidateTopicCache, invalidateCumulativeOpinionCache } from './cacheInvalidation.js';
+import { invalidateOpinionCache, invalidateTopicCache, invalidateCumulativeOpinionCache, invalidateUserCache } from './cacheInvalidation.js';
 import { logSecurityEvent } from '../utils/securityLogger.js';
 import type { Request } from 'express';
 
@@ -347,6 +347,8 @@ export class OpinionService {
       
       // Invalidate caches after deleting opinion
       await invalidateOpinionCache(id, topicId);
+      if (opinion?.userId) await invalidateUserCache(opinion.userId);
+      if (topicId) await this.updateTopicDistribution(topicId);
       
       // Log slow operations
       const duration = Date.now() - startTime;
@@ -634,6 +636,7 @@ export class OpinionService {
           lastAnalyzedAt: sql`now()`,
         } as any)
         .where(eq(userProfiles.userId, userId));
+      await invalidateUserCache(userId);
       return true;
     } catch (error) {
       console.error(`Failed to analyze political compass for user ${userId}:`, error);
