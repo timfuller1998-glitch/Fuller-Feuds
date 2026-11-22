@@ -12,6 +12,7 @@ import { moderationActions, users } from '../../shared/schema.js';
 import { desc, eq } from 'drizzle-orm';
 import { runAISummaryUpdate } from '../scheduled-jobs.js';
 import { AiFlagService } from '../services/aiFlagService.js';
+import { AI_MODEL, checkAIHealth, getAIStatus } from '../lib/aiConfig.js';
 
 const router = Router();
 
@@ -350,8 +351,17 @@ router.post('/backfill-embeddings', requireAdmin, async (req, res) => {
 });
 
 // AI Summary generation trigger
+router.get('/ai/status', requireAdmin, async (_req, res) => {
+  const health = await checkAIHealth();
+  res.json({ ...getAIStatus(), lastHealth: health });
+});
+
 router.post('/summaries/generate', requireAdmin, async (req, res) => {
   try {
+    const health = await checkAIHealth();
+    if (!health.ok) {
+      return res.status(503).json({ success: false, message: `OpenAI is not working (${health.model}): ${health.error}` });
+    }
     const result = await runAISummaryUpdate();
     res.json({
       success: true,
@@ -372,10 +382,10 @@ router.post('/summaries/generate', requireAdmin, async (req, res) => {
 
 router.post('/backfill-opinion-scores', requireAdmin, async (req, res) => {
   try {
-    const { model = 'gpt-4o-mini' } = req.body;
-    
-    if (model !== 'gpt-4o-mini' && model !== 'gpt-5') {
-      return res.status(400).json({ error: 'Invalid model. Must be "gpt-4o-mini" or "gpt-5"' });
+    const model = AI_MODEL;
+    const health = await checkAIHealth();
+    if (!health.ok) {
+      return res.status(503).json({ message: `OpenAI is not working (${health.model}): ${health.error}` });
     }
     
     const opinionRepository = new OpinionRepository();
@@ -410,7 +420,6 @@ router.post('/backfill-opinion-scores', requireAdmin, async (req, res) => {
           const scores = await AIService.analyzeOpinionPoliticalStance(
             opinion.content,
             topic.title,
-            model as 'gpt-4o-mini' | 'gpt-5'
           );
           
           // Update opinion with scores

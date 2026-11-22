@@ -223,15 +223,17 @@ export default function AdminDashboard() {
 
   // Backfill opinion political scores mutation
   const backfillOpinionScoresMutation = useMutation({
-    mutationFn: async (model: 'gpt-4o-mini' | 'gpt-5') => {
-      const response = await apiRequest('POST', '/api/admin/backfill-opinion-scores', { model });
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/admin/backfill-opinion-scores', {});
       return response.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/opinions'] });
       toast({
         title: "Political Score Analysis Started!",
-        description: `Processing ${data.totalOpinions} opinions using ${data.model}. This may take a few minutes.`,
+        description: data.totalOpinions > 0
+          ? `Scoring ${data.totalOpinions} opinions with ${data.model}. This may take a few minutes.`
+          : `Every opinion already has scores (model ${data.model}).`,
       });
     },
     onError: (error: any) => {
@@ -240,6 +242,26 @@ export default function AdminDashboard() {
         description: error.message || "Failed to start opinion political score backfill",
         variant: "destructive",
       });
+    },
+  });
+
+  // Regenerate topic summaries now (also runs nightly). Errors from OpenAI are shown, not hidden.
+  const regenerateSummariesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/admin/summaries/generate', {});
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/topics'] });
+      const failed = data.errors?.length || 0;
+      toast({
+        title: failed ? "Summaries partly updated" : "Summaries regenerated",
+        description: `${data.generated} new, ${data.refreshed} refreshed${failed ? `, ${failed} failed: ${String(data.errors[0]).slice(0, 160)}` : ""}.`,
+        variant: failed ? "destructive" : undefined,
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "AI unavailable", description: error.message || "Failed to regenerate summaries", variant: "destructive" });
     },
   });
 
@@ -371,22 +393,22 @@ export default function AdminDashboard() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() => backfillOpinionScoresMutation.mutate('gpt-4o-mini')}
+                    onClick={() => backfillOpinionScoresMutation.mutate()}
                     disabled={backfillOpinionScoresMutation.isPending}
-                    data-testid="button-backfill-scores-gpt4"
+                    data-testid="button-backfill-scores"
                   >
                     <Sparkles className="h-4 w-4 mr-2" />
-                    {backfillOpinionScoresMutation.isPending ? "Analyzing..." : "Analyze Opinions (GPT-4)"}
+                    {backfillOpinionScoresMutation.isPending ? "Analyzing..." : "Analyze Opinions"}
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => backfillOpinionScoresMutation.mutate('gpt-5')}
-                    disabled={backfillOpinionScoresMutation.isPending}
-                    data-testid="button-backfill-scores-gpt5"
+                    onClick={() => regenerateSummariesMutation.mutate()}
+                    disabled={regenerateSummariesMutation.isPending}
+                    data-testid="button-regenerate-summaries"
                   >
                     <Sparkles className="h-4 w-4 mr-2" />
-                    {backfillOpinionScoresMutation.isPending ? "Analyzing..." : "Analyze Opinions (GPT-5)"}
+                    {regenerateSummariesMutation.isPending ? "Regenerating..." : "Regenerate Summaries"}
                   </Button>
                 </div>
               </div>

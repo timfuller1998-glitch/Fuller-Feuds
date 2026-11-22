@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { AIService } from '../aiService.js';
+import { chatParams } from '../lib/aiConfig.js';
 
 export type EmotionalIntensity = 'passionate' | 'measured' | 'analytical' | 'personal';
 
@@ -57,7 +58,7 @@ Return ONLY the neutral topic title, nothing else.`;
 
     try {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        ...chatParams({ maxTokens: 50, temperature: 0.3 }),
         messages: [
           {
             role: "system",
@@ -68,8 +69,6 @@ Return ONLY the neutral topic title, nothing else.`;
             content: prompt
           }
         ],
-        temperature: 0.3,
-        max_tokens: 50
       });
 
       const responseContent = completion.choices[0]?.message?.content?.trim();
@@ -128,7 +127,7 @@ Return JSON only:
 
     try {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        ...chatParams({ maxTokens: 800, temperature: 0.7, json: true }),
         messages: [
           {
             role: "system",
@@ -139,9 +138,6 @@ Return JSON only:
             content: prompt
           }
         ],
-        response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 800
       });
 
       const responseContent = completion.choices[0]?.message?.content;
@@ -321,7 +317,7 @@ Return JSON array with exactly ${count} items:
 }`;
 
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          ...chatParams({ maxTokens: maxTokens, temperature: 0.8, json: true }),
           messages: [
             {
               role: "system",
@@ -332,9 +328,6 @@ Return JSON array with exactly ${count} items:
               content: prompt
             }
           ],
-          response_format: { type: "json_object" },
-          temperature: 0.8, // Higher temperature for more diversity
-          max_tokens: maxTokens,
         });
 
         const responseContent = completion.choices[0]?.message?.content;

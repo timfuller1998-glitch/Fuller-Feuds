@@ -442,6 +442,11 @@ export class OpinionService {
     this.distributionUpdateQueue.set(topicId, timeout);
   }
 
+  /** Recalculate now (no debounce), e.g. right after a topic's summary row is first created. */
+  async recalculateTopicDistributionNow(topicId: string): Promise<void> {
+    await this.calculateAndUpdateDistribution(topicId);
+  }
+
   private async calculateAndUpdateDistribution(topicId: string): Promise<void> {
     // Use transaction for atomicity (prevents race conditions)
     await db.transaction(async (tx) => {
