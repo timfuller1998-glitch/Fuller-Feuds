@@ -1,3 +1,13 @@
+## 2026-11-21 (19:17 CST, America/Chicago) — Explore Topics Map pills no longer overlap (branch fix/topics-map-spacing)
+Made by the Fuller Feuds Dev bot (Grok Bot). Timothy asked to make sure the pills on the Explore Topics Map don't overcrowd each other.
+- Category and topic pills now get an angular slice proportional to how many topics hang off them, so a busy group like Politics or Other gets more room than a small one like Climate.
+- Ring radius is computed from the measured pill size (including the count under a category) so neighbors on the same ring fit with padding. If a parent still has too many children for one arc, extra children move to a farther compact ring instead of stacking.
+- A layout-time collision pass then nudges any remaining overlaps apart. This never runs per frame, so camera pan/zoom stays a single SVG transform.
+- Labels that would still collide at the current zoom are hidden or abbreviated, and only when lod, focus, or the tree changes. Deeper labels are hidden outright when zoomed out, not faded, so text never stacks. The focused branch stays visible.
+- Tapping a category still centers it and tries to fit its branches; if fitting every child would shrink the focused pill until it is hard to read, the camera zooms in anyway so the pill stays readable (outer branches may sit just off-screen and can be panned to).
+- Typecheck: 50 (ceiling 52). Unit tests cover the live topic tree and a 420-topic synthetic tree, both with no overlapping pills.
+- Left for later: on a narrow phone, a dense category like Politics can push a few child pills just off the right edge when focused; pan still reaches them. Secondary "also in" copies of a topic can sit farther out than the primary one.
+
 ## 2026-11-20 (19:11 CST, America/Chicago) — Explore Topics Map camera focuses without re-rooting (branch fix/topics-map-camera)
 Made by the Fuller Feuds Dev bot (Grok Bot). Timothy rated the first map about a 3/10 and asked to fix zooming first: tapping a category was opening it as its own map, but it should just center that pill at a zoom that shows its connecting branches.
 - The map is now one persistent radial tree in a single world space. Tapping a category, using the breadcrumb or back-to-parent control, or choosing a search result animates only the camera (translate + scale) to center that pill and fit its child branches and connecting lines. The rest of the tree stays in place around it.

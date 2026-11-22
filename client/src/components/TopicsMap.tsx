@@ -4,6 +4,14 @@ import {
   pathToNode,
   ROOT_ID,
 } from "@shared/topicTaxonomy";
+import {
+  layoutWorld,
+  measureLayoutBox,
+  measurePill,
+  planLabels,
+  shortLabel,
+  type LayoutItem,
+} from "@shared/topicsMapLayout";
 
 export const MAP_VIEW_KEY = "ff-topics-map-view";
 
@@ -12,15 +20,6 @@ export interface MapViewState {
   x: number;
   y: number;
   k: number;
-}
-
-interface LayoutItem {
-  id: string;
-  x: number;
-  y: number;
-  depth: number;
-  parentId?: string;
-  node: MapTreeNode;
 }
 
 interface Camera {
@@ -38,8 +37,8 @@ interface TopicsMapProps {
   className?: string;
 }
 
-const MIN_K = 0.22;
-const MAX_K = 8;
+const MIN_K = 0.08;
+const MAX_K = 10;
 const TAP_PX = 14;
 const FRAME_PAD = 56;
 
@@ -55,69 +54,12 @@ function lodFromK(k: number, baseK: number): 0 | 1 | 2 | 3 {
   return 3;
 }
 
-function measurePill(name: string, type: MapTreeNode["type"]): { w: number; h: number } {
-  if (type === "topic") {
-    const w = Math.min(280, Math.max(72, name.length * 7.2 + 20));
-    return { w, h: 28 };
-  }
-  if (type === "root") {
-    return { w: Math.max(150, name.length * 8.2 + 32), h: 40 };
-  }
-  const w = Math.min(220, Math.max(84, name.length * 7.4 + 28));
-  return { w, h: type === "major" ? 34 : 28 };
-}
-
-/** Persistent world layout: always rooted at the tree origin, never re-rooted. */
-function layoutWorld(tree: MapTreeNode): Map<string, LayoutItem> {
-  const items = new Map<string, LayoutItem>();
-  items.set(tree.id, { id: tree.id, x: 0, y: 0, depth: 0, node: tree });
-
-  const children = tree.children;
-  const n = children.length;
-  const R = Math.max(200, (n * 78) / (2 * Math.PI) * 2.15);
-
-  children.forEach((child, i) => {
-    const a = n === 0 ? 0 : (2 * Math.PI * i) / n - Math.PI / 2;
-    const x = Math.cos(a) * R;
-    const y = Math.sin(a) * R;
-    items.set(child.id, { id: child.id, x, y, depth: 1, parentId: tree.id, node: child });
-
-    const grands = child.children;
-    if (!grands.length) return;
-    const r2 = R + Math.max(150, 22 * Math.sqrt(grands.length) + 70);
-    const wedge = n === 0 ? Math.PI / 2 : ((2 * Math.PI) / n) * 0.82;
-    grands.forEach((g, j) => {
-      const t = grands.length === 1 ? 0.5 : j / (grands.length - 1);
-      const a2 = a - wedge / 2 + t * wedge;
-      items.set(g.id, {
-        id: g.id,
-        x: Math.cos(a2) * r2,
-        y: Math.sin(a2) * r2,
-        depth: 2,
-        parentId: child.id,
-        node: g,
-      });
-
-      const greats = g.children;
-      if (!greats.length) return;
-      const r3 = r2 + Math.max(120, 16 * Math.sqrt(greats.length) + 50);
-      const wedge2 = (wedge / Math.max(grands.length, 1)) * 0.9;
-      greats.forEach((tNode, k) => {
-        const u = greats.length === 1 ? 0.5 : k / (greats.length - 1);
-        const a3 = a2 - wedge2 / 2 + u * wedge2;
-        items.set(tNode.id, {
-          id: tNode.id,
-          x: Math.cos(a3) * r3,
-          y: Math.sin(a3) * r3,
-          depth: 3,
-          parentId: g.id,
-          node: tNode,
-        });
-      });
-    });
-  });
-
-  return items;
+/** Lowest zoom in a lod band, used so label hiding is stable during a gesture. */
+function kFloorForLod(lod: number, baseK: number) {
+  if (lod <= 0) return Math.max(baseK, 0.2);
+  if (lod === 1) return 1.35 * baseK;
+  if (lod === 2) return 2.4 * baseK;
+  return 3.8 * baseK;
 }
 
 function easeInOutCubic(t: number) {
@@ -174,19 +116,20 @@ function frameNode(
   let halfW = 40;
   let halfH = 40;
   members.forEach((it) => {
-    const { w, h } = measurePill(it.node.name, it.node.type);
-    const extra = it.node.type !== "topic" && it.node.type !== "root" && it.node.count > 0 ? 14 : 0;
+    const { w, h } = measureLayoutBox(it.node);
     halfW = Math.max(halfW, Math.abs(it.x - w / 2 - cx), Math.abs(it.x + w / 2 - cx));
-    halfH = Math.max(halfH, Math.abs(it.y - h / 2 - cy), Math.abs(it.y + h / 2 + extra - cy));
+    halfH = Math.max(halfH, Math.abs(it.y - h / 2 - cy), Math.abs(it.y + h / 2 - cy));
   });
-  const k = clamp(
-    Math.min(
-      viewport.clientWidth / (halfW * 2 + FRAME_PAD * 2),
-      viewport.clientHeight / (halfH * 2 + FRAME_PAD * 2),
-    ),
-    MIN_K,
-    MAX_K,
+  const fitK = Math.min(
+    viewport.clientWidth / (halfW * 2 + FRAME_PAD * 2),
+    viewport.clientHeight / (halfH * 2 + FRAME_PAD * 2),
   );
+  // If fitting every child would shrink the focused pill until it is hard to
+  // read, zoom in anyway. Outermost branches can sit just off-screen; the
+  // user can pan, and the connecting lines still show the way.
+  const pill = measurePill(focus.node.name, focus.node.type);
+  const readableK = focus.depth > 0 ? 112 / Math.max(pill.w, 72) : 0;
+  const k = clamp(Math.max(fitK, readableK), MIN_K, MAX_K);
   return { x: cx, y: cy, k };
 }
 
@@ -203,6 +146,7 @@ export default function TopicsMap({
   const cam = useRef<Camera>({ x: 0, y: 0, k: 1 });
   const baseKRef = useRef(1);
   const layoutRef = useRef<Map<string, LayoutItem>>(new Map());
+  const nodeEls = useRef<Map<string, SVGGElement>>(new Map());
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinch = useRef<{ dist: number; k: number; lx: number; ly: number } | null>(null);
   const drag = useRef<{ x: number; y: number; cx: number; cy: number; moved: boolean } | null>(null);
@@ -221,8 +165,28 @@ export default function TopicsMap({
     const highlight = highlightId || focusId;
     return new Set(pathToNode(tree, highlight).map((n) => n.id));
   }, [tree, focusId, highlightId]);
+  const highlightIdRef = useRef(highlightId);
+  const pathIdsRef = useRef(pathIds);
+  highlightIdRef.current = highlightId;
+  pathIdsRef.current = pathIds;
 
   const items = useMemo(() => layoutWorld(tree), [tree]);
+  layoutRef.current = items;
+
+  const lodKeyRef = useRef("");
+
+  const applyLabelLod = (lod: number) => {
+    const plan = planLabels(layoutRef.current, {
+      k: kFloorForLod(lod, baseKRef.current),
+      focusId: focusIdRef.current,
+      highlightId: highlightIdRef.current,
+      pathIds: pathIdsRef.current,
+    });
+    nodeEls.current.forEach((el, id) => {
+      el.classList.toggle("tm-crowded", plan.hidden.has(id));
+      el.classList.toggle("tm-abbrev", plan.abbrev.has(id));
+    });
+  };
 
   const applyCamera = () => {
     const { x, y, k } = cam.current;
@@ -234,6 +198,11 @@ export default function TopicsMap({
     el.setAttribute("transform", `translate(${w / 2} ${h / 2}) scale(${k}) translate(${-x} ${-y})`);
     const lod = lodFromK(k, baseKRef.current);
     if (box.getAttribute("data-lod") !== String(lod)) box.setAttribute("data-lod", String(lod));
+    const key = `${lod}|${focusIdRef.current}|${highlightIdRef.current || ""}`;
+    if (lodKeyRef.current !== key) {
+      lodKeyRef.current = key;
+      applyLabelLod(lod);
+    }
   };
 
   const cancelAnim = () => {
@@ -307,6 +276,7 @@ export default function TopicsMap({
 
   useEffect(() => {
     layoutRef.current = items;
+    lodKeyRef.current = "";
     const box = viewportRef.current;
     if (!box || items.size === 0) return;
     baseKRef.current = frameNode(items, ROOT_ID, box).k;
@@ -501,6 +471,10 @@ export default function TopicsMap({
               return (
                 <g
                   key={node.id}
+                  ref={(el) => {
+                    if (el) nodeEls.current.set(node.id, el);
+                    else nodeEls.current.delete(node.id);
+                  }}
                   transform={`translate(${item.x} ${item.y})`}
                   className={`tm-node ${lodClass} ${isFocus || isChildOfFocus ? "tm-forced" : ""} ${isFocus ? "is-focus" : ""} ${isHighlight ? "is-highlight" : ""}`}
                   data-testid={`map-node-${node.id}`}
@@ -523,14 +497,30 @@ export default function TopicsMap({
                     ry={h / 2}
                     style={node.accent && node.type !== "topic" ? { stroke: node.accent } : undefined}
                   />
-                  <text
-                    className={node.type === "topic" ? "tm-topic-label" : "tm-label"}
-                    textAnchor="middle"
-                    y={node.type === "topic" && node.alsoIn?.length ? -2 : 4}
-                    fontSize={fontSize}
-                  >
-                    {labelSafe(node.name)}
-                  </text>
+                  {(() => {
+                    const full = labelSafe(node.name);
+                    const short = shortLabel(full, node.type);
+                    const y = node.type === "topic" && node.alsoIn?.length ? -2 : 4;
+                    const cls = node.type === "topic" ? "tm-topic-label" : "tm-label";
+                    return (
+                      <>
+                        <text
+                          className={`${cls} tm-label-full`}
+                          textAnchor="middle"
+                          y={y}
+                          fontSize={fontSize}
+                          data-full={full}
+                        >
+                          {full}
+                        </text>
+                        {short !== full && (
+                          <text className={`${cls} tm-label-short`} textAnchor="middle" y={y} fontSize={fontSize}>
+                            {short}
+                          </text>
+                        )}
+                      </>
+                    );
+                  })()}
                   {node.type !== "topic" && node.type !== "root" && node.count > 0 && (
                     <text className="tm-count" textAnchor="middle" y={h / 2 + 12}>
                       {node.count}
