@@ -5,8 +5,8 @@ import { CumulativeOpinionService } from './cumulativeOpinionService.js';
 import { AIService } from '../aiService.js';
 import { lexiconAnalysisService } from './lexiconAnalysisService.js';
 import { db } from '../db.js';
-import { opinions, cumulativeOpinions } from '../../shared/schema.js';
-import { eq, and, sql, asc } from 'drizzle-orm';
+import { opinions, cumulativeOpinions, userProfiles } from '../../shared/schema.js';
+import { eq, and, sql, asc, desc, inArray } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
 import { invalidateOpinionCache, invalidateTopicCache, invalidateCumulativeOpinionCache } from './cacheInvalidation.js';
@@ -608,14 +608,36 @@ export class OpinionService {
     // Tier 3: Cold topics handled by daily CRON
   }
 
-  private async analyzeUserPoliticalCompass(userId: string): Promise<void> {
+  /**
+   * Profile political compass (was a TODO stub, so every profile stayed at 0/0). Analyzes the user's
+   * last 50 opinions and saves the result. Returns false (and saves nothing) if the AI call fell back.
+   */
+  async analyzeUserPoliticalCompass(userId: string): Promise<boolean> {
     try {
-      // Get user's last 50 opinions for analysis
-      // This would need to be implemented - for now just log
-      console.log(`[AI Analysis] Analyzing political compass for user ${userId}`);
-      // TODO: Implement AI analysis using AIService
+      const recent = await db.select().from(opinions)
+        .where(and(eq(opinions.userId, userId), inArray(opinions.status, ['approved', 'pending'])))
+        .orderBy(desc(opinions.createdAt))
+        .limit(50);
+      if (recent.length === 0) return false;
+      console.log(`[AI Analysis] Analyzing political compass for user ${userId} (${recent.length} opinions)`);
+      const result = await AIService.analyze2DPoliticalCompass(recent);
+      if (result.reasoning?.startsWith('Fallback')) {
+        console.warn(`[AI Analysis] Compass for user ${userId} not saved: AI unavailable`);
+        return false;
+      }
+      await db.update(userProfiles)
+        .set({
+          economicScore: result.economicScore,
+          authoritarianScore: result.authoritarianScore,
+          leaningConfidence: result.confidence,
+          politicalLeaning: result.quadrant,
+          lastAnalyzedAt: sql`now()`,
+        } as any)
+        .where(eq(userProfiles.userId, userId));
+      return true;
     } catch (error) {
       console.error(`Failed to analyze political compass for user ${userId}:`, error);
+      return false;
     }
   }
 }
