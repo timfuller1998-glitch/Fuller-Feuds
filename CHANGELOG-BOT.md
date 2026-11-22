@@ -1,3 +1,11 @@
+## 2026-11-21 (20:58 CST, America/Chicago) — Explore Topics Map: solid pills, site fonts, organic branches, theme support (branch fix/topics-map-style)
+Made by the Fuller Feuds Dev bot (Grok Bot). Timothy said the bubbles shouldn't be transparent, the font should match the site, the lines felt thick and simplistic, and light theme was showing dark colors.
+- Pills are fully solid at rest in every theme (no alpha on fills, hover, focus, or text). Only the brief pop/merge fade uses opacity.
+- Fonts now match the site: category pills use Playfair Display bold (the site's heading font), topic pills use Source Serif 4 (the body font), the center hub uses Anton like the wordmark, and counts use Inter. Pill sizes were re-measured for these fonts.
+- Lines are now thin, tapered, gently curved branches: a cubic curve from parent to child drawn as one filled path, thicker at the parent and fine at the child, with a brand-red gradient that fades toward the child. They follow the float and sway slightly. Widths stay constant on screen at any zoom. No filters; still 60fps.
+- The map and its header (back button, breadcrumb, search, results, loading) follow the site theme through the shared CSS variables: light background, card-colored pills, and dark-red branches in light theme; the existing palette in dark; and a matching mid tone in medium. Switching the theme updates the map live.
+- Typecheck: 50 (ceiling 52). `npm run test:shared`: 23 pass. Build OK.
+
 ## 2026-11-21 (20:40 CST, America/Chicago) — Explore Topics Map pops open and floats (branch fix/topics-map-organic)
 Made by the Fuller Feuds Dev bot (Grok Bot). Timothy said the map felt too rigid and asked for pills that pop into their parts as you zoom in, float around, and recombine into the umbrella pill when you zoom back out.
 - Semantic zoom: zoomed out, each category is one umbrella pill with its count. Zooming in on it (wheel, pinch, or a tap) pops its children out of the parent with a springy scale/opacity burst. Zooming back out pulls them back in and merges them into the umbrella. Works at every level, so niche topics only appear deep in. Hysteresis keeps it from flickering at the threshold, and only umbrellas near the view pop.

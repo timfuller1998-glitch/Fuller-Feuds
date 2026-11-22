@@ -706,21 +706,38 @@
 }
 
 
-/* Explore Topics Map — always uses the dark theme palette, even in light mode.
-   Camera motion is a single SVG transform; no layout or filter animation. */
+/* Explore Topics Map — follows the site theme (light / medium / dark) through
+   the shared CSS variables. Pills are solid; branches are tapered filled paths
+   with a gradient. Motion is SVG transforms only; no filters. */
 .topics-map {
-  --tm-bg: hsl(30 14% 9%);
-  --tm-fg: hsl(40 35% 90%);
-  --tm-muted: hsl(38 18% 70%);
-  --tm-line: hsl(4 72% 66%);
-  --tm-pill: hsl(30 13% 16%);
-  --tm-pill-border: hsl(38 22% 70% / 0.35);
-  --tm-hover: hsl(4 72% 66%);
+  --tm-bg: hsl(var(--background));
+  --tm-fg: hsl(var(--foreground));
+  --tm-muted: hsl(var(--muted-foreground));
+  --tm-line: hsl(var(--primary));
+  --tm-pill: hsl(var(--card));
+  --tm-pill-border: hsl(var(--border));
+  --tm-hover: hsl(var(--primary));
+  --tm-hover-fill: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)));
+  --tm-focus-fill: color-mix(in srgb, hsl(var(--primary)) 16%, hsl(var(--card)));
+  --tm-focus-fg: hsl(var(--primary));
   background: var(--tm-bg);
   color: var(--tm-fg);
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+.dark .topics-map {
+  --tm-pill: hsl(30 13% 16%);
+  --tm-pill-border: hsl(38 18% 46%);
+  --tm-hover-fill: hsl(4 28% 21%);
+  --tm-focus-fill: hsl(4 32% 25%);
+  --tm-focus-fg: hsl(40 40% 96%);
+}
+.medium .topics-map {
+  --tm-pill: hsl(30 13% 22%);
+  --tm-hover-fill: hsl(4 24% 27%);
+  --tm-focus-fill: hsl(4 28% 30%);
+  --tm-focus-fg: hsl(40 40% 96%);
 }
 .topics-map svg {
   display: block;
@@ -732,18 +749,11 @@
   cursor: grabbing;
 }
 .topics-map .tm-link {
-  fill: none;
-  stroke: var(--tm-line);
-  stroke-width: 1.25;
-  stroke-linecap: round;
-  opacity: 0.85;
+  stroke: none;
   pointer-events: none;
-  vector-effect: non-scaling-stroke;
 }
-.topics-map .tm-link.tm-path {
-  stroke-width: 2.25;
-  opacity: 1;
-}
+.topics-map .tm-stop-a { stop-color: var(--tm-line); stop-opacity: 0.9; }
+.topics-map .tm-stop-b { stop-color: var(--tm-line); stop-opacity: 0.28; }
 .topics-map .tm-pill {
   fill: var(--tm-pill);
   stroke: var(--tm-pill-border);
@@ -755,38 +765,45 @@
 .topics-map .tm-node:hover .tm-pill,
 .topics-map .tm-node:focus-visible .tm-pill {
   stroke: var(--tm-hover);
-  stroke-width: 2;
-  fill: hsl(4 72% 66% / 0.18);
+  stroke-width: 1.75;
+  fill: var(--tm-hover-fill);
 }
 .topics-map .tm-node.is-focus .tm-pill,
 .topics-map .tm-node.is-highlight .tm-pill {
   stroke: var(--tm-hover);
-  stroke-width: 2.25;
-  fill: hsl(4 72% 66% / 0.28);
+  stroke-width: 2;
+  fill: var(--tm-focus-fill);
 }
+.topics-map .tm-node:focus { outline: none; }
 .topics-map .tm-node.is-focus .tm-label,
-.topics-map .tm-node.is-highlight .tm-label {
-  fill: hsl(40 40% 96%);
+.topics-map .tm-node.is-highlight .tm-label,
+.topics-map .tm-node.is-highlight .tm-topic-label {
+  fill: var(--tm-focus-fg);
 }
 .topics-map .tm-label {
   fill: var(--tm-fg);
-  font-family: Inter, system-ui, sans-serif;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  letter-spacing: 0;
   pointer-events: none;
+}
+.topics-map .tm-node[data-map-type="root"] .tm-label {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .topics-map .tm-topic-label {
   fill: var(--tm-fg);
-  font-family: "Playfair Display", Georgia, serif;
+  font-family: var(--font-sans);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   text-transform: none;
   pointer-events: none;
 }
 .topics-map .tm-also {
   fill: var(--tm-muted);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -800,7 +817,8 @@
 }
 .topics-map .tm-count {
   fill: var(--tm-muted);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: var(--font-ui);
+  font-weight: 600;
   font-size: 9px;
   letter-spacing: 0.06em;
   pointer-events: none;
