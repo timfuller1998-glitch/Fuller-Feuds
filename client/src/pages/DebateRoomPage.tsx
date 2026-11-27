@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { debateTurn, useDebateRoom } from "@/lib/debateTurn";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MessageSquare, Send, LogOut, Swords, Lock, Unlock, Flag, Eye, Radio } from "lucide-react";
+import { MessageSquare, Send, LogOut, Swords, Lock, Unlock, Flag, Eye, Radio, MoreHorizontal } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -80,6 +82,7 @@ export default function DebateRoomPage() {
   const [flaggingMessageId, setFlaggingMessageId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{id: string, content: string, timestamp: string}>>([]);
+  const chatCardRef = useRef<HTMLDivElement>(null);
   const [showVotingModal, setShowVotingModal] = useState(false);
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -87,11 +90,10 @@ export default function DebateRoomPage() {
   const typingSender = useTypingSender(roomId);
 
   // Fetch debate room (debaters get the full room; anyone can watch a public, accepted debate)
-  const { data: room, isLoading: roomLoading, error: roomError } = useQuery<DebateRoom>({
-    queryKey: ["/api/debate-rooms", roomId],
-    enabled: !!roomId,
-    retry: false,
-  });
+  // Shared, self-refreshing room (turn state) — same source as the footer popup. `msgCount` is fed back from the
+  // messages query below so a new message refetches the turn.
+  const [msgCount, setMsgCount] = useState<number | undefined>(undefined);
+  const { data: room, isLoading: roomLoading, error: roomError } = useDebateRoom<DebateRoom>(roomId, msgCount);
   const amDebater = !!currentUser && !!room && (currentUser.id === room.participant1Id || currentUser.id === room.participant2Id);
 
   // Live updates over /ws for everyone on this page (debaters and spectators). Read-only.
@@ -131,6 +133,7 @@ export default function DebateRoomPage() {
     queryKey: ["/api/debate-rooms", roomId, "messages"],
     enabled: !!roomId && !!room,
   });
+  useEffect(() => { setMsgCount(messages.length); }, [messages.length]);
 
   // Send message mutation
   const sendMessageMutation = useMutation({
@@ -390,16 +393,17 @@ export default function DebateRoomPage() {
   const opp = isParticipant1 ? participant2 : participant1;
   const opponentFirstName = opp?.firstName || (opp?.handle ? '@' + opp.handle : 'Opponent');
   const opponentTypingHere = !!roomId && typingRooms.has(roomId) && room.status === 'active' && room.phase !== 'voting';
+  const turn = debateTurn(room, currentUser?.id);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4 p-4">
-      {/* Topic Header - Centered and Clean */}
-      <div className="text-center space-y-2">
+    <div className="max-w-5xl mx-auto space-y-2 sm:space-y-4 p-0 sm:p-4">
+      {/* Topic Header - compact on phones */}
+      <div className="text-center space-y-1 sm:space-y-2">
         <div className="flex items-center justify-center gap-2">
-          <div className="p-2 rounded-lg bg-primary/10">
+          <div className="hidden sm:block p-2 rounded-lg bg-primary/10">
             <Swords className="w-5 h-5 text-primary" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-debate-topic">
+          <h1 className="text-lg leading-snug sm:text-3xl font-bold line-clamp-2" data-testid="text-debate-topic">
             {topic?.title || "Loading topic..."}
           </h1>
         </div>
@@ -431,25 +435,25 @@ export default function DebateRoomPage() {
           )}
         </div>
         {topic?.description && (
-          <p className="text-muted-foreground text-sm max-w-2xl mx-auto">{topic.description}</p>
+          <p className="hidden sm:block text-muted-foreground text-sm max-w-2xl mx-auto">{topic.description}</p>
         )}
       </div>
 
       {/* Participants Face-Off - Horizontal VS Layout */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between gap-4">
+      <Card className="overflow-hidden">
+        <CardContent className="p-2.5 sm:p-6">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
             {/* Participant 1 */}
-            <div className="flex-1 flex items-center gap-3 justify-start">
-              <Avatar className="w-12 h-12 sm:w-16 sm:h-16">
+            <div className="flex-1 min-w-0 flex items-center gap-2 sm:gap-3 justify-start">
+              <Avatar className="w-9 h-9 sm:w-16 sm:h-16 shrink-0">
                 <AvatarImage src={participant1?.profileImageUrl} />
                 <AvatarFallback>
                   {participant1?.firstName?.[0] || participant1?.handle?.[0]?.toUpperCase() || "?"}
                   {participant1?.lastName?.[0] || participant1?.handle?.[1]?.toUpperCase() || "?"}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex flex-col items-start">
-                <p className="font-semibold text-sm sm:text-base" data-testid={`text-participant-${participant1?.id}`}>
+              <div className="flex flex-col items-start min-w-0">
+                <p className="font-semibold text-sm sm:text-base truncate max-w-full" data-testid={`text-participant-${participant1?.id}`}>
                   {participant1?.firstName && participant1?.lastName
                     ? `${participant1.firstName} ${participant1.lastName}`
                     : (participant1?.handle ? '@' + participant1?.handle : undefined) || "Loading..."}
@@ -465,13 +469,13 @@ export default function DebateRoomPage() {
 
             {/* VS Badge */}
             <div className="flex-shrink-0">
-              <Badge variant="default" className="px-3 py-1 text-sm font-bold">VS</Badge>
+              <Badge variant="default" className="px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-bold">VS</Badge>
             </div>
 
             {/* Participant 2 */}
-            <div className="flex-1 flex items-center gap-3 justify-end">
-              <div className="flex flex-col items-end">
-                <p className="font-semibold text-sm sm:text-base" data-testid={`text-participant-${participant2?.id}`}>
+            <div className="flex-1 min-w-0 flex items-center gap-2 sm:gap-3 justify-end">
+              <div className="flex flex-col items-end min-w-0">
+                <p className="font-semibold text-sm sm:text-base truncate max-w-full" data-testid={`text-participant-${participant2?.id}`}>
                   {participant2?.firstName && participant2?.lastName
                     ? `${participant2.firstName} ${participant2.lastName}`
                     : (participant2?.handle ? '@' + participant2?.handle : undefined) || "Loading..."}
@@ -483,7 +487,7 @@ export default function DebateRoomPage() {
                   </Badge>
                 )}
               </div>
-              <Avatar className="w-12 h-12 sm:w-16 sm:h-16">
+              <Avatar className="w-9 h-9 sm:w-16 sm:h-16 shrink-0" data-testid="avatar-participant2">
                 <AvatarImage src={participant2?.profileImageUrl} />
                 <AvatarFallback>
                   {participant2?.firstName?.[0] || participant2?.handle?.[0]?.toUpperCase() || "?"}
@@ -494,41 +498,6 @@ export default function DebateRoomPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Action Buttons - End Debate & Privacy Toggle */}
-      {isParticipant && !isEnded && (
-        <div className="flex flex-wrap gap-2 justify-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleTogglePrivacy}
-            disabled={privacyMutation.isPending}
-            data-testid="button-toggle-privacy"
-          >
-            {isPrivate ? (
-              <>
-                <Unlock className="w-4 h-4 mr-2" />
-                Let people watch
-              </>
-            ) : (
-              <>
-                <Lock className="w-4 h-4 mr-2" />
-                Hide from spectators
-              </>
-            )}
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleEndDebate}
-            disabled={endDebateMutation.isPending}
-            data-testid="button-end-debate"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            End Debate
-          </Button>
-        </div>
-      )}
 
       {/* Debate invites: accept / decline (invitee), waiting + withdraw (inviter), closed notice */}
       {isParticipant && invitePendingForMe && (
@@ -638,10 +607,11 @@ export default function DebateRoomPage() {
       )}
 
       {/* Chat Area - Full Width */}
-      <Card className="flex flex-col h-[70vh] min-h-[400px] max-h-[600px]">
-        <CardHeader className="border-b">
+      {/* Phones: the chat fills the screen under the compact header, input pinned above the footer. */}
+      <Card ref={chatCardRef} className="flex flex-col h-[calc(100dvh-9.5rem)] min-h-[340px] sm:h-[70vh] sm:min-h-[400px] sm:max-h-[600px]" data-testid="card-debate-chat">
+        <CardHeader className="border-b p-3 sm:p-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="hidden sm:flex text-lg items-center gap-2">
               <MessageSquare className="w-5 h-5" />
               Debate Chat
             </CardTitle>
@@ -660,27 +630,44 @@ export default function DebateRoomPage() {
                 <Badge variant="secondary" data-testid="badge-spectator-turn">{turnName}'s turn</Badge>
               )}
               {/* Turn Indicator */}
-              {room.phase === 'structured' && currentUser && isParticipant && (
+              {room.phase === 'structured' && currentUser && isParticipant && !isEnded && (
                 <Badge 
-                  variant={room.currentTurn === currentUser.id ? 'default' : 'secondary'}
+                  variant={turn.isMyTurn ? 'default' : 'secondary'}
                   data-testid="badge-turn-indicator"
                   className="gap-1"
                 >
-                  {room.currentTurn === currentUser.id ? 'Your Turn' : "Opponent's Turn"}
-                  {room.currentTurn === currentUser.id && (
+                  {turn.isMyTurn ? 'Your Turn' : "Opponent's Turn"}
+                  {turn.isMyTurn && (
                     <span className="text-xs">
                       ({(currentUser.id === room.participant1Id ? (room.turnCount1 || 0) : (room.turnCount2 || 0)) + 1}/3)
                     </span>
                   )}
                 </Badge>
               )}
+              {isParticipant && !isEnded && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Debate options" data-testid="button-debate-menu">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleTogglePrivacy} disabled={privacyMutation.isPending} data-testid="button-toggle-privacy">
+                      {isPrivate ? <><Unlock className="w-4 h-4 mr-2" />Let people watch</> : <><Lock className="w-4 h-4 mr-2" />Hide from spectators</>}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleEndDebate} disabled={endDebateMutation.isPending} className="text-destructive focus:text-destructive" data-testid="button-end-debate">
+                      <LogOut className="w-4 h-4 mr-2" />End debate
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col p-0 min-h-0 overflow-hidden">
           {/* Messages */}
-          <ScrollArea className="flex-1 min-h-0 px-4">
-            <div className="space-y-4 py-4">
+          <ScrollArea className="flex-1 min-h-0 px-3 sm:px-4">
+            <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
               {allMessages.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -700,21 +687,32 @@ export default function DebateRoomPage() {
                       className={`flex gap-3 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}
                       data-testid={`message-${message.id}`}
                     >
-                      <Avatar className="w-8 h-8">
+                      <Avatar className="w-7 h-7 sm:w-8 sm:h-8 shrink-0">
                         <AvatarImage src={sender?.profileImageUrl} />
                         <AvatarFallback>
                           {sender?.firstName?.[0] || sender?.handle?.[0]?.toUpperCase() || "?"}
                           {sender?.lastName?.[0] || sender?.handle?.[1]?.toUpperCase() || "?"}
                         </AvatarFallback>
                       </Avatar>
-                      <div className={`flex-1 max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
-                        <div className="flex items-baseline gap-2 mb-1">
+                      <div className={`flex-1 max-w-[80%] sm:max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
+                        <div className="flex items-center gap-2 mb-1">
                           <p className="text-sm font-medium">
                             {senderName}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {parseServerDate(message.createdAt).toLocaleTimeString()}
+                            {parseServerDate(message.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                           </p>
+                          {!!currentUser && !isOwnMessage && !isEnded && !String(message.id).startsWith('optimistic-') && (
+                            <button
+                              onClick={() => setFlaggingMessageId(message.id)}
+                              className="p-1 -m-1 text-muted-foreground hover:text-destructive"
+                              aria-label="Flag a fallacy in this message"
+                              title="Flag fallacy"
+                              data-testid={`button-flag-message-${message.id}`}
+                            >
+                              <Flag className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                         <div
                           className={`rounded-lg p-3 ${
@@ -733,19 +731,6 @@ export default function DebateRoomPage() {
                           </div>
                         )}
                         
-                        {/* Flag button */}
-                        {!!currentUser && !isOwnMessage && !isEnded && !String(message.id).startsWith('optimistic-') && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setFlaggingMessageId(message.id)}
-                            className="mt-1 h-6 px-2 text-xs"
-                            data-testid={`button-flag-message-${message.id}`}
-                          >
-                            <Flag className="w-3 h-3 mr-1" />
-                            Flag Fallacy
-                          </Button>
-                        )}
                       </div>
                     </div>
                   );
@@ -757,7 +742,7 @@ export default function DebateRoomPage() {
 
           {/* Message Input */}
           {isParticipant && !isEnded && (
-            <div className="border-t p-4">
+            <div className="border-t p-2.5 sm:p-4">
               {/* Typing Indicator */}
               {opponentTypingHere && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2 px-1" data-testid="room-typing">
@@ -766,8 +751,8 @@ export default function DebateRoomPage() {
                 </div>
               )}
               {/* Turn restriction notice */}
-              {room.phase === 'structured' && currentUser && room.currentTurn !== currentUser.id && (
-                <div className="text-sm text-muted-foreground mb-2 px-1 text-center bg-muted/50 rounded py-2">
+              {turn.waiting && (
+                <div className="text-xs sm:text-sm text-muted-foreground mb-2 px-1 text-center bg-muted/50 rounded py-1.5 sm:py-2" data-testid="text-room-waiting">
                   <span className="italic">Wait for your turn to respond</span>
                 </div>
               )}
@@ -775,7 +760,7 @@ export default function DebateRoomPage() {
               <div className="flex gap-2">
                 <Input
                   placeholder={
-                    room.phase === 'structured' && currentUser && room.currentTurn !== currentUser.id
+                    turn.waiting
                       ? "Waiting for opponent's turn..."
                       : room.phase === 'voting'
                       ? "Please vote on your opponent's performance..."
@@ -795,9 +780,7 @@ export default function DebateRoomPage() {
                     }
                   }}
                   disabled={
-                    sendMessageMutation.isPending || 
-                    (room.phase === 'structured' && currentUser && room.currentTurn !== currentUser.id) ||
-                    room.phase === 'voting'
+                    sendMessageMutation.isPending || !turn.canSend
                   }
                   data-testid="input-message"
                 />
@@ -805,9 +788,7 @@ export default function DebateRoomPage() {
                   onClick={() => { handleSendMessage(); typingSender.stop(); }}
                   disabled={
                     !messageInput.trim() || 
-                    sendMessageMutation.isPending ||
-                    (room.phase === 'structured' && currentUser && room.currentTurn !== currentUser.id) ||
-                    room.phase === 'voting'
+                    sendMessageMutation.isPending || !turn.canSend
                   }
                   data-testid="button-send-message"
                 >

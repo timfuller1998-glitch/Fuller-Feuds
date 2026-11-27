@@ -15,11 +15,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTypingRooms, useTypingSender } from '@/lib/typingStore';
 import { TypingBubble } from './TypingBubble';
+import { debateTurn, useDebateRoom } from '@/lib/debateTurn';
 
 interface Message {
   id: string;
   content: string;
-  senderId: string;
+  userId?: string; // what the API sends
+  senderId?: string;
   senderName: string;
   createdAt: string;
 }
@@ -88,17 +90,15 @@ export function PopupDebateWindow({
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch debate room details
-  const { data: room } = useQuery<DebateRoom>({
-    queryKey: ['/api/debate-rooms', debateRoomId],
-  });
-
   // Fetch messages
   const { data: messages = [] } = useQuery<Message[]>({
     queryKey: ['/api/debate-rooms', debateRoomId, 'messages'],
     // Live updates arrive over the WebSocket (debate_update); polling is just a fallback if it drops.
     refetchInterval: 10000,
   });
+
+  // Debate room (turn state), shared with the full debate page and refreshed when messages move.
+  const { data: room } = useDebateRoom<DebateRoom>(debateRoomId, messages.length);
 
   // Send message mutation
   const sendMutation = useMutation({
@@ -203,10 +203,7 @@ export function PopupDebateWindow({
   };
 
   const avatarColor = get2DPoliticalCompassColor(0, 0);
-  const isMyTurn = room?.currentTurn === user?.id;
-  const isOver = !!room && (room.status !== 'active' || room.phase === 'voting');
-  const waiting = !!room && room.status === 'active' && room.phase === 'structured' && !!room.currentTurn && !isMyTurn;
-  const canSend = !room || (!isOver && !waiting);
+  const { isMyTurn, isOver, waiting, canSend } = debateTurn(room, user?.id);
   const openFull = () => { minimizeDebateWindow(debateRoomId); setLocation(`/debate-room/${debateRoomId}`); };
 
   return (
@@ -289,13 +286,20 @@ export function PopupDebateWindow({
             No messages yet. Start the conversation!
           </div>
         ) : (
-          messages.map((msg) => {
-            const isMe = msg.senderId === user?.id;
+          messages.map((msg, i) => {
+            // The API sends `userId`; comparing the old `senderId` put every message on the opponent's side.
+            const authorId = msg.userId ?? msg.senderId;
+            const isMe = !!user?.id && authorId === user.id;
+            const prevAuthor = i > 0 ? (messages[i - 1].userId ?? messages[i - 1].senderId) : null;
             return (
               <div 
                 key={msg.id}
-                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                data-testid={`popup-message-${isMe ? 'mine' : 'theirs'}`}
               >
+                {!isMe && prevAuthor !== authorId && (
+                  <span className="text-xs font-medium text-muted-foreground mb-0.5 px-1">{opponentName}</span>
+                )}
                 <div 
                   className={`max-w-[80%] sm:max-w-[70%] rounded-lg px-3 py-2 ${
                     isMe 
@@ -359,7 +363,7 @@ export function PopupDebateWindow({
             onChange={(e) => { setMessage(e.target.value); if (e.target.value) typingSender.onKey(); else typingSender.stop(); }}
             onBlur={typingSender.stop}
             onKeyPress={(e) => { if (e.key === 'Enter') typingSender.stop(); handleKeyPress(e); }}
-            placeholder={canSend ? "Type a message..." : waiting ? "Wait for your turn" : "Debate ended"}
+            placeholder={!room ? "Loading…" : canSend ? "Type a message..." : waiting ? "Wait for your turn" : "Debate ended"}
             disabled={!canSend || sendMutation.isPending}
             className="flex-1 min-w-0 px-3 py-2 text-base sm:text-sm rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             data-testid="input-message"
