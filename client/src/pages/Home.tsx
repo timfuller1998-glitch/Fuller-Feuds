@@ -125,13 +125,10 @@ export default function Home() {
       <section className="h-full snap-start shrink-0 flex flex-col items-center justify-center px-4 py-8">
         <div className="text-center space-y-3 sm:space-y-4">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
-            Every opinion. One fair fight.
+            Where opposing views feud over the fuller picture.
           </h1>
           <div className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed space-y-1">
-            <p>Submit your opinion. Change the summary</p>
-            <p>Debate 1v1. no comments, no crowd.</p>
-            <p>See both sides or step in to change minds.</p>
-            <p>Break echo chamber, one fair fight at a time.</p>
+            <p>No cheap shots, no endless dog piles. Just two people hashing out the fuller picture.</p>
           </div>
         </div>
         <p className="mt-8 font-ui text-xs text-muted-foreground" data-testid="home-legal-links">

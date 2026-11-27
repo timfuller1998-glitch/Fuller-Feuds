@@ -824,7 +824,7 @@ export default function Topic() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <TabsList className="w-full grid grid-cols-3">
-          <TabsTrigger value="ai">AI Summary</TabsTrigger>
+          <TabsTrigger value="ai">The Fuller Picture</TabsTrigger>
           <TabsTrigger value="yours">Your Opinion</TabsTrigger>
           <TabsTrigger value="others">Other Opinions</TabsTrigger>
         </TabsList>
@@ -839,7 +839,7 @@ export default function Topic() {
                 renderBack={(item) => <SummaryParagraphBack item={item} />}
                 maxWidth={420}
                 emptyLabel="No summary yet"
-                ariaLabel="AI summary paragraphs"
+                ariaLabel="The Fuller Picture paragraphs"
                 testId="summary-deck"
                 ads={false}
               />
@@ -847,7 +847,7 @@ export default function Topic() {
           ) : (
             <article className="rounded-xl border bg-card shadow-md deck-card-surface overflow-hidden px-5 py-5 md:px-8 md:py-7" data-testid="ai-summary-empty">
               <header className="mb-5">
-                <p className="font-ui text-xs uppercase tracking-[0.14em] text-[hsl(var(--gold))]">AI Summary</p>
+                <p className="font-ui text-xs uppercase tracking-[0.14em] text-[hsl(var(--gold))]">The Fuller Picture</p>
                 <div className="mt-3 h-px w-full bg-[hsl(var(--gold)/0.45)]" />
               </header>
               <p className="font-serif text-base italic text-muted-foreground">

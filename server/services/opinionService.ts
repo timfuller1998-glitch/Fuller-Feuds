@@ -5,7 +5,7 @@ import { CumulativeOpinionService } from './cumulativeOpinionService.js';
 import { AIService } from '../aiService.js';
 import { lexiconAnalysisService } from './lexiconAnalysisService.js';
 import { db } from '../db.js';
-import { opinions, cumulativeOpinions, userProfiles } from '../../shared/schema.js';
+import { opinions, cumulativeOpinions, userProfiles, topics } from '../../shared/schema.js';
 import { eq, and, sql, asc, desc, inArray } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
@@ -217,12 +217,10 @@ export class OpinionService {
       // 5. Check if summary regeneration needed (tiered, uses actual counts)
       await this.checkAndTriggerSummaryUpdate(data.topicId);
       
-      // 6. Trigger AI political compass analysis every 5 opinions (existing logic)
-      const profile = await this.userRepository.getProfile(data.userId, requestingUserId, requestingUserRole, req);
-      if (profile && profile.opinionCount && profile.opinionCount % 5 === 0) {
-        console.log(`[Trigger AI Analysis] User ${data.userId} reached ${profile.opinionCount} opinions`);
-
-        // Run analysis asynchronously
+      // 6. Keep profile opinion counts in sync, and refresh the compass every 5 visible opinions.
+      const { count } = await this.recountUserOpinions(data.userId);
+      if (count > 0 && count % 5 === 0) {
+        console.log(`[Trigger AI Analysis] User ${data.userId} reached ${count} opinions`);
         this.analyzeUserPoliticalCompass(data.userId).catch(error => {
           console.error(`[AI Analysis ERROR] Failed to analyze political compass for user ${data.userId}:`, error);
         });
@@ -347,8 +345,8 @@ export class OpinionService {
       
       // Invalidate caches after deleting opinion
       await invalidateOpinionCache(id, topicId);
-      if (opinion?.userId) await invalidateUserCache(opinion.userId);
       if (topicId) await this.updateTopicDistribution(topicId);
+      if (opinion?.userId) await this.recountUserOpinionsAndRefreshCompass(opinion.userId);
       
       // Log slow operations
       const duration = Date.now() - startTime;
@@ -611,16 +609,135 @@ export class OpinionService {
   }
 
   /**
+   * Visible opinions: approved or pending, on a topic that exists and is not hidden.
+   * Matches the profile opinion list (findEnrichedByUserId).
+   */
+  async countVisibleOpinions(userId: string): Promise<number> {
+    const result: any = await db.execute(sql`
+      SELECT COUNT(*)::int AS n
+      FROM opinions o
+      JOIN topics t ON t.id = o.topic_id
+      WHERE o.user_id = ${userId}
+        AND o.status IN ('approved', 'pending')
+        AND COALESCE(t.status, 'active') <> 'hidden'
+    `);
+    return Number((result.rows ?? result)[0]?.n || 0);
+  }
+
+  /** Rewrite opinion_count and total_opinions from a live visible-opinion count. */
+  async recountUserOpinions(userId: string): Promise<{ count: number; changed: boolean }> {
+    const count = await this.countVisibleOpinions(userId);
+    const [profile] = await db
+      .select({
+        opinionCount: userProfiles.opinionCount,
+        totalOpinions: userProfiles.totalOpinions,
+      })
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, userId))
+      .limit(1);
+    const changed = !profile
+      || (profile.opinionCount ?? 0) !== count
+      || (profile.totalOpinions ?? 0) !== count;
+    if (profile) {
+      await db.update(userProfiles)
+        .set({
+          opinionCount: count,
+          totalOpinions: count,
+          updatedAt: sql`now()`,
+        } as any)
+        .where(eq(userProfiles.userId, userId));
+    }
+    await invalidateUserCache(userId);
+    return { count, changed };
+  }
+
+  async recountUserOpinionsAndRefreshCompass(userId: string): Promise<void> {
+    const { count } = await this.recountUserOpinions(userId);
+    if (count === 0) {
+      await db.update(userProfiles)
+        .set({
+          economicScore: 0,
+          authoritarianScore: 0,
+          leaningConfidence: 'low',
+          politicalLeaning: null,
+          lastAnalyzedAt: sql`now()`,
+          updatedAt: sql`now()`,
+        } as any)
+        .where(eq(userProfiles.userId, userId));
+      await invalidateUserCache(userId);
+      return;
+    }
+    await this.analyzeUserPoliticalCompass(userId);
+  }
+
+  async recountUsersOnTopic(topicId: string): Promise<void> {
+    const result: any = await db.execute(sql`
+      SELECT DISTINCT user_id FROM opinions WHERE topic_id = ${topicId}
+    `);
+    const rows = result.rows ?? result;
+    for (const row of rows) {
+      if (row.user_id) await this.recountUserOpinionsAndRefreshCompass(row.user_id);
+    }
+  }
+
+  /** Startup repair: fix every profile's counts and rerun the compass when they changed. */
+  async recountAllProfiles(): Promise<{ updated: number; compass: number }> {
+    const profiles = await db.select({ userId: userProfiles.userId }).from(userProfiles);
+    let updated = 0;
+    let compass = 0;
+    for (const profile of profiles) {
+      const { count, changed } = await this.recountUserOpinions(profile.userId);
+      if (changed) updated++;
+      if (count === 0) {
+        await db.update(userProfiles)
+          .set({
+            economicScore: 0,
+            authoritarianScore: 0,
+            leaningConfidence: 'low',
+            politicalLeaning: null,
+            lastAnalyzedAt: sql`now()`,
+            updatedAt: sql`now()`,
+          } as any)
+          .where(eq(userProfiles.userId, profile.userId));
+        await invalidateUserCache(profile.userId);
+      } else if (changed) {
+        if (await this.analyzeUserPoliticalCompass(profile.userId)) compass++;
+      }
+    }
+    return { updated, compass };
+  }
+
+  /**
    * Profile political compass (was a TODO stub, so every profile stayed at 0/0). Analyzes the user's
-   * last 50 opinions and saves the result. Returns false (and saves nothing) if the AI call fell back.
+   * last 50 visible opinions and saves the result. Returns false (and saves nothing) if the AI call fell back.
    */
   async analyzeUserPoliticalCompass(userId: string): Promise<boolean> {
     try {
-      const recent = await db.select().from(opinions)
-        .where(and(eq(opinions.userId, userId), inArray(opinions.status, ['approved', 'pending'])))
+      const rows = await db.select({ opinion: opinions })
+        .from(opinions)
+        .innerJoin(topics, eq(opinions.topicId, topics.id))
+        .where(and(
+          eq(opinions.userId, userId),
+          inArray(opinions.status, ['approved', 'pending']),
+          sql`COALESCE(${topics.status}, 'active') <> 'hidden'`,
+        ))
         .orderBy(desc(opinions.createdAt))
         .limit(50);
-      if (recent.length === 0) return false;
+      const recent = rows.map((r) => r.opinion);
+      if (recent.length === 0) {
+        await db.update(userProfiles)
+          .set({
+            economicScore: 0,
+            authoritarianScore: 0,
+            leaningConfidence: 'low',
+            politicalLeaning: null,
+            lastAnalyzedAt: sql`now()`,
+            updatedAt: sql`now()`,
+          } as any)
+          .where(eq(userProfiles.userId, userId));
+        await invalidateUserCache(userId);
+        return true;
+      }
       console.log(`[AI Analysis] Analyzing political compass for user ${userId} (${recent.length} opinions)`);
       const result = await AIService.analyze2DPoliticalCompass(recent);
       if (result.reasoning?.startsWith('Fallback')) {

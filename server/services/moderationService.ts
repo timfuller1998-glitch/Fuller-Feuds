@@ -30,11 +30,19 @@ export class ModerationService {
   }
 
   async hideOpinion(opinionId: string, moderatorId: string, reason?: string): Promise<void> {
+    const { OpinionRepository } = await import('../repositories/opinionRepository.js');
+    const existing = await new OpinionRepository().findById(opinionId, moderatorId, 'admin');
     await this.repository.hideOpinion(opinionId, moderatorId, reason);
+    if (existing?.userId) {
+      const { OpinionService } = await import('./opinionService.js');
+      await new OpinionService().recountUserOpinionsAndRefreshCompass(existing.userId);
+    }
   }
 
   async hideTopic(topicId: string, moderatorId: string, reason?: string): Promise<void> {
     await this.repository.hideTopic(topicId, moderatorId, reason);
+    const { OpinionService } = await import('./opinionService.js');
+    await new OpinionService().recountUsersOnTopic(topicId);
   }
 
   async archiveTopic(topicId: string, moderatorId: string, reason?: string): Promise<void> {
@@ -43,6 +51,8 @@ export class ModerationService {
 
   async restoreTopic(topicId: string, moderatorId: string, reason?: string): Promise<void> {
     await this.repository.restoreTopic(topicId, moderatorId, reason);
+    const { OpinionService } = await import('./opinionService.js');
+    await new OpinionService().recountUsersOnTopic(topicId);
   }
 
   // User management
@@ -71,11 +81,22 @@ export class ModerationService {
   }
 
   async deleteOpinionAdmin(opinionId: string, adminId: string): Promise<void> {
+    const { OpinionRepository } = await import('../repositories/opinionRepository.js');
+    const existing = await new OpinionRepository().findById(opinionId, adminId, 'admin');
     await this.repository.deleteOpinionAdmin(opinionId, adminId);
+    const { OpinionService } = await import('./opinionService.js');
+    const opinionService = new OpinionService();
+    if (existing?.userId) await opinionService.recountUserOpinionsAndRefreshCompass(existing.userId);
+    if (existing?.topicId) {
+      const { invalidateOpinionCache } = await import('./cacheInvalidation.js');
+      await invalidateOpinionCache(opinionId, existing.topicId);
+    }
   }
 
   async deleteTopicAdmin(topicId: string, adminId: string): Promise<void> {
     await this.repository.deleteTopicAdmin(topicId, adminId);
+    const { OpinionService } = await import('./opinionService.js');
+    await new OpinionService().recountUsersOnTopic(topicId);
   }
 
   // Banned phrases management

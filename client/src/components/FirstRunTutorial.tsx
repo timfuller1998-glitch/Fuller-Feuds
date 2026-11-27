@@ -49,7 +49,7 @@ const IconRow = ({ icons }: { icons: ReactNode[] }) => (
 const STEPS: Step[] = [
   {
     kicker: "Welcome",
-    title: "Every opinion. One fair fight.",
+    title: "Where opposing views feud over the fuller picture.",
     body: (
       <>
         Fuller Feuds is where people argue about real questions and actually hear each other out. Every <strong>topic</strong> is a

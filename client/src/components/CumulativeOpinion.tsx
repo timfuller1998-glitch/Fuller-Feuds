@@ -44,7 +44,7 @@ export default function CumulativeOpinion({
             </div>
             <div>
               <h3 className="font-semibold text-lg flex items-center gap-2">
-                AI-Generated Summary
+                The Fuller Picture
                 <Sparkles className="w-4 h-4 text-primary" />
               </h3>
               <p className="text-sm text-muted-foreground">

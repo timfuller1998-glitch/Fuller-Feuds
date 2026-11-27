@@ -214,7 +214,7 @@ export default function AppSidebar({
             </div>
             <div>
               <h2 className="font-display font-normal uppercase leading-none tracking-[0.02em] text-[1.45rem]" data-testid="text-wordmark">Fuller<span className="text-primary"> Feuds</span></h2>
-              <p className="mt-1 text-xs italic text-muted-foreground">Every opinion. One fair fight.</p>
+              <p className="mt-1 text-xs italic text-muted-foreground">Where opposing views feud over the fuller picture.</p>
             </div>
           </div>
         </Link>

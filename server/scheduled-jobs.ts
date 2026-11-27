@@ -211,6 +211,12 @@ export function startScheduledJobs() {
         log(`[CRON ERROR] Summary sentence backfill failed: ${error}`);
       }
       try {
+        const counts = await opinionService.recountAllProfiles();
+        log(`[CRON] Profile opinion recount: ${counts.updated} counts updated, ${counts.compass} compasses rerun`);
+      } catch (error) {
+        log(`[CRON ERROR] Profile opinion recount failed: ${error}`);
+      }
+      try {
         await repairFallbackSummaries();
       } catch (error) {
         log(`[CRON ERROR] Summary repair failed: ${error}`);
