@@ -38,6 +38,7 @@ import { getParagraphTextAtIndex } from "@/lib/textSegments";
 import CardDeck from "@/components/CardDeck";
 import { OpinionDeckFront, OpinionDeckBack } from "@/components/OpinionDeckCard";
 import { SummaryParagraphFront, SummaryParagraphBack, type SummaryParagraphCard } from "@/components/SummaryParagraphCard";
+import { TopicResourceCards } from "@/components/TopicResourceCards";
 import { tallyStances } from "@/lib/stance";
 import { useQueries } from "@tanstack/react-query";
 
@@ -980,6 +981,8 @@ export default function Topic() {
           )}
         </TabsContent>
       </Tabs>
+
+      <TopicResourceCards topicId={id} />
 
       {/* Right-side sheet for paragraph / summary-segment interactions */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
