@@ -537,7 +537,7 @@ export default function TopicCard({
                   <div className="flex flex-col h-full justify-center min-h-0 max-h-full" style={{ transform: "matrix(1, 0, 0, 1, 0, 0)" }}>
                     <div className="flex items-center justify-center gap-2 mb-2 flex-shrink-0 mt-8">
                       <Sparkles className="w-4 h-4 text-primary" />
-                      <h3 className="font-semibold text-sm">AI Summary</h3>
+                      <h3 className="font-semibold text-sm">The Fuller Picture</h3>
                     </div>
                     <div className="flex-1 min-h-0 overflow-hidden flex items-center">
                       <p className="text-sm leading-relaxed overflow-hidden w-full h-full" data-testid={`text-ai-summary-${id}`}>

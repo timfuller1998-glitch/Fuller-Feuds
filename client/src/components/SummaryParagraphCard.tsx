@@ -34,7 +34,7 @@ export function SummaryParagraphFront({ item }: { item: SummaryParagraphCard }) 
   return (
     <div className={`${shell} p-4`} data-testid={`summary-card-front-${item.index}`}>
       <p className="font-ui text-[0.65rem] uppercase tracking-[0.14em] text-[hsl(var(--gold))]">
-        AI Summary
+        The Fuller Picture
       </p>
       <p className="mt-1 font-ui text-[0.65rem] uppercase tracking-[0.12em] text-muted-foreground">
         ¶ {item.index + 1} of {item.total}
