@@ -116,46 +116,35 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// Web Push (Nov 27 2026). Always show something: iOS revokes push for a site that receives one silently.
+// Payload: { title, body, url, tag }. Same tag = a merged burst replacing its earlier notification quietly.
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
-
-  try {
-    const payload = event.data.json();
-    const { title, body, icon, badge, tag, data } = payload;
-    const options = {
-      body: body || '',
-      icon: icon || '/icon-192.png',
-      badge: badge || '/badge-72.png',
-      tag: tag || 'default',
-      data: data || {},
-      vibrate: [200, 100, 200],
-      requireInteraction: false,
-      actions: [
-        { action: 'view', title: 'View' },
-        { action: 'close', title: 'Close' },
-      ],
-    };
-    event.waitUntil(self.registration.showNotification(title || 'Fuller Feuds', options));
-  } catch (error) {
-    console.error('[Service Worker] Error parsing push data:', error);
-  }
+  let p = {};
+  try { p = event.data ? event.data.json() : {}; } catch (e) { p = { body: event.data ? event.data.text() : '' }; }
+  const url = typeof p.url === 'string' && p.url.startsWith('/') ? p.url : '/';
+  event.waitUntil(self.registration.showNotification(p.title || 'Fuller Feuds', {
+    body: p.body || '',
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
+    tag: p.tag || url,
+    renotify: false,
+    data: { url },
+  }));
 });
 
+// Open the notification's page: reuse an open Fuller Feuds window (navigate + focus), otherwise open one.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const urlToOpen = event.notification.data?.url || '/';
-  if (event.action === 'close') return;
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url.includes(urlToOpen) && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
+  const target = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
+  event.waitUntil((async () => {
+    const list = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of list) {
+      if (new URL(c.url).origin !== self.location.origin) continue;
+      try {
+        if (c.url !== target && 'navigate' in c) await c.navigate(target);
+        return c.focus();
+      } catch (e) { /* fall through to openWindow */ }
+    }
+    if (clients.openWindow) return clients.openWindow(target);
+  })());
 });

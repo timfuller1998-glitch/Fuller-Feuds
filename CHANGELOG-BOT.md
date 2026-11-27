@@ -1,3 +1,21 @@
+## 2026-11-27 (1:50 PM CST, America/Chicago) — Phone notifications (Web Push) (branch feat/web-push)
+Made by the Fuller Feuds Dev bot (Grok Bot). Timothy approved real phone notifications when the app is closed. This builds on PR #80.
+- Keys: a new VAPID keypair. `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` (mailto:timothy@quickwebspro.com) were set on Render one key at a time, and no other env vars changed. A private copy is on the bot's box (chmod 600) and is not in the repo.
+- Server: `server/lib/webPush.ts` sends to each device the user has turned on (24h TTL). Subscriptions that come back 404 or 410 are pruned; other failures are logged and kept.
+  - Every stored notification is also sent as a push: debate invites, turns, and ratings through `notifyUser`, and activity through `notifyActivity`. Per-type switches and burst merging happen before the push.
+  - A push's tag is its burst key, so a merged burst replaces the earlier phone notification quietly instead of stacking.
+  - Endpoints: `GET /api/push/config` (public key), `POST /api/push/subscribe` and `POST /api/push/unsubscribe` (a device endpoint belongs to whoever is signed in on it), and `POST /api/push/test` (once per 10s).
+- Service worker: the `push` handler always shows a notification (iOS revokes push for sites that receive pushes silently) and uses the site's own icon. `notificationclick` navigates and focuses an open Fuller Feuds window, or opens the notification's URL. Caching, update, and reload logic are unchanged.
+- Settings > Notifications: a "Phone notifications" row with an "Enable phone notifications" button. Permission is requested right from the tap.
+  - On iPhone in a Safari tab, it says "Add Fuller Feuds to your Home Screen first…".
+  - It shows On / Blocked / Unsupported states, a "Turn off" button, and "Send test notification". The old unused `usePushNotifications` hook was rewritten.
+- DB: migration `0020_push_subscriptions.sql` is additive (create-if-missing table, endpoint index, RLS on). It was applied to live, where the table already existed.
+- Verified:
+  - A real Chrome subscription on a local dev server got an FCM endpoint. The server's send was authenticated by FCM, which answered 410 for the automated browser profile, and the subscription was pruned as designed.
+  - A push delivered to the service worker through DevTools showed the notification. Two pushes with the same tag left one notification (the merged title).
+  - `npm run test:notify` (local DB): 7 pass, including web push with one device sent, one 410 pruned, one 500 kept, and the tag/url payload.
+- Typecheck: 50 (ceiling 52). Shared tests: 35 pass. WS tests: 4 pass. Build OK.
+
 ## 2026-11-27 (1:30 PM CST, America/Chicago) — Activity notifications + footer bell (branch feat/activity-notifications)
 Made by the Fuller Feuds Dev bot (Grok Bot). Timothy asked for notifications when people respond to your stuff, and for the footer's Archive button to become the bell (Archive is still in the Debates tray).
 - Triggers (server-side, `server/lib/activityNotify.ts`, rules in `shared/notificationRules.ts`):

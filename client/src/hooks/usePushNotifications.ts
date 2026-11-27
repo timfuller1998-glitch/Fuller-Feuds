@@ -1,131 +1,92 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '@/lib/queryClient';
 
-export function usePushNotifications() {
-  const [permission, setPermission] = useState<NotificationPermission>('default');
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [isSupported, setIsSupported] = useState(false);
+export type PushState =
+  | 'checking'
+  | 'unsupported'      // this browser can't do Web Push
+  | 'ios-install'      // iPhone/iPad Safari tab: push only works from the Home Screen app
+  | 'off'              // supported, not subscribed (permission not asked yet, or granted but no subscription)
+  | 'on'               // this device is subscribed
+  | 'blocked'          // the user denied permission; only browser settings can undo it
+  | 'unavailable';     // server has no VAPID key
 
-  useEffect(() => {
-    // Check if push notifications are supported
-    const supported = 'serviceWorker' in navigator && 'PushManager' in window;
-    setIsSupported(supported);
-    
-    if (supported) {
-      setPermission(Notification.permission);
-      checkSubscription();
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const raw = atob((base64String + padding).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+/** Phone notifications for this device. `enable` must be called from a tap (browsers require it). */
+export function usePushNotifications() {
+  const [state, setState] = useState<PushState>('checking');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+      if (!supported) return setState(isIOS() && !isStandalone() ? 'ios-install' : 'unsupported');
+      if (Notification.permission === 'denied') return setState('blocked');
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = await reg?.pushManager.getSubscription();
+      setState(sub && Notification.permission === 'granted' ? 'on' : 'off');
+    } catch {
+      setState('off');
     }
   }, []);
 
-  const checkSubscription = async () => {
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const enable = useCallback(async () => {
+    setBusy(true); setError(null);
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      setIsSubscribed(!!subscription);
-    } catch (error) {
-      console.error('Failed to check subscription:', error);
-    }
-  };
-
-  const requestPermission = async () => {
-    if (!isSupported) {
-      console.warn('Push notifications are not supported');
-      return false;
-    }
-
-    try {
-      const result = await Notification.requestPermission();
-      setPermission(result);
-      return result === 'granted';
-    } catch (error) {
-      console.error('Failed to request permission:', error);
-      return false;
-    }
-  };
-
-  const subscribe = async () => {
-    if (!isSupported || permission !== 'granted') {
-      return false;
-    }
-
-    try {
-      // Register service worker if not already registered
-      let registration = await navigator.serviceWorker.getRegistration();
-      if (!registration) {
-        registration = await navigator.serviceWorker.register('/service-worker.js');
-      }
-
+      // Ask first, straight from the tap, before any awaits that could lose the user gesture on Safari.
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') { setState(permission === 'denied' ? 'blocked' : 'off'); return; }
+      const cfg = await (await fetch('/api/push/config', { credentials: 'include' })).json();
+      if (!cfg?.publicKey) { setState('unavailable'); return; }
+      const reg = (await navigator.serviceWorker.getRegistration()) || (await navigator.serviceWorker.register('/service-worker.js'));
       await navigator.serviceWorker.ready;
-
-      // Get VAPID public key from backend
-      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-      if (!vapidPublicKey) {
-        console.error('VAPID public key not found');
-        return false;
-      }
-
-      // Subscribe to push notifications
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
-      });
-
-      // Send subscription to backend
-      await apiRequest('POST', '/api/push/subscribe', subscription);
-
-      setIsSubscribed(true);
-      return true;
-    } catch (error) {
-      console.error('Failed to subscribe to push notifications:', error);
-      return false;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(cfg.publicKey) });
+      await apiRequest('POST', '/api/push/subscribe', sub.toJSON());
+      setState('on');
+    } catch (e: any) {
+      setError(e?.message || 'Could not turn on notifications');
+      await refresh();
+    } finally {
+      setBusy(false);
     }
-  };
+  }, [refresh]);
 
-  const unsubscribe = async () => {
+  const disable = useCallback(async () => {
+    setBusy(true); setError(null);
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      
-      if (subscription) {
-        await subscription.unsubscribe();
-        
-        // Notify backend
-        await apiRequest('POST', '/api/push/unsubscribe', { 
-          endpoint: subscription.endpoint 
-        });
-        
-        setIsSubscribed(false);
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = await reg?.pushManager.getSubscription();
+      if (sub) {
+        await apiRequest('POST', '/api/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => {});
+        await sub.unsubscribe();
       }
-      
-      return true;
-    } catch (error) {
-      console.error('Failed to unsubscribe:', error);
-      return false;
+      setState('off');
+    } finally {
+      setBusy(false);
     }
-  };
+  }, []);
 
-  return {
-    isSupported,
-    permission,
-    isSubscribed,
-    requestPermission,
-    subscribe,
-    unsubscribe
-  };
-}
+  const sendTest = useCallback(async () => {
+    setError(null);
+    try {
+      const r = await apiRequest('POST', '/api/push/test', {});
+      const { sent } = await r.json();
+      if (!sent) setError('No device accepted it. Try turning notifications off and on again.');
+    } catch (e: any) {
+      setError(String(e?.message || 'Test failed').replace(/^\d+:\s*/, ''));
+    }
+  }, []);
 
-// Helper function to convert VAPID key
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding)
-    .replace(/\-/g, '+')
-    .replace(/_/g, '/');
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
+  return { state, busy, error, enable, disable, sendTest };
 }

@@ -2,6 +2,7 @@ import { and, desc, eq, gt, sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import { notifications, users } from '../../shared/schema.js';
 import { pushNotification } from '../websocket.js';
+import { pushForNotification } from './webPush.js';
 import { displayNameOf } from './debateFlow.js';
 import {
   type ActivityType, COLLAPSE_WINDOW_MS, describe, groupKeyFor, mergeActors, shouldNotify,
@@ -54,6 +55,7 @@ export async function notifyActivity(n: {
           .set({ ...text, actorIds, createdAt: new Date() })
           .where(eq(notifications.id, open.id)).returning();
         pushNotification(recipientId, row);
+        pushForNotification(recipientId, row);
         return row;
       }
     }
@@ -64,6 +66,7 @@ export async function notifyActivity(n: {
       userId: recipientId, type: n.type, ...text, groupKey, linkUrl: n.linkUrl, actorIds, topicId: n.topicId,
     }).returning();
     pushNotification(recipientId, row);
+    pushForNotification(recipientId, row);
     return row;
   } catch (e) {
     console.error('[notifyActivity] failed:', (e as Error).message);

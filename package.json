@@ -12,7 +12,7 @@
     "db:push": "drizzle-kit push",
     "test:shared": "tsx --test shared/**/*.test.ts",
     "test:ws": "tsx --test server/websocket.test.ts",
-    "test:notify": "tsx --test server/lib/activityNotify.test.ts"
+    "test:notify": "tsx --test server/lib/activityNotify.test.ts server/lib/webPush.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

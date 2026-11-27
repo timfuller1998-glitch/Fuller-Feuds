@@ -1,6 +1,7 @@
 import { db } from '../db.js';
 import { notifications } from '../../shared/schema.js';
 import { pushNotification } from '../websocket.js';
+import { pushForNotification } from './webPush.js';
 
 export type NotifyType = 'new_debate' | 'your_turn' | 'debate_ended' | 'rate_opponent' | 'ratings_in' | 'debate_accepted' | 'debate_declined';
 
@@ -15,6 +16,7 @@ export async function notifyUser(
       .values({ userId, type: n.type, title: n.title, message: n.message, debateRoomId: n.debateRoomId ?? null })
       .returning();
     pushNotification(userId, row);
+    pushForNotification(userId, row);
     return row;
   } catch (e) {
     console.error('[notify] failed:', (e as Error).message);

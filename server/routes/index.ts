@@ -18,6 +18,7 @@ import followRoutes from './follow.js';
 import leaderboardRoutes from './leaderboards.js';
 import handleRoutes from './handles.js';
 import notificationRoutes from './notifications.js';
+import pushRoutes from './push.js';
 import { feedbackRouter, adminFeedbackRouter } from './feedback.js';
 import { publicFoundersRouter, foundersRouter, adminFoundersRouter } from './founders.js';
 
@@ -50,6 +51,7 @@ router.use('/follow', followRoutes);
 router.use('/leaderboards', leaderboardRoutes);
 router.use('/handles', handleRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/push', pushRoutes);
 router.use('/feedback', feedbackRouter);
 router.use('/founders', foundersRouter);
 router.use('/', publicFoundersRouter);
