@@ -1,161 +1,161 @@
+import { useState } from "react";
+import { compassExtent, confidenceRadius, type Confidence } from "@shared/compassDescription";
+
 interface PoliticalCompassChartProps {
-  economicScore?: number | null;
-  authoritarianScore?: number | null;
+  economicScore: number;
+  authoritarianScore: number;
+  confidence?: Confidence;
+  /** "sm" hides the zoom toggle and outer labels, for compact reuse. */
   size?: "sm" | "md" | "lg";
+  markerLabel?: string;
+  className?: string;
 }
 
+// Plot area in SVG units; labels sit in the padding around it.
+const P = 26;
+const W = 240;
+const TOTAL = W + P * 2;
+
+const QUADRANTS = [
+  { x: 0, y: 0, color: "#c0392b", label: "Auth Left" },
+  { x: 1, y: 0, color: "#2f5d8a", label: "Auth Right" },
+  { x: 0, y: 1, color: "#3f7d4e", label: "Lib Left" },
+  { x: 1, y: 1, color: "#b8892e", label: "Lib Right" },
+];
+
+const fmt = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(Math.round(v))}`;
+
 export function PoliticalCompassChart({
-  economicScore = 0,
-  authoritarianScore = 0,
-  size = "md"
+  economicScore,
+  authoritarianScore,
+  confidence,
+  size = "md",
+  markerLabel,
+  className = "",
 }: PoliticalCompassChartProps) {
-  const sizeMap = {
-    sm: { width: 200, height: 200, fontSize: "text-xs" },
-    md: { width: 280, height: 280, fontSize: "text-sm" },
-    lg: { width: 360, height: 360, fontSize: "text-base" }
-  };
+  const e = Math.max(-100, Math.min(100, economicScore ?? 0));
+  const a = Math.max(-100, Math.min(100, authoritarianScore ?? 0));
+  const fitted = compassExtent(e, a);
+  const [full, setFull] = useState(false);
+  const extent = full ? 100 : fitted;
+  const zoomed = extent < 100;
 
-  const { width, height, fontSize } = sizeMap[size];
-  const padding = 40;
-  const chartWidth = width - padding * 2;
-  const chartHeight = height - padding * 2;
-
-  // Normalize scores from -100 to 100 range to chart coordinates
-  const normalizeX = (score: number) => {
-    return padding + ((score + 100) / 200) * chartWidth;
-  };
-
-  const normalizeY = (score: number) => {
-    // Inverted because SVG Y axis goes down
-    return padding + ((100 - score) / 200) * chartHeight;
-  };
-
-  const userX = normalizeX(economicScore || 0);
-  const userY = normalizeY(authoritarianScore || 0);
-
-  // Dynamic color calculation matching avatar ring system
-  const getQuadrantColor = (economicPos: number, authoritarianPos: number) => {
-    const x = economicPos / 100;  // -1 (economic Left) to +1 (economic Right)
-    const y = authoritarianPos / 100;  // -1 (libertarian) to +1 (authoritarian)
-    
-    const distanceFromCenter = Math.sqrt(x * x + y * y);
-    const intensity = Math.min(distanceFromCenter, 1);
-    
-    let hue: number;
-    let saturation: number;
-    let lightness: number;
-    
-    // Determine quadrant and base color
-    if (x < 0 && y >= 0) {
-      hue = 0; // Red - Authoritarian Left
-      saturation = 70 + (intensity * 25);
-      lightness = 55;
-    } else if (x >= 0 && y >= 0) {
-      hue = 220; // Blue - Authoritarian Right
-      saturation = 70 + (intensity * 25);
-      lightness = 55;
-    } else if (x < 0 && y < 0) {
-      hue = 140; // Green - Libertarian Left
-      saturation = 65 + (intensity * 30);
-      lightness = 50;
-    } else {
-      hue = 50; // Yellow - Libertarian Right
-      saturation = 70 + (intensity * 25);
-      lightness = 55;
-    }
-    
-    // Minimal white in center
-    if (distanceFromCenter < 0.15) {
-      saturation = saturation * 0.6;
-      lightness = 65;
-    } else if (distanceFromCenter < 0.3) {
-      saturation = saturation * 0.8;
-      lightness = 60;
-    } else {
-      lightness = 55 - (intensity * 10);
-    }
-    
-    // Fade to black at extremes (±85)
-    const absX = Math.abs(x);
-    const absY = Math.abs(y);
-    if (absX >= 0.85 || absY >= 0.85) {
-      const maxAbsolute = Math.max(absX, absY);
-      const extremeFactor = (maxAbsolute - 0.85) / 0.15;
-      lightness = lightness * (1 - extremeFactor * 0.7);
-      saturation = saturation * (1 - extremeFactor * 0.3);
-    }
-    
-    return `hsl(${hue} ${saturation}% ${lightness}%)`;
-  };
-
-  // Calculate corner colors for gradients using moderate values (±60)
-  // This prevents fade-to-black from activating on the gradient backgrounds
-  const quadrantColors = {
-    topLeft: getQuadrantColor(-60, 60),        // Red - Authoritarian Left
-    topRight: getQuadrantColor(60, 60),        // Blue - Authoritarian Right
-    bottomLeft: getQuadrantColor(-60, -60),    // Green - Libertarian Left
-    bottomRight: getQuadrantColor(60, -60)     // Yellow - Libertarian Right
-  };
+  const toX = (v: number) => P + ((v + extent) / (2 * extent)) * W;
+  const toY = (v: number) => P + ((extent - v) / (2 * extent)) * W;
+  const unit = W / (2 * extent);
+  const step = extent <= 30 ? 5 : extent <= 60 ? 10 : 25;
+  const ticks: number[] = [];
+  for (let t = -extent + step; t < extent; t += step) if (t !== 0) ticks.push(t);
+  const halo = confidenceRadius(confidence);
+  const cx = toX(e);
+  const cy = toY(a);
+  const half = W / 2;
+  const compact = size === "sm";
+  const maxW = size === "lg" ? "max-w-[420px]" : compact ? "max-w-[200px]" : "max-w-[340px]";
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <svg width={width} height={height} className="border border-border rounded-md bg-card">
-        {/* Gradient backgrounds for quadrants */}
-        <defs>
-          <radialGradient id="tl-gradient" cx="0%" cy="0%">
-            <stop offset="0%" stopColor={quadrantColors.topLeft} stopOpacity="0.5" />
-            <stop offset="50%" stopColor={quadrantColors.topLeft} stopOpacity="0.2" />
-            <stop offset="100%" stopColor={quadrantColors.topLeft} stopOpacity="0.05" />
-          </radialGradient>
-          <radialGradient id="tr-gradient" cx="100%" cy="0%">
-            <stop offset="0%" stopColor={quadrantColors.topRight} stopOpacity="0.5" />
-            <stop offset="50%" stopColor={quadrantColors.topRight} stopOpacity="0.2" />
-            <stop offset="100%" stopColor={quadrantColors.topRight} stopOpacity="0.05" />
-          </radialGradient>
-          <radialGradient id="bl-gradient" cx="0%" cy="100%">
-            <stop offset="0%" stopColor={quadrantColors.bottomLeft} stopOpacity="0.5" />
-            <stop offset="50%" stopColor={quadrantColors.bottomLeft} stopOpacity="0.2" />
-            <stop offset="100%" stopColor={quadrantColors.bottomLeft} stopOpacity="0.05" />
-          </radialGradient>
-          <radialGradient id="br-gradient" cx="100%" cy="100%">
-            <stop offset="0%" stopColor={quadrantColors.bottomRight} stopOpacity="0.5" />
-            <stop offset="50%" stopColor={quadrantColors.bottomRight} stopOpacity="0.2" />
-            <stop offset="100%" stopColor={quadrantColors.bottomRight} stopOpacity="0.05" />
-          </radialGradient>
-        </defs>
+    <div className={`w-full ${maxW} mx-auto ${className}`} data-testid="political-compass">
+      <svg
+        viewBox={`0 0 ${TOTAL} ${TOTAL}`}
+        className="w-full h-auto select-none"
+        role="img"
+        aria-label={`Political compass: economic ${fmt(e)}, social ${fmt(a)}`}
+      >
+        {QUADRANTS.map((q) => (
+          <rect key={q.label} x={P + q.x * half} y={P + q.y * half} width={half} height={half} fill={q.color} fillOpacity={0.09} />
+        ))}
+        {ticks.map((t) => (
+          <g key={t} stroke="hsl(var(--border))" strokeWidth={0.6} strokeOpacity={0.7}>
+            <line x1={toX(t)} y1={P} x2={toX(t)} y2={P + W} />
+            <line x1={P} y1={toY(t)} x2={P + W} y2={toY(t)} />
+          </g>
+        ))}
+        <rect x={P} y={P} width={W} height={W} fill="none" stroke="hsl(var(--border))" strokeWidth={1} rx={3} />
+        <line x1={P + half} y1={P} x2={P + half} y2={P + W} stroke="hsl(var(--foreground))" strokeOpacity={0.35} strokeWidth={1} />
+        <line x1={P} y1={P + half} x2={P + W} y2={P + half} stroke="hsl(var(--foreground))" strokeOpacity={0.35} strokeWidth={1} />
 
-        {/* Background quadrants */}
-        <rect x={padding} y={padding} width={chartWidth / 2} height={chartHeight / 2} fill="url(#tl-gradient)" />
-        <rect x={padding + chartWidth / 2} y={padding} width={chartWidth / 2} height={chartHeight / 2} fill="url(#tr-gradient)" />
-        <rect x={padding} y={padding + chartHeight / 2} width={chartWidth / 2} height={chartHeight / 2} fill="url(#bl-gradient)" />
-        <rect x={padding + chartWidth / 2} y={padding + chartHeight / 2} width={chartWidth / 2} height={chartHeight / 2} fill="url(#br-gradient)" />
+        {!compact &&
+          QUADRANTS.map((q) => (
+            <text
+              key={`l-${q.label}`}
+              x={P + q.x * half + (q.x ? half - 6 : 6)}
+              y={P + q.y * half + (q.y ? half - 6 : 12)}
+              textAnchor={q.x ? "end" : "start"}
+              className="font-ui"
+              fontSize={7.5}
+              letterSpacing={0.6}
+              fill={q.color}
+              fillOpacity={0.85}
+            >
+              {q.label.toUpperCase()}
+            </text>
+          ))}
 
-        {/* Grid lines */}
-        <line x1={padding} y1={padding + chartHeight / 2} x2={padding + chartWidth} y2={padding + chartHeight / 2} stroke="currentColor" strokeWidth="2" opacity="0.3" />
-        <line x1={padding + chartWidth / 2} y1={padding} x2={padding + chartWidth / 2} y2={padding + chartHeight} stroke="currentColor" strokeWidth="2" opacity="0.3" />
+        <g className="font-ui" fontSize={8} fontWeight={600} letterSpacing={0.8} fill="hsl(var(--muted-foreground))">
+          <text x={P + half} y={P - 9} textAnchor="middle">AUTHORITARIAN</text>
+          <text x={P + half} y={P + W + 16} textAnchor="middle">LIBERTARIAN</text>
+          <text x={P - 9} y={P + half} textAnchor="middle" transform={`rotate(-90 ${P - 9} ${P + half})`}>LEFT</text>
+          <text x={P + W + 9} y={P + half} textAnchor="middle" transform={`rotate(90 ${P + W + 9} ${P + half})`}>RIGHT</text>
+        </g>
+        {!compact && (
+          <g className="font-ui" fontSize={6.5} fill="hsl(var(--muted-foreground))" fillOpacity={0.8}>
+            <text x={P + 3} y={P + half + 9}>−{extent}</text>
+            <text x={P + W - 3} y={P + half + 9} textAnchor="end">+{extent}</text>
+          </g>
+        )}
 
-        {/* Lighter grid lines for quarters */}
-        <line x1={padding} y1={padding + chartHeight / 4} x2={padding + chartWidth} y2={padding + chartHeight / 4} stroke="currentColor" strokeWidth="1" opacity="0.15" strokeDasharray="4,4" />
-        <line x1={padding} y1={padding + (chartHeight * 3) / 4} x2={padding + chartWidth} y2={padding + (chartHeight * 3) / 4} stroke="currentColor" strokeWidth="1" opacity="0.15" strokeDasharray="4,4" />
-        <line x1={padding + chartWidth / 4} y1={padding} x2={padding + chartWidth / 4} y2={padding + chartHeight} stroke="currentColor" strokeWidth="1" opacity="0.15" strokeDasharray="4,4" />
-        <line x1={padding + (chartWidth * 3) / 4} y1={padding} x2={padding + (chartWidth * 3) / 4} y2={padding + chartHeight} stroke="currentColor" strokeWidth="1" opacity="0.15" strokeDasharray="4,4" />
-
-        {/* User position dot with glow effect */}
-        <circle cx={userX} cy={userY} r="6" fill="white" stroke="hsl(var(--primary))" strokeWidth="3" opacity="0.9" />
-        <circle cx={userX} cy={userY} r="10" fill="hsl(var(--primary))" opacity="0.2" />
-
-        {/* Axis labels: standard Political Compass (Left/Right on x, Authoritarian top, Libertarian bottom) */}
-        <text x={padding + chartWidth / 2} y={padding - 10} className={`fill-muted-foreground ${fontSize}`} textAnchor="middle">Authoritarian</text>
-        <text x={padding + chartWidth / 2} y={height - padding + 20} className={`fill-muted-foreground ${fontSize}`} textAnchor="middle">Libertarian</text>
-        <text x={padding - 6} y={padding + chartHeight / 2 + 4} className={`fill-muted-foreground ${fontSize}`} textAnchor="end">Left</text>
-        <text x={padding + chartWidth + 6} y={padding + chartHeight / 2 + 4} className={`fill-muted-foreground ${fontSize}`} textAnchor="start">Right</text>
+        {halo != null && (
+          <circle
+            cx={cx}
+            cy={cy}
+            r={Math.max(halo * unit, 9)}
+            fill="hsl(var(--primary))"
+            fillOpacity={0.14}
+            stroke="hsl(var(--primary))"
+            strokeOpacity={0.5}
+            strokeDasharray="3 3"
+            strokeWidth={1}
+            data-testid="compass-halo"
+          />
+        )}
+        <line x1={P + half} y1={P + half} x2={cx} y2={cy} stroke="hsl(var(--primary))" strokeOpacity={0.45} strokeWidth={1} strokeDasharray="2 2" />
+        <circle cx={cx} cy={cy} r={6.5} fill="hsl(var(--primary))" stroke="hsl(var(--card))" strokeWidth={2.5} data-testid="compass-marker" />
+        {!compact && (
+          <text
+            x={cx + (cx > P + W - 60 ? -10 : 10)}
+            y={cy + (cy < P + 16 ? 14 : -9)}
+            textAnchor={cx > P + W - 60 ? "end" : "start"}
+            className="font-ui"
+            fontSize={8.5}
+            fontWeight={700}
+            fill="hsl(var(--foreground))"
+            paintOrder="stroke"
+            stroke="hsl(var(--card))"
+            strokeWidth={3}
+          >
+            {markerLabel ? `${markerLabel} ` : ""}({fmt(e)}, {fmt(a)})
+          </text>
+        )}
       </svg>
-
-      {/* Score display */}
-      <div className={`text-center ${fontSize} text-muted-foreground`}>
-        <div>Economic (Left − / Right +): {economicScore !== null && economicScore !== undefined ? economicScore : 0}</div>
-        <div>Social (Libertarian − / Authoritarian +): {authoritarianScore !== null && authoritarianScore !== undefined ? authoritarianScore : 0}</div>
-      </div>
+      {!compact && (
+        <div className="mt-1 flex items-center justify-center gap-2 font-ui text-[0.65rem] uppercase tracking-[0.08em] text-muted-foreground">
+          {zoomed && (
+            <span className="rounded-full border border-border px-2 py-0.5" data-testid="compass-zoom-indicator">
+              Zoomed to ±{extent}
+            </span>
+          )}
+          {fitted < 100 && (
+            <button
+              type="button"
+              className="rounded-full px-2 py-0.5 text-primary hover:underline"
+              onClick={() => setFull((v) => !v)}
+              data-testid="button-compass-zoom"
+            >
+              {full ? "Zoom in" : "Full ±100 view"}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

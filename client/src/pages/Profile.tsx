@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AvatarWithBadge } from "@/components/AvatarWithBadge";
 import { PoliticalCompassChart } from "@/components/PoliticalCompassChart";
+import { describeCompass } from "@shared/compassDescription";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -350,30 +351,6 @@ export default function Profile() {
   const formatJoinDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString("en-US", { year: "numeric", month: "long" });
 
-  const get2DPoliticalDescription = (economicScore: number, authoritarianScore: number) => {
-    // Standard Political Compass: negative economic score = Left, positive = Right.
-    let economicLabel = "";
-    const absEconomic = Math.abs(economicScore);
-    if (absEconomic >= 85) economicLabel = economicScore < 0 ? "extreme left" : "extreme right";
-    else if (absEconomic >= 60) economicLabel = economicScore < 0 ? "very left" : "very right";
-    else if (absEconomic >= 30) economicLabel = economicScore < 0 ? "left" : "right";
-    else if (absEconomic >= 15) economicLabel = economicScore < 0 ? "moderate left" : "moderate right";
-    else economicLabel = "economically centrist";
-
-    let authoritarianLabel = "";
-    const absAuthoritarian = Math.abs(authoritarianScore);
-    if (absAuthoritarian >= 85) authoritarianLabel = authoritarianScore > 0 ? "extreme authoritarian" : "extreme libertarian";
-    else if (absAuthoritarian >= 60) authoritarianLabel = authoritarianScore > 0 ? "very authoritarian" : "very libertarian";
-    else if (absAuthoritarian >= 30) authoritarianLabel = authoritarianScore > 0 ? "authoritarian" : "libertarian";
-    else if (absAuthoritarian >= 15) authoritarianLabel = authoritarianScore > 0 ? "moderate authoritarian" : "moderate libertarian";
-    else authoritarianLabel = "socially centrist";
-
-    if (economicLabel.includes("centrist") && authoritarianLabel.includes("centrist")) return "moderate";
-    if (economicLabel.includes("centrist")) return authoritarianLabel;
-    if (authoritarianLabel.includes("centrist")) return economicLabel;
-    return `${economicLabel}, ${authoritarianLabel}`;
-  };
-
   const peopleList = activeTab === "following" ? following : followers;
   const filteredPeople = useMemo(() => {
     const q = peopleSearch.trim().toLowerCase();
@@ -424,9 +401,13 @@ export default function Profile() {
   const totalDebates = typeof debateStats?.totalDebates === "number" ? debateStats.totalDebates : null;
   const hasLeaning =
     !!profile && profile.economicScore != null && profile.authoritarianScore != null && (profile.totalOpinions ?? 0) > 0;
-  const leaningLabel = hasLeaning
-    ? get2DPoliticalDescription(profile!.economicScore ?? 0, profile!.authoritarianScore ?? 0)
+  const reading = hasLeaning
+    ? describeCompass(profile!.economicScore ?? 0, profile!.authoritarianScore ?? 0, {
+        opinions: profile!.totalOpinions,
+        confidence: profile?.leaningConfidence,
+      })
     : null;
+  const leaningLabel = reading?.region ?? null;
 
   const stats: { key: ProfileTab; label: string; value: number | string; icon: typeof MessageSquare; testId: string }[] = [
     { key: "opinions", label: "Opinions", value: opinionCount, icon: MessageSquare, testId: "button-stat-opinions" },
@@ -461,7 +442,7 @@ export default function Profile() {
         imageUrl={topic.imageUrl}
         categories={topic.categories}
         participantCount={topic.participantCount || 0}
-        opinionsCount={topic.opinionCount || 0}
+        opinionsCount={topic.opinionsCount ?? topic.opinionCount ?? 0}
         isActive={topic.isActive || false}
         previewContent={topic.previewContent}
         previewAuthor={topic.previewAuthor}
@@ -570,12 +551,6 @@ export default function Profile() {
             {leaningLabel && (
               <p className="mt-1 text-sm text-muted-foreground" data-testid="political-leaning-label">
                 {leaningLabel}
-                {profile?.leaningConfidence && (
-                  <span className="text-xs" data-testid="confidence-metric">
-                    {" "}
-                    · {profile.leaningConfidence} confidence
-                  </span>
-                )}
               </p>
             )}
             {(user.bio || profile?.bio) && (
@@ -585,30 +560,70 @@ export default function Profile() {
             )}
           </div>
 
-          <div className="mt-5 flex justify-center gap-1 sm:gap-4 lg:absolute lg:left-6 lg:top-8 lg:mt-0 lg:justify-start">
-            {stats.map((stat) => {
-              const Icon = stat.icon;
-              return (
+          <div className="mt-3 flex flex-col items-center gap-1.5" data-testid="profile-stats-row">
+            <div className="flex flex-wrap items-center justify-center gap-x-1 text-sm">
+              {stats.map((stat, i) => (
+                <span key={stat.key} className="inline-flex items-center">
+                  {i > 0 && <span className="mx-1 text-muted-foreground/60" aria-hidden="true">·</span>}
+                  <button
+                    type="button"
+                    className="rounded px-1 hover:underline"
+                    onClick={() => {
+                      setActiveTab(stat.key);
+                      setPeopleSearch("");
+                    }}
+                    data-testid={stat.testId}
+                  >
+                    <span className="font-semibold tabular-nums">{stat.value}</span>{" "}
+                    <span className="text-muted-foreground">{stat.label.toLowerCase()}</span>
+                  </button>
+                </span>
+              ))}
+              {totalDebates != null && (
+                <span className="inline-flex items-center" data-testid="text-total-debates">
+                  <span className="mx-1 text-muted-foreground/60" aria-hidden="true">·</span>
+                  <span className="px-1">
+                    <span className="font-semibold tabular-nums">{totalDebates}</span>{" "}
+                    <span className="text-muted-foreground">debates</span>
+                  </span>
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              {user.createdAt && <span data-testid="text-joined">Joined {formatJoinDate(user.createdAt)}</span>}
+              {topRank && (
                 <button
                   type="button"
-                  key={stat.key}
-                  className="text-center hover-elevate active-elevate-2 rounded-md px-3 py-2 transition-colors min-w-[5.5rem]"
-                  onClick={() => {
-                    setActiveTab(stat.key);
-                    setPeopleSearch("");
-                  }}
-                  data-testid={stat.testId}
+                  className="hover:underline"
+                  onClick={() => setShowLeaderboardsModal(true)}
+                  data-testid="button-rankings-about"
                 >
-                  <div className="flex flex-col items-center gap-0.5">
-                    <Icon className="w-4 h-4 text-primary" />
-                    <div className="text-base sm:text-lg font-semibold tabular-nums leading-none">{stat.value}</div>
-                    <div className="font-ui text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                      {stat.label}
-                    </div>
-                  </div>
+                  · #{topRank.me!.rank} {topRank.title.replace(/^(Most|Top) /, "")}
                 </button>
-              );
-            })}
+              )}
+            </div>
+            {earnedBadges.length > 0 && (
+              <button
+                type="button"
+                className="flex flex-wrap items-center justify-center gap-1"
+                onClick={() => setActiveTab("badges")}
+                data-testid="button-badges"
+                aria-label={`${earnedBadges.length} badges earned`}
+              >
+                {earnedBadges.slice(0, 3).map((b: any) => (
+                  <span
+                    key={b.badgeId ?? b.id}
+                    className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 font-ui text-[0.62rem] font-semibold uppercase tracking-[0.06em]"
+                  >
+                    <Trophy className="h-3 w-3 text-primary" />
+                    {b.name ?? b.badgeName ?? "Badge"}
+                  </span>
+                ))}
+                {earnedBadges.length > 3 && (
+                  <span className="font-ui text-[0.62rem] font-semibold text-muted-foreground">+{earnedBadges.length - 3}</span>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2 lg:absolute lg:right-6 lg:top-10 lg:mt-0 lg:justify-end">
@@ -713,77 +728,30 @@ export default function Profile() {
 
         {activeTab === "profile" && (
           <div className="space-y-6" data-testid="section-profile-about">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {user.createdAt && (
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      Joined
-                    </p>
-                    <p className="mt-1 text-sm">{formatJoinDate(user.createdAt)}</p>
-                  </CardContent>
-                </Card>
-              )}
-              <Card>
-                <CardContent className="p-4">
-                  <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Rankings
-                  </p>
-                  <button
-                    type="button"
-                    className="mt-1 text-sm hover:underline"
-                    onClick={() => setShowLeaderboardsModal(true)}
-                    data-testid="button-rankings-about"
-                  >
-                    {topRank ? `#${topRank.me!.rank} · ${topRank.title.replace(/^(Most|Top) /, "")}` : "View rankings"}
-                  </button>
-                </CardContent>
-              </Card>
-              {totalDebates != null && (
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground flex items-center gap-1.5">
-                      <Swords className="w-3.5 h-3.5" />
-                      Debates
-                    </p>
-                    <p className="mt-1 text-sm tabular-nums" data-testid="text-total-debates">
-                      {totalDebates}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-              <Card>
-                <CardContent className="p-4">
-                  <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    Badges
-                  </p>
-                  <button
-                    type="button"
-                    className="mt-1 text-sm hover:underline"
-                    onClick={() => setActiveTab("badges")}
-                    data-testid="button-badges"
-                  >
-                    {earnedBadges.length}/{milestoneBadges.length || earnedBadges.length} earned
-                  </button>
-                </CardContent>
-              </Card>
-            </div>
-
-            {hasLeaning && (
-              <Card>
-                <CardContent className="p-4 space-y-3">
-                  <h3 className="font-ui text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Political compass
-                  </h3>
-                  <PoliticalCompassChart
-                    economicScore={profile!.economicScore}
-                    authoritarianScore={profile!.authoritarianScore}
-                    size="sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Based on analysis of {profile!.totalOpinions} opinions
-                    {profile?.leaningConfidence ? ` · ${profile.leaningConfidence} confidence` : ""}
-                  </p>
+            {hasLeaning && reading && (
+              <Card data-testid="card-political-compass">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="grid gap-4 sm:grid-cols-[minmax(0,340px)_1fr] sm:items-center">
+                    <PoliticalCompassChart
+                      economicScore={profile!.economicScore ?? 0}
+                      authoritarianScore={profile!.authoritarianScore ?? 0}
+                      confidence={profile?.leaningConfidence}
+                    />
+                    <div className="space-y-2 text-center sm:text-left">
+                      <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        Political compass
+                      </p>
+                      <h3 className="font-serif text-lg sm:text-xl font-semibold leading-snug" data-testid="text-compass-region">
+                        {reading.region}
+                      </h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-compass-summary">
+                        {reading.summary}
+                      </p>
+                      <p className="text-xs text-muted-foreground/80" data-testid="confidence-metric">
+                        {reading.basis}
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -820,20 +788,25 @@ export default function Profile() {
                 </h3>
                 {followingTopics.length > 0 ? (
                   <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
-                    {followingTopics.map((item: any) =>
-                      item.type === "topic" || item.title ? (
-                        renderTopicCard(item)
-                      ) : (
-                        <Card key={`${item.type}-${item.id}`} className="p-4 text-sm text-muted-foreground">
-                          {item.content || "Update from someone you follow"}
-                        </Card>
-                      )
-                    )}
+                    {followingTopics.map((item: any) => (
+                      <div key={item.id} className="space-y-1.5">
+                        {item.followReason && (
+                          <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground" data-testid="text-follow-reason">
+                            {item.followReason}
+                          </p>
+                        )}
+                        {renderTopicCard(item)}
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <Card className="p-8 text-center">
-                    <UserPlus className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p className="text-muted-foreground">Follow users to see their topics and opinions here</p>
+                    <UserPlus className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                    <p className="text-muted-foreground" data-testid="text-following-empty">
+                      {followingCount === 0
+                        ? "You're not following anyone yet. Follow people from their profiles to see their new topics and opinions here."
+                        : "No recent topics or opinions from the people you follow."}
+                    </p>
                   </Card>
                 )}
               </div>

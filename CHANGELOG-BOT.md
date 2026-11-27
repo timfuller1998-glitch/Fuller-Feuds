@@ -1,3 +1,9 @@
+## Nov 27, 2026 2:47 PM CT — Profile page cleanup, working feeds, new political compass
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- Header: opinions / followers / following / debates collapsed into one tappable line under the name, with joined date, best rank, and a small inline badge strip. The separate Joined / Rankings / Debates / Badges blocks are gone.
+- "Recommended for you" and "From people you follow" were stub endpoints that always returned an empty list. They now return real topics: recommendations rank unanswered topics by the categories you already debate, then activity and recency; the following feed shows recent topics and opinions from people you follow with a short reason. Both are own-profile only (403 for anyone else), with a clear empty state when you follow no one. Topic cards now show the right opinion count.
+- Political compass redesigned: site fonts/colors, theme-aware, subtle quadrant tints, standard orientation, zoomed view (±max(25, |score|+10)) with a full ±100 toggle, and a confidence halo. A neutral plain-language reading (region, what it usually means, number of opinions and confidence) is generated deterministically in `shared/compassDescription.ts` (unit tested).
+
 ## Nov 27, 2026 2:07 PM CT — Fix debate chat screens (popup turn bug + mobile live view)
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - Footer popup chat: own messages right-aligned (was comparing a non-existent `senderId`, so everything showed as the opponent's); opponent name shown on their bubbles.
