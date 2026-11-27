@@ -13,6 +13,8 @@ import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/a
 import { insertOpinionSchema } from '../../shared/schema.js';
 import { z } from 'zod';
 import { invalidateVoteCache } from '../services/cacheInvalidation.js';
+import { notifyActivityLater } from '../lib/activityNotify.js';
+import { isLikeMilestone } from '../../shared/notificationRules.js';
 import { UnauthorizedError, ForbiddenError, AuthorizationError, DataAccessError } from '../utils/securityErrors.js';
 import { AiFlagService } from '../services/aiFlagService.js';
 
@@ -198,6 +200,12 @@ router.post('/:opinionId/vote', isAuthenticated, async (req, res) => {
     
     // Invalidate vote cache
     await invalidateVoteCache(req.params.opinionId, userId);
+
+    if (voteType === 'like' && isLikeMilestone(counts.likesCount)) {
+      const [op] = await db.select({ userId: opinionsTable.userId, topicId: opinionsTable.topicId }).from(opinionsTable).where(eq(opinionsTable.id, req.params.opinionId)).limit(1);
+      if (op) notifyActivityLater({ type: 'like_milestone', recipientId: op.userId, actorId: userId, likes: counts.likesCount,
+        targetId: req.params.opinionId, topicId: op.topicId, linkUrl: `/opinion/${req.params.opinionId}/counterpoints` });
+    }
     
     res.json({ message: voteType === null ? "Vote removed" : "Vote recorded", likesCount: counts.likesCount, dislikesCount: counts.dislikesCount, userVote: voteType ? { voteType } : null });
   } catch (error) {
@@ -446,6 +454,9 @@ router.post('/:opinionId/counterpoints', isAuthenticated, async (req, res) => {
       content: String(content ?? ''),
       paragraphText: paragraphText != null ? String(paragraphText) : undefined,
     });
+    const [op] = await db.select({ userId: opinionsTable.userId, topicId: opinionsTable.topicId }).from(opinionsTable).where(eq(opinionsTable.id, req.params.opinionId)).limit(1);
+    if (op) notifyActivityLater({ type: 'opinion_counterpoint', recipientId: op.userId, actorId: userId,
+      targetId: req.params.opinionId, topicId: op.topicId, linkUrl: `/opinion/${req.params.opinionId}/counterpoints` });
     res.status(201).json(created);
   } catch (error: any) {
     res.status(400).json({ message: error.message || 'Failed to create counterpoint' });

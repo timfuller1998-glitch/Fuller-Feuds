@@ -1,3 +1,22 @@
+## 2026-11-27 (1:30 PM CST, America/Chicago) — Activity notifications + footer bell (branch feat/activity-notifications)
+Made by the Fuller Feuds Dev bot (Grok Bot). Timothy asked for notifications when people respond to your stuff, and for the footer's Archive button to become the bell (Archive is still in the Debates tray).
+- Triggers (server-side, `server/lib/activityNotify.ts`, rules in `shared/notificationRules.ts`):
+  - A new opinion on a topic you created goes to the topic creator, and hidden or flagged opinions are skipped.
+  - A counterpoint on your opinion goes to the opinion's author.
+  - A debate started from your counterpoint goes to the counterpoint's author, unless they're the one invited, since they already get the invite.
+  - Like milestones on your opinion (5, 10, 25, 50, 100, 250, 500, 1000) notify once per milestone, even after an unlike and re-like.
+  - Existing debate invites, turns, and ratings notifications are unchanged. Counterpoints have no replies to notify about.
+- Rules:
+  - Nobody is notified about their own action.
+  - Bursts fold into one unread row per thing for 24h (for example "3 new opinions on your topic", "Dave and 2 others weighed in on …"), counted by distinct people.
+  - Each notification links to the topic, the opinion's counterpoints page, or the debate.
+  - They're pushed live over the existing `notification` socket event, which already refreshes the list. No polling. Notification failures never break the action that caused them.
+- Footer bell (`NotificationBell`): replaces the footer Archive button in every footer state. It shows an unread badge, opens the newest 30 notifications with unread dots, and includes "Mark all read". Tapping one marks it read and opens its link. Updates are optimistic, use stable callbacks, and only refetch once when opened. Archived debates are still in the Debates tray (Archive section).
+- Settings > Notifications has an on/off switch per type, stored in `users.notification_prefs` (missing keys mean on). Debate invites to you are always on. New endpoints are `GET/PUT /api/notifications/prefs`.
+- DB: migration `0019_activity_notifications.sql` is additive. It adds `group_key`, `link_url`, `actor_ids`, and `topic_id` to notifications plus 2 indexes, and `users.notification_prefs`. It was applied to the live project. No notifications were created for past activity, and no email or push notifications are sent.
+- Tests: 6 shared rule tests. `npm run test:notify` runs the DB trigger tests against a local seeded DB and skips otherwise; 6 pass locally (self-skip, 3-person burst collapse, fresh row after read, switch off, milestone once). WS tests: 4 pass.
+- Typecheck: 50 (ceiling 52). Shared tests: 35 pass. Build OK. Screenshots are in /workspace/ff-videos/nov27/notifications/.
+
 ## 2026-11-27 (13:00 CST, America/Chicago) — Profile picture uploads enabled on Render (config)
 Made by the Fuller Feuds Dev bot (Grok Bot). Set `SUPABASE_SERVICE_ROLE_KEY` on the Render web service so photo uploads can reach the `profile-pictures` bucket from PR #76. A test image was uploaded through the server storage helper, confirmed publicly readable, and then deleted. Timothy's profile picture was not changed. No secret values are recorded here.
 ## 2026-11-27 (1:05 PM CST, America/Chicago) — Live chat stability with several users (branch fix/live-chat-stability)

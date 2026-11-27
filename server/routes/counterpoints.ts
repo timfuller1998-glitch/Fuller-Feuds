@@ -5,6 +5,7 @@ import { DebateService } from '../services/debateService.js';
 import { notifyNewDebateCreated } from '../websocket.js';
 import { postDebateMessage, notifyDebateInvite, displayNameOf, FlowError } from '../lib/debateFlow.js';
 import { checkDebateStart, markInvitePending } from '../lib/debateLimits.js';
+import { notifyActivityLater } from '../lib/activityNotify.js';
 import { CounterpointRepository } from '../repositories/counterpointRepository.js';
 import { getPresenceForUserIds } from '../websocket.js';
 import { db } from '../db.js';
@@ -157,6 +158,11 @@ router.post('/:id/start-debate', isAuthenticated, async (req, res) => {
     await markInvitePending(room.id, requestingUserId, opponentUserId);
     notifyNewDebateCreated(room.id, await displayNameOf(requestingUserId), opponentUserId);
     await notifyDebateInvite(room.id, requestingUserId, opponentUserId, opinion.topicId);
+    // The counterpoint's author, if they aren't one of the two debaters (they'd already have the invite).
+    if (counterpoint.authorUserId !== opponentUserId) {
+      notifyActivityLater({ type: 'counterpoint_debate', recipientId: counterpoint.authorUserId, actorId: requestingUserId,
+        targetId: room.id, topicId: opinion.topicId, linkUrl: `/debate-room/${room.id}` });
+    }
 
     res.json(room);
   } catch (error: any) {

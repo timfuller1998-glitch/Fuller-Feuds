@@ -54,6 +54,7 @@ export const users = pgTable("users", {
   selectedBadgeId: varchar("selected_badge_id"), // Badge displayed on user avatar
   // Ad-free switch + future subscription placeholders (migration 0015, additive). No payments yet.
   adFree: boolean("ad_free").default(false),
+  notificationPrefs: jsonb("notification_prefs").$type<Record<string, boolean>>().default({}), // migration 0019
   subscriptionTier: varchar("subscription_tier", { length: 30 }),
   subscriptionExpiresAt: timestamp("subscription_expires_at"),
   // Founding members (migration 0016, additive): invite tree, source tracking, 18+ confirmation, founder perks.
@@ -212,6 +213,11 @@ export const notifications = pgTable("notifications", {
   messageId: uuid("message_id").references(() => debateMessages.id, { onDelete: "cascade" }),
   isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+  // Activity notifications (migration 0019): bursts collapse by group_key while unread.
+  groupKey: varchar("group_key", { length: 160 }),
+  linkUrl: text("link_url"),
+  actorIds: text("actor_ids").array().default(sql`ARRAY[]::text[]`),
+  topicId: uuid("topic_id").references(() => topics.id, { onDelete: "cascade" }),
 });
 
 // Push notification subscriptions for browser notifications

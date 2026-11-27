@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Archive } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 import { useDebateContext } from '@/contexts/DebateContext';
 import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
 import { DebateTray } from './DebateTray';
@@ -134,35 +135,17 @@ export function DebateFooter() {
               </div>
             </div>
 
-            {/* Archived Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openDebatesTray('archive')}
-              className="shrink-0"
-              data-testid="button-archived-debates"
-            >
-              <Archive className="w-4 h-4 mr-1" />
-              Archive
-            </Button>
+            {/* Notifications bell (replaced Archive, Nov 27: Archive lives in the Debates tray) */}
+            <NotificationBell side="top" />
           </>
         ) : hasArchivedDebates ? (
           <>
-            {/* Only archived debates - show welcoming message with archived button */}
+            {/* Only archived debates: Archive is in the Debates tray */}
             <DebateTray />
             <div className="flex-1 flex items-center justify-center gap-3 text-sm text-muted-foreground">
               <span>No active debates right now</span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openDebatesTray('archive')}
-              className="shrink-0"
-              data-testid="button-archived-debates"
-            >
-              <Archive className="w-4 h-4 mr-1" />
-              View Archive
-            </Button>
+            <NotificationBell side="top" />
           </>
         ) : (
           <>
@@ -173,6 +156,7 @@ export function DebateFooter() {
                 Start your first debate! Our community values respectful, thoughtful discussions.
               </span>
             </div>
+            <NotificationBell side="top" />
           </>
         )}
       </div>
