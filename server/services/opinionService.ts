@@ -8,6 +8,7 @@ import { db } from '../db.js';
 import { opinions, cumulativeOpinions, userProfiles, topics } from '../../shared/schema.js';
 import { eq, and, sql, asc, desc, inArray } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
+import { notifyActivityLater } from '../lib/activityNotify.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
 import { invalidateOpinionCache, invalidateTopicCache, invalidateCumulativeOpinionCache, invalidateUserCache } from './cacheInvalidation.js';
 import { logSecurityEvent } from '../utils/securityLogger.js';
@@ -210,6 +211,13 @@ export class OpinionService {
       
       // 3. Mark that user has an opinion on this topic
       await this.interactionRepository.markHasOpinion(data.userId, data.topicId);
+
+      // Tell the topic's creator (not for hidden/flagged opinions, never for their own).
+      if ((opinion as any)?.status !== 'hidden' && (opinion as any)?.status !== 'flagged') {
+        const [t] = await db.select({ createdById: topics.createdById }).from(topics).where(eq(topics.id, data.topicId)).limit(1);
+        notifyActivityLater({ type: 'topic_opinion', recipientId: t?.createdById, actorId: data.userId,
+          targetId: data.topicId, topicId: data.topicId, linkUrl: `/topic/${data.topicId}` });
+      }
       
       // 4. Update topic distribution (debounced, handles partial distributions)
       await this.updateTopicDistribution(data.topicId);

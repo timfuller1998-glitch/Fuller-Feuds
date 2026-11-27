@@ -10,10 +10,11 @@ import { ProfilePictureUpload } from "@/components/ProfilePictureUpload";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Save, User, Cloudy, Sun, Moon, AtSign, HelpCircle, Megaphone } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { NOTIFICATION_PREFS } from "@shared/notificationRules";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { FounderCard } from "@/components/FounderCard";
 import { canUseAdFree } from "@shared/supporter";
@@ -473,6 +474,8 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      <NotificationSettingsCard />
+
       {founderNumber != null ? <FounderCard founderNumber={founderNumber} publicLaunch={publicLaunch} /> : null}
 
       {/* Ads */}
@@ -522,5 +525,37 @@ export default function Settings() {
           : "App version unavailable"}
       </p>
     </div>
+  );
+}
+
+/** Per-type switches for activity notifications. Debate invites to you always notify. */
+function NotificationSettingsCard() {
+  const { data: prefs } = useQuery<Record<string, boolean>>({ queryKey: ["/api/notifications/prefs"] });
+  const save = useMutation({
+    mutationFn: async (patch: Record<string, boolean>) => (await apiRequest("PUT", "/api/notifications/prefs", patch)).json(),
+    onMutate: (patch) => queryClient.setQueryData(["/api/notifications/prefs"], (old: any) => ({ ...(old || {}), ...patch })),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications/prefs"] }),
+  });
+  return (
+    <Card data-testid="card-settings-notifications">
+      <CardHeader>
+        <CardTitle>Notifications</CardTitle>
+        <CardDescription>Choose what shows up in your bell. Debate invites to you always do.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {NOTIFICATION_PREFS.map((p) => (
+          <div key={p.key} className="flex items-center justify-between gap-4">
+            <label htmlFor={`switch-notify-${p.key}`} className="text-sm">{p.label}</label>
+            <Switch
+              id={`switch-notify-${p.key}`}
+              checked={prefs ? prefs[p.key] !== false : true}
+              disabled={!prefs}
+              onCheckedChange={(v) => save.mutate({ [p.key]: v })}
+              data-testid={`switch-notify-${p.key}`}
+            />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

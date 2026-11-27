@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db.js';
-import { notifications } from '../../shared/schema.js';
+import { notifications, users } from '../../shared/schema.js';
+import { NOTIFICATION_PREFS } from '../../shared/notificationRules.js';
 import { isAuthenticated } from '../middleware/auth.js';
 import { listUserDebates } from '../lib/userDebates.js';
 
@@ -35,6 +36,33 @@ router.get('/debates', isAuthenticated, async (req, res) => {
   } catch (e) {
     console.error('Error fetching footer debates:', e);
     res.status(500).json({ message: 'Failed to fetch debates' });
+  }
+});
+
+// GET /api/notifications/prefs - per-type switches (missing = on)
+router.get('/prefs', isAuthenticated, async (req, res) => {
+  try {
+    const [u] = await db.select({ prefs: users.notificationPrefs }).from(users).where(eq(users.id, req.user!.id)).limit(1);
+    const prefs: Record<string, boolean> = {};
+    for (const p of NOTIFICATION_PREFS) prefs[p.key] = (u?.prefs as any)?.[p.key] !== false;
+    res.json(prefs);
+  } catch (e) {
+    console.error('Error reading notification prefs:', e);
+    res.status(500).json({ message: 'Failed to load notification settings' });
+  }
+});
+
+// PUT /api/notifications/prefs { topicOpinions?: boolean, ... } - only known keys, booleans only
+router.put('/prefs', isAuthenticated, async (req, res) => {
+  try {
+    const [u] = await db.select({ prefs: users.notificationPrefs }).from(users).where(eq(users.id, req.user!.id)).limit(1);
+    const next: Record<string, boolean> = { ...((u?.prefs as any) || {}) };
+    for (const p of NOTIFICATION_PREFS) if (typeof req.body?.[p.key] === 'boolean') next[p.key] = req.body[p.key];
+    await db.update(users).set({ notificationPrefs: next }).where(eq(users.id, req.user!.id));
+    res.json(next);
+  } catch (e) {
+    console.error('Error saving notification prefs:', e);
+    res.status(500).json({ message: 'Failed to save notification settings' });
   }
 });
 
