@@ -1,3 +1,8 @@
+## Nov 27, 2026 4:58 PM CT — Profile suggestion sections as real card decks
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- "Recommended for you" and "From people you follow" now use the site's standard topic deck (SwipeableCardStack / CardDeck + TopicCard), same as the Topics tab and Trending: tap flips, vertical swipe scrolls, only buttons/links navigate, with the usual prev/next and counter. Removes the extra whitespace above the old loose cards.
+- The "why it's here" note (and the followed person's opinion quote) shows under the deck for the top card.
+
 ## Nov 27, 2026 4:24 PM CT — Fix empty profile suggestion decks; leaner profile header
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - Root cause: both decks excluded topics the viewer created. On live, every topic was created by Timothy's account, so "Recommended" filtered out all 34 topics and "From people you follow" dropped Samuel's opinions (both were on topics Tim started).
