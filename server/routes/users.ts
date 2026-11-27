@@ -12,6 +12,7 @@ import { isSecurityError } from '../utils/securityErrors.js';
 import { sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import { canUseAdFree } from '../../shared/supporter.js';
+import { rankRecommended, rankFollowing } from '../../shared/profileFeeds.js';
 import { getSiteConfig } from '../lib/siteSettings.js';
 import { assertOwnProfilePicturePath, publicProfilePictureUrl } from '../lib/profilePictureStorage.js';
 
@@ -494,21 +495,30 @@ router.post('/me/selected-badge', isAuthenticated, async (req, res) => {
   }
 });
 
-// GET /api/users/:userId/recommended-topics - Get recommended topics for user
-router.get('/:userId/recommended-topics', async (req, res) => {
+// GET /api/users/:userId/recommended-topics - topics the signed-in user hasn't joined yet (own profile only)
+router.get('/:userId/recommended-topics', isAuthenticated, async (req, res) => {
   try {
-    const key = cacheKey('user', req.params.userId, 'recommended-topics');
-    
-    // Try cache first
-    let result = await getCache(key);
+    const me = req.user as Express.User;
+    const userId = req.params.userId;
+    if (!me?.id || String(me.id) !== userId) return res.status(403).json({ message: "Only available on your own profile" });
+    const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 20);
+    const key = cacheKey('user', userId, 'recommended-topics-v2', limit);
+    let result = await getCache<{ topics: any[] }>(key);
     if (!result) {
-      // TODO: Implement topic recommendation logic
-      result = { topics: [] };
-      
-      // Cache for 3 minutes
+      const [candidates, answered]: [any[], any] = await Promise.all([
+        topicService.getTopics({ limit: 200 }),
+        db.execute(sql`select distinct o.topic_id::text as topic_id, t.categories
+                       from opinions o join topics t on t.id = o.topic_id where o.user_id = ${userId}`),
+      ]);
+      const rows: any[] = answered.rows ?? answered;
+      const categoryWeights = new Map<string, number>();
+      for (const r of rows) for (const c of (r.categories ?? [])) categoryWeights.set(c, (categoryWeights.get(c) ?? 0) + 1);
+      const topics = rankRecommended(candidates, {
+        userId, answeredTopicIds: new Set(rows.map((r) => String(r.topic_id))), categoryWeights, limit,
+      });
+      result = { topics };
       await setCache(key, result, CACHE_TTL.TOPIC_FULL);
     }
-    
     res.json(result);
   } catch (error) {
     console.error("Error fetching recommended topics:", error);
@@ -516,11 +526,35 @@ router.get('/:userId/recommended-topics', async (req, res) => {
   }
 });
 
-// GET /api/users/:userId/following-topics - Get topics user is following
-router.get('/:userId/following-topics', async (req, res) => {
+// GET /api/users/:userId/following-topics - recent topics/opinions from people the signed-in user follows (own profile only)
+router.get('/:userId/following-topics', isAuthenticated, async (req, res) => {
   try {
-    // TODO: Implement following topics logic
-    res.json({ topics: [] });
+    const me = req.user as Express.User;
+    const userId = req.params.userId;
+    if (!me?.id || String(me.id) !== userId) return res.status(403).json({ message: "Only available on your own profile" });
+    const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 20);
+    const act: any = await db.execute(sql`
+      with f as (select following_id from user_follows where follower_id = ${userId})
+      select * from (
+        select t.id::text as topic_id, t.created_by_id as actor_id, 'created' as kind, t.created_at as at
+          from topics t where t.created_by_id in (select following_id from f)
+        union all
+        select o.topic_id::text, o.user_id, 'opinion', o.created_at
+          from opinions o where o.user_id in (select following_id from f) and coalesce(o.status, 'approved') = 'approved'
+      ) a order by at desc limit 100`);
+    const activityRows: any[] = act.rows ?? act;
+    if (activityRows.length === 0) return res.json({ topics: [] });
+    const actorIds = Array.from(new Set(activityRows.map((r) => String(r.actor_id))));
+    const names: any = await db.execute(sql`select id, handle, first_name from users where id in (${sql.join(actorIds.map((id) => sql`${id}`), sql`, `)})`);
+    const nameOf = new Map<string, string>(((names.rows ?? names) as any[]).map((u) => [String(u.id), u.handle ? `@${u.handle}` : (u.first_name || "Someone")]));
+    const wanted = new Set(activityRows.map((r) => String(r.topic_id)));
+    const candidates = (await Promise.all(Array.from(wanted).slice(0, 40).map((id) => topicService.getTopic(id).catch(() => null))))
+      .filter(Boolean) as any[];
+    const topics = rankFollowing(candidates, activityRows.map((r) => ({
+      topicId: String(r.topic_id), actorId: String(r.actor_id), actorName: nameOf.get(String(r.actor_id)) ?? "Someone",
+      kind: r.kind === 'created' ? 'created' as const : 'opinion' as const, at: r.at,
+    })), { userId, limit });
+    res.json({ topics });
   } catch (error) {
     console.error("Error fetching following topics:", error);
     res.status(500).json({ message: "Failed to fetch following topics" });
