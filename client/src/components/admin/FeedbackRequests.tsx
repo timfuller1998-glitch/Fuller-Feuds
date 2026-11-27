@@ -50,7 +50,7 @@ export function FeedbackRequests() {
             <div>
               <CardTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5" />Bug reports &amp; feature requests</CardTitle>
               <CardDescription>
-                Sent from the Feedback button in the app. {counts.new ?? 0} new · {counts.in_progress ?? 0} in progress · {counts.done ?? 0} done
+                Sent from the Feedback button in the app, plus reported topic links (titles start with “Reported link:”). {counts.new ?? 0} new · {counts.in_progress ?? 0} in progress · {counts.done ?? 0} done
               </CardDescription>
             </div>
             <div className="flex gap-2 flex-wrap">

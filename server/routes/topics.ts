@@ -4,7 +4,10 @@ import { OpinionService } from '../services/opinionService.js';
 import { InteractionRepository } from '../repositories/interactionRepository.js';
 import { CumulativeOpinionService } from '../services/cumulativeOpinionService.js';
 import { AIService } from '../aiService.js';
-import { previewSource, UnsafeUrlError } from '../services/sourcePreviewService.js';
+import { previewSource, UnsafeUrlError, assertPublicHttpUrl } from '../services/sourcePreviewService.js';
+import { aggregateTopicResources, normalizeHttpUrl, resourceDomain } from '../../shared/topicResources.js';
+import { db } from '../db.js';
+import { feedbackRequests } from '../../shared/schema.js';
 import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertTopicSchema, insertOpinionSchema } from '../../shared/schema.js';
 import { buildMapTree, buildSyntheticTopics } from '../../shared/topicTaxonomy.js';
@@ -190,6 +193,68 @@ router.post('/:id/opinions', isAuthenticated, async (req, res) => {
       error: 'Failed to create opinion',
       message: errorMessage
     });
+  }
+});
+
+// GET /api/topics/:id/resources - Ranked reference links cited in this topic's opinions.
+router.get('/:id/resources', async (req, res) => {
+  try {
+    const requestingUserId = (req.user as Express.User)?.id;
+    const requestingUserRole = req.userRole;
+    const topic = await topicService.getTopic(req.params.id, requestingUserId, requestingUserRole, req);
+    const isStaff = requestingUserRole === 'admin' || requestingUserRole === 'moderator';
+    if (!topic || ((topic as any).status === 'hidden' && !isStaff)) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+    const opinions = await opinionService.getOpinionsByTopic(
+      req.params.id,
+      { userRole: requestingUserRole, currentUserId: requestingUserId },
+      requestingUserId,
+      requestingUserRole,
+      req,
+    );
+    res.json({ items: aggregateTopicResources(opinions || []).slice(0, 40) });
+  } catch (error) {
+    if (error instanceof ForbiddenError || error instanceof AuthorizationError || error instanceof DataAccessError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
+    console.error('Error listing topic resources:', error);
+    res.status(500).json({ error: 'Failed to load resources' });
+  }
+});
+
+// POST /api/topics/:id/resources/report - Report a bad link; it shows up in admin Requests.
+router.post('/:id/resources/report', isAuthenticated, async (req, res) => {
+  try {
+    const requestingUserId = (req.user as Express.User)?.id;
+    if (!requestingUserId) return res.status(401).json({ error: 'Sign in to report a link' });
+    const requestingUserRole = req.userRole;
+    const topic = await topicService.getTopic(req.params.id, requestingUserId, requestingUserRole, req);
+    const isStaff = requestingUserRole === 'admin' || requestingUserRole === 'moderator';
+    if (!topic || ((topic as any).status === 'hidden' && !isStaff)) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+    const url = normalizeHttpUrl(String(req.body?.url || ''));
+    if (!url) return res.status(400).json({ error: 'That link is not allowed.' });
+    try {
+      await assertPublicHttpUrl(url);
+    } catch (error) {
+      if (error instanceof UnsafeUrlError) return res.status(400).json({ error: error.message });
+      throw error;
+    }
+    const reason = String(req.body?.reason || '').trim().slice(0, 2000);
+    await db.insert(feedbackRequests).values({
+      userId: requestingUserId,
+      type: 'bug',
+      title: `Reported link: ${resourceDomain(url)}`.slice(0, 140),
+      description: `A link on "${topic.title}" was reported.\n\nURL: ${url}\nTopic: https://www.fullerfeuds.com/topic/${topic.id}\n\nReason:\n${reason || '(none given)'}`,
+      pageUrl: url,
+      userAgent: String(req.headers['user-agent'] || '').slice(0, 500) || null,
+    });
+    res.status(201).json({ ok: true });
+  } catch (error) {
+    console.error('Error reporting topic resource:', error);
+    res.status(500).json({ error: 'Could not send the report' });
   }
 });
 
