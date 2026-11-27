@@ -1,3 +1,9 @@
+## Nov 27, 2026 2:07 PM CT — Fix debate chat screens (popup turn bug + mobile live view)
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- Footer popup chat: own messages right-aligned (was comparing a non-existent `senderId`, so everything showed as the opponent's); opponent name shown on their bubbles.
+- Turn state now comes from one shared live source (`client/src/lib/debateTurn.ts`): room query refetches when messages change, on focus, and every 15s while active, so the input unlocks on your turn even if a socket event was missed.
+- Live debate page (mobile): compact header/VS card with opponent avatar kept inside the card, Hide-from-spectators / End debate moved into a ⋯ menu, chat fills the screen with input pinned at the bottom, Flag Fallacy is a small icon per message.
+
 ## 2026-11-27 (1:50 PM CST, America/Chicago) — Phone notifications (Web Push) (branch feat/web-push)
 Made by the Fuller Feuds Dev bot (Grok Bot). Timothy approved real phone notifications when the app is closed. This builds on PR #80.
 - Keys: a new VAPID keypair. `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` (mailto:timothy@quickwebspro.com) were set on Render one key at a time, and no other env vars changed. A private copy is on the bot's box (chmod 600) and is not in the repo.
