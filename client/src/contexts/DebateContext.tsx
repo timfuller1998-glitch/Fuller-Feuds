@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
 interface OpenDebateWindow {
   debateRoomId: string;
@@ -133,24 +133,28 @@ export function DebateProvider({ children }: { children: ReactNode }) {
     setOpponentPanelData(null);
   };
 
-  const setUnreadCount = (debateRoomId: string, count: number) => {
-    setUnreadCounts(prev => ({ ...prev, [debateRoomId]: count }));
-  };
+  // Stable (useCallback) and no-op when nothing changes. These used to be new functions on every render and
+  // clearUnread always produced a new object, so a popup effect depending on clearUnread re-ran forever and
+  // flooded the server with mark-read requests (Nov 23 live chat "crash").
+  const setUnreadCount = useCallback((debateRoomId: string, count: number) => {
+    setUnreadCounts(prev => (prev[debateRoomId] === count ? prev : { ...prev, [debateRoomId]: count }));
+  }, []);
 
-  const incrementUnread = (debateRoomId: string) => {
-    setUnreadCounts(prev => ({ 
-      ...prev, 
-      [debateRoomId]: (prev[debateRoomId] || 0) + 1 
+  const incrementUnread = useCallback((debateRoomId: string) => {
+    setUnreadCounts(prev => ({
+      ...prev,
+      [debateRoomId]: (prev[debateRoomId] || 0) + 1
     }));
-  };
+  }, []);
 
-  const clearUnread = (debateRoomId: string) => {
+  const clearUnread = useCallback((debateRoomId: string) => {
     setUnreadCounts(prev => {
+      if (!(debateRoomId in prev)) return prev;
       const newCounts = { ...prev };
       delete newCounts[debateRoomId];
       return newCounts;
     });
-  };
+  }, []);
 
   const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 

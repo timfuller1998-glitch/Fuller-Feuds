@@ -21,6 +21,7 @@ export function useDebateWebSocket(userId?: string) {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
+  const authRejectedRef = useRef(false);
   const { incrementUnread, openWindows } = useDebateContext();
   const { toast } = useToast();
   
@@ -97,6 +98,9 @@ export function useDebateWebSocket(userId?: string) {
 
   const connect = useCallback(() => {
     if (!userId) return;
+    // One socket per tab: don't open another while one is open or still connecting.
+    const cur = wsRef.current;
+    if (cur && (cur.readyState === WebSocket.OPEN || cur.readyState === WebSocket.CONNECTING)) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -106,7 +110,14 @@ export function useDebateWebSocket(userId?: string) {
 
     ws.onopen = () => {
       console.log('[WebSocket] Connected');
+      const wasReconnect = reconnectAttemptsRef.current > 0;
       reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
+      if (wasReconnect) {
+        // Catch up on anything that happened while we were offline.
+        queryClient.invalidateQueries({ queryKey: ['/api/debate-rooms'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/debates/grouped'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      }
       
       // Authenticate - server expects authToken, which is the userId
       ws.send(JSON.stringify({
@@ -203,7 +214,7 @@ export function useDebateWebSocket(userId?: string) {
       });
       
       // Only show error toast after multiple failed attempts to avoid spam
-      if (reconnectAttemptsRef.current >= 2) {
+      if (reconnectAttemptsRef.current === 2) {
         const { toast } = handlersRef.current;
         toast({
           title: 'Connection Error',
@@ -215,6 +226,7 @@ export function useDebateWebSocket(userId?: string) {
     };
 
     ws.onclose = (event) => {
+      if (wsRef.current !== ws) return; // a stale socket closing after we replaced it
       console.log('[WebSocket] Disconnected', {
         code: event.code,
         reason: event.reason || 'No reason provided',
@@ -225,30 +237,25 @@ export function useDebateWebSocket(userId?: string) {
       wsRef.current = null;
       
       // Don't reconnect if it was a clean close or auth error
+      if (event.code === 1008) authRejectedRef.current = true;
       if (event.code === 1000 || event.code === 1008) {
         console.log('[WebSocket] Clean close or policy violation, not reconnecting');
         reconnectAttemptsRef.current = 0;
         return;
       }
       
-      // Attempt to reconnect with exponential backoff
-      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-        reconnectAttemptsRef.current++;
-        const delay = Math.min(3000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000); // Max 30 seconds
-        console.log(`[WebSocket] Attempting to reconnect in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connect();
-        }, delay);
-      } else {
-        console.error('[WebSocket] Max reconnection attempts reached. Stopping reconnection attempts.');
-        const { toast } = handlersRef.current;
-        toast({
-          title: 'Connection Failed',
-          description: 'Unable to establish a connection. Please refresh the page to try again.',
-          variant: 'destructive',
-          duration: 8000,
-        });
+      // Keep reconnecting with backoff (3s, 6s, 12s … capped at 30s). Phones drop sockets when the tab sleeps
+      // and every deploy restarts the server, so giving up after 5 tries left the chat silently dead.
+      reconnectAttemptsRef.current++;
+      const delay = Math.min(3000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+      if (reconnectAttemptsRef.current === maxReconnectAttempts) {
+        console.error('[WebSocket] Still reconnecting after several attempts');
       }
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = undefined;
+        connect();
+      }, delay);
     };
   }, [userId, handleNewMessage, handleNotification, handleDebateEnded, handleNewDebateCreated]);
 
@@ -271,6 +278,22 @@ export function useDebateWebSocket(userId?: string) {
   }, [sendMessage]);
 
   useEffect(() => {
+    const wake = () => {
+      if (document.visibilityState === 'hidden' || authRejectedRef.current) return;
+      const cur = wsRef.current;
+      if (cur && (cur.readyState === WebSocket.OPEN || cur.readyState === WebSocket.CONNECTING)) return;
+      if (reconnectTimeoutRef.current) { clearTimeout(reconnectTimeoutRef.current); reconnectTimeoutRef.current = undefined; }
+      connect();
+    };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('online', wake);
+    return () => {
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('online', wake);
+    };
+  }, [connect]);
+
+  useEffect(() => {
     connect();
 
     // Proper cleanup on unmount or userId change
@@ -280,8 +303,9 @@ export function useDebateWebSocket(userId?: string) {
         reconnectTimeoutRef.current = undefined;
       }
       if (wsRef.current) {
-        wsRef.current.close();
+        const old = wsRef.current;
         wsRef.current = null;
+        old.close(1000);
       }
     };
   }, [connect]);
