@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarWithBadge } from "@/components/AvatarWithBadge";
 import { BarChart3, Heart, Activity, Users, Lightbulb, Star } from "lucide-react";
 
 export interface LeaderboardEntry {
@@ -11,6 +11,8 @@ export interface LeaderboardEntry {
   handle?: string | null;
   lastName?: string | null;
   profileImageUrl?: string | null;
+  economicScore?: number;
+  authoritarianScore?: number;
   value: number;
   rank: number;
 }
@@ -63,10 +65,16 @@ function Row({ e, unit, highlight, onOpen }: { e: LeaderboardEntry; unit: string
       data-testid={`leaderboard-row-${e.userId}`}
     >
       <span className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${medal(e.rank)}`}>{e.rank}</span>
-      <Avatar className="w-8 h-8">
-        <AvatarImage src={e.profileImageUrl ?? undefined} />
-        <AvatarFallback className="text-xs">{e.firstName?.charAt(0)}{e.lastName?.charAt(0)}</AvatarFallback>
-      </Avatar>
+      <AvatarWithBadge
+        userId={e.userId}
+        firstName={e.firstName ?? undefined}
+        lastName={e.lastName ?? undefined}
+        profileImageUrl={e.profileImageUrl ?? undefined}
+        size="sm"
+        economicScore={e.economicScore}
+        authoritarianScore={e.authoritarianScore}
+        showPoliticalLeaning={true}
+      />
       <span className="flex-1 min-w-0">
         {/* @handle first (public identity); real name underneath */}
         <span className="block truncate text-sm font-medium">{e.handle ? `@${e.handle}` : `${e.firstName ?? ""} ${e.lastName ?? ""}`.trim()}</span>

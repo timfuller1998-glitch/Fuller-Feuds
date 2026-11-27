@@ -142,7 +142,9 @@ function AppWithSidebar({
           id: user.id,
           name: displayName,
           avatar: user.profileImageUrl,
-          isOnline: true
+          isOnline: true,
+          economicScore: user.economicScore ?? undefined,
+          authoritarianScore: user.authoritarianScore ?? undefined,
         } : undefined}
         onLogout={async () => {
           try {

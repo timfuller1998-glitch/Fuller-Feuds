@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { UserHandle } from "@/components/UserHandle";
 import type { Opinion } from "@shared/schema";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarWithBadge } from "@/components/AvatarWithBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Flag, MessageSquareReply, RotateCcw, ThumbsDown, ThumbsUp, UserPlus } from "lucide-react";
@@ -25,7 +25,7 @@ export function StanceChip({ stance, testId }: { stance: Stance; testId?: string
   return <Badge className={cls} data-testid={testId}>{stanceLabel[stance]}</Badge>;
 }
 
-type Op = Opinion & { author?: { firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null } | null; userVote?: { voteType?: string } | null };
+type Op = Opinion & { author?: { firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null; id?: string | null; economicScore?: number | null; authoritarianScore?: number | null } | null; userVote?: { voteType?: string } | null };
 
 export function opinionAuthorName(op: Op): string {
   const a = op.author;
@@ -64,10 +64,15 @@ function AuthorRow({ op }: { op: Op }) {
   const name = opinionAuthorName(op);
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <Avatar className="h-9 w-9 flex-shrink-0">
-        {op.author?.profileImageUrl ? <AvatarImage src={op.author.profileImageUrl} alt={name} /> : null}
-        <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
-      </Avatar>
+      <AvatarWithBadge
+        userId={op.author?.id || op.userId || "unknown"}
+        name={name}
+        profileImageUrl={op.author?.profileImageUrl || undefined}
+        size="sm"
+        economicScore={op.author?.economicScore ?? undefined}
+        authoritarianScore={op.author?.authoritarianScore ?? undefined}
+        showPoliticalLeaning={true}
+      />
       <span className="min-w-0 flex flex-col">
         <span className="font-semibold truncate leading-tight" data-testid={`text-opinion-author-${op.id}`}>{name}</span>
         <UserHandle handle={(op.author as any)?.handle} testId={`text-opinion-handle-${op.id}`} />

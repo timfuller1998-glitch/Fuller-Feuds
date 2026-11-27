@@ -82,7 +82,7 @@ async function rankCategory(cat: Category, limit: number, meId?: string, topicId
   const result: any = await db.execute(sql`
     WITH v AS (${cat.valueSql(topicId)}),
     ranked AS (
-      SELECT u.id AS user_id, coalesce((select nullif(trim(sn.display_first_name), '') from user_profiles sn where sn.user_id = u.id limit 1), u.first_name) AS first_name, (case when exists (select 1 from user_profiles sn where sn.user_id = u.id and nullif(trim(sn.display_first_name), '') is not null) then (select sn.display_last_name from user_profiles sn where sn.user_id = u.id limit 1) else u.last_name end) AS last_name, u.handle, u.profile_image_url, v.value,
+      SELECT u.id AS user_id, coalesce((select nullif(trim(sn.display_first_name), '') from user_profiles sn where sn.user_id = u.id limit 1), u.first_name) AS first_name, (case when exists (select 1 from user_profiles sn where sn.user_id = u.id and nullif(trim(sn.display_first_name), '') is not null) then (select sn.display_last_name from user_profiles sn where sn.user_id = u.id limit 1) else u.last_name end) AS last_name, u.handle, u.profile_image_url, (select p.economic_score from user_profiles p where p.user_id = u.id limit 1) AS economic_score, (select p.authoritarian_score from user_profiles p where p.user_id = u.id limit 1) AS authoritarian_score, v.value,
              RANK() OVER (ORDER BY v.value DESC) AS rank,
              ROW_NUMBER() OVER (ORDER BY v.value DESC, u.first_name, u.id) AS rn
       FROM v JOIN users u ON u.id = v.user_id
@@ -98,6 +98,8 @@ async function rankCategory(cat: Category, limit: number, meId?: string, topicId
     handle: r.handle,
     lastName: r.last_name,
     profileImageUrl: r.profile_image_url,
+    economicScore: r.economic_score == null ? undefined : Number(r.economic_score),
+    authoritarianScore: r.authoritarian_score == null ? undefined : Number(r.authoritarian_score),
     value: Number(r.value),
     rank: Number(r.rank),
   });

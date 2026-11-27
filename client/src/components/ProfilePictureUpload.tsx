@@ -36,31 +36,24 @@ export function ProfilePictureUpload({ currentImageUrl, userId, fallbackInitial 
 
     setIsUploading(true);
     try {
-      // Get upload URL
-      const uploadParamsResponse = await apiRequest("POST", "/api/objects/upload");
-      const uploadParams = await uploadParamsResponse.json();
-      
-      // Upload file directly to storage
-      const uploadResponse = await fetch(uploadParams.uploadURL, {
-        method: 'PUT',
+      const uploadResponse = await fetch("/api/objects/upload", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": selectedFile.type },
         body: selectedFile,
-        headers: {
-          'Content-Type': selectedFile.type,
-        },
       });
-
       if (!uploadResponse.ok) {
-        throw new Error('Upload failed');
+        let message = "Upload failed";
+        try {
+          const body = await uploadResponse.json();
+          if (body?.message) message = body.message;
+        } catch {}
+        throw new Error(message);
       }
+      const uploaded = await uploadResponse.json();
 
-      // Extract object ID from upload URL
-      const url = new URL(uploadParams.uploadURL);
-      const pathParts = url.pathname.split('/');
-      const objectId = pathParts[pathParts.length - 1];
-
-      // Associate uploaded image with profile
       await apiRequest("PUT", "/api/profile-picture", {
-        objectId: objectId,
+        path: uploaded.path,
       });
 
       // Invalidate queries to refresh UI
@@ -77,7 +70,7 @@ export function ProfilePictureUpload({ currentImageUrl, userId, fallbackInitial 
       
     } catch (error) {
       console.error('Error uploading profile picture:', error);
-      alert('Failed to upload image. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to upload image. Please try again.');
     } finally {
       setIsUploading(false);
     }

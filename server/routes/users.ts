@@ -13,6 +13,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import { canUseAdFree } from '../../shared/supporter.js';
 import { getSiteConfig } from '../lib/siteSettings.js';
+import { assertOwnProfilePicturePath, publicProfilePictureUrl } from '../lib/profilePictureStorage.js';
 
 const router = Router();
 const badgeRepository = new BadgeRepository();
@@ -533,10 +534,17 @@ router.put('/profile-picture', isAuthenticated, async (req, res) => {
     if (!user || !user.id) {
       return res.status(401).json({ message: "User not authenticated" });
     }
-    const userId = user.id;
-    // TODO: Implement profile picture upload logic
-    res.json({ success: true });
+    const userId = String(user.id);
+    const path = assertOwnProfilePicturePath(userId, String(req.body?.path || req.body?.objectId || ''));
+    const publicUrl = publicProfilePictureUrl(path);
+    await userRepository.updateProfileImage(userId, publicUrl, userId, req.userRole, req);
+    await invalidateUserCache(userId);
+    res.json({ success: true, objectPath: publicUrl, profileImageUrl: publicUrl });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update profile picture';
+    if (message.includes('Invalid profile picture path')) {
+      return res.status(400).json({ error: message });
+    }
     console.error("Error updating profile picture:", error);
     res.status(500).json({ error: "Failed to update profile picture" });
   }

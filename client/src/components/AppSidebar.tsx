@@ -62,6 +62,8 @@ interface AppSidebarProps {
     name: string;
     avatar?: string;
     isOnline: boolean;
+    economicScore?: number;
+    authoritarianScore?: number;
   };
   onNavigate?: (path: string) => void;
   onLogout?: () => void;
@@ -415,6 +417,9 @@ export default function AppSidebar({
                 size="sm"
                 showOnlineStatus
                 isOnline={currentUser.isOnline}
+                economicScore={currentUser.economicScore}
+                authoritarianScore={currentUser.authoritarianScore}
+                showPoliticalLeaning={true}
               />
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm truncate">{currentUser.name}</p>
