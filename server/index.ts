@@ -263,6 +263,17 @@ app.get('/api/debug/static', (req, res) => {
   res.json(results);
 });
 
+// Process-level guards: a stray rejected promise or thrown error in a socket/route handler is logged
+// instead of taking the whole server (and everyone's live debate) down.
+process.on('unhandledRejection', (reason: any) => {
+  log(`[process] Unhandled promise rejection: ${reason?.stack || reason}`, 'error');
+});
+process.on('uncaughtException', (err: Error) => {
+  log(`[process] Uncaught exception (kept running): ${err?.stack || err}`, 'error');
+  // Can't bind the port: nothing to keep running, let Render restart us.
+  if ((err as any)?.code === 'EADDRINUSE') process.exit(1);
+});
+
 // Create HTTP server
 const server = createServer(app);
 

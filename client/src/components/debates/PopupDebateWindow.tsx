@@ -96,7 +96,8 @@ export function PopupDebateWindow({
   // Fetch messages
   const { data: messages = [] } = useQuery<Message[]>({
     queryKey: ['/api/debate-rooms', debateRoomId, 'messages'],
-    refetchInterval: 3000,
+    // Live updates arrive over the WebSocket (debate_update); polling is just a fallback if it drops.
+    refetchInterval: 10000,
   });
 
   // Send message mutation
@@ -128,14 +129,20 @@ export function PopupDebateWindow({
       .catch(() => {});
   }, [debateRoomId]);
 
-  // Mark as read
+  // Mark as read once per new message count. clearUnread is read through a ref so a context re-render can
+  // never re-fire this effect (that loop sent hundreds of mark-read requests a second on Nov 23).
+  const clearUnreadRef = useRef(clearUnread);
+  clearUnreadRef.current = clearUnread;
+  const lastMarkedRef = useRef<string>('');
   useEffect(() => {
-    if (messages.length > 0) {
-      clearUnread(debateRoomId);
-      apiRequest('PATCH', `/api/debate-rooms/${debateRoomId}/mark-read`, {})
-        .catch(err => console.error('Failed to mark as read:', err));
-    }
-  }, [messages.length, debateRoomId, clearUnread]);
+    if (messages.length === 0) return;
+    const key = `${debateRoomId}:${messages.length}`;
+    if (lastMarkedRef.current === key) return;
+    lastMarkedRef.current = key;
+    clearUnreadRef.current(debateRoomId);
+    apiRequest('PATCH', `/api/debate-rooms/${debateRoomId}/mark-read`, {})
+      .catch(err => console.error('Failed to mark as read:', err));
+  }, [messages.length, debateRoomId]);
 
   // Scroll to bottom
   useEffect(() => {

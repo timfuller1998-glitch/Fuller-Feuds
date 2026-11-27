@@ -1,6 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
-import { parse } from 'url';
 import { log } from './vite.js';
 
 interface AuthenticatedWebSocket extends WebSocket {
@@ -41,17 +40,33 @@ function stopWatching(ws: WebSocket, roomId?: string) {
   if (rooms.size === 0) roomsBySocket.delete(ws);
 }
 
+/** Send without ever throwing: a socket can close between the readyState check and the write. */
+function safeSend(sock: WebSocket, data: string) {
+  if (sock.readyState !== WebSocket.OPEN) return;
+  try {
+    sock.send(data, () => {}); // a write error just means the socket is closing; its close handler cleans up
+  } catch (e) {
+    log(`[WebSocket] send threw: ${(e as Error).message}`);
+  }
+}
+
 function sendWatcherCount(roomId: string) {
   const set = watchersByRoom.get(roomId);
   if (!set) return;
   let count = 0;
   set.forEach((counts) => { if (counts) count++; });
   const msg = JSON.stringify({ type: 'debate_viewers', debateRoomId: roomId, count });
-  set.forEach((_c, sock) => { if (sock.readyState === WebSocket.OPEN) sock.send(msg); });
+  set.forEach((_c, sock) => safeSend(sock, msg));
 }
 
 let sessionMw: any = null;
+// Tests swap in a fake resolver so the socket server can run without a database.
+let sessionResolverOverride: ((req: IncomingMessage) => Promise<string | null>) | null = null;
+export function __setSessionResolverForTests(fn: ((req: IncomingMessage) => Promise<string | null>) | null) {
+  sessionResolverOverride = fn;
+}
 async function resolveSessionUserId(req: IncomingMessage): Promise<string | null> {
+  if (sessionResolverOverride) return sessionResolverOverride(req);
   try {
     if (!sessionMw) {
       const { getSession } = await import('./auth.js');
@@ -70,6 +85,8 @@ export function setupWebSocketServer(server: any) {
   const wss = new WebSocketServer({ 
     server,
     path: '/ws',
+    // Chat messages go over HTTP; the socket only carries small control messages.
+    maxPayload: 64 * 1024,
     verifyClient: (info: { origin: string; secure: boolean; req: IncomingMessage }) => {
       // Allow connections from same origin
       // In production, you might want to add origin validation
@@ -77,15 +94,39 @@ export function setupWebSocketServer(server: any) {
     }
   });
 
+  // An error on the listening server must never take the whole process down.
+  wss.on('error', (error: Error) => {
+    log(`[WebSocket] Server error: ${error.message}`, 'error');
+  });
+
+  // One heartbeat for all sockets. Cloudflare drops idle sockets after ~100s, so ping every 30s and
+  // terminate any socket that missed the previous pong (dead phones, sleeping tabs).
+  const heartbeat = setInterval(() => {
+    wss.clients.forEach((client) => {
+      const c = client as AuthenticatedWebSocket;
+      if (c.isAlive === false) { try { c.terminate(); } catch {} return; }
+      c.isAlive = false;
+      try { c.ping(); } catch {}
+    });
+  }, 30000);
+  wss.on('close', () => clearInterval(heartbeat));
+
   wss.on('connection', (ws: AuthenticatedWebSocket, req: IncomingMessage) => {
-    const url = parse(req.url || '', true);
     log(`[WebSocket] New connection from ${req.socket.remoteAddress}`);
 
     ws.isAuthenticated = false;
+    ws.isAlive = true;
 
     ws.on('message', async (data: Buffer) => {
       try {
-        const message: WebSocketMessage = JSON.parse(data.toString());
+        let message: WebSocketMessage;
+        try {
+          message = JSON.parse(data.toString());
+        } catch {
+          safeSend(ws, JSON.stringify({ type: 'error', message: 'Invalid message' }));
+          return;
+        }
+        if (!message || typeof message !== 'object' || typeof message.type !== 'string') return;
 
         // Handle authentication
         if (message.type === 'authenticate') {
@@ -94,13 +135,21 @@ export function setupWebSocketServer(server: any) {
           const userId = await resolveSessionUserId(req);
           
           if (!userId || typeof userId !== 'string') {
-            ws.send(JSON.stringify({
+            safeSend(ws, JSON.stringify({
               type: 'auth_error',
               message: 'Invalid authentication token'
             }));
             ws.close(1008, 'Invalid authentication');
             return;
           }
+
+          // Already signed in on this socket (e.g. a duplicate authenticate) — just confirm.
+          if (ws.isAuthenticated && ws.userId === userId) {
+            safeSend(ws, JSON.stringify({ type: 'authenticated', userId }));
+            return;
+          }
+          // The socket may have closed while we were looking up the session; don't register a dead socket.
+          if (ws.readyState !== WebSocket.OPEN) return;
 
           // Authenticate the socket
           ws.userId = userId;
@@ -117,7 +166,7 @@ export function setupWebSocketServer(server: any) {
           log(`[WebSocket] User ${userId} authenticated`);
 
           // Send authentication confirmation
-          ws.send(JSON.stringify({
+          safeSend(ws, JSON.stringify({
             type: 'authenticated',
             userId: userId
           }));
@@ -139,22 +188,23 @@ export function setupWebSocketServer(server: any) {
             const uid = ws.userId || await resolveSessionUserId(req);
             debater = !!uid && (room.participant1Id === uid || room.participant2Id === uid);
           }
+          if (ws.readyState !== WebSocket.OPEN) return; // closed during the lookup
           if (!room || (!debater && !isWatchable(room))) {
-            ws.send(JSON.stringify({ type: 'watch_error', debateRoomId: roomId, message: 'This debate is not open to watch' }));
+            safeSend(ws, JSON.stringify({ type: 'watch_error', debateRoomId: roomId, message: 'This debate is not open to watch' }));
             return;
           }
           if (!watchersByRoom.has(roomId)) watchersByRoom.set(roomId, new Map());
           watchersByRoom.get(roomId)!.set(ws, !debater);
           if (!roomsBySocket.has(ws)) roomsBySocket.set(ws, new Set());
           roomsBySocket.get(ws)!.add(roomId);
-          ws.send(JSON.stringify({ type: 'watching', debateRoomId: roomId }));
+          safeSend(ws, JSON.stringify({ type: 'watching', debateRoomId: roomId }));
           sendWatcherCount(roomId);
           return;
         }
 
         // Require authentication for all other messages
         if (!ws.isAuthenticated || !ws.userId) {
-          ws.send(JSON.stringify({
+          safeSend(ws, JSON.stringify({
             type: 'auth_error',
             message: 'Not authenticated'
           }));
@@ -196,8 +246,8 @@ export function setupWebSocketServer(server: any) {
             log(`[WebSocket] Unknown message type: ${message.type}`);
         }
       } catch (error: any) {
-        log(`[WebSocket] Error processing message: ${error.message}`, 'error');
-        ws.send(JSON.stringify({
+        log(`[WebSocket] Error processing message: ${error?.message}`, 'error');
+        safeSend(ws, JSON.stringify({
           type: 'error',
           message: 'Failed to process message'
         }));
@@ -224,17 +274,6 @@ export function setupWebSocketServer(server: any) {
     ws.on('error', (error: Error) => {
       log(`[WebSocket] Error: ${error.message}`, 'error');
     });
-
-    // Send ping to keep connection alive
-    const pingInterval = setInterval(() => {
-      if (ws.isAlive === false) {
-        clearInterval(pingInterval);
-        ws.terminate();
-        return;
-      }
-      ws.isAlive = false;
-      ws.ping();
-    }, 30000);
 
     ws.on('pong', () => {
       ws.isAlive = true;
@@ -280,11 +319,7 @@ export function sendToUser(userId: string, message: any) {
   const clients = clientsByUserId.get(userId);
   if (clients) {
     const messageStr = JSON.stringify(message);
-    clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(messageStr);
-      }
-    });
+    clients.forEach(client => safeSend(client, messageStr));
   }
 }
 
@@ -301,7 +336,7 @@ export function sendToWatchers(roomId: string, message: any, skipUserIds: string
   set.forEach((_counts, c) => {
     const uid = userIdBySocket.get(c);
     if (uid && skipUserIds.includes(uid)) return;
-    if (c.readyState === WebSocket.OPEN) c.send(str);
+    safeSend(c, str);
   });
 }
 
