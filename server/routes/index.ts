@@ -28,6 +28,11 @@ router.use('/auth', authRoutes);
 router.use('/topics', topicRoutes);
 router.use('/feed', feedRoutes);
 router.use('/users', userRoutes);
+// Settings and onboarding call /api/profile-picture (not /api/users/profile-picture).
+router.put('/profile-picture', (req, res, next) => {
+  req.url = '/profile-picture';
+  return userRoutes(req, res, next);
+});
 router.use('/opinions', opinionRoutes);
 router.use('/counterpoints', counterpointRoutes);
 router.use('/debates', debateRoutes);

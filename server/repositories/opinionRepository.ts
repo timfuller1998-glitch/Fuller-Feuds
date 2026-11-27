@@ -754,12 +754,13 @@ export class OpinionRepository {
       .select({
         opinion: opinions,
         author: users,
-        profile: sql`NULL`, // Simplified for now
+        profile: userProfiles,
         screenFirst: screenFirstNameSql(users.id, users.firstName),
         screenLast: screenLastNameSql(users.id, users.lastName),
       })
       .from(opinions)
       .leftJoin(users, eq(opinions.userId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(opinions.createdAt), desc(opinions.id))
       .limit(limit);
@@ -786,6 +787,8 @@ export class OpinionRepository {
         lastName: row.screenLast,
         handle: row.author.handle ?? null,
         profileImageUrl: row.author.profileImageUrl,
+        economicScore: row.profile?.economicScore ?? undefined,
+        authoritarianScore: row.profile?.authoritarianScore ?? undefined,
       } : null
     }));
   }

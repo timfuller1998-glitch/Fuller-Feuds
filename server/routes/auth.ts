@@ -27,6 +27,7 @@ router.get('/user', isAuthenticated, async (req, res) => {
 
     // Return user data without sensitive information
     // Ensure onboardingComplete is always a boolean (never null/undefined)
+    const profile = await userRepository.getProfile(userId, userId, requesterRole, req);
     res.json({
       id: freshUser.id,
       email: freshUser.email,
@@ -48,6 +49,8 @@ router.get('/user', isAuthenticated, async (req, res) => {
       // Founding members (migration 0016)
       founderNumber: freshUser.founderNumber ?? null,
       founderLifetimeAdFree: freshUser.founderLifetimeAdFree ?? false,
+      economicScore: profile?.economicScore ?? null,
+      authoritarianScore: profile?.authoritarianScore ?? null,
     });
   } catch (error) {
     console.error('Error fetching user:', error);

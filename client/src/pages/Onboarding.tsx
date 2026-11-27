@@ -390,31 +390,23 @@ export default function Onboarding() {
 
     setIsUploadingPhoto(true);
     try {
-      // Get upload URL
-      const uploadParamsResponse = await apiRequest("POST", "/api/objects/upload");
-      const uploadParams = await uploadParamsResponse.json();
-      
-      // Upload file directly to storage
-      const uploadResponse = await fetch(uploadParams.uploadURL, {
-        method: 'PUT',
+      const uploadResponse = await fetch("/api/objects/upload", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": selectedFile.type },
         body: selectedFile,
-        headers: {
-          'Content-Type': selectedFile.type,
-        },
       });
-
       if (!uploadResponse.ok) {
-        throw new Error('Upload failed');
+        let message = "Upload failed";
+        try {
+          const body = await uploadResponse.json();
+          if (body?.message) message = body.message;
+        } catch {}
+        throw new Error(message);
       }
-
-      // Extract object ID from upload URL
-      const url = new URL(uploadParams.uploadURL);
-      const pathParts = url.pathname.split('/');
-      const objectId = pathParts[pathParts.length - 1];
-
-      // Associate uploaded image with profile
+      const uploaded = await uploadResponse.json();
       const response = await apiRequest("PUT", "/api/profile-picture", {
-        objectId: objectId,
+        path: uploaded.path,
       });
       const data = await response.json();
 
