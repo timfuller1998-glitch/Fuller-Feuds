@@ -1,3 +1,10 @@
+## Nov 27, 2026 3:08 PM CT — Opponent debate picker redesign
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- The sheet that opens from an opponent's footer avatar no longer overflows: titles wrap to 2 lines inside the card.
+- Now a bottom sheet sized to its content with a You-vs-opponent face-off header and an "N active · N finished · N need you" summary.
+- Each debate is a card with the topic, both stance chips (FOR/AGAINST), a highlighted pulsing "Your turn" (others muted), message count and round, last activity, and an unread dot; your-turn debates sort first.
+- Finished debates sit in a collapsed section; a "View profile" link at the bottom. Turn status uses the shared debateTurn() source (the grouped debates endpoint now includes the room's turn fields, stances and message count) and refreshes every 15s while open.
+
 ## Nov 27, 2026 2:47 PM CT — Profile page cleanup, working feeds, new political compass
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - Header: opinions / followers / following / debates collapsed into one tappable line under the name, with joined date, best rank, and a small inline badge strip. The separate Joined / Rankings / Debates / Badges blocks are gone.

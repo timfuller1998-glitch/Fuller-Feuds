@@ -6,6 +6,8 @@ export interface UserDebate {
   id: string; topicTitle: string; opponentId: string; opponentName: string; opponentHandle: string | null;
   opponentAvatar: string | null; state: DebateState; isNew: boolean; unread: number; finished: boolean;
   myTurns: number; activityAt: string | null; endedAt: string | null;
+  room?: { status: string; phase: string | null; currentTurn: string | null; participant1Id: string; participant2Id: string };
+  myStance?: string | null; opponentStance?: string | null; messageCount?: number;
 }
 export interface OpponentGroup {
   opponentId: string; opponentName: string; opponentHandle: string | null; opponentAvatar: string | null;
