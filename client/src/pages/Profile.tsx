@@ -101,6 +101,11 @@ function displayName(user?: ProfileData["user"], profile?: ProfileData["profile"
   return `${user.firstName ?? ""}${user.lastName ? ` ${user.lastName}` : ""}`.trim() || "Member";
 }
 
+/** Same mapping the Topics tab deck uses. */
+function deckTopic(topic: any) {
+  return { ...topic, opinionsCount: topic.opinionsCount ?? topic.opinionCount ?? 0 };
+}
+
 function personName(person: Person) {
   return `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() || "Member";
 }
@@ -182,6 +187,8 @@ export default function Profile() {
   const [showLeaderboardsModal, setShowLeaderboardsModal] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>("profile");
   const [peopleSearch, setPeopleSearch] = useState("");
+  const [recTopId, setRecTopId] = useState<string | null>(null);
+  const [followTopId, setFollowTopId] = useState<string | null>(null);
 
   const isOwnProfile = currentUser?.id === userId;
 
@@ -432,26 +439,6 @@ export default function Profile() {
     following: { title: "Following", count: followingCount },
     badges: { title: "Badges", count: earnedBadges.length },
   };
-
-  const renderTopicCard = (topic: any) => (
-    <div key={topic.id} className="w-full max-w-[420px]">
-      <TopicCard
-        id={topic.id}
-        title={topic.title}
-        description={topic.description}
-        imageUrl={topic.imageUrl}
-        categories={topic.categories}
-        participantCount={topic.participantCount || 0}
-        opinionsCount={topic.opinionsCount ?? topic.opinionCount ?? 0}
-        isActive={topic.isActive || false}
-        previewContent={topic.previewContent}
-        previewAuthor={topic.previewAuthor}
-        previewIsAI={topic.previewIsAI}
-        diversityScore={topic.diversityScore}
-        politicalDistribution={topic.politicalDistribution}
-      />
-    </div>
-  );
 
   const renderPeopleGrid = () => {
     const kind = activeTab === "following" ? "following" : "followers";
@@ -735,17 +722,20 @@ export default function Profile() {
                   Recommended for You
                 </h3>
                 {recommendedTopics.length > 0 ? (
-                  <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
-                    {recommendedTopics.map((topic: any) => (
-                      <div key={topic.id} className="space-y-1.5">
-                        {topic.recommendReason && (
-                          <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground" data-testid="text-recommend-reason">
-                            {topic.recommendReason}
-                          </p>
-                        )}
-                        {renderTopicCard(topic)}
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    <SwipeableCardStack
+                      topics={recommendedTopics.map(deckTopic)}
+                      testId="deck-recommended"
+                      onTopChange={(t) => setRecTopId(t.id)}
+                    />
+                    {(() => {
+                      const top: any = recommendedTopics.find((t: any) => t.id === recTopId) ?? recommendedTopics[0];
+                      return top?.recommendReason ? (
+                        <p className="text-center font-ui text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground" data-testid="text-recommend-reason">
+                          {top.recommendReason}
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
                 ) : (
                   <Card className="p-8 text-center">
@@ -768,22 +758,30 @@ export default function Profile() {
                   From People You Follow
                 </h3>
                 {followingTopics.length > 0 ? (
-                  <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
-                    {followingTopics.map((item: any) => (
-                      <div key={item.id} className="space-y-1.5">
-                        {item.followReason && (
-                          <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground" data-testid="text-follow-reason">
-                            {item.followReason}
-                          </p>
-                        )}
-                        {item.followExcerpt && (
-                          <p className="max-w-[420px] border-l-2 border-primary/50 pl-2 text-sm italic text-muted-foreground line-clamp-2 break-words" data-testid="text-follow-excerpt">
-                            “{item.followExcerpt}”
-                          </p>
-                        )}
-                        {renderTopicCard(item)}
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    <SwipeableCardStack
+                      topics={followingTopics.map(deckTopic)}
+                      testId="deck-following"
+                      onTopChange={(t) => setFollowTopId(t.id)}
+                    />
+                    {(() => {
+                      const top: any = followingTopics.find((t: any) => t.id === followTopId) ?? followingTopics[0];
+                      if (!top) return null;
+                      return (
+                        <div className="mx-auto max-w-[400px] space-y-1 text-center">
+                          {top.followReason && (
+                            <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground" data-testid="text-follow-reason">
+                              {top.followReason}
+                            </p>
+                          )}
+                          {top.followExcerpt && (
+                            <p className="text-sm italic text-muted-foreground line-clamp-2 break-words" data-testid="text-follow-excerpt">
+                              “{top.followExcerpt}”
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <Card className="p-8 text-center">
