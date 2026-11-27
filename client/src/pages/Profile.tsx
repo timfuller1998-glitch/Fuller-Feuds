@@ -548,11 +548,6 @@ export default function Profile() {
               {name}
             </h2>
             <UserHandle handle={(user as any).handle} className="text-sm" testId="profile-handle" />
-            {leaningLabel && (
-              <p className="mt-1 text-sm text-muted-foreground" data-testid="political-leaning-label">
-                {leaningLabel}
-              </p>
-            )}
             {(user.bio || profile?.bio) && (
               <p className="mt-2 text-sm text-muted-foreground max-w-md break-words" data-testid="profile-bio">
                 {user.bio || profile?.bio}
@@ -561,34 +556,6 @@ export default function Profile() {
           </div>
 
           <div className="mt-3 flex flex-col items-center gap-1.5" data-testid="profile-stats-row">
-            <div className="flex flex-wrap items-center justify-center gap-x-1 text-sm">
-              {stats.map((stat, i) => (
-                <span key={stat.key} className="inline-flex items-center">
-                  {i > 0 && <span className="mx-1 text-muted-foreground/60" aria-hidden="true">·</span>}
-                  <button
-                    type="button"
-                    className="rounded px-1 hover:underline"
-                    onClick={() => {
-                      setActiveTab(stat.key);
-                      setPeopleSearch("");
-                    }}
-                    data-testid={stat.testId}
-                  >
-                    <span className="font-semibold tabular-nums">{stat.value}</span>{" "}
-                    <span className="text-muted-foreground">{stat.label.toLowerCase()}</span>
-                  </button>
-                </span>
-              ))}
-              {totalDebates != null && (
-                <span className="inline-flex items-center" data-testid="text-total-debates">
-                  <span className="mx-1 text-muted-foreground/60" aria-hidden="true">·</span>
-                  <span className="px-1">
-                    <span className="font-semibold tabular-nums">{totalDebates}</span>{" "}
-                    <span className="text-muted-foreground">debates</span>
-                  </span>
-                </span>
-              )}
-            </div>
             <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               {user.createdAt && <span data-testid="text-joined">Joined {formatJoinDate(user.createdAt)}</span>}
               {topRank && (
@@ -702,6 +669,11 @@ export default function Profile() {
                   <Icon className={`w-4 h-4 ${active ? "text-primary" : ""}`} />
                   <span className="font-ui text-[0.6rem] font-semibold uppercase tracking-[0.08em] leading-none">
                     {tab.label}
+                    {typeof sectionMeta[tab.id].count === "number" && (
+                      <span className="ml-1 tabular-nums text-primary" data-testid={`${tab.testId}-count`}>
+                        {sectionMeta[tab.id].count}
+                      </span>
+                    )}
                   </span>
                   {active && <span className="absolute left-2 right-2 bottom-0 h-0.5 bg-primary rounded-full" />}
                 </button>
@@ -764,7 +736,16 @@ export default function Profile() {
                 </h3>
                 {recommendedTopics.length > 0 ? (
                   <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
-                    {recommendedTopics.map((topic) => renderTopicCard(topic))}
+                    {recommendedTopics.map((topic: any) => (
+                      <div key={topic.id} className="space-y-1.5">
+                        {topic.recommendReason && (
+                          <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground" data-testid="text-recommend-reason">
+                            {topic.recommendReason}
+                          </p>
+                        )}
+                        {renderTopicCard(topic)}
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <Card className="p-8 text-center">
@@ -793,6 +774,11 @@ export default function Profile() {
                         {item.followReason && (
                           <p className="font-ui text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground" data-testid="text-follow-reason">
                             {item.followReason}
+                          </p>
+                        )}
+                        {item.followExcerpt && (
+                          <p className="max-w-[420px] border-l-2 border-primary/50 pl-2 text-sm italic text-muted-foreground line-clamp-2 break-words" data-testid="text-follow-excerpt">
+                            “{item.followExcerpt}”
                           </p>
                         )}
                         {renderTopicCard(item)}
