@@ -1,3 +1,10 @@
+## Nov 27, 2026 4:24 PM CT — Fix empty profile suggestion decks; leaner profile header
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- Root cause: both decks excluded topics the viewer created. On live, every topic was created by Timothy's account, so "Recommended" filtered out all 34 topics and "From people you follow" dropped Samuel's opinions (both were on topics Tim started).
+- Recommended now only skips topics you've already weighed in on (own topics allowed), and falls back to trending topics so it's never empty while topics exist; each card shows why it's suggested.
+- Following feed now shows followed users' recent opinions (with a short quote) and topics regardless of who started the topic. Both decks stay own-profile only.
+- Header: removed the political-lean label and the opinions/followers/following/debates counts; counts now sit on the tab labels, and the lean description lives in the compass card.
+
 ## Nov 27, 2026 3:08 PM CT — Opponent debate picker redesign
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - The sheet that opens from an opponent's footer avatar no longer overflows: titles wrap to 2 lines inside the card.

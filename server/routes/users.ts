@@ -502,7 +502,7 @@ router.get('/:userId/recommended-topics', isAuthenticated, async (req, res) => {
     const userId = req.params.userId;
     if (!me?.id || String(me.id) !== userId) return res.status(403).json({ message: "Only available on your own profile" });
     const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 20);
-    const key = cacheKey('user', userId, 'recommended-topics-v2', limit);
+    const key = cacheKey('user', userId, 'recommended-topics-v3', limit);
     let result = await getCache<{ topics: any[] }>(key);
     if (!result) {
       const [candidates, answered]: [any[], any] = await Promise.all([
@@ -536,10 +536,10 @@ router.get('/:userId/following-topics', isAuthenticated, async (req, res) => {
     const act: any = await db.execute(sql`
       with f as (select following_id from user_follows where follower_id = ${userId})
       select * from (
-        select t.id::text as topic_id, t.created_by_id as actor_id, 'created' as kind, t.created_at as at
+        select t.id::text as topic_id, t.created_by_id as actor_id, 'created' as kind, t.created_at as at, null::text as excerpt
           from topics t where t.created_by_id in (select following_id from f)
         union all
-        select o.topic_id::text, o.user_id, 'opinion', o.created_at
+        select o.topic_id::text, o.user_id, 'opinion', o.created_at, left(o.content, 180)
           from opinions o where o.user_id in (select following_id from f) and coalesce(o.status, 'approved') = 'approved'
       ) a order by at desc limit 100`);
     const activityRows: any[] = act.rows ?? act;
@@ -552,7 +552,7 @@ router.get('/:userId/following-topics', isAuthenticated, async (req, res) => {
       .filter(Boolean) as any[];
     const topics = rankFollowing(candidates, activityRows.map((r) => ({
       topicId: String(r.topic_id), actorId: String(r.actor_id), actorName: nameOf.get(String(r.actor_id)) ?? "Someone",
-      kind: r.kind === 'created' ? 'created' as const : 'opinion' as const, at: r.at,
+      kind: r.kind === 'created' ? 'created' as const : 'opinion' as const, at: r.at, excerpt: r.excerpt,
     })), { userId, limit });
     res.json({ topics });
   } catch (error) {
