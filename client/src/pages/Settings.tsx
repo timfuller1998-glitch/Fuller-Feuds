@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Save, User, Cloudy, Sun, Moon, AtSign, HelpCircle, Megaphone } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { NOTIFICATION_PREFS } from "@shared/notificationRules";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { FounderCard } from "@/components/FounderCard";
 import { canUseAdFree } from "@shared/supporter";
@@ -543,6 +544,7 @@ function NotificationSettingsCard() {
         <CardDescription>Choose what shows up in your bell. Debate invites to you always do.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <PhoneNotifications />
         {NOTIFICATION_PREFS.map((p) => (
           <div key={p.key} className="flex items-center justify-between gap-4">
             <label htmlFor={`switch-notify-${p.key}`} className="text-sm">{p.label}</label>
@@ -557,5 +559,39 @@ function NotificationSettingsCard() {
         ))}
       </CardContent>
     </Card>
+  );
+}
+
+/** "Enable phone notifications" (Web Push) for this device. */
+function PhoneNotifications() {
+  const push = usePushNotifications();
+  const note = {
+    checking: "Checking this device…",
+    unsupported: "This browser can't show phone notifications.",
+    "ios-install": "Add Fuller Feuds to your Home Screen first: tap Share, then Add to Home Screen, then open it from there.",
+    off: "Get notified on this device even when Fuller Feuds is closed.",
+    on: "On for this device.",
+    blocked: "Blocked for this site. Turn notifications back on in your browser or phone settings.",
+    unavailable: "Phone notifications aren't set up on the server yet.",
+  }[push.state];
+  return (
+    <div className="space-y-2 pb-4 border-b" data-testid="phone-notifications">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="text-sm font-medium">Phone notifications</h3>
+          <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-push-state">{note}</p>
+        </div>
+        {push.state === "off" && (
+          <Button size="sm" onClick={push.enable} disabled={push.busy} data-testid="button-enable-push">Enable phone notifications</Button>
+        )}
+        {push.state === "on" && (
+          <Button size="sm" variant="outline" onClick={push.disable} disabled={push.busy} data-testid="button-disable-push">Turn off</Button>
+        )}
+      </div>
+      {push.state === "on" && (
+        <Button size="sm" variant="ghost" className="px-0 h-auto text-primary" onClick={push.sendTest} data-testid="button-test-push">Send test notification</Button>
+      )}
+      {push.error && <p className="text-xs text-destructive" data-testid="text-push-error">{push.error}</p>}
+    </div>
   );
 }
