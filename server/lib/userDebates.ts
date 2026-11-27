@@ -18,6 +18,9 @@ export type UserDebate = {
   id: string; topicTitle: string; opponentId: string; opponentName: string; opponentHandle: string | null;
   opponentAvatar: string | null; state: DebateState; isNew: boolean; unread: number; finished: boolean;
   myTurns: number; activityAt: string | null; endedAt: string | null;
+  /** Raw room turn fields so the client can use the shared debateTurn() source. */
+  room: { status: string; phase: string | null; currentTurn: string | null; participant1Id: string; participant2Id: string };
+  myStance: string | null; opponentStance: string | null; messageCount: number;
 };
 
 // Raw SQL returns "2026-11-03 14:16:47.72+00"; send a real ISO string (Safari can't parse the "+00" form).
@@ -30,7 +33,8 @@ const iso = (d: any): string | null => {
 export async function listUserDebates(me: string): Promise<UserDebate[]> {
   const r: any = await db.execute(sql`
     SELECT d.id, d.status, d.phase, d.current_turn, d.turn_count1, d.turn_count2,
-           d.participant1_id, d.invite_status, d.invitee_id,
+           d.participant1_id, d.participant2_id, d.participant1_stance, d.participant2_stance, d.invite_status, d.invitee_id,
+           (SELECT count(*)::int FROM debate_messages m WHERE m.room_id = d.id) AS message_count,
            (coalesce(d.last_message_at, d.started_at) AT TIME ZONE 'UTC') AS activity_at,
            (d.ended_at AT TIME ZONE 'UTC') AS ended_at,
            t.title AS topic_title,
@@ -67,6 +71,10 @@ export async function listUserDebates(me: string): Promise<UserDebate[]> {
       finished: state === 'completed' || state === 'rated' || state === 'declined',
       myTurns: (isP1 ? d.turn_count1 : d.turn_count2) ?? 0,
       activityAt: iso(d.activity_at), endedAt: iso(d.ended_at),
+      room: { status: d.status, phase: d.phase, currentTurn: d.current_turn, participant1Id: d.participant1_id, participant2Id: d.participant2_id },
+      myStance: (isP1 ? d.participant1_stance : d.participant2_stance) ?? null,
+      opponentStance: (isP1 ? d.participant2_stance : d.participant1_stance) ?? null,
+      messageCount: d.message_count ?? 0,
     };
   });
 }
