@@ -1,3 +1,10 @@
+## Nov 27, 2026 8:50 PM CT — Deleting an opinion removes its XP
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- User and admin deletes were already a hard delete of the opinions row, and getSkillXp already summed only non-hidden, non-flagged rows — so deleting already dropped that opinion's strength_xp. There were no hidden/flagged rows on live, and no leftover deleted opinions, so current totals did not need a backfill.
+- Tightened the sum so one topic can never contribute more than 25 XP (in case a user had two opinions on the same topic). Live data has no such pairs, so totals stay the same.
+- Shared helper `opinionXpFromRows` (used by tests, mirrored in `badgeRepository.getSkillXp`) covers: hard delete removes XP; hide/flag removes XP; delete-then-recreate never exceeds 25 for that topic; legacy NULL still counts as 25.
+- Profile rule text now says deleting an opinion (or a moderator hiding it) removes that XP. No new migration.
+
 ## Nov 27, 2026 8:30 PM CT — Smarter opinion strength bar; opinion XP now earned by strength (max 25)
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - Old scorer: `shared/opinionStrength.ts` (`analyzeOpinion`), used by the editor bar (`OpinionStructure.tsx`) and the bare-opinion tip. It ticked each item on a single keyword match, so "yes because random.co on the other hand my mind is open" hit every box. Old XP: a flat 25 XP per opinion, computed live in `badgeRepository.getSkillXp`.

@@ -543,6 +543,38 @@ export function opinionXp(text: string): number {
   return analyzeOpinion(text).xp;
 }
 
+/** Statuses that hide an opinion. getSkillXp must not count these (same as a delete). */
+export const EXCLUDED_OPINION_STATUSES = ["hidden", "flagged"] as const;
+
+export type OpinionXpRow = {
+  topicId: string;
+  status?: string | null;
+  /** Absent rows (hard-deleted, or omitted from the list) are not passed in, so they add 0. */
+  strengthXp?: number | null;
+};
+
+/**
+ * Opinions-skill XP from a user's current opinion rows.
+ * - Hard-deleted opinions are gone from the list, so their XP is removed.
+ * - hidden / flagged (moderation soft-delete) are skipped, so that XP is removed too.
+ * - Each row is clamped to 0–25 (NULL strength_xp is the legacy flat 25).
+ * - At most 25 XP per topic, even if a user somehow has two opinions on it.
+ * Keep the SQL in badgeRepository.getSkillXp in sync with this.
+ */
+export function opinionXpFromRows(rows: readonly OpinionXpRow[]): number {
+  const bestByTopic = new Map<string, number>();
+  for (const row of rows) {
+    const status = (row.status ?? "approved").toLowerCase();
+    if ((EXCLUDED_OPINION_STATUSES as readonly string[]).includes(status)) continue;
+    const xp = Math.max(0, Math.min(MAX_OPINION_XP, row.strengthXp ?? LEGACY_OPINION_XP));
+    const prev = bestByTopic.get(row.topicId) ?? 0;
+    if (xp > prev) bestByTopic.set(row.topicId, xp);
+  }
+  let sum = 0;
+  for (const xp of bestByTopic.values()) sum += xp;
+  return sum;
+}
+
 /** One-line prompt that can mention the topic question. */
 export function structurePrompt(topicTitle?: string | null): string {
   const base =
