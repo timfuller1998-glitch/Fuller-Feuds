@@ -1,3 +1,12 @@
+## Nov 27, 2026 8:30 PM CT — Smarter opinion strength bar; opinion XP now earned by strength (max 25)
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- Old scorer: `shared/opinionStrength.ts` (`analyzeOpinion`), used by the editor bar (`OpinionStructure.tsx`) and the bare-opinion tip. It ticked each item on a single keyword match, so "yes because random.co on the other hand my mind is open" hit every box. Old XP: a flat 25 XP per opinion, computed live in `badgeRepository.getSkillXp`.
+- New scorer, same file, shared by client and server: a cue ("because", "on the other hand", "I tested", "unless") only counts if real content words follow it. No topic words are hardcoded, so it works for politics, religion, cars and recipes. Personal experience counts as evidence, openness has low weight, links only count next to real text, and a stuffing penalty, a repeated-word penalty and a short-text cap keep it honest. Fixes the chat draft's bugs (the always-true `hasConcreteNoun` regex and the pineapple/alternator word list).
+- XP: the server recomputes the score from the saved text on create and edit (`opinionRepository`) and stores it in the new `opinions.strength_xp` (0-25, never taken from the client). A non-linear curve gives nothing-burgers ~0 and caps at 25. Edits can only raise an opinion's XP. The Opinions skill XP now sums `strength_xp`.
+- No retroactive change: migration `0021_opinion_strength_xp.sql` adds the column and sets every existing opinion to 25, which is what it was already earning.
+- Editor bar: the checklist chips still tick, now only on real substance. It shows "Strong · 19 XP" and a short note when the text is stuffed.
+- 14 new tests in `shared/opinionStrength.test.ts`. Typecheck stays at 50.
+
 ## Nov 27, 2026 7:49 PM CT — Always show topic Resources; links field in the opinion editor
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - Root cause: the Resources block on the topic page was hidden whenever no links were found, so it looked like it was missing. Link extraction only matched URLs that already started with http(s)://, so a bare domain like example.com in the opinion text was ignored. The opinions.references column already existed and was accepted by the API, but the composer had no UI to add links, so that array was always empty. There is no live opinion with a stored URL or reference (including Timothy's).

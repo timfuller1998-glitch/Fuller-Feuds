@@ -56,7 +56,7 @@ export const XP_SKILLS: { id: SkillId; name: string; icon: string; rules: string
     id: "opinions",
     name: "Opinions",
     icon: "Lightbulb",
-    rules: ["25 XP per opinion you share", "5 XP per like your opinions get from others"],
+    rules: ["Up to 25 XP per opinion you share, based on how well it's argued (stance, reason, support, the other side)", "5 XP per like your opinions get from others"],
   },
   {
     id: "topics",
