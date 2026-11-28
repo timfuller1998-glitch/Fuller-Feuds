@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { getMajor } from "@shared/topicTaxonomy";
 import { useUserSearch, PersonRow } from "@/components/PeopleResults";
 import { Search, History, Plus, X, Link as LinkIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -196,10 +197,12 @@ export default function SearchBar({
       const response = await apiRequest("POST", "/api/topics/generate-categories", { title });
       return response.json();
     },
-    onSuccess: (data: { categories: string[] }) => {
+    onSuccess: (data: { categories: string[]; home?: { homeMajor: string } }) => {
       // Only show form if the mutation query still matches the current debounced query
       if (pendingMutationQuery === debouncedQuery) {
-        setTopicCategories(data.categories);
+        // The server files the topic under an official group on create; these are just the visible tags.
+        const homeName = getMajor(data.home?.homeMajor)?.name;
+        setTopicCategories(data.categories?.length ? data.categories : homeName ? [homeName] : ["General"]);
         setShowCreateForm(true);
       }
       setPendingMutationQuery(null);

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { MAJOR_CATEGORIES, resolveHome } from "@shared/topicTaxonomy";
 import { useSearch, useLocation } from "wouter";
 import SwipeableCardStack from "@/components/SwipeableCardStack";
 import { Card, CardContent } from "@/components/ui/card";
@@ -70,11 +71,14 @@ export default function Search() {
     if (!isLoading && !peopleLoading && (topics?.length ?? 0) === 0 && people.length > 0) setKind("people");
   }, [isLoading, peopleLoading, topics, people.length]);
 
-  // Filter by category for tabs
-  const allCategories = Array.from(new Set(topics?.flatMap(t => t.categories) || []));
-  const filteredTopics = activeTab === "all" 
-    ? topics 
-    : topics?.filter(t => t.categories.includes(activeTab));
+  // Tabs are the official groups (each topic's home major), not raw tags.
+  const majorOf = (t: any) => resolveHome({ id: t.id, title: t.title, description: t.description, categories: t.categories ?? [], homeMajor: t.homeMajor, homeSub: t.homeSub }).majorId;
+  const groupTabs = MAJOR_CATEGORIES
+    .map((m) => ({ id: m.id, name: m.name, count: (topics || []).filter((t) => majorOf(t) === m.id).length }))
+    .filter((g) => g.count > 0);
+  const filteredTopics = activeTab === "all"
+    ? topics
+    : topics?.filter((t) => majorOf(t) === activeTab);
 
   if (!searchQuery) {
     return (
@@ -205,13 +209,13 @@ export default function Search() {
               <TabsTrigger value="all" data-testid="tab-all">
                 All ({topics.length})
               </TabsTrigger>
-              {allCategories.map((category) => (
-                <TabsTrigger 
-                  key={category} 
-                  value={category}
-                  data-testid={`tab-${category.toLowerCase()}`}
+              {groupTabs.map((g) => (
+                <TabsTrigger
+                  key={g.id}
+                  value={g.id}
+                  data-testid={`tab-${g.id}`}
                 >
-                  {category} ({topics.filter(t => t.categories.includes(category)).length})
+                  {g.name} ({g.count})
                 </TabsTrigger>
               ))}
             </TabsList>

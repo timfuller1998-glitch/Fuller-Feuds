@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { MAJOR_CATEGORIES, getMajor, resolveHome, resolveTag } from "@shared/topicTaxonomy";
 import { openTutorial } from "@/lib/tutorial";
 import { openFeedback } from "@/lib/feedback";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -43,7 +44,7 @@ import {
   Clock,
   Star,
   Crown,
-  PenLine
+  PenLine, Car, UtensilsCrossed, Church, Lightbulb
 } from "lucide-react";
 import type { Topic } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
@@ -90,6 +91,8 @@ export default function AppSidebar({
   });
 
   const savedCategories = userData?.followedCategories || [];
+  const toGroupName = (c: string) => getMajor(resolveTag(c)?.majorId)?.name ?? null;
+  const savedGroupNames = Array.from(new Set(savedCategories.map(toGroupName).filter((n): n is string => !!n)));
 
   // Fetch recently viewed categories
   const { data: recentCategories } = useQuery({
@@ -111,8 +114,9 @@ export default function AppSidebar({
   // Mutation to toggle category follow status
   const toggleCategoryMutation = useMutation({
     mutationFn: async ({ category, isFollowing }: { category: string; isFollowing: boolean }) => {
+      // Followed categories are official groups. Older follows saved as raw tags count toward the group they belong to.
       const newFollowedCategories = isFollowing
-        ? savedCategories.filter(c => c !== category)
+        ? savedCategories.filter(c => toGroupName(c) !== category)
         : [...savedCategories, category];
       
       return apiRequest("PATCH", "/api/users/me", { followedCategories: newFollowedCategories });
@@ -156,33 +160,31 @@ export default function AppSidebar({
       'Energy': Flame,
       'Climate': Globe,
       'Society': MessageCircle,
+      'Vehicles': Car,
+      'Food & Cooking': UtensilsCrossed,
+      'Religion': Church,
+      'Social Policy': MessageCircle,
+      'Ideas': Lightbulb,
+      'Culture': Globe,
       'General': Grid,
     };
     return iconMap[categoryName] || MessageCircle; // Default icon
   };
 
-  // Extract all unique categories from all topics with their counts
+  // Official groups (each topic's home major) with their topic counts, biggest first
   const allCategories: CategoryItem[] = topics
-    ? Array.from(
-        topics.reduce((acc, topic) => {
-          topic.categories.forEach(cat => {
-            if (!acc.has(cat)) {
-              acc.set(cat, { title: cat, count: 0 });
-            }
-            acc.get(cat)!.count++;
-          });
-          return acc;
-        }, new Map<string, { title: string; count: number }>())
-      )
-      .map(([_, data]) => ({
-        ...data,
-        icon: getCategoryIcon(data.title),
-      }))
-      .sort((a, b) => b.count - a.count) // Sort by count descending
+    ? MAJOR_CATEGORIES
+        .map((m) => ({
+          title: m.name,
+          count: topics.filter((t: any) => resolveHome({ id: t.id, title: t.title, description: t.description, categories: t.categories ?? [], homeMajor: t.homeMajor, homeSub: t.homeSub }).majorId === m.id).length,
+          icon: getCategoryIcon(m.name),
+        }))
+        .filter((c) => c.count > 0)
+        .sort((a, b) => b.count - a.count)
     : [];
 
   // Get saved categories with their details (up to 10)
-  const savedCategoryItems = savedCategories
+  const savedCategoryItems = savedGroupNames
     .slice(0, 10)
     .map(cat => {
       const categoryData = allCategories.find(c => c.title === cat);
@@ -195,7 +197,7 @@ export default function AppSidebar({
 
   // Get recently viewed categories that aren't already in saved categories (up to 5)
   const recentCategoryItems = (recentCategories || [])
-    .filter(cat => !savedCategories.includes(cat))
+    .filter(cat => !savedGroupNames.includes(cat))
     .slice(0, 5)
     .map(cat => {
       const categoryData = allCategories.find(c => c.title === cat);
@@ -329,11 +331,11 @@ export default function AppSidebar({
                     <SidebarMenuItem key={`saved-${category.title}`}>
                       <div className="flex items-center gap-2 px-2 py-1.5 w-full">
                         <Checkbox
-                          checked={savedCategories.includes(category.title)}
+                          checked={savedGroupNames.includes(category.title)}
                           onCheckedChange={() => {
                             toggleCategoryMutation.mutate({
                               category: category.title,
-                              isFollowing: savedCategories.includes(category.title),
+                              isFollowing: savedGroupNames.includes(category.title),
                             });
                           }}
                           data-testid={`checkbox-category-${category.title.toLowerCase()}`}

@@ -5,6 +5,7 @@ import type { InsertTopic, TopicWithCounts, InsertOpinion, TopicInsert } from '.
 import { withCache, getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
 import { invalidateTopicCache, invalidateTopicsListCache } from './cacheInvalidation.js';
 import { logSecurityEvent } from '../utils/securityLogger.js';
+import { normalizeHome, GENERAL_SUB_ID } from '../../shared/topicTaxonomy.js';
 import type { Request } from 'express';
 
 export class TopicService {
@@ -108,6 +109,8 @@ export class TopicService {
       title: string;
       description?: string;
       categories?: string[];
+      homeMajor?: string | null;
+      homeSub?: string | null;
       imageUrl?: string | null;
       isActive?: boolean;
       status?: string;
@@ -140,40 +143,23 @@ export class TopicService {
     
     try {
       // Extract opinion-related fields that shouldn't be in topic data
-      const { initialOpinion, references, stance, categories: userCategories, ...topicData } = data;
+      const { initialOpinion, references, stance, categories: userCategories, ...topicData } = data; // eslint-disable-line @typescript-eslint/no-unused-vars
 
       // Prefer an explicit topic description (e.g. drafted from a source link), then the opening opinion, then the title.
       const description = data.description?.trim() || initialOpinion?.trim() || data.title || 'No description provided';
 
-      // Handle categories: use provided categories if available, otherwise generate AI categories
-      let categories: string[] = [];
-      if (userCategories && Array.isArray(userCategories) && userCategories.length > 0) {
-        categories = userCategories.slice(0, 5); // Limit to 5 categories
-        // If less than 3 categories, supplement with AI-generated ones
-        if (categories.length < 3) {
-          try {
-            const aiCategories = await AIService.generateCategories(data.title);
-            // Merge unique categories, prioritizing user-provided ones
-            const allCategories = [...categories];
-            for (const aiCat of aiCategories) {
-              if (!allCategories.includes(aiCat) && allCategories.length < 5) {
-                allCategories.push(aiCat);
-              }
-            }
-            categories = allCategories.slice(0, 5);
-          } catch (error) {
-            console.error('Error generating AI categories, using user categories only:', error);
-          }
-        }
-      } else {
-        // No user categories provided, generate AI categories
-        try {
-          categories = await AIService.generateCategories(data.title);
-        } catch (error) {
-          console.error('Error generating AI categories, using defaults:', error);
-          // Fallback to default categories if AI generation fails
-          categories = ['General', 'Politics', 'Society'];
-        }
+      // Official home group + optional extra tags.
+      // The author's picked home wins when it is on the official list. Otherwise the AI picks from the
+      // official list (validated), falling back to alias/keyword matching, then the closest major's General.
+      // Free-form tags are optional extras (max 5); the AI offers a few when the author gave none.
+      let categories: string[] = Array.isArray(userCategories)
+        ? [...new Set(userCategories.map((c) => String(c).trim()).filter(Boolean))].slice(0, 5)
+        : [];
+      let home = normalizeHome(data.homeMajor, data.homeSub);
+      if (!home) {
+        const suggestion = await AIService.suggestTopicHome(data.title, description, categories);
+        if (!home) home = { majorId: suggestion.majorId, subId: suggestion.subId };
+        if (categories.length === 0) categories = suggestion.tags.slice(0, 5);
       }
 
       // Build topic data with only valid database fields (excluding extended schema fields)
@@ -183,6 +169,8 @@ export class TopicService {
         title: data.title,
         description,
         categories,
+        homeMajor: home.majorId,
+        homeSub: home.subId,
         createdById: userId,
         ...(sourceUrl ? { sourceUrl } : {}),
         ...(data.imageUrl !== undefined && { imageUrl: data.imageUrl }),
@@ -292,6 +280,20 @@ export class TopicService {
       console.error(`[TopicService] Failed to generate embedding for topic ${topicId}:`, error);
       throw error;
     }
+  }
+
+  /** Admin: move a topic to another official home (major + sub). Official groups only. */
+  async setTopicHome(topicId: string, major: string, sub?: string | null): Promise<{ homeMajor: string; homeSub: string }> {
+    const home = normalizeHome(major, sub);
+    if (!home) throw new Error('Not an official group');
+    // An unknown sub is rejected, not silently turned into General.
+    if (sub && home.subId === GENERAL_SUB_ID && String(sub).trim().toLowerCase() !== GENERAL_SUB_ID) {
+      throw new Error('Not an official sub-group');
+    }
+    await this.repository.setHome(topicId, home.majorId, home.subId);
+    await invalidateTopicCache(topicId);
+    await invalidateTopicsListCache();
+    return { homeMajor: home.majorId, homeSub: home.subId };
   }
 
   async deleteTopic(id: string): Promise<void> {

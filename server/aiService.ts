@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { Opinion, Topic, CumulativeOpinion, SummarySentence } from '../shared/schema.js';
 import { chatParams, recordAIFailure, EMBEDDING_MODEL } from './lib/aiConfig.js';
+import { MAJOR_CATEGORIES, subsOf, normalizeHome, classifyTopic } from '../shared/topicTaxonomy.js';
 
 // Temporarily disable OpenAI for testing - remove this when you have API key
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({
@@ -129,6 +130,52 @@ export class AIService {
       console.error(`[AI] Category generation failed: ${recordAIFailure(error)}`);
       // Fallback to generic categories
       return ["Politics", "Society", "General"];
+    }
+  }
+
+  /**
+   * Pick the topic's official home (major + sub from shared/topicTaxonomy.ts) and up to 3 optional
+   * free-form extra tags. The AI only chooses from the official list; an off-list or failed answer
+   * falls back to the alias/keyword classifier, so the result is always a valid, non-"Other" home.
+   */
+  static async suggestTopicHome(
+    title: string,
+    description?: string | null,
+    existingTags: string[] = [],
+  ): Promise<{ majorId: string; subId: string; tags: string[]; source: 'ai' | 'keywords' }> {
+    const keywordPick = classifyTopic({ title, description, categories: existingTags });
+    const fallback = { majorId: keywordPick.majorId, subId: keywordPick.subId, tags: [] as string[], source: 'keywords' as const };
+    if (!openai) return fallback;
+    try {
+      const menu = MAJOR_CATEGORIES.map((m) =>
+        `- ${m.id}: ${m.name} | subs: ${subsOf(m.id).map((s) => `${s.id} (${s.name})`).join(', ')}`).join('\n');
+      const completion = await openai.chat.completions.create({
+        ...chatParams({ maxTokens: 120, temperature: 0.2, json: true }),
+        messages: [
+          {
+            role: 'system',
+            content: 'You file debate topics into an official group list for a general debate site (politics, religion, vehicles, recipes, movies, sports and more). Choose exactly one major and one sub from the list, using the ids exactly as written. If no specific sub fits, use "general" for that major. Never invent groups. Also give up to 3 short optional extra tags (1-2 words, not the major name). Reply with JSON only: {"major":"<id>","sub":"<id>","tags":["..."]}.',
+          },
+          {
+            role: 'user',
+            content: `Official groups:\n${menu}\n\nTopic title: "${title}"${description ? `\nDescription: "${description.slice(0, 400)}"` : ''}${existingTags.length ? `\nTags the author already chose: ${existingTags.join(', ')}` : ''}`,
+          },
+        ],
+      });
+      const raw = completion.choices[0]?.message?.content?.trim();
+      if (!raw) throw new Error('No response from OpenAI');
+      const parsed = JSON.parse(raw);
+      const home = normalizeHome(String(parsed.major ?? ''), parsed.sub ? String(parsed.sub) : null);
+      if (!home) throw new Error('AI picked a group that is not on the official list');
+      const majorNames = new Set(MAJOR_CATEGORIES.flatMap((m) => [m.name.toLowerCase(), m.id]));
+      const tags = (Array.isArray(parsed.tags) ? parsed.tags : [])
+        .map((t: unknown) => String(t).trim())
+        .filter((t: string) => t && t.length <= 30 && !majorNames.has(t.toLowerCase()))
+        .slice(0, 3);
+      return { majorId: home.majorId, subId: home.subId, tags, source: 'ai' };
+    } catch (error) {
+      console.error(`[AI] Topic home suggestion failed, using keywords: ${recordAIFailure(error)}`);
+      return fallback;
     }
   }
 

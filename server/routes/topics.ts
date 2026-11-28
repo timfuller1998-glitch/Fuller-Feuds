@@ -10,7 +10,7 @@ import { db } from '../db.js';
 import { feedbackRequests } from '../../shared/schema.js';
 import { isAuthenticated, requireModerator, requireAdmin } from '../middleware/auth.js';
 import { insertTopicSchema, insertOpinionSchema } from '../../shared/schema.js';
-import { buildMapTree, buildSyntheticTopics } from '../../shared/topicTaxonomy.js';
+import { buildMapTree, buildSyntheticTopics, countByGroup, findSplitCandidates, MAJOR_CATEGORIES, subsOf, type MapTopicRef } from '../../shared/topicTaxonomy.js';
 import { z } from 'zod';
 import { UnauthorizedError, ForbiddenError, AuthorizationError, DataAccessError } from '../utils/securityErrors.js';
 
@@ -64,6 +64,47 @@ router.get('/search-similar', async (req, res) => {
 });
 
 
+// Compact topic rows for the map (active topics only; the 2-minute topic list cache already applies).
+async function loadMapTopics(): Promise<MapTopicRef[]> {
+  const topics = await topicService.getTopics({ limit: 2000 });
+  return (topics || []).map((t: any) => ({
+    id: t.id,
+    title: t.title,
+    description: t.description ?? null,
+    categories: Array.isArray(t.categories) ? t.categories : [],
+    homeMajor: t.homeMajor ?? null,
+    homeSub: t.homeSub ?? null,
+  }));
+}
+
+// A sub over ~20 topics is only logged for a person to split (names are never invented automatically). At most once per 10 minutes.
+let lastSplitLog = 0;
+function logSplitCandidates(c?: { majorName: string; subName: string; count: number }[]) {
+  if (!c?.length || Date.now() - lastSplitLog < 10 * 60 * 1000) return;
+  lastSplitLog = Date.now();
+  console.warn('[topics map] groups to consider splitting: ' + c.map((x) => `${x.majorName} / ${x.subName} (${x.count})`).join(', '));
+}
+
+// GET /api/topics/groups - Official groups with live topic counts (for pickers, Search tabs, the sidebar and admin Move)
+router.get('/groups', async (_req, res) => {
+  try {
+    const { byMajor, bySub } = countByGroup(await loadMapTopics());
+    const splits = findSplitCandidates(bySub);
+    res.json({
+      majors: MAJOR_CATEGORIES.map((m) => ({
+        id: m.id,
+        name: m.name,
+        count: byMajor[m.id] || 0,
+        subs: subsOf(m.id).map((s) => ({ id: s.id, name: s.name, count: bySub[`${m.id}/${s.id}`] || 0 })),
+      })),
+      splitCandidates: splits,
+    });
+  } catch (error) {
+    console.error('Error building topic groups:', error);
+    res.status(500).json({ error: 'Failed to load topic groups' });
+  }
+});
+
 // GET /api/topics/map - Public radial-map tree (signed-out visitors welcome)
 router.get('/map', async (req, res) => {
   try {
@@ -75,14 +116,10 @@ router.get('/map', async (req, res) => {
       const count = Math.min(800, Math.max(50, parseInt(String(req.query.count || '420'), 10) || 420));
       return res.json(buildMapTree(buildSyntheticTopics(count)));
     }
-    const topics = await topicService.getTopics({ limit: 2000 });
-    const compact = (topics || []).map((t: any) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description ?? null,
-      categories: Array.isArray(t.categories) ? t.categories : [],
-    }));
-    res.json(buildMapTree(compact));
+    const compact = await loadMapTopics();
+    const tree = buildMapTree(compact);
+    logSplitCandidates(tree.splitCandidates);
+    res.json(tree);
   } catch (error) {
     console.error('Error building topics map:', error);
     res.status(500).json({ error: 'Failed to build topics map' });
@@ -352,8 +389,14 @@ router.post('/generate-categories', isAuthenticated, async (req, res) => {
       return res.status(400).json({ error: 'Title is required' });
     }
 
-    const categories = await AIService.generateCategories(title.trim());
-    res.json({ categories });
+    const description = typeof req.body.description === 'string' ? req.body.description : undefined;
+    const tags = Array.isArray(req.body.categories) ? req.body.categories.filter((c: unknown) => typeof c === 'string').slice(0, 5) : [];
+    // The suggested official home plus a few optional extra tags. `categories` is kept so older clients keep working.
+    const suggestion = await AIService.suggestTopicHome(title.trim(), description, tags);
+    res.json({
+      categories: suggestion.tags,
+      home: { homeMajor: suggestion.majorId, homeSub: suggestion.subId, source: suggestion.source },
+    });
   } catch (error) {
     console.error('Error generating categories:', error);
     res.status(500).json({ error: 'Failed to generate categories' });

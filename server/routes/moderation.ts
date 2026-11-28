@@ -207,6 +207,24 @@ router.get('/topics', requireModerator, async (req, res) => {
   }
 });
 
+// Admin: move a topic to another official home group (official majors/subs only)
+router.put('/topics/:topicId/home', requireAdmin, async (req, res) => {
+  try {
+    const { homeMajor, homeSub } = z.object({
+      homeMajor: z.string().min(1).max(60),
+      homeSub: z.string().max(80).nullish(),
+    }).parse(req.body);
+    const home = await topicService.setTopicHome(req.params.topicId, homeMajor, homeSub ?? null);
+    res.json({ message: "Topic moved", ...home });
+  } catch (error) {
+    if (error instanceof z.ZodError || (error instanceof Error && /official/.test(error.message))) {
+      return res.status(400).json({ message: error instanceof Error ? error.message : "Invalid group" });
+    }
+    console.error("Error moving topic:", error);
+    res.status(500).json({ message: "Failed to move topic" });
+  }
+});
+
 // Admin opinion management
 router.get('/opinions', requireModerator, async (req, res) => {
   try {
