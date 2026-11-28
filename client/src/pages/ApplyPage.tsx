@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getRef } from "@/lib/ref";
 import {
   FOUNDERS_PLEDGE, FREQUENCY_OPTIONS, INTEREST_AREAS, POLITICS_OPTIONS, RELIGION_OPTIONS, STEELMAN_PROMPTS,
+  politicsOptionLabel,
 } from "@shared/founders";
 
 // Public founding-member application (Fuller Feuds Dev, Nov 20 2026). ~5 minutes, rubric-scored for the admin.
@@ -169,7 +170,7 @@ export default function ApplyPage() {
               <Field label="Politically, where do you roughly sit?">
                 <Select value={politics} onValueChange={setPolitics}>
                   <SelectTrigger data-testid="select-apply-politics"><SelectValue placeholder="Skip" /></SelectTrigger>
-                  <SelectContent>{POLITICS_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                  <SelectContent>{POLITICS_OPTIONS.map((o) => <SelectItem key={o} value={o}>{politicsOptionLabel(o)}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
               <Field label="And on religion?">

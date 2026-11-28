@@ -3,18 +3,18 @@ import assert from "node:assert/strict";
 import { describeCompass, compassExtent, confidenceRadius, degree } from "./compassDescription";
 
 test("near-centre positions read as centrist with their small leans", () => {
-  assert.equal(describeCompass(-10, 5).region, "Centrist, leaning slightly left and slightly authoritarian");
+  assert.equal(describeCompass(-10, 5).region, "Centrist, leaning slightly liberal and slightly authoritarian");
   assert.equal(describeCompass(0, 0).region, "Centrist");
   assert.equal(describeCompass(3, -12).region, "Centrist, leaning slightly libertarian");
   assert.match(describeCompass(-10, 5).summary, /tendency rather than a fixed position/);
 });
 
 test("quadrants and single-axis positions", () => {
-  assert.equal(describeCompass(-40, -40).region, "Libertarian Left");
-  assert.equal(describeCompass(70, 20).region, "Strong Authoritarian Right");
-  assert.equal(describeCompass(-20, 16).region, "Moderate Authoritarian Left");
-  assert.equal(describeCompass(45, 2).region, "Right, socially centrist");
-  assert.equal(describeCompass(-8, -50).region, "Libertarian, slightly left on economics");
+  assert.equal(describeCompass(-40, -40).region, "Libertarian Liberal");
+  assert.equal(describeCompass(70, 20).region, "Strong Authoritarian Conservative");
+  assert.equal(describeCompass(-20, 16).region, "Moderate Authoritarian Liberal");
+  assert.equal(describeCompass(45, 2).region, "Conservative, socially centrist");
+  assert.equal(describeCompass(-8, -50).region, "Libertarian, slightly liberal on economics");
   assert.match(describeCompass(70, 20).summary, /free markets/);
   assert.match(describeCompass(-40, -40).summary, /personal freedom/);
 });

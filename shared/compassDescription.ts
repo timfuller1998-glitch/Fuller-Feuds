@@ -1,5 +1,5 @@
 // Deterministic, neutral plain-language reading of a political compass position.
-// Orientation matches the chart: economic < 0 = Left, > 0 = Right; social > 0 = Authoritarian, < 0 = Libertarian.
+// Orientation matches the chart: economic < 0 = Liberal, > 0 = Conservative; social > 0 = Authoritarian, < 0 = Libertarian.
 
 export type Confidence = "low" | "medium" | "high" | string | null | undefined;
 
@@ -23,7 +23,7 @@ export function degree(abs: number): "" | "slightly" | "moderately" | "clearly" 
 
 function regionName(e: number, s: number): string {
   const ae = Math.abs(e), as = Math.abs(s);
-  const econ = e < 0 ? "left" : "right";
+  const econ = e < 0 ? "liberal" : "conservative";
   const soc = s > 0 ? "authoritarian" : "libertarian";
   if (ae < 15 && as < 15) {
     const parts = [
@@ -47,8 +47,8 @@ function regionName(e: number, s: number): string {
 }
 
 const ECON = {
-  left: "a bigger role for government in the economy, such as public services, regulation and reducing inequality",
-  right: "free markets, lower taxes and private enterprise over government involvement in the economy",
+  liberal: "a bigger role for government in the economy, such as public services, regulation and reducing inequality",
+  conservative: "free markets, lower taxes and private enterprise over government involvement in the economy",
   center: "a mix of market and government approaches on economic questions",
 };
 const SOCIAL = {
@@ -63,7 +63,7 @@ export function describeCompass(
   opts: { opinions?: number | null; confidence?: Confidence } = {},
 ): CompassReading {
   const e = clamp(economicScore), s = clamp(authoritarianScore);
-  const econ = Math.abs(e) < 15 ? ECON.center : e < 0 ? ECON.left : ECON.right;
+  const econ = Math.abs(e) < 15 ? ECON.center : e < 0 ? ECON.liberal : ECON.conservative;
   const social = Math.abs(s) < 15 ? SOCIAL.center : s > 0 ? SOCIAL.auth : SOCIAL.lib;
   let summary: string;
   if (Math.abs(e) < 15 && Math.abs(s) < 15) {
