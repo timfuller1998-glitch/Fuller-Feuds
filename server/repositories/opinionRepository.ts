@@ -564,6 +564,8 @@ export class OpinionRepository {
         userAgent: req?.headers['user-agent'],
       });
 
+      // Hard delete: the row is removed, so getSkillXp no longer counts its strength_xp.
+      // (Moderator hide is a soft delete: status='hidden', which getSkillXp also skips.)
       await db.delete(opinions).where(eq(opinions.id, id));
 
       const queryTime = Date.now() - startTime;

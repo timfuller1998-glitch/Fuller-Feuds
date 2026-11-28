@@ -88,8 +88,16 @@ export class BadgeRepository {
         (SELECT COUNT(*)::int FROM opinion_sentence_counterpoints
            WHERE author_user_id = ${userId} AND COALESCE(status, 'approved') NOT IN ('hidden', 'flagged', 'removed')) AS counterpoints,
         (SELECT COUNT(*)::int FROM opinions WHERE user_id = ${userId} AND COALESCE(status, 'approved') NOT IN ('hidden', 'flagged')) AS opinions,
-        -- Opinion XP: server-computed strength (0-25). Rows from before this change (NULL) keep their flat 25.
-        (SELECT COALESCE(SUM(LEAST(25, GREATEST(0, COALESCE(strength_xp, 25)))), 0)::int FROM opinions WHERE user_id = ${userId} AND COALESCE(status, 'approved') NOT IN ('hidden', 'flagged')) AS opinion_xp,
+        -- Opinion XP from current rows only (keep in sync with opinionXpFromRows in shared/opinionStrength.ts).
+        -- Hard-deleted opinions are gone, so their XP is removed. hidden/flagged (moderation hide) are skipped too.
+        -- NULL strength_xp is the legacy flat 25. Group by topic so one topic can never contribute more than 25.
+        (SELECT COALESCE(SUM(topic_best), 0)::int FROM (
+           SELECT LEAST(25, MAX(LEAST(25, GREATEST(0, COALESCE(strength_xp, 25))))) AS topic_best
+           FROM opinions
+           WHERE user_id = ${userId}
+             AND COALESCE(status, 'approved') NOT IN ('hidden', 'flagged')
+           GROUP BY topic_id
+         ) topic_xp) AS opinion_xp,
         (SELECT COUNT(*)::int FROM opinion_votes v JOIN opinions o ON o.id = v.opinion_id
            WHERE o.user_id = ${userId} AND v.vote_type = 'like' AND v.user_id <> ${userId}) AS likes,
         (SELECT COUNT(*)::int FROM topics WHERE created_by_id = ${userId}) AS topics,

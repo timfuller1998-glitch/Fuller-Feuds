@@ -4,6 +4,7 @@ import {
   analyzeOpinion,
   isBareOpinion,
   opinionXp,
+  opinionXpFromRows,
   xpForQuality,
   MAX_OPINION_XP,
   structurePrompt,
@@ -270,5 +271,75 @@ describe("strength indicator v2", () => {
 
   it("returns xp on analyzeOpinion that matches opinionXp", () => {
     assert.equal(analyzeOpinion(VEHICLE).xp, opinionXp(VEHICLE));
+  });
+});
+
+
+describe("opinionXpFromRows (delete removes XP; cap 25 per topic)", () => {
+  const t1 = "topic-1";
+  const t2 = "topic-2";
+
+  it("sums visible opinions and treats a missing (hard-deleted) row as 0", () => {
+    const afterCreate = [{ topicId: t1, status: "approved", strengthXp: 19 }];
+    assert.equal(opinionXpFromRows(afterCreate), 19);
+    assert.equal(opinionXpFromRows([]), 0);
+  });
+
+  it("removes XP when an opinion is hidden or flagged (soft delete / moderation)", () => {
+    const live = [
+      { topicId: t1, status: "approved", strengthXp: 19 },
+      { topicId: t2, status: "approved", strengthXp: 16 },
+    ];
+    assert.equal(opinionXpFromRows(live), 35);
+    assert.equal(
+      opinionXpFromRows([
+        { topicId: t1, status: "hidden", strengthXp: 19 },
+        { topicId: t2, status: "approved", strengthXp: 16 },
+      ]),
+      16,
+    );
+    assert.equal(
+      opinionXpFromRows([
+        { topicId: t1, status: "flagged", strengthXp: 19 },
+        { topicId: t2, status: "approved", strengthXp: 16 },
+      ]),
+      16,
+    );
+  });
+
+  it("delete-then-recreate never exceeds 25 XP for that topic", () => {
+    const first = [{ topicId: t1, status: "approved", strengthXp: 19 }];
+    assert.equal(opinionXpFromRows(first), 19);
+
+    const afterDelete: typeof first = [];
+    assert.equal(opinionXpFromRows(afterDelete), 0);
+
+    const recreated = [{ topicId: t1, status: "approved", strengthXp: 22 }];
+    const total = opinionXpFromRows(recreated);
+    assert.equal(total, 22);
+    assert.ok(total <= 25);
+
+    // Even if both rows were somehow still present, the topic is capped at 25.
+    const both = [
+      { topicId: t1, status: "approved", strengthXp: 19 },
+      { topicId: t1, status: "approved", strengthXp: 22 },
+    ];
+    assert.equal(opinionXpFromRows(both), 22);
+    assert.ok(opinionXpFromRows(both) <= 25);
+  });
+
+  it("does not let two topics' XP get mixed into one topic's cap", () => {
+    const rows = [
+      { topicId: t1, status: "approved", strengthXp: 19 },
+      { topicId: t2, status: "approved", strengthXp: 16 },
+    ];
+    assert.equal(opinionXpFromRows(rows), 35);
+  });
+
+  it("counts legacy NULL strength_xp as 25, and clamps out-of-range values", () => {
+    assert.equal(opinionXpFromRows([{ topicId: t1, strengthXp: null }]), 25);
+    assert.equal(opinionXpFromRows([{ topicId: t1, status: "approved" }]), 25);
+    assert.equal(opinionXpFromRows([{ topicId: t1, status: "approved", strengthXp: 900 }]), 25);
+    assert.equal(opinionXpFromRows([{ topicId: t1, status: "approved", strengthXp: -4 }]), 0);
   });
 });
