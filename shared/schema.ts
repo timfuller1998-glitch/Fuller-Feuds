@@ -559,7 +559,7 @@ export type TopicWithCounts = Topic & {
   previewContent?: string;
   previewAuthor?: string;
   previewIsAI?: boolean;
-  diversityScore?: number;
+  diversityScore?: number | null;
   avgTasteScore?: number;
   avgPassionScore?: number;
   politicalDistribution?: {

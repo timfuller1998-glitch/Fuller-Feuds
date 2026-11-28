@@ -12,7 +12,7 @@ export default function HotDebates() {
 
   // Sort by diversity score (copy array to avoid cache mutation)
   const sortedTopics = topics ? [...topics]
-    .filter(t => t.diversityScore !== undefined && t.diversityScore > 0)
+    .filter(t => t.diversityScore != null && t.diversityScore > 0)
     .sort((a, b) => (b.diversityScore || 0) - (a.diversityScore || 0)) : [];
 
   // Calculate aggregate stats
@@ -153,7 +153,9 @@ export default function HotDebates() {
                         <Activity className="w-4 h-4 text-ai" />
                         <span className="text-sm font-medium">Political Diversity</span>
                       </div>
-                      <span className="text-sm font-bold text-ai">{diversityScore}%</span>
+                      <span className="text-sm font-bold text-ai" data-testid={`text-diversity-${topic.id}`}>
+                        {topic.diversityScore == null ? "Not enough opinions yet" : `${diversityScore}%`}
+                      </span>
                     </div>
                     {hasDistribution && distribution && (
                       <div className="space-y-2">

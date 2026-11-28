@@ -5,6 +5,7 @@ import { eq, desc, and, sql, count } from 'drizzle-orm';
 
 import type { InsertTopic, Topic, TopicWithCounts, TopicInsert } from '../../shared/schema.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
+import { politicalDiversity } from '../../shared/politicalDiversity.js';
 import { AIService } from '../aiService.js';
 
 
@@ -19,12 +20,35 @@ export class TopicRepository {
     return topic;
   }
 
+
+  /** Live political-diversity scores from opinion leanings (does not depend on cumulative_opinions). */
+  async diversityScoresFor(topicIds: string[]): Promise<Map<string, number | null>> {
+    const map = new Map<string, number | null>();
+    for (const id of topicIds) map.set(id, null);
+    if (topicIds.length === 0) return map;
+    const r: any = await db.execute(sql`
+      SELECT topic_id::text AS topic_id, topic_economic_score AS economic, topic_authoritarian_score AS authoritarian
+      FROM opinions
+      WHERE topic_id IN (${sql.join(topicIds.map((id) => sql`${id}`), sql`, `)})
+        AND status IN ('approved', 'pending')
+    `);
+    const by = new Map<string, { economic: number | null; authoritarian: number | null }[]>();
+    for (const row of (r.rows ?? r) as any[]) {
+      const id = String(row.topic_id);
+      if (!by.has(id)) by.set(id, []);
+      by.get(id)!.push(row);
+    }
+    for (const [id, leans] of by) map.set(id, politicalDiversity(leans).score);
+    return map;
+  }
+
   async findByIdWithCounts(id: string): Promise<TopicWithCounts | undefined> {
     const topic = await this.findById(id);
     if (!topic) return undefined;
 
     const counts = await this.getTopicCounts(id);
     const preview = await this.getTopicPreview(id);
+    const diversityById = await this.diversityScoresFor([id]);
     
     // Get cumulative opinion for distribution data
     const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository.js');
@@ -38,7 +62,7 @@ export class TopicRepository {
       previewContent: preview.content,
       previewAuthor: preview.author,
       previewIsAI: preview.isAI,
-      diversityScore: cumulative?.diversityScore ?? 0,
+      diversityScore: diversityById.get(id) ?? null,
       avgTasteScore: typeof cumulative?.averageTasteScore === 'number' ? cumulative.averageTasteScore : undefined,
       avgPassionScore: typeof cumulative?.averagePassionScore === 'number' ? cumulative.averagePassionScore : undefined,
       politicalDistribution: (() => {
@@ -107,6 +131,7 @@ export class TopicRepository {
     const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository.js');
     const cumulativeRepo = new CumulativeOpinionRepository();
     
+    const diversityById = await this.diversityScoresFor(topicsList.map((t) => t.id));
     const topicsWithCounts = await Promise.all(
       topicsList.map(async (topic) => {
         const counts = await this.getTopicCounts(topic.id);
@@ -120,7 +145,7 @@ export class TopicRepository {
           previewContent: preview.content,
           previewAuthor: preview.author,
           previewIsAI: preview.isAI,
-          diversityScore: cumulative?.diversityScore ?? 0,
+          diversityScore: diversityById.get(topic.id) ?? null,
           avgTasteScore: typeof cumulative?.averageTasteScore === 'number' ? cumulative.averageTasteScore : undefined,
           avgPassionScore: typeof cumulative?.averagePassionScore === 'number' ? cumulative.averagePassionScore : undefined,
           politicalDistribution: (() => {
@@ -252,6 +277,7 @@ export class TopicRepository {
     const { CumulativeOpinionRepository } = await import('./cumulativeOpinionRepository.js');
     const cumulativeRepo = new CumulativeOpinionRepository();
     
+    const diversityById = await this.diversityScoresFor(topicsList.map((t) => t.id));
     const topicsWithCounts = await Promise.all(
       topicsList.map(async (topic) => {
         const counts = await this.getTopicCounts(topic.id);
@@ -268,7 +294,7 @@ export class TopicRepository {
           previewContent: preview.content,
           previewAuthor: preview.author,
           previewIsAI: preview.isAI,
-          diversityScore: cumulative?.diversityScore ?? 0,
+          diversityScore: diversityById.get(topic.id) ?? null,
           avgTasteScore: typeof avgTaste === 'number' ? avgTaste : (avgTaste === null ? undefined : undefined),
           avgPassionScore: typeof avgPassion === 'number' ? avgPassion : (avgPassion === null ? undefined : undefined),
           politicalDistribution: (() => {

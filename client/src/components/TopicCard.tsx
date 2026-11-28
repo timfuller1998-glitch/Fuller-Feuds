@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Activity, Loader2, Heart, Skull, Flame, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { Sparkles, Activity, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getTopicCornerGlow } from "@/lib/politicalColors";
@@ -24,7 +24,7 @@ interface TopicCardProps {
   previewContent?: string;
   previewAuthor?: string;
   previewIsAI?: boolean;
-  diversityScore?: number;
+  diversityScore?: number | null;
   avgTasteScore?: number;
   avgPassionScore?: number;
   politicalDistribution?: {
@@ -54,8 +54,6 @@ export default function TopicCard({
   previewAuthor,
   previewIsAI,
   diversityScore,
-  avgTasteScore,
-  avgPassionScore,
   politicalDistribution,
   onFlipChange,
   onBackTimeUpdate,
@@ -304,51 +302,16 @@ export default function TopicCard({
               )}
             </div>
 
-            <div className="absolute top-2 right-2 flex gap-1 z-20 pointer-events-auto">
-              {diversityScore !== undefined && (
-                <Badge className="bg-ai/90 text-primary-foreground backdrop-blur-sm" data-testid={`badge-diversity-${id}`}>
+            <div className="absolute top-2 right-2 z-20 pointer-events-none max-w-[55%]">
+              {diversityScore == null ? (
+                <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-muted-foreground font-normal" data-testid={`badge-diversity-${id}`} title="Not enough opinions yet to measure political diversity">
+                  <Activity className="w-3 h-3 mr-1" />
+                  Not enough yet
+                </Badge>
+              ) : (
+                <Badge className="bg-ai/90 text-primary-foreground backdrop-blur-sm" data-testid={`badge-diversity-${id}`} title={`Political diversity: ${diversityScore}%`}>
                   <Activity className="w-3 h-3 mr-1" />
                   {diversityScore}%
-                </Badge>
-              )}
-              {/* Taste indicator */}
-              {avgTasteScore !== undefined && Math.abs(avgTasteScore) > 30 && (
-                <Badge 
-                  className={`backdrop-blur-sm ${
-                    avgTasteScore > 0 
-                      ? 'bg-primary/90 text-primary-foreground' 
-                      : 'bg-foreground/90 text-background'
-                  }`}
-                  style={{ opacity: Math.min(1, Math.abs(avgTasteScore) / 100) }}
-                >
-                  {avgTasteScore > 0 ? (
-                    <Heart className="w-3 h-3 mr-1" />
-                  ) : (
-                    <Skull className="w-3 h-3 mr-1" />
-                  )}
-                  {Math.abs(avgTasteScore) > 30 && (
-                    <span>{avgTasteScore > 0 ? 'Delight' : 'Revulsion'}</span>
-                  )}
-                </Badge>
-              )}
-              {/* Passion indicator */}
-              {avgPassionScore !== undefined && Math.abs(avgPassionScore) > 30 && (
-                <Badge 
-                  className={`backdrop-blur-sm ${
-                    avgPassionScore > 0 
-                      ? 'bg-warning/90 text-primary-foreground' 
-                      : 'bg-info/90 text-primary-foreground'
-                  }`}
-                  style={{ opacity: Math.min(1, Math.abs(avgPassionScore) / 100) }}
-                >
-                  {avgPassionScore > 0 ? (
-                    <Flame className="w-3 h-3 mr-1" />
-                  ) : (
-                    <BookOpen className="w-3 h-3 mr-1" />
-                  )}
-                  {Math.abs(avgPassionScore) > 30 && (
-                    <span>{avgPassionScore > 0 ? 'Aggressive' : 'Academic'}</span>
-                  )}
                 </Badge>
               )}
             </div>
@@ -477,51 +440,16 @@ export default function TopicCard({
               )}
             </div>
 
-            <div className="absolute top-2 right-2 flex gap-1 z-20 pointer-events-auto">
-              {diversityScore !== undefined && (
-                <Badge className="bg-ai/90 text-primary-foreground backdrop-blur-sm" data-testid={`badge-diversity-back-${id}`}>
+            <div className="absolute top-2 right-2 z-20 pointer-events-none max-w-[55%]">
+              {diversityScore == null ? (
+                <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-muted-foreground font-normal" data-testid={`badge-diversity-back-${id}`} title="Not enough opinions yet to measure political diversity">
+                  <Activity className="w-3 h-3 mr-1" />
+                  Not enough yet
+                </Badge>
+              ) : (
+                <Badge className="bg-ai/90 text-primary-foreground backdrop-blur-sm" data-testid={`badge-diversity-back-${id}`} title={`Political diversity: ${diversityScore}%`}>
                   <Activity className="w-3 h-3 mr-1" />
                   {diversityScore}%
-                </Badge>
-              )}
-              {/* Taste indicator */}
-              {avgTasteScore !== undefined && Math.abs(avgTasteScore) > 30 && (
-                <Badge 
-                  className={`backdrop-blur-sm ${
-                    avgTasteScore > 0 
-                      ? 'bg-primary/90 text-primary-foreground' 
-                      : 'bg-foreground/90 text-background'
-                  }`}
-                  style={{ opacity: Math.min(1, Math.abs(avgTasteScore) / 100) }}
-                >
-                  {avgTasteScore > 0 ? (
-                    <Heart className="w-3 h-3 mr-1" />
-                  ) : (
-                    <Skull className="w-3 h-3 mr-1" />
-                  )}
-                  {Math.abs(avgTasteScore) > 30 && (
-                    <span>{avgTasteScore > 0 ? 'Delight' : 'Revulsion'}</span>
-                  )}
-                </Badge>
-              )}
-              {/* Passion indicator */}
-              {avgPassionScore !== undefined && Math.abs(avgPassionScore) > 30 && (
-                <Badge 
-                  className={`backdrop-blur-sm ${
-                    avgPassionScore > 0 
-                      ? 'bg-warning/90 text-primary-foreground' 
-                      : 'bg-info/90 text-primary-foreground'
-                  }`}
-                  style={{ opacity: Math.min(1, Math.abs(avgPassionScore) / 100) }}
-                >
-                  {avgPassionScore > 0 ? (
-                    <Flame className="w-3 h-3 mr-1" />
-                  ) : (
-                    <BookOpen className="w-3 h-3 mr-1" />
-                  )}
-                  {Math.abs(avgPassionScore) > 30 && (
-                    <span>{avgPassionScore > 0 ? 'Aggressive' : 'Academic'}</span>
-                  )}
                 </Badge>
               )}
             </div>
