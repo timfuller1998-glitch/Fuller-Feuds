@@ -1,3 +1,10 @@
+## Nov 27, 2026 11:38 PM CT — Settings choice for Standard or American political chart colors
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- Settings now has a "Political chart colors" selector with two options. Standard (default, current) is the traditional political compass: authoritarian liberal red, authoritarian conservative blue, libertarian liberal green, libertarian conservative yellow. American swaps only red and blue, so authoritarian liberal is blue and authoritarian conservative is red; libertarian green and yellow stay the same.
+- Every color comes from `shared/politicalCompass.ts` (`compassQuadrantsFor` plus the existing 2D/1D helpers), so the chart, avatar rings, card washes, and page background all follow the choice instantly with no reload.
+- The preference is stored on the account (`user_profiles.compass_color_scheme`, migration 0023, returned on `GET /api/auth/user` and saved with the existing `PATCH /api/profile/:userId`). Logged-out users always get Standard.
+- Typecheck: 50 (ceiling 52). Shared tests: 104 pass (2 new). Evidence: `/workspace/ff-videos/nov27/compass-colors/`.
+
 ## Nov 27, 2026 11:26 PM CT — Compass colours stay traditional; labels say Liberal and Conservative
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - User-facing political compass wording now uses Liberal / Conservative instead of Left / Right: "Authoritarian Liberal", "Libertarian Conservative", axis ends, chart quadrant labels, the profile reading (`shared/compassDescription.ts`), and the founding-member application/admin mix (stored values stay "Left"/"Right" and are mapped at the display layer). Centrist is unchanged. AI scoring prompts were updated so any label they write uses Liberal/Conservative; numeric axes and DB/API fields are the same.

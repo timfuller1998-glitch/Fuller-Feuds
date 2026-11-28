@@ -55,6 +55,28 @@ export const COMPASS_QUADRANTS = {
   },
 } as const satisfies Record<string, CompassQuadrantStyle>;
 
+export type CompassColorScheme = "standard" | "american";
+export const DEFAULT_COMPASS_COLOR_SCHEME: CompassColorScheme = "standard";
+
+export function parseCompassColorScheme(value: unknown): CompassColorScheme {
+  return value === "american" ? "american" : "standard";
+}
+
+/**
+ * Standard is the traditional political compass (auth-liberal red, auth-conservative blue).
+ * American swaps only that red/blue pair; libertarian green/yellow stay put. Labels never change.
+ */
+export function compassQuadrantsFor(scheme: CompassColorScheme = "standard"): Record<keyof typeof COMPASS_QUADRANTS, CompassQuadrantStyle> {
+  if (scheme !== "american") return COMPASS_QUADRANTS;
+  const lib = COMPASS_QUADRANTS.authoritarianLiberal;
+  const con = COMPASS_QUADRANTS.authoritarianConservative;
+  return {
+    ...COMPASS_QUADRANTS,
+    authoritarianLiberal: { ...lib, hex: con.hex, hue: con.hue, rgb: con.rgb },
+    authoritarianConservative: { ...con, hex: lib.hex, hue: lib.hue, rgb: lib.rgb },
+  };
+}
+
 export type CompassQuadrantId = keyof typeof COMPASS_QUADRANTS;
 
 export const COMPASS_AXIS = {
@@ -116,13 +138,13 @@ function hslToHex(h: number, s: number, l: number): string {
 }
 
 /**
- * Blended compass colour for a point. Auth-liberal is red, auth-conservative is
- * blue, lib-liberal is green, lib-conservative is yellow.
+ * Blended compass colour for a point. Hues follow the selected colour scheme
+ * (Standard: auth-liberal red, auth-conservative blue; American swaps that pair).
  */
 export function get2DPoliticalCompassColor(
   economicScore: number,
   authoritarianScore: number,
-  opts?: { vivid?: boolean },
+  opts?: { vivid?: boolean; scheme?: CompassColorScheme },
 ): string {
   const x = economicScore / 100;
   const y = authoritarianScore / 100;
@@ -131,7 +153,7 @@ export function get2DPoliticalCompassColor(
   const vivid = !!opts?.vivid;
 
   const id = compassQuadrantId(economicScore, authoritarianScore);
-  let hue: number = COMPASS_QUADRANTS[id].hue;
+  let hue: number = compassQuadrantsFor(opts?.scheme)[id].hue;
   let saturation: number = vivid ? 70 + intensity * 25 : 35 + intensity * 15;
   let lightness: number = vivid ? 55 : 75;
 
@@ -158,9 +180,10 @@ export function get2DPoliticalCompassColor(
   return hslToHex(hue, saturation, lightness);
 }
 
-/** 1D fallback (legacy single-axis score): liberal is red, conservative is blue. */
-export function get1DLeaningColor(score: number): string {
-  if (score < -20) return hslToHex(COMPASS_QUADRANTS.authoritarianLiberal.hue, 45, 55);
+/** 1D fallback (legacy single-axis score). Follows the same scheme as the 2D colours. */
+export function get1DLeaningColor(score: number, scheme: CompassColorScheme = "standard"): string {
+  const q = compassQuadrantsFor(scheme);
+  if (score < -20) return hslToHex(q.authoritarianLiberal.hue, 45, 55);
   if (score <= 20) return hslToHex(38, 18, 62);
-  return hslToHex(COMPASS_QUADRANTS.authoritarianConservative.hue, 45, 55);
+  return hslToHex(q.authoritarianConservative.hue, 45, 55);
 }

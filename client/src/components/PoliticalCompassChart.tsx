@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { compassExtent, confidenceRadius, type Confidence } from "@shared/compassDescription";
-import { COMPASS_AXIS, COMPASS_QUADRANTS } from "@shared/politicalCompass";
+import { COMPASS_AXIS, compassQuadrantsFor } from "@shared/politicalCompass";
+import { useCompassColorScheme } from "@/lib/compassColorScheme";
 
 interface PoliticalCompassChartProps {
   economicScore: number;
@@ -17,13 +18,6 @@ const P = 32;
 const W = 240;
 const TOTAL = W + P * 2;
 
-const QUADRANTS = [
-  { x: 0, y: 0, color: COMPASS_QUADRANTS.authoritarianLiberal.hex, label: COMPASS_QUADRANTS.authoritarianLiberal.shortLabel },
-  { x: 1, y: 0, color: COMPASS_QUADRANTS.authoritarianConservative.hex, label: COMPASS_QUADRANTS.authoritarianConservative.shortLabel },
-  { x: 0, y: 1, color: COMPASS_QUADRANTS.libertarianLiberal.hex, label: COMPASS_QUADRANTS.libertarianLiberal.shortLabel },
-  { x: 1, y: 1, color: COMPASS_QUADRANTS.libertarianConservative.hex, label: COMPASS_QUADRANTS.libertarianConservative.shortLabel },
-];
-
 const fmt = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(Math.round(v))}`;
 
 export function PoliticalCompassChart({
@@ -34,6 +28,16 @@ export function PoliticalCompassChart({
   markerLabel,
   className = "",
 }: PoliticalCompassChartProps) {
+  const scheme = useCompassColorScheme();
+  const QUADRANTS = useMemo(() => {
+    const q = compassQuadrantsFor(scheme);
+    return [
+      { x: 0, y: 0, color: q.authoritarianLiberal.hex, label: q.authoritarianLiberal.shortLabel },
+      { x: 1, y: 0, color: q.authoritarianConservative.hex, label: q.authoritarianConservative.shortLabel },
+      { x: 0, y: 1, color: q.libertarianLiberal.hex, label: q.libertarianLiberal.shortLabel },
+      { x: 1, y: 1, color: q.libertarianConservative.hex, label: q.libertarianConservative.shortLabel },
+    ];
+  }, [scheme]);
   const e = Math.max(-100, Math.min(100, economicScore ?? 0));
   const a = Math.max(-100, Math.min(100, authoritarianScore ?? 0));
   const fitted = compassExtent(e, a);

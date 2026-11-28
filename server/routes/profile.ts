@@ -204,6 +204,7 @@ router.patch('/:userId', isAuthenticated, async (req, res) => {
     if (bio !== undefined) patch.bio = bio;
     if (['newest', 'oldest', 'most_liked', 'most_controversial'].includes(b.opinionSortPreference)) patch.opinionSortPreference = b.opinionSortPreference;
     if (['popular', 'alphabetical', 'newest', 'oldest'].includes(b.categorySortPreference)) patch.categorySortPreference = b.categorySortPreference;
+    if (['standard', 'american'].includes(b.compassColorScheme)) patch.compassColorScheme = b.compassColorScheme;
     const [row] = await db
       .insert(userProfiles)
       .values({ userId: me.id, ...patch } as any)

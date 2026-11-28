@@ -5,6 +5,7 @@ import { MessageSquare } from 'lucide-react';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useDebateContext } from '@/contexts/DebateContext';
 import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
+import { useCompassColorScheme } from '@/lib/compassColorScheme';
 import { DebateTray } from './DebateTray';
 import { TypingBubble } from './TypingBubble';
 import { type OpponentGroup, StatusDot } from './DebateStatus';
@@ -34,6 +35,7 @@ function useAvatarSlots() {
  * Finished debates (both rated, or you rated and are waiting on theirs) live in Archive instead.
  */
 export function DebateFooter() {
+  const scheme = useCompassColorScheme();
   const { openOpponentPanel } = useDebateContext();
   const { ref: rowRef, slots } = useAvatarSlots();
   const typingRooms = useTypingRooms();
@@ -80,7 +82,8 @@ export function DebateFooter() {
                   const indicator = typing ? 'typing' : group.status;
                   const avatarColor = get2DPoliticalCompassColor(
                     group.opponentEconomicScore || 0,
-                    group.opponentAuthoritarianScore || 0
+                    group.opponentAuthoritarianScore || 0,
+                    { scheme },
                   );
 
                   return (

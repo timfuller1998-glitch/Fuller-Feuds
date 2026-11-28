@@ -9,6 +9,7 @@ import { FirstRunTutorial } from "@/components/FirstRunTutorial";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import SearchBar from "@/components/SearchBar";
 import { ActiveBackgroundGradient } from "@/components/ActiveBackgroundGradient";
+import { CompassColorSchemeSync } from "@/lib/compassColorScheme";
 import { useAuth } from "@/hooks/useAuth";
 import { DebateProvider } from "@/contexts/DebateContext";
 import { DebateFooter } from "@/components/debates/DebateFooter";
@@ -351,6 +352,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <CompassColorSchemeSync />
       <TooltipProvider>
         <ActiveBackgroundGradient>
           <AppContent />

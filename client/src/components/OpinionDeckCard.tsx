@@ -11,6 +11,7 @@ import { ChallengeButton } from "@/components/ChallengeButton";
 import { InteractiveSentenceText } from "@/components/InteractiveSentenceText";
 import { CardScrollBody } from "@/components/CardScrollBody";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
+import { useCompassColorScheme } from "@/lib/compassColorScheme";
 import { getOpinionStance, stanceLabel, type Stance } from "@/lib/stance";
 
 export type Person = { firstName?: string | null; lastName?: string | null; handle?: string | null; profileImageUrl?: string | null };
@@ -97,11 +98,12 @@ export function OpinionDeckFront({
   paragraphsClickable?: boolean;
   footer?: ReactNode;
 }) {
+  const scheme = useCompassColorScheme();
   const { byIndex } = useCounterpointCounts(op.id);
   return (
     <div className={`${shell} relative`} data-testid={`opinion-card-front-${op.id}`}>
       {/* Political-colour tint layered over an opaque card so cards underneath never show through */}
-      <div className="absolute inset-0 pointer-events-none" style={getOpinionGradientStyle(op.topicEconomicScore, op.topicAuthoritarianScore)} aria-hidden />
+      <div className="absolute inset-0 pointer-events-none" style={getOpinionGradientStyle(op.topicEconomicScore, op.topicAuthoritarianScore, scheme)} aria-hidden />
       <div className="relative flex flex-col flex-1 min-h-0">
       <AuthorRow op={op} />
       <CardScrollBody className="mt-3">

@@ -4,14 +4,15 @@
  * auth-liberal red, auth-conservative blue, lib-liberal green, lib-conservative yellow).
  */
 
-import { COMPASS_QUADRANTS, get2DPoliticalCompassColor } from "@shared/politicalCompass";
+import { compassQuadrantsFor, get2DPoliticalCompassColor, type CompassColorScheme } from "@shared/politicalCompass";
 
-export { get2DPoliticalCompassColor, COMPASS_QUADRANTS } from "@shared/politicalCompass";
+export { get2DPoliticalCompassColor, COMPASS_QUADRANTS, compassQuadrantsFor } from "@shared/politicalCompass";
 
 
 export function getOpinionGradientStyle(
   economicScore: number | null | undefined,
-  authoritarianScore: number | null | undefined
+  authoritarianScore: number | null | undefined,
+  scheme?: CompassColorScheme,
 ): React.CSSProperties {
   if (economicScore === null || economicScore === undefined ||
       authoritarianScore === null || authoritarianScore === undefined) {
@@ -20,7 +21,7 @@ export function getOpinionGradientStyle(
     };
   }
 
-  const baseColor = get2DPoliticalCompassColor(economicScore, authoritarianScore);
+  const baseColor = get2DPoliticalCompassColor(economicScore, authoritarianScore, { scheme });
   return {
     background: `linear-gradient(135deg, ${baseColor}2F 0%, ${baseColor}1A 100%)`,
   };
@@ -31,16 +32,17 @@ export function getTopicCornerGradient(distribution: {
   authoritarianSocialist: number;   // % of opinions (red, auth-liberal) — top-left
   libertarianCapitalist: number;    // % of opinions (yellow, lib-conservative) — bottom-right
   libertarianSocialist: number;     // % of opinions (green, lib-liberal) — bottom-left
-}): React.CSSProperties {
+}, scheme?: CompassColorScheme): React.CSSProperties {
   // Quadrant colors - softer, more pastel versions for text legibility
   // Convert percentages (0-100) to reduced opacity (max 0.4 instead of 1.0)
   const toOpacity = (percent: number) => ((percent / 100) * 0.4).toFixed(2);
 
   // Softer color variants with higher lightness
-  const tl = COMPASS_QUADRANTS.authoritarianLiberal.rgb;
-  const tr = COMPASS_QUADRANTS.authoritarianConservative.rgb;
-  const bl = COMPASS_QUADRANTS.libertarianLiberal.rgb;
-  const br = COMPASS_QUADRANTS.libertarianConservative.rgb;
+  const q = compassQuadrantsFor(scheme);
+  const tl = q.authoritarianLiberal.rgb;
+  const tr = q.authoritarianConservative.rgb;
+  const bl = q.libertarianLiberal.rgb;
+  const br = q.libertarianConservative.rgb;
   const topLeft = `rgba(${tl[0]}, ${tl[1]}, ${tl[2]}, ${toOpacity(distribution.authoritarianSocialist)})`;
   const topRight = `rgba(${tr[0]}, ${tr[1]}, ${tr[2]}, ${toOpacity(distribution.authoritarianCapitalist)})`;
   const bottomLeft = `rgba(${bl[0]}, ${bl[1]}, ${bl[2]}, ${toOpacity(distribution.libertarianSocialist)})`;
@@ -70,15 +72,16 @@ export function getTopicCornerGlow(distribution: {
   authoritarianSocialist: number;   // % of opinions (red, auth-liberal) — top-left
   libertarianCapitalist: number;    // % of opinions (yellow, lib-conservative) — bottom-right
   libertarianSocialist: number;     // % of opinions (green, lib-liberal) — bottom-left
-}): React.CSSProperties {
+}, scheme?: CompassColorScheme): React.CSSProperties {
   // Convert percentages (0-100) to glow intensity (0-1)
   const toIntensity = (percent: number) => Math.max(0, Math.min(1, percent / 100));
   
   // Base colors for each quadrant (RGB values)
-  const [tlr, tlg, tlb] = COMPASS_QUADRANTS.authoritarianLiberal.rgb;
-  const [trr, trg, trb] = COMPASS_QUADRANTS.authoritarianConservative.rgb;
-  const [blr, blg, blb] = COMPASS_QUADRANTS.libertarianLiberal.rgb;
-  const [brr, brg, brb] = COMPASS_QUADRANTS.libertarianConservative.rgb;
+  const q = compassQuadrantsFor(scheme);
+  const [tlr, tlg, tlb] = q.authoritarianLiberal.rgb;
+  const [trr, trg, trb] = q.authoritarianConservative.rgb;
+  const [blr, blg, blb] = q.libertarianLiberal.rgb;
+  const [brr, brg, brb] = q.libertarianConservative.rgb;
   const topLeftColor = { r: tlr, g: tlg, b: tlb };
   const topRightColor = { r: trr, g: trg, b: trb };
   const bottomLeftColor = { r: blr, g: blg, b: blb };

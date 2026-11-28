@@ -6,6 +6,7 @@ import { Sparkles, Activity, Loader2, ChevronLeft, ChevronRight } from "lucide-r
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getTopicCornerGlow } from "@/lib/politicalColors";
+import { useCompassColorScheme } from "@/lib/compassColorScheme";
 import { type Opinion } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { LoginPromptDialog } from "@/components/LoginPromptDialog";
@@ -62,6 +63,7 @@ export default function TopicCard({
 }: TopicCardProps) {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
+  const scheme = useCompassColorScheme();
   const [isFlipped, setIsFlipped] = useState(false);
   const [skipFlipTransition, setSkipFlipTransition] = useState(false);
   const [showOpinionForm, setShowOpinionForm] = useState(false);
@@ -76,7 +78,7 @@ export default function TopicCard({
 
   // Get glow style based on political distribution
   const glowStyle = politicalDistribution && opinionsCount > 0
-    ? getTopicCornerGlow(politicalDistribution)
+    ? getTopicCornerGlow(politicalDistribution, scheme)
     : {};
 
   // Fetch AI summary when card is flipped

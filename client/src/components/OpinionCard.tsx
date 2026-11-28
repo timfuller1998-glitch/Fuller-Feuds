@@ -6,6 +6,7 @@ import { ThumbsUp, ThumbsDown, Clock, Link as LinkIcon, Maximize2 } from "lucide
 import { useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { getOpinionGradientStyle } from "@/lib/politicalColors";
+import { useCompassColorScheme } from "@/lib/compassColorScheme";
 import { useAuth } from "@/hooks/useAuth";
 
 interface OpinionCardProps {
@@ -56,6 +57,7 @@ export default function OpinionCard({
 }: OpinionCardProps) {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const scheme = useCompassColorScheme();
 
   const topicOpinionHref = useMemo(() => {
     const sp = new URLSearchParams();
@@ -68,7 +70,7 @@ export default function OpinionCard({
     return `/topic/${topicId}?${sp.toString()}`;
   }, [id, topicId, userId, user?.id]);
 
-  const gradientStyle = getOpinionGradientStyle(topicEconomicScore, topicAuthoritarianScore);
+  const gradientStyle = getOpinionGradientStyle(topicEconomicScore, topicAuthoritarianScore, scheme);
 
   const goToTopicOpinion = () => {
     setLocation(topicOpinionHref);

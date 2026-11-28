@@ -26,6 +26,8 @@ import { useToast } from "@/hooks/use-toast";
 import { openTutorial } from "@/lib/tutorial";
 import { openFeedback } from "@/lib/feedback";
 import { Link } from "wouter";
+import { applyCompassColorScheme, useCompassColorScheme } from "@/lib/compassColorScheme";
+import { parseCompassColorScheme, type CompassColorScheme } from "@shared/politicalCompass";
 
 const profileFormSchema = z.object({
   displayFirstName: z.string().min(1, "First name is required").max(50, "First name must be 50 characters or less"),
@@ -60,6 +62,7 @@ interface ProfileData {
 export default function Settings() {
   const { user: currentUser } = useAuth();
   const [themePreference, setThemePreference] = useState<"light" | "medium" | "dark">("light");
+  const compassColorScheme = useCompassColorScheme();
   const { toast } = useToast();
   const { data: buildInfo } = useQuery({
     queryKey: ["/api/version"],
@@ -184,6 +187,33 @@ export default function Settings() {
   const handleThemeChange = (value: "light" | "medium" | "dark") => {
     setThemePreference(value);
     applyTheme(value);
+  };
+
+  const handleCompassColorSchemeChange = (value: string) => {
+    const next = parseCompassColorScheme(value);
+    if (!currentUser?.id) return;
+    const prev: CompassColorScheme = compassColorScheme;
+    applyCompassColorScheme(next, { persistLocal: true });
+    queryClient.setQueryData(["/api/auth/user"], (old: unknown) =>
+      old && typeof old === "object" ? { ...old, compassColorScheme: next } : old,
+    );
+    fetch(`/api/profile/${currentUser.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ compassColorScheme: next }),
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("save failed");
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      })
+      .catch(() => {
+        applyCompassColorScheme(prev, { persistLocal: true });
+        queryClient.setQueryData(["/api/auth/user"], (old: unknown) =>
+          old && typeof old === "object" ? { ...old, compassColorScheme: prev } : old,
+        );
+        toast({ title: "Couldn't save color preference", variant: "destructive" });
+      });
   };
 
   // Profile update mutation
@@ -471,6 +501,34 @@ export default function Settings() {
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Political chart colors */}
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-medium mb-1">Political chart colors</h3>
+              <p className="text-sm text-muted-foreground">
+                Choose how the political compass is colored. Libertarian green and yellow stay the same in both.
+              </p>
+            </div>
+            <Select value={compassColorScheme} onValueChange={handleCompassColorSchemeChange}>
+              <SelectTrigger className="w-full sm:w-80" data-testid="select-compass-colors">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="standard" data-testid="option-compass-colors-standard">
+                  Standard (default)
+                </SelectItem>
+                <SelectItem value="american" data-testid="option-compass-colors-american">
+                  American
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground" data-testid="text-compass-colors-help">
+              {compassColorScheme === "american"
+                ? "Authoritarian liberal is blue and authoritarian conservative is red — U.S. party colors."
+                : "Authoritarian liberal is red and authoritarian conservative is blue — the usual political compass."}
+            </p>
           </div>
         </CardContent>
       </Card>
