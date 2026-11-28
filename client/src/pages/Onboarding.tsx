@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ProfilePictureCropDialog } from "@/components/ProfilePictureCropDialog";
 import { 
   Upload, 
   Search, 
@@ -25,6 +25,7 @@ import {
   X
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { uploadProfilePictureFile } from "@/lib/uploadProfilePicture";
 import type { Topic, Opinion } from "@shared/schema";
 import { HandleField, type HandleStatus } from "@/components/HandleField";
 import { useAuth } from "@/hooks/useAuth";
@@ -62,7 +63,6 @@ export default function Onboarding() {
   const [handleStatus, setHandleStatus] = useState<HandleStatus>("idle");
   
   // Photo upload state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPhotoPreview, setShowPhotoPreview] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -379,54 +379,21 @@ export default function Onboarding() {
         alert('File size must be less than 10MB');
         return;
       }
-      setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
       setShowPhotoPreview(true);
     }
   };
 
-  const handlePhotoUpload = async () => {
-    if (!selectedFile) return;
-
+  const handlePhotoUpload = async (file: File) => {
     setIsUploadingPhoto(true);
     try {
-      const uploadResponse = await fetch("/api/objects/upload", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": selectedFile.type },
-        body: selectedFile,
-      });
-      if (!uploadResponse.ok) {
-        let message = "Upload failed";
-        try {
-          const body = await uploadResponse.json();
-          if (body?.message) message = body.message;
-        } catch {}
-        throw new Error(message);
-      }
-      const uploaded = await uploadResponse.json();
-      const response = await apiRequest("PUT", "/api/profile-picture", {
-        path: uploaded.path,
-      });
-      const data = await response.json();
-
-      // Update local state with the new image URL
-      setProfileImageUrl(data.objectPath);
-
-      // Clean up
-      setShowPhotoPreview(false);
-      setSelectedFile(null);
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-      setPreviewUrl(null);
-      
-      // Invalidate queries to refresh user data
+      const data = await uploadProfilePictureFile(file);
+      setProfileImageUrl(data.profileImageUrl || data.objectPath || data.publicUrl || "");
+      handleCancelPhotoUpload();
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-      
     } catch (error) {
       console.error('Error uploading profile picture:', error);
-      alert('Failed to upload image. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to upload image. Please try again.');
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -434,7 +401,6 @@ export default function Onboarding() {
 
   const handleCancelPhotoUpload = () => {
     setShowPhotoPreview(false);
-    setSelectedFile(null);
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
@@ -822,47 +788,13 @@ export default function Onboarding() {
         </div>
       </div>
 
-      {/* Photo Preview Dialog */}
-      <Dialog open={showPhotoPreview} onOpenChange={setShowPhotoPreview}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Preview Profile Picture</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col items-center gap-4 py-4">
-            {previewUrl && (
-              <div className="relative">
-                <Avatar className="w-48 h-48">
-                  <AvatarImage src={previewUrl} className="object-cover" />
-                </Avatar>
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground text-center">
-              This is how your profile picture will appear
-            </p>
-          </div>
-          <DialogFooter className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCancelPhotoUpload}
-              disabled={isUploadingPhoto}
-              data-testid="button-cancel-photo-upload"
-            >
-              <X className="w-4 h-4 mr-2" />
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handlePhotoUpload}
-              disabled={isUploadingPhoto}
-              data-testid="button-confirm-photo-upload"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              {isUploadingPhoto ? "Uploading..." : "Upload"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProfilePictureCropDialog
+        open={showPhotoPreview}
+        imageSrc={previewUrl}
+        isUploading={isUploadingPhoto}
+        onCancel={handleCancelPhotoUpload}
+        onConfirm={handlePhotoUpload}
+      />
     </div>
   );
 }

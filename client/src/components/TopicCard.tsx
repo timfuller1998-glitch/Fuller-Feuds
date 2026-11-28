@@ -344,7 +344,7 @@ export default function TopicCard({
                           <img 
                             src={topOpinions[currentOpinionIndex].author.profileImageUrl} 
                             alt={topOpinions[currentOpinionIndex].author.firstName || "User"}
-                            className="w-5 h-5 rounded-full"
+                            className="w-5 h-5 rounded-full object-cover"
                           />
                         )}
                         <span className="text-xs font-medium text-muted-foreground">
