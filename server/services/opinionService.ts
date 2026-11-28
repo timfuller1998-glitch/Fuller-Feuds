@@ -9,6 +9,7 @@ import { opinions, cumulativeOpinions, userProfiles, topics } from '../../shared
 import { eq, and, sql, asc, desc, inArray } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { notifyActivityLater } from '../lib/activityNotify.js';
+import { politicalDiversity } from '../../shared/politicalDiversity.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
 import { invalidateOpinionCache, invalidateTopicCache, invalidateCumulativeOpinionCache, invalidateUserCache } from './cacheInvalidation.js';
 import { logSecurityEvent } from '../utils/securityLogger.js';
@@ -510,6 +511,13 @@ export class OpinionService {
       // Calculate diversity scores (standard deviation normalized to 0-100)
       const tasteDiversity = await this.calculateDiversityScore(tx, topicId, 'taste_score');
       const passionDiversity = await this.calculateDiversityScore(tx, topicId, 'passion_score');
+      const leanRows: any = await tx.execute(sql`
+        SELECT topic_economic_score AS economic, topic_authoritarian_score AS authoritarian
+        FROM opinions
+        WHERE topic_id = ${topicId}
+          AND status IN ('approved', 'pending')
+      `);
+      const diversity = politicalDiversity((leanRows.rows ?? leanRows) as any[]);
       
       // Update cumulative_opinions atomically
       await tx.update(cumulativeOpinions)
@@ -540,6 +548,7 @@ export class OpinionService {
           },
           tasteDiversity: Math.round(tasteDiversity),
           passionDiversity: Math.round(passionDiversity),
+          diversityScore: diversity.score,
           updatedAt: sql`now()`
         })
         .where(eq(cumulativeOpinions.topicId, topicId));

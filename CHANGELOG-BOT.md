@@ -1,3 +1,10 @@
+## Nov 27, 2026 6:33 PM CT — Remove card emotion labels; fix political diversity scale
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- Removed the "Delight"/"Revulsion" and "Aggressive"/"Academic" badges from the top-right of topic cards (front and back). The underlying taste/passion scores and the AI/lexicon analysis are unchanged.
+- Political diversity was never written: cumulative_opinions.diversity_score was left null on every live row, and the API defaulted the missing value to 0, so cards showed 0% (or disappeared from Hot Debates). The old 4-quadrant count also ignored moderate leanings (most users, including a −30 vs +35 split, never landed in a ±20 quadrant).
+- Diversity is now a deterministic 0–100 score in `shared/politicalDiversity.ts` (unit tested): the RMS of the two axis standard deviations from each opinion's economic/authoritarian scores. Fewer than two scored opinions shows "Not enough yet" instead of 0%. The API computes it live from opinions, and it is also stored when topic distributions are recalculated.
+- Backfilled the two live topics with enough leanings (assisted dying 22, UBI 33). Backup: /workspace/ff-backups/cumulative_opinions-diversity-2026-11-27.json.
+
 ## Nov 27, 2026 4:58 PM CT — Profile suggestion sections as real card decks
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - "Recommended for you" and "From people you follow" now use the site's standard topic deck (SwipeableCardStack / CardDeck + TopicCard), same as the Topics tab and Trending: tap flips, vertical swipe scrolls, only buttons/links navigate, with the usual prev/next and counter. Removes the extra whitespace above the old loose cards.
