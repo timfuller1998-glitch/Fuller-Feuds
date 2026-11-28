@@ -12,6 +12,7 @@ import {
   shortLabel,
   type LayoutItem,
 } from "@shared/topicsMapLayout";
+import { decideOpenSet, leafZoomCap, READ_SCALE } from "@shared/topicsMapZoom";
 
 export const MAP_VIEW_KEY = "ff-topics-map-view";
 
@@ -54,12 +55,6 @@ function lodFromK(k: number, baseK: number): 0 | 1 | 2 | 3 {
   return 3;
 }
 
-/** An umbrella pops open once its children would sit this far out, as a share of the short screen side. */
-const POP_OPEN_FRAC = 0.18;
-/** ...and merges back below this (hysteresis so it doesn't flicker at the edge). */
-const POP_CLOSE_FRAC = 0.13;
-/** Children only pop once they'd render at least this big (so topic text is readable). */
-const READ_SCALE = 0.62;
 /** Zoomed out, pills keep about this on-screen size where they have room (semantic zoom). */
 const LABEL_FLOOR = 0.9;
 const POP_MS = 460;
@@ -288,41 +283,30 @@ export default function TopicsMap({
     kickLoop();
   };
 
-  /** Which umbrellas are popped open at the current zoom (with hysteresis). */
+  /** Which umbrellas are popped open at the current zoom (with hysteresis). Topics never pop. */
   const updateOpen = () => {
-    const { order, childDist, kidRead } = motionRef.current;
+    const { order, childDist, kidRead, kids } = motionRef.current;
     const k = cam.current.k;
     const box = viewportRef.current;
     const minDim = box ? Math.min(box.clientWidth, box.clientHeight) : 400;
     const vx = box ? box.clientWidth / 2 / k : Infinity;
     const vy = box ? box.clientHeight / 2 / k : Infinity;
-    const cx = cam.current.x;
-    const cy = cam.current.y;
     const fk = focusFrameK.current;
     forcedActive.current = forcedActive.current ? k >= fk * 0.6 : k >= fk * 0.72;
-    const forced = forcedActive.current ? pathIdsRef.current : null;
-    const open = openSet.current;
-    for (const it of order) {
-      const d = childDist.get(it.id);
-      if (d == null) continue;
-      if (!it.parentId) {
-        open.add(it.id);
-        continue;
-      }
-      if (!open.has(it.parentId)) {
-        open.delete(it.id);
-        continue;
-      }
-      // Pop only umbrellas you are zoomed in on: past the depth's zoom and near the view.
-      const was = open.has(it.id);
-      const margin = was ? 1.5 : 1.05;
-      const near = Math.abs(it.x - cx) < vx * margin && Math.abs(it.y - cy) < vy * margin;
-      const spread = d * k >= minDim * (was ? POP_CLOSE_FRAC : POP_OPEN_FRAC);
-      const readable = k >= (kidRead.get(it.id) || 0) * (was ? 0.85 : 1);
-      const want = (forced && forced.has(it.id)) || (spread && readable && near);
-      if (want) open.add(it.id);
-      else open.delete(it.id);
-    }
+    openSet.current = decideOpenSet({
+      order,
+      childDist,
+      kidRead,
+      kids,
+      k,
+      cx: cam.current.x,
+      cy: cam.current.y,
+      vx,
+      vy,
+      minDim,
+      wasOpen: openSet.current,
+      forced: forcedActive.current ? pathIdsRef.current : null,
+    });
   };
 
   const setShown = (id: string, el: Element, value: string) => {
@@ -394,6 +378,13 @@ export default function TopicsMap({
     const dt = Math.min(64, Math.max(0, now - lastTick.current));
     lastTick.current = now;
     updateOpen();
+    // If topics just popped and k is already past the leaf cap, pull back
+    // around the current center so we never dive into a single letter.
+    const leafCap = currentMaxK();
+    if (cam.current.k > leafCap + 1e-4) {
+      cam.current.k = leafCap;
+      applyCamera();
+    }
     const { order, wob, groupCap, kids } = motionRef.current;
     const open = openSet.current;
     const pres = presence.current;
@@ -527,8 +518,22 @@ export default function TopicsMap({
     };
   };
 
+  /** Once topic pills are open, don't zoom in past a full-pill-on-screen cap. */
+  const currentMaxK = () => {
+    const box = viewportRef.current;
+    const vw = box ? box.clientWidth : 400;
+    const vh = box ? box.clientHeight : 400;
+    const open = openSet.current;
+    const sizes: { w: number; h: number }[] = [];
+    layoutRef.current.forEach((it) => {
+      if (it.node.type !== "topic") return;
+      if (it.parentId && open.has(it.parentId)) sizes.push({ w: it.w, h: it.h });
+    });
+    return leafZoomCap(sizes, vw, vh, MAX_K);
+  };
+
   const zoomAround = (sx: number, sy: number, nextK: number) => {
-    const k = clamp(nextK, MIN_K, MAX_K);
+    const k = clamp(nextK, MIN_K, currentMaxK());
     const before = screenToLayout(sx, sy);
     cam.current.k = k;
     const after = screenToLayout(sx, sy);
@@ -659,7 +664,7 @@ export default function TopicsMap({
         const midX = (pts[0].x + pts[1].x) / 2;
         const midY = (pts[0].y + pts[1].y) / 2;
         userMovedRef.current = true;
-        const nextK = clamp(pinch.current.k * (dist / pinch.current.dist), MIN_K, MAX_K);
+        const nextK = clamp(pinch.current.k * (dist / pinch.current.dist), MIN_K, currentMaxK());
         cam.current.k = nextK;
         const boxRect = box.getBoundingClientRect();
         cam.current.x = pinch.current.lx - (midX - boxRect.left - boxRect.width / 2) / nextK;
