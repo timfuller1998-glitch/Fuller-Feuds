@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link as LinkIcon, Plus, X } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,12 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { insertOpinionSchema, type Opinion } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { OpinionStructure, BareOpinionTip, useBareOpinionGuard } from "@/components/OpinionStructure";
+import { coerceHttpUrl, normalizeReferences, MAX_OPINION_LINKS } from "@shared/topicResources";
 
 export const opinionFormSchema = insertOpinionSchema.omit({
   topicId: true,
@@ -20,7 +23,7 @@ export const opinionFormSchema = insertOpinionSchema.omit({
 }).extend({
   content: z.string().min(1, "Opinion is required").max(2000, "Opinion too long"),
   debateStatus: z.enum(["open", "closed", "private"], { required_error: "Please select debate availability" }),
-  references: z.array(z.string().url("Must be a valid URL")).optional().default([]),
+  references: z.array(z.string()).optional().default([]).transform((v) => normalizeReferences(v)),
   stance: z.enum(["for", "against", "neutral"], { required_error: "Pick a stance", invalid_type_error: "Pick a stance" }),
 });
 export type OpinionFormValues = z.infer<typeof opinionFormSchema>;
@@ -69,6 +72,7 @@ export function OpinionComposerDialog({ open, onOpenChange, topicId, topicTitle,
       // Cards and the topic page share ["/api/topics", id, "opinions"], so both refresh.
       queryClient.invalidateQueries({ queryKey: ["/api/topics", topicId, "opinions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/topics", topicId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", topicId, "resources"] });
       queryClient.invalidateQueries({ queryKey: ["/api/topics"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/platform"] });
       opinionForm.reset();
@@ -175,6 +179,74 @@ export function OpinionComposerDialog({ open, onOpenChange, topicId, topicTitle,
                   <FormMessage />
                 </FormItem>
               )}
+            />
+            <FormField
+              control={opinionForm.control}
+              name="references"
+              render={({ field }) => {
+                const links = field.value ?? [];
+                const setAt = (index: number, value: string) => {
+                  const next = [...links];
+                  next[index] = value;
+                  field.onChange(next);
+                };
+                return (
+                  <FormItem data-testid="section-opinion-links">
+                    <FormLabel className="flex items-center gap-1.5">
+                      <LinkIcon className="h-4 w-4" />
+                      Links / sources
+                    </FormLabel>
+                    <p className="text-xs text-muted-foreground">
+                      Optional. Up to {MAX_OPINION_LINKS} links. A bare domain like example.com is fine — we'll add https.
+                    </p>
+                    <div className="space-y-2">
+                      {links.map((url, index) => (
+                        <div key={index} className="flex gap-2">
+                          <FormControl>
+                            <Input
+                              value={url}
+                              placeholder="example.com/article"
+                              inputMode="url"
+                              autoCapitalize="none"
+                              autoCorrect="off"
+                              data-testid={`input-opinion-link-${index}`}
+                              onChange={(e) => setAt(index, e.target.value)}
+                              onBlur={() => {
+                                const coerced = coerceHttpUrl(url);
+                                if (coerced) setAt(index, coerced);
+                              }}
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Remove link"
+                            data-testid={`button-remove-link-${index}`}
+                            onClick={() => field.onChange(links.filter((_, i) => i !== index))}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    {links.length < MAX_OPINION_LINKS && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-1"
+                        data-testid="button-add-link"
+                        onClick={() => field.onChange([...links, ""])}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add a link
+                      </Button>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <BareOpinionTip
               open={bareOpinion.showTip}
