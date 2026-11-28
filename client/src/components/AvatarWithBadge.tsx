@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getBadgeIcon } from "@/lib/badgeIcons";
+import { get1DLeaningColor, get2DPoliticalCompassColor } from "@shared/politicalCompass";
 import { useQuery } from "@tanstack/react-query";
 
 interface AvatarWithBadgeProps {
@@ -14,7 +15,7 @@ interface AvatarWithBadgeProps {
   showOnlineStatus?: boolean;
   isOnline?: boolean;
   politicalLeaningScore?: number; // DEPRECATED: Legacy single-axis score
-  economicScore?: number; // -100 (socialist) to +100 (capitalist)
+  economicScore?: number; // -100 (liberal) to +100 (conservative)
   authoritarianScore?: number; // -100 (libertarian) to +100 (authoritarian)
   showPoliticalLeaning?: boolean;
 }
@@ -35,101 +36,6 @@ const ringWidthClasses = {
   sm: "border-2",
   md: "border-[3px]",
   lg: "border-4"
-};
-
-// Helper function to determine color from political leaning score (DEPRECATED)
-const getPoliticalLeaningColorFromScore = (score: number) => {
-  if (score < -50) return 'hsl(var(--stance-for))'; // Very Progressive - blue
-  if (score < -20) return 'hsl(var(--stance-for))'; // Progressive - blue
-  if (score <= 20) return 'hsl(var(--stance-neutral))'; // Moderate - purple
-  if (score <= 50) return 'hsl(var(--stance-against))'; // Conservative - red
-  return 'hsl(var(--stance-against))'; // Very Conservative - red
-};
-
-// Helper function to convert HSL to hex color
-const hslToHex = (h: number, s: number, l: number): string => {
-  l /= 100;
-  const a = s * Math.min(l, 1 - l) / 100;
-  const f = (n: number) => {
-    const k = (n + h / 30) % 12;
-    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * color).toString(16).padStart(2, '0');
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-};
-
-// 2D political compass color blending function
-const get2DPoliticalCompassColor = (economicScore: number, authoritarianScore: number): string => {
-  // Normalize scores to -1 to 1 range for easier calculation
-  const x = economicScore / 100;  // -1 (economic Left) to +1 (economic Right)
-  const y = authoritarianScore / 100;  // -1 (libertarian) to +1 (authoritarian)
-  
-  // Calculate distance from center (0,0) - used for intensity
-  const distanceFromCenter = Math.sqrt(x * x + y * y);
-  const intensity = Math.min(distanceFromCenter, 1); // 0 to 1
-  
-  // Base colors for each quadrant (Hue, Saturation, Lightness)
-  // Standard Political Compass colours:
-  // Red (authoritarian left): H=0, x < 0, y > 0
-  // Blue (authoritarian right): H=220, x > 0, y > 0
-  // Green (libertarian left): H=140, x < 0, y < 0
-  // Yellow (libertarian right): H=50, x > 0, y < 0
-  
-  let hue: number;
-  let saturation: number;
-  let lightness: number;
-  
-  // Determine quadrant and base color
-  if (x < 0 && y >= 0) {
-    // Authoritarian Left (Red) - top left
-    hue = 0;
-    saturation = 70 + (intensity * 25); // 70-95%
-    lightness = 55;
-  } else if (x >= 0 && y >= 0) {
-    // Authoritarian Right (Blue) - top right
-    hue = 220;
-    saturation = 70 + (intensity * 25); // 70-95%
-    lightness = 55;
-  } else if (x < 0 && y < 0) {
-    // Libertarian Left (Green) - bottom left
-    hue = 140;
-    saturation = 65 + (intensity * 30); // 65-95%
-    lightness = 50;
-  } else {
-    // Libertarian Right (Yellow) - bottom right
-    hue = 50;
-    saturation = 70 + (intensity * 25); // 70-95%
-    lightness = 55;
-  }
-  
-  // Blend colors more - only a little white in the center
-  if (distanceFromCenter < 0.15) {
-    // Very center - slight desaturation
-    saturation = saturation * 0.6;
-    lightness = 65;
-  } else if (distanceFromCenter < 0.3) {
-    // Near center - moderate blending
-    saturation = saturation * 0.8;
-    lightness = 60;
-  } else {
-    // Further from center - stronger colors
-    lightness = 55 - (intensity * 10);
-  }
-  
-  // Fade to black at extremes (±85 on both axes)
-  const absX = Math.abs(x);
-  const absY = Math.abs(y);
-  if (absX >= 0.85 || absY >= 0.85) {
-    // Calculate how far into the extreme zone (0.85 to 1.0)
-    const maxAbsolute = Math.max(absX, absY);
-    const extremeFactor = (maxAbsolute - 0.85) / 0.15; // 0 at 0.85, 1 at 1.0
-    
-    // Fade to black by reducing lightness dramatically
-    lightness = lightness * (1 - extremeFactor * 0.7); // Reduce lightness up to 70%
-    saturation = saturation * (1 - extremeFactor * 0.3); // Also reduce saturation a bit
-  }
-  
-  return hslToHex(hue, saturation, lightness);
 };
 
 export function AvatarWithBadge({
@@ -195,7 +101,7 @@ export function AvatarWithBadge({
         <div 
           className={`absolute inset-0 rounded-full pointer-events-none ${ringWidthClasses[size]}`}
           style={{ 
-            borderColor: get2DPoliticalCompassColor(economicScore, authoritarianScore),
+            borderColor: get2DPoliticalCompassColor(economicScore, authoritarianScore, { vivid: true }),
           }}
           data-testid="political-leaning-ring"
         />
@@ -205,7 +111,7 @@ export function AvatarWithBadge({
         <div 
           className={`absolute inset-0 rounded-full pointer-events-none ${ringWidthClasses[size]}`}
           style={{ 
-            borderColor: getPoliticalLeaningColorFromScore(politicalLeaningScore),
+            borderColor: get1DLeaningColor(politicalLeaningScore),
           }}
           data-testid="political-leaning-ring"
         />

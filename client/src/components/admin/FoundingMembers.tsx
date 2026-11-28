@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { parseServerDate } from "@/lib/dates";
-import { RUBRIC_LABELS, RUBRIC_MAX, BEST_PICK_THRESHOLD, FOUNDER_CAP, type RubricKey } from "@shared/founders";
+import { RUBRIC_LABELS, RUBRIC_MAX, BEST_PICK_THRESHOLD, FOUNDER_CAP, politicsOptionLabel, type RubricKey } from "@shared/founders";
 
 // Admin "Founders" tab (Fuller Feuds Dev, Nov 20 2026): site switches, applications with suggested scores and best
 // picks (Timothy decides), acceptance messages to send by hand, invite codes and the Saturday showcase.
@@ -96,7 +96,7 @@ function MixLine({ label, mix }: { label: string; mix: Mix }) {
   return (
     <div className="text-xs text-muted-foreground" data-testid={`mix-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <span className="font-semibold text-foreground">{label} ({mix.count}):</span>{" "}
-      Left {p.left} · Center/other {p.center} · Right {p.right} · Skipped {p.unknown}
+      Liberal {p.left} · Center/other {p.center} · Conservative {p.right} · Skipped {p.unknown}
       <span className="mx-2">|</span>
       Religious {r.religious} · Not religious {r.nonreligious} · Unsure {r.unsure} · Skipped {r.unknown}
     </div>
@@ -175,7 +175,7 @@ function ApplicationCard({ a, onDecided }: { a: App; onDecided: (a: App, invite:
         <div className="flex flex-wrap gap-1.5 text-xs">
           {a.interests.map((i) => <Badge key={i} variant="outline">{i}</Badge>)}
           <Badge variant="outline">{FREQ[a.frequency] ?? a.frequency}</Badge>
-          <Badge variant="outline" data-testid={`badge-politics-${a.id}`}>Politics: {a.politics ?? "skipped"}</Badge>
+          <Badge variant="outline" data-testid={`badge-politics-${a.id}`}>Politics: {politicsOptionLabel(a.politics)}</Badge>
           <Badge variant="outline">Religion: {a.religion ?? "skipped"}</Badge>
         </div>
 

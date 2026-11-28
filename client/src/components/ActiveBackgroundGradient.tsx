@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { COMPASS_QUADRANTS } from "@shared/politicalCompass";
 
 interface PoliticalDistribution {
   authoritarianCapitalist: number;
@@ -16,11 +17,14 @@ function getActiveBackgroundGradient(distribution: PoliticalDistribution): React
   // Convert percentages (0-100) to subtle opacity for background (max 0.20 for visibility)
   const toOpacity = (percent: number) => ((percent / 100) * 0.20).toFixed(3);
 
-  // Softer color variants with higher lightness - same as topic cards
-  const topLeft = `rgba(255, 120, 130, ${toOpacity(distribution.authoritarianSocialist)})`;      // Soft Red (Auth-Left)
-  const topRight = `rgba(100, 150, 255, ${toOpacity(distribution.authoritarianCapitalist)})`;    // Soft Blue (Auth-Right)
-  const bottomLeft = `rgba(100, 200, 150, ${toOpacity(distribution.libertarianSocialist)})`;      // Soft Green
-  const bottomRight = `rgba(255, 220, 100, ${toOpacity(distribution.libertarianCapitalist)})`;    // Soft Yellow
+  const tl = COMPASS_QUADRANTS.authoritarianLiberal.rgb;
+  const tr = COMPASS_QUADRANTS.authoritarianConservative.rgb;
+  const bl = COMPASS_QUADRANTS.libertarianLiberal.rgb;
+  const br = COMPASS_QUADRANTS.libertarianConservative.rgb;
+  const topLeft = `rgba(${tl[0]}, ${tl[1]}, ${tl[2]}, ${toOpacity(distribution.authoritarianSocialist)})`;
+  const topRight = `rgba(${tr[0]}, ${tr[1]}, ${tr[2]}, ${toOpacity(distribution.authoritarianCapitalist)})`;
+  const bottomLeft = `rgba(${bl[0]}, ${bl[1]}, ${bl[2]}, ${toOpacity(distribution.libertarianSocialist)})`;
+  const bottomRight = `rgba(${br[0]}, ${br[1]}, ${br[2]}, ${toOpacity(distribution.libertarianCapitalist)})`;
 
   // Create a radial gradient for each corner with larger spread (95% instead of 85%)
   return {

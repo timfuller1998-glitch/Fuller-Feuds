@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { compassExtent, confidenceRadius, type Confidence } from "@shared/compassDescription";
+import { COMPASS_AXIS, COMPASS_QUADRANTS } from "@shared/politicalCompass";
 
 interface PoliticalCompassChartProps {
   economicScore: number;
@@ -12,15 +13,15 @@ interface PoliticalCompassChartProps {
 }
 
 // Plot area in SVG units; labels sit in the padding around it.
-const P = 26;
+const P = 32;
 const W = 240;
 const TOTAL = W + P * 2;
 
 const QUADRANTS = [
-  { x: 0, y: 0, color: "#c0392b", label: "Auth Left" },
-  { x: 1, y: 0, color: "#2f5d8a", label: "Auth Right" },
-  { x: 0, y: 1, color: "#3f7d4e", label: "Lib Left" },
-  { x: 1, y: 1, color: "#b8892e", label: "Lib Right" },
+  { x: 0, y: 0, color: COMPASS_QUADRANTS.authoritarianLiberal.hex, label: COMPASS_QUADRANTS.authoritarianLiberal.shortLabel },
+  { x: 1, y: 0, color: COMPASS_QUADRANTS.authoritarianConservative.hex, label: COMPASS_QUADRANTS.authoritarianConservative.shortLabel },
+  { x: 0, y: 1, color: COMPASS_QUADRANTS.libertarianLiberal.hex, label: COMPASS_QUADRANTS.libertarianLiberal.shortLabel },
+  { x: 1, y: 1, color: COMPASS_QUADRANTS.libertarianConservative.hex, label: COMPASS_QUADRANTS.libertarianConservative.shortLabel },
 ];
 
 const fmt = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(Math.round(v))}`;
@@ -82,8 +83,8 @@ export function PoliticalCompassChart({
               y={P + q.y * half + (q.y ? half - 6 : 12)}
               textAnchor={q.x ? "end" : "start"}
               className="font-ui"
-              fontSize={7.5}
-              letterSpacing={0.6}
+              fontSize={6.5}
+              letterSpacing={0.4}
               fill={q.color}
               fillOpacity={0.85}
             >
@@ -92,10 +93,10 @@ export function PoliticalCompassChart({
           ))}
 
         <g className="font-ui" fontSize={8} fontWeight={600} letterSpacing={0.8} fill="hsl(var(--muted-foreground))">
-          <text x={P + half} y={P - 9} textAnchor="middle">AUTHORITARIAN</text>
-          <text x={P + half} y={P + W + 16} textAnchor="middle">LIBERTARIAN</text>
-          <text x={P - 9} y={P + half} textAnchor="middle" transform={`rotate(-90 ${P - 9} ${P + half})`}>LEFT</text>
-          <text x={P + W + 9} y={P + half} textAnchor="middle" transform={`rotate(90 ${P + W + 9} ${P + half})`}>RIGHT</text>
+          <text x={P + half} y={P - 9} textAnchor="middle">{COMPASS_AXIS.authoritarian.toUpperCase()}</text>
+          <text x={P + half} y={P + W + 16} textAnchor="middle">{COMPASS_AXIS.libertarian.toUpperCase()}</text>
+          <text x={P - 9} y={P + half} textAnchor="middle" transform={`rotate(-90 ${P - 9} ${P + half})`}>{COMPASS_AXIS.liberal.toUpperCase()}</text>
+          <text x={P + W + 9} y={P + half} textAnchor="middle" transform={`rotate(90 ${P + W + 9} ${P + half})`}>{COMPASS_AXIS.conservative.toUpperCase()}</text>
         </g>
         {!compact && (
           <g className="font-ui" fontSize={6.5} fill="hsl(var(--muted-foreground))" fillOpacity={0.8}>

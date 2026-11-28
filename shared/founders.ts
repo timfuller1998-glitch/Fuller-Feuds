@@ -47,6 +47,24 @@ export const INTEREST_AREAS = [
 ] as const;
 
 export const POLITICS_OPTIONS = ["Left", "Center-left", "Center", "Center-right", "Right", "Libertarian", "Other", "Prefer not to say"] as const;
+
+/** Stored values stay as Left/Right; show Liberal/Conservative in the UI. */
+export const POLITICS_OPTION_LABELS: Record<(typeof POLITICS_OPTIONS)[number] | string, string> = {
+  Left: "Liberal",
+  "Center-left": "Center-liberal",
+  Center: "Center",
+  "Center-right": "Center-conservative",
+  Right: "Conservative",
+  Libertarian: "Libertarian",
+  Other: "Other",
+  "Prefer not to say": "Prefer not to say",
+};
+
+export function politicsOptionLabel(value: string | null | undefined): string {
+  if (!value) return "skipped";
+  return POLITICS_OPTION_LABELS[value] ?? value;
+}
+
 export const RELIGION_OPTIONS = ["Religious", "Spiritual, not religious", "Not religious", "Unsure", "Prefer not to say"] as const;
 export const FREQUENCY_OPTIONS = [
   { value: "weekly", label: "Weekly or more" },

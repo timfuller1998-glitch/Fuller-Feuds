@@ -451,7 +451,7 @@ Scoring Guide:
 
 Special categories:
 - Libertarian: Strong individual freedom + minimal government on both social and economic issues
-- Populist: Anti-establishment, pro-common people regardless of left/right spectrum
+- Populist: Anti-establishment, pro-common people regardless of liberal/conservative spectrum
 
 Consider:
 1. Economic views (taxation, regulation, welfare, free market)
@@ -581,7 +581,7 @@ ECONOMIC AXIS (-100 to +100):
 +21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
 +51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
 
-NOTE: -100 = economic Left (Socialist), +100 = economic Right (Capitalist). This matches the standard Political Compass: Left on the left, Right on the right.
+NOTE: -100 = economic Liberal (more government in the economy / socialist), +100 = economic Conservative (free markets / capitalist). On the standard Political Compass this is Liberal on the left side and Conservative on the right side. Any label you write for a person must use Liberal or Conservative, never Left or Right.
 
 AUTHORITARIAN AXIS (-100 to +100):
 -100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
@@ -748,7 +748,7 @@ ECONOMIC AXIS (-100 to +100):
 +21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
 +51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
 
-NOTE: -100 = economic Left (Socialist), +100 = economic Right (Capitalist). This matches the standard Political Compass: Left on the left, Right on the right.
+NOTE: -100 = economic Liberal (more government in the economy / socialist), +100 = economic Conservative (free markets / capitalist). On the standard Political Compass this is Liberal on the left side and Conservative on the right side. Any label you write for a person must use Liberal or Conservative, never Left or Right.
 
 AUTHORITARIAN AXIS (-100 to +100):
 -100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
@@ -868,7 +868,7 @@ ECONOMIC AXIS (-100 to +100):
 +21 to +50: Capitalist (free market preference, limited regulation, private enterprise focus)
 +51 to +100: Very Capitalist (minimal government intervention, pure free market, strong private property rights)
 
-NOTE: -100 = economic Left (Socialist), +100 = economic Right (Capitalist). This matches the standard Political Compass: Left on the left, Right on the right.
+NOTE: -100 = economic Liberal (more government in the economy / socialist), +100 = economic Conservative (free markets / capitalist). On the standard Political Compass this is Liberal on the left side and Conservative on the right side. Any label you write for a person must use Liberal or Conservative, never Left or Right.
 
 AUTHORITARIAN AXIS (-100 to +100):
 -100 to -51: Very Libertarian (maximum individual freedom, minimal state authority, strong civil liberties)
