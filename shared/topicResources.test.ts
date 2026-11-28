@@ -5,6 +5,8 @@ import {
   normalizeHttpUrl,
   extractHttpUrls,
   aggregateTopicResources,
+  coerceHttpUrl,
+  normalizeReferences,
 } from "./topicResources.ts";
 
 describe("isSafeHttpUrl", () => {
@@ -54,5 +56,40 @@ describe("normalizeHttpUrl", () => {
   it("returns null for unsafe protocols", () => {
     assert.equal(normalizeHttpUrl("javascript:alert(1)"), null);
     assert.equal(normalizeHttpUrl("data:text/html,x"), null);
+  });
+});
+
+describe("coerceHttpUrl", () => {
+  it("adds https to bare domains and www hosts", () => {
+    assert.equal(coerceHttpUrl("example.com"), "https://example.com");
+    assert.equal(coerceHttpUrl("www.example.com/path"), "https://www.example.com/path");
+    assert.equal(coerceHttpUrl("https://example.com/a"), "https://example.com/a");
+  });
+  it("rejects schemes and bare words that are not domains", () => {
+    assert.equal(coerceHttpUrl("javascript:alert(1)"), null);
+    assert.equal(coerceHttpUrl("notalink"), null);
+    assert.equal(coerceHttpUrl("localhost"), null);
+  });
+});
+
+describe("extractHttpUrls bare domains", () => {
+  it("picks example.com out of opinion text", () => {
+    assert.deepEqual(extractHttpUrls("I read this at example.com yesterday."), ["https://example.com"]);
+    assert.deepEqual(extractHttpUrls("See www.bbc.co.uk/news and https://nytimes.com/a."), [
+      "https://nytimes.com/a",
+      "https://www.bbc.co.uk/news",
+    ]);
+  });
+  it("does not treat emails as links", () => {
+    assert.deepEqual(extractHttpUrls("Email me at you@example.com please."), []);
+  });
+});
+
+describe("normalizeReferences", () => {
+  it("coerces, dedupes, and caps at 5", () => {
+    assert.deepEqual(
+      normalizeReferences(["example.com", "https://example.com", "https://other.org/x", "", "not a link", "a.com", "b.com", "c.com", "d.com"]),
+      ["https://example.com", "https://other.org/x", "https://a.com", "https://b.com", "https://c.com"],
+    );
   });
 });

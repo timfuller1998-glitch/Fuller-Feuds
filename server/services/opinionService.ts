@@ -9,6 +9,7 @@ import { opinions, cumulativeOpinions, userProfiles, topics } from '../../shared
 import { eq, and, sql, asc, desc, inArray } from 'drizzle-orm';
 import type { InsertOpinion, Opinion } from '../../shared/schema.js';
 import { notifyActivityLater } from '../lib/activityNotify.js';
+import { normalizeReferences } from '../../shared/topicResources.js';
 import { politicalDiversity } from '../../shared/politicalDiversity.js';
 import { getCache, setCache, cacheKey, CACHE_TTL } from './cacheService.js';
 import { invalidateOpinionCache, invalidateTopicCache, invalidateCumulativeOpinionCache, invalidateUserCache } from './cacheInvalidation.js';
@@ -180,6 +181,7 @@ export class OpinionService {
     }
     
     try {
+      data = { ...data, references: normalizeReferences(data.references) };
       // 1. Analyze taste/passion immediately (lexicon-based)
       const localAnalysis = lexiconAnalysisService.analyzeOpinionLocally(data.content);
       
@@ -282,6 +284,9 @@ export class OpinionService {
     }
     
     try {
+      if (data.references !== undefined) {
+        data = { ...data, references: normalizeReferences(data.references) };
+      }
       // Pass through security context to repository
       const opinion = await this.repository.update(id, data, requestingUserId, requestingUserRole, req);
       

@@ -1,6 +1,9 @@
 /** Collect, normalize, and rank reference links from opinions. */
 
 const URL_RE = /https?:\/\/[^\s<>"'`]+/gi;
+/** Bare domains and www. hosts in running text (not emails, not already captured as http). */
+const BARE_RE = /(?<![/@\w.-])(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?:\/[^\s<>"'`]*)?/gi;
+export const MAX_OPINION_LINKS = 5;
 
 export type ResourceOpinionInput = {
   content?: string | null;
@@ -18,6 +21,33 @@ export type RankedResource = {
   dislikes: number;
   likeRatio: number;
 };
+
+/** Accept a full URL or a bare domain like example.com by adding https://. */
+export function coerceHttpUrl(raw: string): string | null {
+  const trimmed = trimUrlCandidate(String(raw || "").trim());
+  if (!trimmed) return null;
+  if (/^(javascript|data|file|vbscript|blob):/i.test(trimmed)) return null;
+  const withScheme = /^(https?:\/\/)/i.test(trimmed) ? trimmed : `https://${trimmed.replace(/^\/\//, "")}`;
+  const url = isSafeHttpUrl(withScheme);
+  if (!url) return null;
+  if (!url.hostname.includes(".")) return null;
+  return normalizeHttpUrl(url.toString());
+}
+
+/** Dedupe and coerce up to `limit` user-supplied source links. */
+export function normalizeReferences(raw: unknown, limit = MAX_OPINION_LINKS): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const normalized = coerceHttpUrl(String(item ?? ""));
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
 
 export function isSafeHttpUrl(raw: string): URL | null {
   let url: URL;
@@ -60,7 +90,7 @@ export function extractHttpUrls(...parts: Array<string | string[] | null | undef
   const found: string[] = [];
   const seen = new Set<string>();
   const add = (raw: string) => {
-    const normalized = normalizeHttpUrl(trimUrlCandidate(raw));
+    const normalized = coerceHttpUrl(raw);
     if (!normalized || seen.has(normalized)) return;
     seen.add(normalized);
     found.push(normalized);
@@ -72,8 +102,8 @@ export function extractHttpUrls(...parts: Array<string | string[] | null | undef
       continue;
     }
     const text = String(part);
-    const matches = text.match(URL_RE) || [];
-    for (const match of matches) add(match);
+    for (const match of text.match(URL_RE) || []) add(match);
+    for (const match of text.match(BARE_RE) || []) add(match);
   }
   return found;
 }

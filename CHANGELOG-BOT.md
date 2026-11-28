@@ -1,3 +1,9 @@
+## Nov 27, 2026 7:49 PM CT — Always show topic Resources; links field in the opinion editor
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- Root cause: the Resources block on the topic page was hidden whenever no links were found, so it looked like it was missing. Link extraction only matched URLs that already started with http(s)://, so a bare domain like example.com in the opinion text was ignored. The opinions.references column already existed and was accepted by the API, but the composer had no UI to add links, so that array was always empty. There is no live opinion with a stored URL or reference (including Timothy's).
+- The Resources section now always appears at the bottom of the topic page, with an empty state: "Nobody has added reference materials yet. Add a link to your opinion to share one." A fake or unreachable link still shows a basic card (domain + URL); a broken favicon is hidden.
+- The shared opinion composer (create and Update) has a "Links / sources" section for up to 5 URLs. Bare domains are accepted and stored with https added, alongside any links found in the opinion text. Existing opinions keep working; no migration was needed (the references column was already there).
+
 ## Nov 27, 2026 7:36 PM CT — Hot Debates uses the standard card deck; drop rank circles
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - Hot Debates now uses the same topic deck as Trending, the Topics tab and the profile suggestion decks (tap flips, vertical swipe scrolls, only buttons/links navigate, with arrows and counter). Topics are still sorted by political diversity. The existing diversity badge stays on the card, and a "Political diversity N%" note under the deck updates as you move through the cards.

@@ -23,7 +23,7 @@ function ResourceFront({ item }: { item: TopicResource }) {
   return (
     <div className="h-full flex flex-col justify-between p-5">
       <div className="flex items-start gap-3 min-w-0">
-        <img src={item.faviconUrl} alt="" width={32} height={32} className="w-8 h-8 rounded-sm bg-muted flex-shrink-0" />
+        <img src={item.faviconUrl} alt="" width={32} height={32} className="w-8 h-8 rounded-sm bg-muted flex-shrink-0" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }} />
         <div className="min-w-0">
           <p className="font-ui text-xs uppercase tracking-[0.14em] text-[hsl(var(--gold))]">Resource</p>
           <h3 className="mt-1 font-serif text-lg leading-snug break-words">{item.domain}</h3>
@@ -98,15 +98,23 @@ export function TopicResourceCards({ topicId }: { topicId?: string }) {
   });
 
   const items = data?.items || [];
-  if (!topicId || isLoading) return null;
-  if (!items.length) return null;
+  if (!topicId) return null;
 
   return (
     <section className="mt-8" data-testid="topic-resource-cards">
       <h2 className="font-serif text-xl mb-1">Resources</h2>
       <p className="text-sm text-muted-foreground mb-4">
-        Links cited in opinions, ranked by how often they appear and by like ratio. Tap a card to flip it.
+        Links and sources from opinions on this topic, ranked by how often they appear and by like ratio.
       </p>
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground" data-testid="resources-loading">Loading sources…</p>
+      ) : items.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-6 text-center" data-testid="resources-empty">
+          <p className="text-sm text-muted-foreground">
+            Nobody has added reference materials yet. Add a link to your opinion to share one.
+          </p>
+        </div>
+      ) : (
       <div className="flex justify-center py-2">
         <CardDeck<TopicResource>
           items={items}
@@ -131,6 +139,7 @@ export function TopicResourceCards({ topicId }: { topicId?: string }) {
           ads={false}
         />
       </div>
+      )}
 
       <Dialog open={!!reporting} onOpenChange={(open) => { if (!open) setReporting(null); }}>
         <DialogContent className="sm:max-w-md">
