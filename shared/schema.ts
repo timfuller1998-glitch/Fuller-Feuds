@@ -102,6 +102,9 @@ export const topics = pgTable("topics", {
   status: varchar("status", { length: 20 }).default("active"), // 'active', 'hidden', 'archived'
   embedding: jsonb("embedding"), // OpenAI embedding vector (1536 dimensions) stored as JSON array
   sourceUrl: text("source_url"), // Optional link to the article, video, or post being debated
+  // Official home group on the Explore map: ids from shared/topicTaxonomy.ts (major + sub). `categories` stays as optional extra tags.
+  homeMajor: varchar("home_major", { length: 40 }),
+  homeSub: varchar("home_sub", { length: 60 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -7,12 +7,17 @@ import type { InsertTopic, Topic, TopicWithCounts, TopicInsert } from '../../sha
 import { getCache, setCache, cacheKey, CACHE_TTL } from '../services/cacheService.js';
 import { politicalDiversity } from '../../shared/politicalDiversity.js';
 import { AIService } from '../aiService.js';
+import { normalizeHome } from '../../shared/topicTaxonomy.js';
 
 
 export class TopicRepository {
   async create(topic: TopicInsert): Promise<Topic> {
     const [created] = await db.insert(topics).values(topic).returning();
     return created;
+  }
+
+  async setHome(topicId: string, homeMajor: string, homeSub: string): Promise<void> {
+    await db.update(topics).set({ homeMajor, homeSub, updatedAt: new Date() }).where(eq(topics.id, topicId));
   }
 
   async findById(id: string): Promise<Topic | undefined> {
@@ -107,7 +112,11 @@ export class TopicRepository {
     let conditions = [eq(topics.isActive, true)];
 
     if (category) {
-      conditions.push(sql`${category} = ANY(${topics.categories})`);
+      // Matches an extra tag, or the topic's official home group (by id or name).
+      const home = normalizeHome(category);
+      conditions.push(home
+        ? sql`(${category} = ANY(${topics.categories}) OR ${topics.homeMajor} = ${home.majorId})`
+        : sql`${category} = ANY(${topics.categories})`);
     }
 
     if (search) {

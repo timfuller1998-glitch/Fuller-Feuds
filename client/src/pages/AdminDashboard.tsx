@@ -26,6 +26,7 @@ import {
   FileText,
   MessageSquare,
   Trash2,
+  FolderInput,
   BookOpen,
   Sparkles,
   Crown
@@ -41,6 +42,8 @@ import { ContentFilters } from "@/components/admin/ContentFilters";
 import { AuditLog } from "@/components/admin/AuditLog";
 import { FeedbackRequests } from "@/components/admin/FeedbackRequests";
 import { AiOpinionFlags } from "@/components/admin/AiOpinionFlags";
+import { MoveTopicDialog, homeLabel, type MoveTopic } from "@/components/admin/MoveTopicDialog";
+import { resolveHome } from "@shared/topicTaxonomy";
 import { FoundingMembers } from "@/components/admin/FoundingMembers";
 import {
   AlertDialog,
@@ -74,6 +77,7 @@ export default function AdminDashboard() {
   const [opinionModerationReason, setOpinionModerationReason] = useState("");
   const [challengeModerationReason, setChallengeModerationReason] = useState("");
   const [deleteTopicId, setDeleteTopicId] = useState<string | null>(null);
+  const [moveTopic, setMoveTopic] = useState<MoveTopic | null>(null);
   const [deleteOpinionId, setDeleteOpinionId] = useState<string | null>(null);
 
   // Fetch all topics (only for admin/moderator — avoids 403 spam for normal users)
@@ -439,6 +443,9 @@ export default function AdminDashboard() {
                         <Badge variant="secondary" data-testid={`badge-topic-status-${topic.id}`}>
                           {topic.status}
                         </Badge>
+                        <Badge variant="outline" data-testid={`badge-topic-home-${topic.id}`}>
+                          {(() => { const h = resolveHome({ id: topic.id, title: topic.title, description: topic.description, categories: topic.categories ?? [], homeMajor: topic.homeMajor, homeSub: topic.homeSub }); return homeLabel(h.majorId, h.subId); })()}
+                        </Badge>
                         <span className="text-sm text-muted-foreground">
                           {topic.opinionsCount || 0} opinions
                         </span>
@@ -447,6 +454,17 @@ export default function AdminDashboard() {
                         </span>
                       </div>
                     </div>
+                    {isAdmin && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setMoveTopic(topic)}
+                        data-testid={`button-move-topic-${topic.id}`}
+                      >
+                        <FolderInput className="h-4 w-4 mr-2" />
+                        Move
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="destructive"
@@ -657,6 +675,8 @@ export default function AdminDashboard() {
           <AuditLog queriesEnabled={adminQueriesEnabled} />
         </TabsContent>
       </Tabs>
+
+      <MoveTopicDialog topic={moveTopic} onClose={() => setMoveTopic(null)} />
 
       {/* Delete Topic Confirmation Dialog */}
       <AlertDialog open={!!deleteTopicId} onOpenChange={() => setDeleteTopicId(null)}>

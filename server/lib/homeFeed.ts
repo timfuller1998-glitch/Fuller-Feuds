@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { getMajor } from '../../shared/topicTaxonomy.js';
 import { db } from '../db.js';
 import { TopicService } from '../services/topicService.js';
 import type { TopicWithCounts } from '../../shared/schema.js';
@@ -140,6 +141,8 @@ export async function buildHomeFeed(req: FeedRequest) {
   const scored = pool.map((t) => {
     let score = scoreTopic(req.section, t, stats.get(t.id) || EMPTY);
     const cats = ((t.categories as string[] | null) || []).map((c) => c.toLowerCase());
+    const homeName = getMajor((t as any).homeMajor)?.name;
+    if (homeName) cats.push(homeName.toLowerCase()); // following an official group matches topics whose home is in it
     if (followed.size && cats.some((c) => followed.has(c))) score *= 1.5; // the user's interests
     if (req.cycle === 0 && req.seen.has(t.id)) score *= 0.25; // seen recently: later in the first pass
     return { t, score: Math.max(score, 1e-6) };

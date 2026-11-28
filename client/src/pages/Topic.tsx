@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
+import { getMajor, getSub, resolveHome } from "@shared/topicTaxonomy";
 import { UserHandle } from "@/components/UserHandle";
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -737,6 +738,19 @@ export default function Topic() {
       <div className="space-y-4">
         {/* Categories and Active Badge */}
         <div className="flex items-center gap-2 flex-wrap">
+          {(() => {
+            const h = resolveHome({ id: topic.id, title: topic.title, description: topic.description, categories: topic.categories ?? [], homeMajor: (topic as any).homeMajor, homeSub: (topic as any).homeSub });
+            return (
+              <Badge
+                variant="default"
+                className="cursor-pointer hover-elevate"
+                onClick={() => navigate(`/categories?focus=${encodeURIComponent(`sub:major:${h.majorId}:${h.subId}`)}`)}
+                data-testid="badge-home-group"
+              >
+                {getMajor(h.majorId)?.name} › {getSub(h.majorId, h.subId)?.name}
+              </Badge>
+            );
+          })()}
           {(Array.isArray(topic.categories) ? topic.categories : []).map((cat) => (
             <Badge 
               key={String(cat)} 
