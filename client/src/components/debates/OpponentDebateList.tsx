@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useDebateContext } from '@/contexts/DebateContext';
 import { useAuth } from '@/hooks/useAuth';
-import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
+import { getCompassQuadrantColor } from '@/lib/politicalColors';
 import { useCompassColorScheme } from '@/lib/compassColorScheme';
 import { debateTurn } from '@/lib/debateTurn';
 import { cn } from '@/lib/utils';
@@ -62,7 +62,7 @@ export function OpponentDebateList() {
   if (!group) return null;
 
   const me = user?.id as string | undefined;
-  const oppColor = get2DPoliticalCompassColor(group.opponentEconomicScore || 0, group.opponentAuthoritarianScore || 0, { scheme });
+  const oppColor = getCompassQuadrantColor(group.opponentEconomicScore || 0, group.opponentAuthoritarianScore || 0, scheme);
   const oppFirst = group.opponentName.split(' ')[0];
   const active = group.activeDebates
     .map((d) => ({ d, state: liveState(d, me) }))

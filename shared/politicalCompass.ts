@@ -124,6 +124,19 @@ export function compassQuadrantId(economicScore: number, authoritarianScore: num
   return "libertarianConservative";
 }
 
+/**
+ * Solid ink colour for the quadrant a point sits in. Used by avatar rings and
+ * the chart marker so they match the chart quadrant, including near the origin
+ * (get2DPoliticalCompassColor fades those points toward gold).
+ */
+export function getCompassQuadrantColor(
+  economicScore: number,
+  authoritarianScore: number,
+  scheme: CompassColorScheme = "standard",
+): string {
+  return compassQuadrantsFor(scheme)[compassQuadrantId(economicScore, authoritarianScore)].hex;
+}
+
 function hslToHex(h: number, s: number, l: number): string {
   l /= 100;
   const a = (s * Math.min(l, 1 - l)) / 100;

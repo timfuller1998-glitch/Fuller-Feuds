@@ -7,6 +7,7 @@ import {
   displayQuadrantLabel,
   get1DLeaningColor,
   get2DPoliticalCompassColor,
+  getCompassQuadrantColor,
   parseCompassColorScheme,
 } from "./politicalCompass";
 
@@ -76,4 +77,18 @@ test("point and 1D colours follow the selected scheme", () => {
   assert.equal(parseCompassColorScheme("standard"), "standard");
   assert.equal(parseCompassColorScheme("nope"), "standard");
   assert.equal(parseCompassColorScheme(null), "standard");
+});
+
+test("rings and the chart marker use the solid quadrant colour, even near the origin", () => {
+  const standardLib = COMPASS_QUADRANTS.authoritarianLiberal.hex;
+  const americanLib = compassQuadrantsFor("american").authoritarianLiberal.hex;
+  // (-10, +5) is authoritarian liberal — Timothy's live point — but close enough
+  // to center that the blended 2D colour shifts to gold (hue 38).
+  assert.equal(compassQuadrantId(-10, 5), "authoritarianLiberal");
+  assert.equal(getCompassQuadrantColor(-10, 5), standardLib);
+  assert.equal(getCompassQuadrantColor(-10, 5, "standard"), standardLib);
+  assert.equal(getCompassQuadrantColor(-10, 5, "american"), americanLib);
+  assert.notEqual(get2DPoliticalCompassColor(-10, 5, { vivid: true }), standardLib);
+  assert.notEqual(get2DPoliticalCompassColor(-10, 5, { vivid: true, scheme: "american" }), americanLib);
+  assert.equal(americanLib, COMPASS_QUADRANTS.authoritarianConservative.hex);
 });

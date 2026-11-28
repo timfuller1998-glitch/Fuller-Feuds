@@ -9,8 +9,9 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useDebateContext } from '@/contexts/DebateContext';
 import { useDebateWebSocket } from '@/hooks/useDebateWebSocket';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
+import { getCompassQuadrantColor } from '@/lib/politicalColors';
 import { useCompassColorScheme } from '@/lib/compassColorScheme';
+import { type OpponentGroup } from './DebateStatus';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -90,6 +91,10 @@ export function PopupDebateWindow({
     queryKey: ['/api/users', opponentId],
     enabled: !!opponentId,
     staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: groupedDebates = [] } = useQuery<OpponentGroup[]>({
+    queryKey: ['/api/debates/grouped'],
   });
 
   // Fetch messages
@@ -204,7 +209,16 @@ export function PopupDebateWindow({
     }
   };
 
-  const avatarColor = get2DPoliticalCompassColor(0, 0, { scheme });
+  const opponentGroup = groupedDebates.find((g) => g.opponentId === opponentId);
+  const hasOpponentCompass =
+    opponentGroup?.opponentEconomicScore != null && opponentGroup?.opponentAuthoritarianScore != null;
+  const avatarColor = hasOpponentCompass
+    ? getCompassQuadrantColor(
+        opponentGroup.opponentEconomicScore as number,
+        opponentGroup.opponentAuthoritarianScore as number,
+        scheme,
+      )
+    : undefined;
   const { isMyTurn, isOver, waiting, canSend } = debateTurn(room, user?.id);
   const openFull = () => { minimizeDebateWindow(debateRoomId); setLocation(`/debate-room/${debateRoomId}`); };
 
@@ -228,12 +242,12 @@ export function PopupDebateWindow({
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {!isMobile && <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />}
-          <Avatar className="w-8 h-8 border" style={{ borderColor: avatarColor }}>
+          <Avatar className="w-8 h-8 border" style={avatarColor ? { borderColor: avatarColor } : undefined}>
             <AvatarFallback 
-              style={{ 
+              style={avatarColor ? { 
                 background: avatarColor,
                 color: 'hsl(30 18% 11%)'
-              }}
+              } : undefined}
             >
               {opponentName.slice(0, 2).toUpperCase()}
             </AvatarFallback>

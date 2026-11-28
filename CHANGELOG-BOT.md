@@ -1,3 +1,10 @@
+## Nov 28, 2026 7:24 AM CT — Avatar rings and the compass marker use the chart quadrant color
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- The gold/tan ring on a near-center profile (e.g. (-10, +5), authoritarian liberal) was not a founding-member border. Avatar rings used `get2DPoliticalCompassColor`, which fades any point within 15 units of the origin to hue 38 (gold). The chart quadrant for that point is blue in American mode and red in Standard, so the ring did not match. Founding status stays on the crown badge; the ring is now the solid quadrant colour from `getCompassQuadrantColor`, the same ink as the chart quadrant, using the viewer's colour scheme.
+- The chart marker, dashed connector, and confidence circle used brand `--primary` (coral/red). They now use that same quadrant colour.
+- Other political rings (cards, feed, sidebar, debate avatars) go through the same helper so they stay consistent. The setting is still per viewer.
+- Typecheck: 50 (ceiling 52). Shared tests: 105 pass (1 new). Evidence: `/workspace/ff-videos/nov27/compass-colors/`.
+
 ## Nov 27, 2026 11:38 PM CT — Settings choice for Standard or American political chart colors
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - Settings now has a "Political chart colors" selector with two options. Standard (default, current) is the traditional political compass: authoritarian liberal red, authoritarian conservative blue, libertarian liberal green, libertarian conservative yellow. American swaps only red and blue, so authoritarian liberal is blue and authoritarian conservative is red; libertarian green and yellow stay the same.

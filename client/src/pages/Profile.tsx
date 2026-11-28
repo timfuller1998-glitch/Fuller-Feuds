@@ -524,6 +524,7 @@ export default function Profile() {
                 profileImageUrl={user.profileImageUrl}
                 firstName={user.firstName}
                 lastName={user.lastName}
+                size="lg"
                 className="h-24 w-24 sm:h-28 sm:w-28 text-2xl"
                 showBadge={true}
                 economicScore={profile?.economicScore}

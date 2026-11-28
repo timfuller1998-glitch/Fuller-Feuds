@@ -1,6 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getBadgeIcon } from "@/lib/badgeIcons";
-import { get1DLeaningColor, get2DPoliticalCompassColor } from "@shared/politicalCompass";
+import { get1DLeaningColor, getCompassQuadrantColor } from "@shared/politicalCompass";
 import { useCompassColorScheme } from "@/lib/compassColorScheme";
 import { useQuery } from "@tanstack/react-query";
 
@@ -103,7 +103,7 @@ export function AvatarWithBadge({
         <div 
           className={`absolute inset-0 rounded-full pointer-events-none ${ringWidthClasses[size]}`}
           style={{ 
-            borderColor: get2DPoliticalCompassColor(economicScore, authoritarianScore, { vivid: true, scheme }),
+            borderColor: getCompassQuadrantColor(economicScore, authoritarianScore, scheme),
           }}
           data-testid="political-leaning-ring"
         />

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { MessageSquare } from 'lucide-react';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useDebateContext } from '@/contexts/DebateContext';
-import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
+import { getCompassQuadrantColor } from '@/lib/politicalColors';
 import { useCompassColorScheme } from '@/lib/compassColorScheme';
 import { DebateTray } from './DebateTray';
 import { TypingBubble } from './TypingBubble';
@@ -80,10 +80,10 @@ export function DebateFooter() {
                 {visible.map((group) => {
                   const typing = group.activeDebates.some((d) => typingRooms.has(d.id));
                   const indicator = typing ? 'typing' : group.status;
-                  const avatarColor = get2DPoliticalCompassColor(
+                  const avatarColor = getCompassQuadrantColor(
                     group.opponentEconomicScore || 0,
                     group.opponentAuthoritarianScore || 0,
-                    { scheme },
+                    scheme,
                   );
 
                   return (

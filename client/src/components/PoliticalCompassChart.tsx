@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { compassExtent, confidenceRadius, type Confidence } from "@shared/compassDescription";
-import { COMPASS_AXIS, compassQuadrantsFor } from "@shared/politicalCompass";
+import { COMPASS_AXIS, compassQuadrantsFor, getCompassQuadrantColor } from "@shared/politicalCompass";
 import { useCompassColorScheme } from "@/lib/compassColorScheme";
 
 interface PoliticalCompassChartProps {
@@ -55,6 +55,7 @@ export function PoliticalCompassChart({
   const cx = toX(e);
   const cy = toY(a);
   const half = W / 2;
+  const markerColor = getCompassQuadrantColor(e, a, scheme);
   const compact = size === "sm";
   const maxW = size === "lg" ? "max-w-[420px]" : compact ? "max-w-[200px]" : "max-w-[340px]";
 
@@ -114,17 +115,17 @@ export function PoliticalCompassChart({
             cx={cx}
             cy={cy}
             r={Math.max(halo * unit, 9)}
-            fill="hsl(var(--primary))"
+            fill={markerColor}
             fillOpacity={0.14}
-            stroke="hsl(var(--primary))"
+            stroke={markerColor}
             strokeOpacity={0.5}
             strokeDasharray="3 3"
             strokeWidth={1}
             data-testid="compass-halo"
           />
         )}
-        <line x1={P + half} y1={P + half} x2={cx} y2={cy} stroke="hsl(var(--primary))" strokeOpacity={0.45} strokeWidth={1} strokeDasharray="2 2" />
-        <circle cx={cx} cy={cy} r={6.5} fill="hsl(var(--primary))" stroke="hsl(var(--card))" strokeWidth={2.5} data-testid="compass-marker" />
+        <line x1={P + half} y1={P + half} x2={cx} y2={cy} stroke={markerColor} strokeOpacity={0.45} strokeWidth={1} strokeDasharray="2 2" />
+        <circle cx={cx} cy={cy} r={6.5} fill={markerColor} stroke="hsl(var(--card))" strokeWidth={2.5} data-testid="compass-marker" />
         {!compact && (
           <text
             x={cx + (cx > P + W - 60 ? -10 : 10)}

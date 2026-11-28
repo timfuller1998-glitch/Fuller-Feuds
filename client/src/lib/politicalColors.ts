@@ -6,7 +6,7 @@
 
 import { compassQuadrantsFor, get2DPoliticalCompassColor, type CompassColorScheme } from "@shared/politicalCompass";
 
-export { get2DPoliticalCompassColor, COMPASS_QUADRANTS, compassQuadrantsFor } from "@shared/politicalCompass";
+export { get2DPoliticalCompassColor, getCompassQuadrantColor, COMPASS_QUADRANTS, compassQuadrantsFor } from "@shared/politicalCompass";
 
 
 export function getOpinionGradientStyle(
