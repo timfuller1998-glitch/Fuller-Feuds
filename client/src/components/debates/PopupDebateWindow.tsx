@@ -10,6 +10,7 @@ import { useDebateContext } from '@/contexts/DebateContext';
 import { useDebateWebSocket } from '@/hooks/useDebateWebSocket';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
+import { useCompassColorScheme } from '@/lib/compassColorScheme';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -54,6 +55,7 @@ export function PopupDebateWindow({
   opponentId,
   position: initialPosition
 }: PopupDebateWindowProps) {
+  const scheme = useCompassColorScheme();
   const { user } = useAuth();
   const { minimizeDebateWindow, closeDebateWindow, updateWindowPosition, clearUnread } = useDebateContext();
   const [message, setMessage] = useState('');
@@ -202,7 +204,7 @@ export function PopupDebateWindow({
     }
   };
 
-  const avatarColor = get2DPoliticalCompassColor(0, 0);
+  const avatarColor = get2DPoliticalCompassColor(0, 0, { scheme });
   const { isMyTurn, isOver, waiting, canSend } = debateTurn(room, user?.id);
   const openFull = () => { minimizeDebateWindow(debateRoomId); setLocation(`/debate-room/${debateRoomId}`); };
 

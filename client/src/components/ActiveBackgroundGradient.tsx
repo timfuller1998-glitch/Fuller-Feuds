@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { COMPASS_QUADRANTS } from "@shared/politicalCompass";
+import { compassQuadrantsFor, type CompassColorScheme } from "@shared/politicalCompass";
+import { useCompassColorScheme } from "@/lib/compassColorScheme";
 
 interface PoliticalDistribution {
   authoritarianCapitalist: number;
@@ -13,14 +13,15 @@ interface PoliticalDistribution {
  * Generate a subtle background gradient with texture overlay
  * based on active user political distribution
  */
-function getActiveBackgroundGradient(distribution: PoliticalDistribution): React.CSSProperties {
+function getActiveBackgroundGradient(distribution: PoliticalDistribution, scheme?: CompassColorScheme): React.CSSProperties {
   // Convert percentages (0-100) to subtle opacity for background (max 0.20 for visibility)
   const toOpacity = (percent: number) => ((percent / 100) * 0.20).toFixed(3);
 
-  const tl = COMPASS_QUADRANTS.authoritarianLiberal.rgb;
-  const tr = COMPASS_QUADRANTS.authoritarianConservative.rgb;
-  const bl = COMPASS_QUADRANTS.libertarianLiberal.rgb;
-  const br = COMPASS_QUADRANTS.libertarianConservative.rgb;
+  const q = compassQuadrantsFor(scheme);
+  const tl = q.authoritarianLiberal.rgb;
+  const tr = q.authoritarianConservative.rgb;
+  const bl = q.libertarianLiberal.rgb;
+  const br = q.libertarianConservative.rgb;
   const topLeft = `rgba(${tl[0]}, ${tl[1]}, ${tl[2]}, ${toOpacity(distribution.authoritarianSocialist)})`;
   const topRight = `rgba(${tr[0]}, ${tr[1]}, ${tr[2]}, ${toOpacity(distribution.authoritarianCapitalist)})`;
   const bottomLeft = `rgba(${bl[0]}, ${bl[1]}, ${bl[2]}, ${toOpacity(distribution.libertarianSocialist)})`;
@@ -43,9 +44,7 @@ function getActiveBackgroundGradient(distribution: PoliticalDistribution): React
  * Updates every 5 minutes to reflect current platform activity
  */
 export function ActiveBackgroundGradient({ children }: { children: React.ReactNode }) {
-  const [gradientStyle, setGradientStyle] = useState<React.CSSProperties>({
-    background: 'hsl(var(--background))'
-  });
+  const scheme = useCompassColorScheme();
 
   // Fetch active user political distribution with 5-minute cache
   const { data: distribution } = useQuery<PoliticalDistribution>({
@@ -54,13 +53,9 @@ export function ActiveBackgroundGradient({ children }: { children: React.ReactNo
     staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
   });
 
-  // Update gradient when distribution data changes
-  useEffect(() => {
-    if (distribution) {
-      const newStyle = getActiveBackgroundGradient(distribution);
-      setGradientStyle(newStyle);
-    }
-  }, [distribution]);
+  const gradientStyle: React.CSSProperties = distribution
+    ? getActiveBackgroundGradient(distribution, scheme)
+    : { background: 'hsl(var(--background))' };
 
   return (
     <div 

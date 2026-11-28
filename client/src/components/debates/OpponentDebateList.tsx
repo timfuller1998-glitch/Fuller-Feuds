@@ -8,6 +8,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useDebateContext } from '@/contexts/DebateContext';
 import { useAuth } from '@/hooks/useAuth';
 import { get2DPoliticalCompassColor } from '@/lib/politicalColors';
+import { useCompassColorScheme } from '@/lib/compassColorScheme';
 import { debateTurn } from '@/lib/debateTurn';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -43,6 +44,7 @@ function StanceChip({ who, stance }: { who: string; stance?: string | null }) {
 }
 
 export function OpponentDebateList() {
+  const scheme = useCompassColorScheme();
   const { activePanel, closePanel, opponentPanelData, openDebateWindow } = useDebateContext();
   const { user } = useAuth() as { user: any };
   const isOpen = activePanel === 'opponent-list';
@@ -60,7 +62,7 @@ export function OpponentDebateList() {
   if (!group) return null;
 
   const me = user?.id as string | undefined;
-  const oppColor = get2DPoliticalCompassColor(group.opponentEconomicScore || 0, group.opponentAuthoritarianScore || 0);
+  const oppColor = get2DPoliticalCompassColor(group.opponentEconomicScore || 0, group.opponentAuthoritarianScore || 0, { scheme });
   const oppFirst = group.opponentName.split(' ')[0];
   const active = group.activeDebates
     .map((d) => ({ d, state: liveState(d, me) }))

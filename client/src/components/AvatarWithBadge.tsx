@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getBadgeIcon } from "@/lib/badgeIcons";
 import { get1DLeaningColor, get2DPoliticalCompassColor } from "@shared/politicalCompass";
+import { useCompassColorScheme } from "@/lib/compassColorScheme";
 import { useQuery } from "@tanstack/react-query";
 
 interface AvatarWithBadgeProps {
@@ -54,6 +55,7 @@ export function AvatarWithBadge({
   authoritarianScore,
   showPoliticalLeaning = true,
 }: AvatarWithBadgeProps) {
+  const scheme = useCompassColorScheme();
   // Fetch user's selected badge
   const { data: userBadges = [] } = useQuery<any[]>({
     queryKey: ['/api/users', userId, 'badges'],
@@ -101,7 +103,7 @@ export function AvatarWithBadge({
         <div 
           className={`absolute inset-0 rounded-full pointer-events-none ${ringWidthClasses[size]}`}
           style={{ 
-            borderColor: get2DPoliticalCompassColor(economicScore, authoritarianScore, { vivid: true }),
+            borderColor: get2DPoliticalCompassColor(economicScore, authoritarianScore, { vivid: true, scheme }),
           }}
           data-testid="political-leaning-ring"
         />
@@ -111,7 +113,7 @@ export function AvatarWithBadge({
         <div 
           className={`absolute inset-0 rounded-full pointer-events-none ${ringWidthClasses[size]}`}
           style={{ 
-            borderColor: get1DLeaningColor(politicalLeaningScore),
+            borderColor: get1DLeaningColor(politicalLeaningScore, scheme),
           }}
           data-testid="political-leaning-ring"
         />

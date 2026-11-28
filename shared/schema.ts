@@ -420,6 +420,7 @@ export const userProfiles = pgTable("user_profiles", {
   displayLastName: varchar("display_last_name"),
   opinionSortPreference: varchar("opinion_sort_preference", { length: 25 }).default("newest"), // 'newest', 'oldest', 'most_liked', 'most_controversial'
   categorySortPreference: varchar("category_sort_preference", { length: 20 }).default("popular"), // 'popular', 'alphabetical', 'newest', 'oldest'
+  compassColorScheme: varchar("compass_color_scheme", { length: 20 }).default("standard"), // 'standard' | 'american'
   politicalLeaning: varchar("political_leaning", { length: 50 }), // 'progressive', 'moderate', 'conservative', etc.
   leaningScore: integer("leaning_score").default(0), // DEPRECATED: Legacy single-axis score (kept for backward compatibility)
   economicScore: integer("economic_score").default(0), // -100 (economic Left / socialist) to +100 (economic Right / capitalist) - standard Political Compass x-axis

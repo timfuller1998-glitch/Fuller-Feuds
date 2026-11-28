@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { UserRepository } from '../repositories/userRepository.js';
 import { isAuthenticated } from '../middleware/auth.js';
+import { parseCompassColorScheme } from '../../shared/politicalCompass.js';
 
 const router = Router();
 const userRepository = new UserRepository();
@@ -51,6 +52,7 @@ router.get('/user', isAuthenticated, async (req, res) => {
       founderLifetimeAdFree: freshUser.founderLifetimeAdFree ?? false,
       economicScore: profile?.economicScore ?? null,
       authoritarianScore: profile?.authoritarianScore ?? null,
+      compassColorScheme: parseCompassColorScheme(profile?.compassColorScheme),
     });
   } catch (error) {
     console.error('Error fetching user:', error);
