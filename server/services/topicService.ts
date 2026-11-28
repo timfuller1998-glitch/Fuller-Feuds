@@ -6,6 +6,7 @@ import { withCache, getCache, setCache, cacheKey, CACHE_TTL } from './cacheServi
 import { invalidateTopicCache, invalidateTopicsListCache } from './cacheInvalidation.js';
 import { logSecurityEvent } from '../utils/securityLogger.js';
 import { normalizeHome, GENERAL_SUB_ID } from '../../shared/topicTaxonomy.js';
+import { ForbiddenError } from '../utils/securityErrors.js';
 import type { Request } from 'express';
 
 export class TopicService {
@@ -296,11 +297,27 @@ export class TopicService {
     return { homeMajor: home.majorId, homeSub: home.subId };
   }
 
-  async deleteTopic(id: string): Promise<void> {
-    await this.repository.delete(id);
-    // Invalidate caches after deleting topic
+  async lastActivityByTopicIds(ids: string[]): Promise<Map<string, Date | null>> {
+    return this.repository.lastActivityByTopicIds(ids);
+  }
+
+  /**
+   * Permanently delete a topic and its dependent rows.
+   * When requestingUserId is passed, only the author or an admin may delete it.
+   */
+  async deleteTopic(id: string, requestingUserId?: string, requestingUserRole?: string): Promise<void> {
+    const topic = await this.repository.findById(id);
+    if (!topic) throw new Error('Topic not found');
+    if (requestingUserId) {
+      const allowed = topic.createdById === requestingUserId || requestingUserRole === 'admin';
+      if (!allowed) throw new ForbiddenError('You can only delete a topic you created');
+    }
+    const { userIds } = await this.repository.hardDelete(id);
     await invalidateTopicCache(id);
     await invalidateTopicsListCache();
+    for (const userId of userIds) {
+      await this.opinionService.recountUserOpinionsAndRefreshCompass(userId);
+    }
   }
 
   async searchTopics(query: string, options?: {

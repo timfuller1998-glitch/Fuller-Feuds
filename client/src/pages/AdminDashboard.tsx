@@ -684,7 +684,7 @@ export default function AdminDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Topic</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this topic? This action cannot be undone and will also remove all associated opinions and debates.
+              This permanently deletes the topic and everything on it (opinions, debates, and related rows). This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -5,6 +5,9 @@ import {
   SUBCATEGORIES,
   GENERAL_SUB_ID,
   SPLIT_THRESHOLD,
+  FOLD_NEW_TOPIC_DAYS,
+  FOLD_RECENT_ACTIVITY_DAYS,
+  compareFoldActivity,
   buildMapTree,
   classifyTopic,
   findSplitCandidates,
@@ -128,6 +131,75 @@ describe("topicTaxonomy: map depth rules", () => {
     assert.equal(general.children.length, 1);
     assert.ok(general.children[0].foldedFrom, "folded topic remembers its sub");
     assert.equal(culture.count, 4);
+  });
+
+
+  it("folds the least-active single first: no recent activity before recent, then fewer opinions, then older topics", () => {
+    const now = Date.parse("2026-11-27T21:00:00-06:00");
+    const day = 24 * 60 * 60 * 1000;
+    const topics = [
+      t("hot", "hot", [], { homeMajor: "culture", homeSub: "arts-literature", createdAt: now - 40 * day, opinionsCount: 2, lastActivity: now - 2 * day }),
+      t("busy", "busy", [], { homeMajor: "culture", homeSub: "holidays", createdAt: now - 40 * day, opinionsCount: 8, lastActivity: now - 40 * day }),
+      t("quiet-newish", "quiet-newish", [], { homeMajor: "culture", homeSub: "media-news", createdAt: now - 20 * day, opinionsCount: 1, lastActivity: now - 20 * day }),
+      t("quiet-old", "quiet-old", [], { homeMajor: "culture", homeSub: "travel", createdAt: now - 60 * day, opinionsCount: 1, lastActivity: now - 60 * day }),
+    ];
+    const culture = buildMapTree(topics, now).children.find((m) => m.name === "Culture")!;
+    const general = culture.children.find((s) => s.name === "General")!;
+    // Only one needs to fold. quiet-old is least active (no activity in 14 days, 1 opinion, oldest).
+    assert.equal(general.children.length, 1);
+    assert.equal(general.children[0].topicId, "quiet-old");
+    assert.equal(general.children[0].foldedFrom, "Travel & Places");
+    assert.ok(culture.children.some((s) => s.name === "Arts & Literature"));
+    assert.ok(culture.children.some((s) => s.name === "Holidays & Traditions"));
+    assert.ok(culture.children.some((s) => s.name === "Media & News"));
+  });
+
+  it("keeps a brand-new topic unfolded when an older quiet single can fold instead", () => {
+    const now = Date.parse("2026-11-27T21:00:00-06:00");
+    const day = 24 * 60 * 60 * 1000;
+    const topics = [
+      t("new", "new", [], { homeMajor: "culture", homeSub: "arts-literature", createdAt: now - 2 * day, opinionsCount: 0 }),
+      t("old-a", "old-a", [], { homeMajor: "culture", homeSub: "holidays", createdAt: now - 40 * day, opinionsCount: 0 }),
+      t("old-b", "old-b", [], { homeMajor: "culture", homeSub: "media-news", createdAt: now - 30 * day, opinionsCount: 3, lastActivity: now - 1 * day }),
+      t("old-c", "old-c", [], { homeMajor: "culture", homeSub: "travel", createdAt: now - 25 * day, opinionsCount: 1 }),
+    ];
+    const culture = buildMapTree(topics, now).children.find((m) => m.name === "Culture")!;
+    const general = culture.children.find((s) => s.name === "General")!;
+    assert.equal(general.children[0].topicId, "old-a"); // oldest, no recent activity, 0 opinions
+    assert.ok(culture.children.some((s) => s.name === "Arts & Literature"), "brand-new topic stays in its sub");
+    assert.equal(culture.children.find((s) => s.name === "Arts & Literature")!.children[0].topicId, "new");
+  });
+
+  it("still folds a brand-new topic if every single is new, using the same activity order", () => {
+    const now = Date.parse("2026-11-27T21:00:00-06:00");
+    const day = 24 * 60 * 60 * 1000;
+    const topics = [
+      t("n1", "n1", [], { homeMajor: "culture", homeSub: "arts-literature", createdAt: now - 6 * day, opinionsCount: 0 }),
+      t("n2", "n2", [], { homeMajor: "culture", homeSub: "holidays", createdAt: now - 1 * day, opinionsCount: 4, lastActivity: now - 1 * day }),
+      t("n3", "n3", [], { homeMajor: "culture", homeSub: "media-news", createdAt: now - 3 * day, opinionsCount: 0 }),
+      t("n4", "n4", [], { homeMajor: "culture", homeSub: "travel", createdAt: now - 5 * day, opinionsCount: 2, lastActivity: now - 5 * day }),
+    ];
+    const general = buildMapTree(topics, now).children.find((m) => m.name === "Culture")!.children.find((s) => s.name === "General")!;
+    // All are new, so newness ties. n1 and n3 have no recent activity and 0 opinions; n1 is older.
+    assert.equal(general.children[0].topicId, "n1");
+  });
+
+  it("is deterministic: the same topics and now always fold the same sub, using topic id as the last tie-break", () => {
+    const now = 1_800_000_000_000;
+    const topics = [
+      t("b", "b", [], { homeMajor: "culture", homeSub: "holidays", createdAt: now - 40 * 86400000, opinionsCount: 1 }),
+      t("a", "a", [], { homeMajor: "culture", homeSub: "arts-literature", createdAt: now - 40 * 86400000, opinionsCount: 1 }),
+      t("c", "c", [], { homeMajor: "culture", homeSub: "media-news", createdAt: now - 40 * 86400000, opinionsCount: 1 }),
+      t("d", "d", [], { homeMajor: "culture", homeSub: "travel", createdAt: now - 40 * 86400000, opinionsCount: 1 }),
+    ];
+    const folded = () => {
+      const g = buildMapTree(topics, now).children.find((m) => m.name === "Culture")!.children.find((s) => s.name === "General")!;
+      return g.children[0].topicId;
+    };
+    assert.equal(folded(), "a");
+    assert.equal(folded(), folded());
+    assert.ok(FOLD_NEW_TOPIC_DAYS === 7 && FOLD_RECENT_ACTIVITY_DAYS === 14);
+    assert.ok(compareFoldActivity(topics[1], topics[0], now) < 0);
   });
 
   it("does not fold when the major has too few subs", () => {

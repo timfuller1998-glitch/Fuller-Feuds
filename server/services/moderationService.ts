@@ -94,9 +94,11 @@ export class ModerationService {
   }
 
   async deleteTopicAdmin(topicId: string, adminId: string): Promise<void> {
-    await this.repository.deleteTopicAdmin(topicId, adminId);
-    const { OpinionService } = await import('./opinionService.js');
-    await new OpinionService().recountUsersOnTopic(topicId);
+    // Log first: after a hard delete the topic row is gone. Then the shared hard-delete
+    // path removes dependent rows and recounts XP for anyone who had an opinion on it.
+    await this.repository.logTopicDeleted(topicId, adminId);
+    const { TopicService } = await import('./topicService.js');
+    await new TopicService().deleteTopic(topicId);
   }
 
   // Banned phrases management

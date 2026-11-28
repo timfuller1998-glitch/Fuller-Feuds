@@ -178,22 +178,13 @@ export class ModerationRepository {
     });
   }
 
-  async deleteTopicAdmin(topicId: string, adminId: string): Promise<void> {
-    // Soft delete: set both isActive to false and status to hidden
-    // This ensures it's hidden from admin dashboard (which filters by isActive)
-    await db.update(topics)
-      .set({ 
-        isActive: false,
-        status: 'hidden' 
-      })
-      .where(eq(topics.id, topicId));
-    
+  async logTopicDeleted(topicId: string, adminId: string): Promise<void> {
     await db.insert(moderationActions).values({
       moderatorId: adminId,
       actionType: 'delete_topic',
       targetType: 'topic',
       targetId: topicId,
-      reason: 'Topic deleted by admin',
+      reason: 'Topic permanently deleted by admin',
     });
   }
 
