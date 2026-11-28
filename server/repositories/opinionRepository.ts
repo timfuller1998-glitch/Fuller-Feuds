@@ -8,6 +8,7 @@ import { aggregateFallacyCounts } from '../utils/fallacyUtils.js';
 import { checkUserOwnership, checkModifyPermission } from '../utils/authorization.js';
 import { logDataAccess, logDatabaseOperation, logSecurityEvent } from '../utils/securityLogger.js';
 import type { Request } from 'express';
+import { opinionXp, LEGACY_OPINION_XP } from '../../shared/opinionStrength.js';
 
 /**
  * Recursively remove all Date objects from an object
@@ -107,6 +108,8 @@ export class OpinionRepository {
       tasteScore: serialized?.tasteScore,
       passionScore: serialized?.passionScore,
       analysisConfidence: serialized?.analysisConfidence,
+      // XP is always recomputed here from the text; a client-supplied value is never used.
+      strengthXp: opinionXp(String(serialized?.content ?? '')),
       // Explicitly exclude all timestamp fields - let database defaults handle them
     };
     
@@ -139,7 +142,7 @@ export class OpinionRepository {
     const insertData: any = {};
     const allowedFields = ['topicId', 'userId', 'content', 'stance', 'status', 'debateStatus', 'references', 
                           'topicEconomicScore', 'topicAuthoritarianScore', 'tasteScore', 
-                          'passionScore', 'analysisConfidence'];
+                          'passionScore', 'analysisConfidence', 'strengthXp'];
     for (const field of allowedFields) {
       if (finalData[field] !== undefined) {
         // Double-check it's not a Date
@@ -491,9 +494,16 @@ export class OpinionRepository {
         userAgent: req?.headers['user-agent'],
       });
 
+      // Opinion XP is recomputed from the new text and never goes down: legacy rows (NULL) keep their 25,
+      // and an edit can only raise what was already earned. A client-supplied strengthXp is ignored.
+      const { strengthXp: _ignoredClientXp, ...safeData } = data as Partial<InsertOpinion> & { strengthXp?: number | null };
+      const patch: Partial<InsertOpinion> & { strengthXp?: number | null } = { ...safeData };
+      if (typeof safeData.content === 'string') {
+        patch.strengthXp = Math.max(existingOpinion.strengthXp ?? LEGACY_OPINION_XP, opinionXp(safeData.content));
+      }
       const [updated] = await db
         .update(opinions)
-        .set(data)
+        .set(patch)
         .where(eq(opinions.id, id))
         .returning();
 

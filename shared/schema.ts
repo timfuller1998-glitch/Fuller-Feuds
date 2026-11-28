@@ -122,6 +122,8 @@ export const opinions = pgTable("opinions", {
   passionScore: integer("passion_score"), // -100 to +100 (academic to aggressive)
   analysisConfidence: varchar("analysis_confidence", { length: 10 }), // 'high', 'medium', 'low'
   analyzedAt: timestamp("analyzed_at"), // When scores were computed
+  // Opinion XP (0-25), computed by the server from the saved text (shared/opinionStrength.ts). NULL = legacy row, counts as 25.
+  strengthXp: integer("strength_xp"),
   likesCount: integer("likes_count").default(0),
   dislikesCount: integer("dislikes_count").default(0),
   repliesCount: integer("replies_count").default(0),

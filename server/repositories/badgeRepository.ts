@@ -88,6 +88,8 @@ export class BadgeRepository {
         (SELECT COUNT(*)::int FROM opinion_sentence_counterpoints
            WHERE author_user_id = ${userId} AND COALESCE(status, 'approved') NOT IN ('hidden', 'flagged', 'removed')) AS counterpoints,
         (SELECT COUNT(*)::int FROM opinions WHERE user_id = ${userId} AND COALESCE(status, 'approved') NOT IN ('hidden', 'flagged')) AS opinions,
+        -- Opinion XP: server-computed strength (0-25). Rows from before this change (NULL) keep their flat 25.
+        (SELECT COALESCE(SUM(LEAST(25, GREATEST(0, COALESCE(strength_xp, 25)))), 0)::int FROM opinions WHERE user_id = ${userId} AND COALESCE(status, 'approved') NOT IN ('hidden', 'flagged')) AS opinion_xp,
         (SELECT COUNT(*)::int FROM opinion_votes v JOIN opinions o ON o.id = v.opinion_id
            WHERE o.user_id = ${userId} AND v.vote_type = 'like' AND v.user_id <> ${userId}) AS likes,
         (SELECT COUNT(*)::int FROM topics WHERE created_by_id = ${userId}) AS topics,
@@ -103,7 +105,7 @@ export class BadgeRepository {
       civility: 20 * n('polite') + 10 * n('finished'),
       open_mind: 20 * n('open') + 15 * n('accepted'),
       debating: 50 * n('debates') + 5 * n('messages'),
-      opinions: 25 * n('opinions') + 5 * n('likes'),
+      opinions: n('opinion_xp') + 5 * n('likes'),
       topics: 50 * n('topics') + 5 * n('topic_opinions'),
     };
   }

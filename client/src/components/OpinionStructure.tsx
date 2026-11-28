@@ -88,12 +88,20 @@ export function OpinionStructure({ text, topicTitle, compact = false }: OpinionS
           />
         </div>
         <span
-          className="font-ui text-[0.65rem] uppercase tracking-[0.1em] text-muted-foreground shrink-0 w-12 text-right"
+          className="font-ui text-[0.65rem] uppercase tracking-[0.1em] text-muted-foreground shrink-0 min-w-12 text-right"
           data-testid="opinion-strength-level"
         >
           {STRENGTH_LEVEL_LABEL[result.level]}
+          {result.wordCount > 0 && (
+            <span className="text-[hsl(var(--gold))]" data-testid="opinion-strength-xp">{` · ${result.xp} XP`}</span>
+          )}
         </span>
       </div>
+      {result.stuffed && (
+        <p className="font-ui text-xs text-muted-foreground leading-snug" data-testid="opinion-strength-stuffed">
+          Phrases like "because" only count when real content follows them.
+        </p>
+      )}
     </div>
   );
 }
