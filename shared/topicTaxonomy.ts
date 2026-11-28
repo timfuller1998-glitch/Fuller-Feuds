@@ -32,6 +32,13 @@
  *  - FOLD: a sub with exactly 1 topic is folded visually into its major's "General"
  *    bubble while the major would still keep at least FOLD_MIN_OTHER_SUBS (3) other
  *    non-General subs. Folded topics remember their sub in `foldedFrom`.
+ *    Which singles fold: the least-active first, so quieter leaves tuck away and
+ *    livelier ones stay visible. Activity is scored, in order, by (1) whether the
+ *    topic had an opinion or debate in the last FOLD_RECENT_ACTIVITY_DAYS (14) days
+ *    — and how recently, (2) opinion count, (3) how recently the topic itself was
+ *    created. Brand-new topics (created within FOLD_NEW_TOPIC_DAYS / 7 days) stay
+ *    unfolded when any older single can be folded instead. Ties break on topic id
+ *    so the result is deterministic. Pass `now` into buildMapTree in tests.
  *  - A major with no topics is hidden. Majors keep the declared order; subs sort by
  *    size, with General last.
  *  - New MAJORS: add one only for a domain you want to welcome (about 8-10+ topics,
@@ -63,6 +70,11 @@ export const FALLBACK_MAJOR_ID = "culture";
 export const SPLIT_THRESHOLD = 20;
 /** A 1-topic sub folds into General only while the major keeps this many other non-General subs. */
 export const FOLD_MIN_OTHER_SUBS = 3;
+/** A last opinion or debate within this many days counts as "recent activity" when deciding what to fold. */
+export const FOLD_RECENT_ACTIVITY_DAYS = 14;
+/** Topics created within this many days stay unfolded when an older single-topic sub can be folded instead. */
+export const FOLD_NEW_TOPIC_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const MAJOR_CATEGORIES: MajorCategory[] = [
   { id: "politics", name: "Politics", accent: "hsl(4 72% 66%)", aliases: ["law", "legal", "government", "policy", "public policy", "election", "elections", "voting", "immigration", "guns", "war", "foreign policy", "justice", "crime"] },
@@ -190,6 +202,11 @@ export interface MapTopicRef {
   /** Stored official home (topics.home_major / topics.home_sub). Missing = computed with classifyTopic. */
   homeMajor?: string | null;
   homeSub?: string | null;
+  /** Used only for fold ranking (least-active singles fold first). */
+  createdAt?: string | Date | number | null;
+  opinionsCount?: number | null;
+  /** Last approved opinion or accepted debate on this topic. */
+  lastActivity?: string | Date | number | null;
 }
 
 export interface SplitCandidate {
@@ -432,7 +449,45 @@ export function findSplitCandidates(bySub: Record<string, number>): SplitCandida
 // ---------------------------------------------------------------------------
 // Map tree
 
-export function buildMapTree(topics: MapTopicRef[]): MapTreeNode {
+
+export function toTimestamp(value: string | Date | number | null | undefined): number {
+  if (value == null || value === "") return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const n = new Date(value).getTime();
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** True when the topic was created within FOLD_NEW_TOPIC_DAYS. Topics with no createdAt are not treated as new. */
+export function isBrandNewTopic(topic: Pick<MapTopicRef, "createdAt">, now: number): boolean {
+  const created = toTimestamp(topic.createdAt);
+  return created > 0 && now - created < FOLD_NEW_TOPIC_DAYS * DAY_MS;
+}
+
+/**
+ * Compare two topics for fold order. Lower rank folds first (least active).
+ * Brand-new topics sort last (stay visible when possible). Then: no recent
+ * activity before recent activity (and older last-activity before newer),
+ * then fewer opinions, then older createdAt, then topic id.
+ */
+export function compareFoldActivity(a: MapTopicRef, b: MapTopicRef, now: number): number {
+  const newA = isBrandNewTopic(a, now) ? 1 : 0;
+  const newB = isBrandNewTopic(b, now) ? 1 : 0;
+  if (newA !== newB) return newA - newB;
+  const recA = toTimestamp(a.lastActivity);
+  const recB = toTimestamp(b.lastActivity);
+  const recentA = recA > 0 && now - recA <= FOLD_RECENT_ACTIVITY_DAYS * DAY_MS ? recA : 0;
+  const recentB = recB > 0 && now - recB <= FOLD_RECENT_ACTIVITY_DAYS * DAY_MS ? recB : 0;
+  if (recentA !== recentB) return recentA - recentB;
+  const opA = a.opinionsCount ?? 0;
+  const opB = b.opinionsCount ?? 0;
+  if (opA !== opB) return opA - opB;
+  const crA = toTimestamp(a.createdAt);
+  const crB = toTimestamp(b.createdAt);
+  if (crA !== crB) return crA - crB;
+  return String(a.id).localeCompare(String(b.id));
+}
+
+export function buildMapTree(topics: MapTopicRef[], now: number = Date.now()): MapTreeNode {
   type Entry = { topic: MapTopicRef; subId: string; primary: boolean };
   // 1) place every topic (home + also-in copies)
   const buckets = new Map<string, Map<string, Entry[]>>(); // major -> sub -> entries
@@ -454,7 +509,8 @@ export function buildMapTree(topics: MapTopicRef[]): MapTreeNode {
   for (const [majorId, subs] of buckets) {
     const named = [...subs.keys()].filter((id) => id !== GENERAL_SUB_ID);
     let remaining = named.length;
-    const singles = named.filter((id) => subs.get(id)!.length === 1).sort();
+    const singles = named.filter((id) => subs.get(id)!.length === 1)
+      .sort((idA, idB) => compareFoldActivity(subs.get(idA)![0].topic, subs.get(idB)![0].topic, now));
     for (const id of singles) {
       if (remaining - 1 < FOLD_MIN_OTHER_SUBS) break;
       const [entry] = subs.get(id)!;

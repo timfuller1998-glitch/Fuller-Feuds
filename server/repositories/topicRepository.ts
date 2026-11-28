@@ -1,6 +1,6 @@
 import { db } from '../db.js';
 import { screenFirstNameSql, screenLastNameSql } from '../lib/screenName.js';
-import { topics, opinions, opinionVotes, topicFlags, users } from '../../shared/schema.js';
+import { topics, opinions, opinionVotes, topicFlags, users, debateRooms, liveStreams } from '../../shared/schema.js';
 import { eq, desc, and, sql, count } from 'drizzle-orm';
 
 import type { InsertTopic, Topic, TopicWithCounts, TopicInsert } from '../../shared/schema.js';
@@ -255,10 +255,52 @@ export class TopicRepository {
     return topicsList;
   }
 
-  async delete(id: string): Promise<void> {
-    await db.update(topics)
-      .set({ isActive: false })
-      .where(eq(topics.id, id));
+  /**
+   * Permanently remove a topic and its dependent rows in one transaction.
+   * debate_rooms and live_streams have no ON DELETE CASCADE from topics, so they
+   * are deleted first (their own children cascade). Opinions, notifications,
+   * flags, views and the rest cascade from the topic row.
+   * Returns the user ids that had opinions on it, so callers can recount XP.
+   */
+  async hardDelete(id: string): Promise<{ userIds: string[] }> {
+    return await db.transaction(async (tx) => {
+      const existing = await tx.select({ id: topics.id }).from(topics).where(eq(topics.id, id)).limit(1);
+      if (!existing.length) throw new Error('Topic not found');
+      const opinionUsers = await tx.execute(sql`
+        SELECT DISTINCT user_id::text AS user_id FROM opinions WHERE topic_id = ${id}::uuid
+      `);
+      const userIds = [...new Set(((opinionUsers as any).rows ?? opinionUsers).map((r: any) => r.user_id).filter(Boolean))] as string[];
+      await tx.delete(liveStreams).where(eq(liveStreams.topicId, id));
+      await tx.delete(debateRooms).where(eq(debateRooms.topicId, id));
+      await tx.delete(topics).where(eq(topics.id, id));
+      return { userIds };
+    });
+  }
+
+  /** @deprecated use hardDelete — kept as an alias so older callers compile during the switch. */
+  async delete(id: string): Promise<{ userIds: string[] }> {
+    return this.hardDelete(id);
+  }
+
+  /** Last approved opinion or accepted debate, for map fold ranking. */
+  async lastActivityByTopicIds(ids: string[]): Promise<Map<string, Date | null>> {
+    const out = new Map<string, Date | null>();
+    if (!ids.length) return out;
+    const result: any = await db.execute(sql`
+      SELECT t.id::text AS id,
+        GREATEST(
+          (SELECT max(o.created_at) FROM opinions o
+            WHERE o.topic_id = t.id AND coalesce(o.status, 'approved') = 'approved'),
+          (SELECT max(coalesce(d.last_message_at, d.started_at)) FROM debate_rooms d
+            WHERE d.topic_id = t.id AND coalesce(d.invite_status, 'accepted') = 'accepted')
+        ) AS last_activity
+      FROM topics t
+      WHERE t.id IN (${sql.join(ids.map((id) => sql`${id}::uuid`), sql`, `)})
+    `);
+    for (const row of (result.rows ?? result)) {
+      out.set(row.id, row.last_activity ? new Date(row.last_activity) : null);
+    }
+    return out;
   }
 
   async countByUser(userId: string): Promise<number> {

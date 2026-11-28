@@ -67,13 +67,18 @@ router.get('/search-similar', async (req, res) => {
 // Compact topic rows for the map (active topics only; the 2-minute topic list cache already applies).
 async function loadMapTopics(): Promise<MapTopicRef[]> {
   const topics = await topicService.getTopics({ limit: 2000 });
-  return (topics || []).map((t: any) => ({
+  const list = topics || [];
+  const lastById = await topicService.lastActivityByTopicIds(list.map((t: any) => t.id));
+  return list.map((t: any) => ({
     id: t.id,
     title: t.title,
     description: t.description ?? null,
     categories: Array.isArray(t.categories) ? t.categories : [],
     homeMajor: t.homeMajor ?? null,
     homeSub: t.homeSub ?? null,
+    createdAt: t.createdAt ?? null,
+    opinionsCount: t.opinionsCount ?? 0,
+    lastActivity: lastById.get(t.id) ?? t.createdAt ?? null,
   }));
 }
 
@@ -458,12 +463,18 @@ router.post('/', isAuthenticated, async (req, res) => {
   }
 });
 
-// DELETE /api/topics/:id - Delete topic (soft delete)
+// DELETE /api/topics/:id - Permanently delete a topic the caller owns (or an admin). Hard delete.
 router.delete('/:id', isAuthenticated, async (req, res) => {
   try {
-    await topicService.deleteTopic(req.params.id);
+    const user = req.user as Express.User;
+    await topicService.deleteTopic(req.params.id, user?.id, req.userRole);
     res.json({ success: true });
   } catch (error) {
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
+    const message = error instanceof Error ? error.message : 'Failed to delete topic';
+    if (message === 'Topic not found') return res.status(404).json({ error: message });
     console.error('Error deleting topic:', error);
     res.status(500).json({ error: 'Failed to delete topic' });
   }
