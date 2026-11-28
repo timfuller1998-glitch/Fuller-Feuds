@@ -1,30 +1,32 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import TopicCard from "@/components/TopicCard";
+import SwipeableCardStack from "@/components/SwipeableCardStack";
 import { Card, CardContent } from "@/components/ui/card";
 import { Flame, Users, Activity } from "lucide-react";
 import { type TopicWithCounts } from "@shared/schema";
 
 export default function HotDebates() {
-  // Fetch topics sorted by political diversity
   const { data: topics, isLoading } = useQuery<TopicWithCounts[]>({
     queryKey: ["/api/topics"],
   });
+  const [topId, setTopId] = useState<string | null>(null);
 
-  // Sort by diversity score (copy array to avoid cache mutation)
-  const sortedTopics = topics ? [...topics]
-    .filter(t => t.diversityScore != null && t.diversityScore > 0)
-    .sort((a, b) => (b.diversityScore || 0) - (a.diversityScore || 0)) : [];
+  const sortedTopics = topics
+    ? [...topics]
+        .filter((t) => t.diversityScore != null && t.diversityScore > 0)
+        .sort((a, b) => (b.diversityScore || 0) - (a.diversityScore || 0))
+    : [];
 
-  // Calculate aggregate stats
-  const totalOpinions = sortedTopics.reduce((sum, t) => sum + (t.opinionsCount || 0), 0);
   const totalParticipants = sortedTopics.reduce((sum, t) => sum + (t.participantCount || 0), 0);
-  const avgDiversity = sortedTopics.length > 0
-    ? Math.round(sortedTopics.reduce((sum, t) => sum + (t.diversityScore || 0), 0) / sortedTopics.length)
-    : 0;
+  const avgDiversity =
+    sortedTopics.length > 0
+      ? Math.round(sortedTopics.reduce((sum, t) => sum + (t.diversityScore || 0), 0) / sortedTopics.length)
+      : 0;
+
+  const top = sortedTopics.find((t) => t.id === topId) ?? sortedTopics[0];
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Page Header */}
       <div className="flex items-center gap-3">
         <div className="p-2 sm:p-3 rounded-lg bg-warning/10">
           <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-warning" />
@@ -39,7 +41,6 @@ export default function HotDebates() {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <CardContent className="pt-4 sm:pt-6">
@@ -90,7 +91,6 @@ export default function HotDebates() {
         </Card>
       </div>
 
-      {/* Hot Topics List */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
@@ -109,111 +109,25 @@ export default function HotDebates() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4" data-testid="list-hot-debates">
-          {sortedTopics.map((topic, index) => {
-            const distribution = topic.politicalDistribution;
-            const diversityScore = topic.diversityScore || 0;
-            const hasDistribution = distribution && 
-              (distribution.authoritarianCapitalist > 0 || 
-               distribution.authoritarianSocialist > 0 || 
-               distribution.libertarianCapitalist > 0 || 
-               distribution.libertarianSocialist > 0);
-
-            return (
-              <div key={topic.id} className="relative">
-                {index < 3 && (
-                  <div className="absolute -left-2 -top-2 z-10">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary flex items-center justify-center text-primary-foreground font-bold text-sm shadow-lg">
-                      {index + 1}
-                    </div>
-                  </div>
-                )}
-                <Card className="overflow-hidden">
-                  <div className="relative">
-                    <TopicCard
-                      id={topic.id}
-                      title={topic.title}
-                      description={topic.description}
-                      categories={topic.categories || []}
-                      opinionsCount={topic.opinionsCount || 0}
-                      participantCount={topic.participantCount || 0}
-                      isActive={topic.isActive ?? true}
-                      imageUrl={topic.imageUrl || ""}
-                      previewContent={topic.previewContent}
-                      previewAuthor={topic.previewAuthor}
-                      previewIsAI={topic.previewIsAI}
-                      diversityScore={topic.diversityScore}
-                      politicalDistribution={topic.politicalDistribution}
-                    />
-                  </div>
-                  {/* Political Diversity Indicator */}
-                  <div className="border-t bg-muted/30 p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-ai" />
-                        <span className="text-sm font-medium">Political Diversity</span>
-                      </div>
-                      <span className="text-sm font-bold text-ai" data-testid={`text-diversity-${topic.id}`}>
-                        {topic.diversityScore == null ? "Not enough opinions yet" : `${diversityScore}%`}
-                      </span>
-                    </div>
-                    {hasDistribution && distribution && (
-                      <div className="space-y-2">
-                        <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-background">
-                          {distribution.authoritarianCapitalist > 0 && (
-                            <div
-                              className="bg-destructive"
-                              style={{ width: `${distribution.authoritarianCapitalist}%` }}
-                              title={`Authoritarian Capitalist: ${distribution.authoritarianCapitalist}%`}
-                            />
-                          )}
-                          {distribution.authoritarianSocialist > 0 && (
-                            <div
-                              className="bg-info"
-                              style={{ width: `${distribution.authoritarianSocialist}%` }}
-                              title={`Authoritarian Socialist: ${distribution.authoritarianSocialist}%`}
-                            />
-                          )}
-                          {distribution.libertarianCapitalist > 0 && (
-                            <div
-                              className="bg-warning"
-                              style={{ width: `${distribution.libertarianCapitalist}%` }}
-                              title={`Libertarian Capitalist: ${distribution.libertarianCapitalist}%`}
-                            />
-                          )}
-                          {distribution.libertarianSocialist > 0 && (
-                            <div
-                              className="bg-success"
-                              style={{ width: `${distribution.libertarianSocialist}%` }}
-                              title={`Libertarian Socialist: ${distribution.libertarianSocialist}%`}
-                            />
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-destructive" />
-                            <span>Auth. Cap.: {distribution.authoritarianCapitalist}%</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-info" />
-                            <span>Auth. Soc.: {distribution.authoritarianSocialist}%</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-warning" />
-                            <span>Lib. Cap.: {distribution.libertarianCapitalist}%</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full bg-success" />
-                            <span>Lib. Soc.: {distribution.libertarianSocialist}%</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
-            );
-          })}
+        <div className="space-y-2 py-4" data-testid="list-hot-debates">
+          <SwipeableCardStack
+            topics={sortedTopics.map((topic) => ({
+              ...topic,
+              categories: topic.categories || [],
+              opinionsCount: topic.opinionsCount ?? 0,
+              imageUrl: topic.imageUrl || "",
+            }))}
+            testId="deck-hot-debates"
+            onTopChange={(t) => setTopId(t.id)}
+          />
+          {top && (
+            <p
+              className="text-center font-ui text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+              data-testid="text-diversity-note"
+            >
+              Political diversity {top.diversityScore}%
+            </p>
+          )}
         </div>
       )}
     </div>

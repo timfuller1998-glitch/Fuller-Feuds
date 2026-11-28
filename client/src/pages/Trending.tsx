@@ -135,13 +135,6 @@ export default function Trending() {
               categories: topic.categories || [],
               imageUrl: topic.imageUrl || "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800",
             }))}
-            renderBadge={(_topic, index) =>
-              index < 3 ? (
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary flex items-center justify-center text-primary-foreground font-bold text-sm shadow-lg ring-2 ring-background" data-testid={`badge-trending-rank-${index + 1}`}>
-                  {index + 1}
-                </div>
-              ) : null
-            }
             testId="deck-trending"
           />
         </div>

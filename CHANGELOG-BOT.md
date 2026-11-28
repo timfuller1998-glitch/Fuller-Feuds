@@ -1,3 +1,8 @@
+## Nov 27, 2026 7:36 PM CT — Hot Debates uses the standard card deck; drop rank circles
+Made by the Fuller Feuds Dev bot (Grok Bot)
+- Hot Debates now uses the same topic deck as Trending, the Topics tab and the profile suggestion decks (tap flips, vertical swipe scrolls, only buttons/links navigate, with arrows and counter). Topics are still sorted by political diversity. The existing diversity badge stays on the card, and a "Political diversity N%" note under the deck updates as you move through the cards.
+- Removed the big red rank-number circles from Hot Debates and Trending.
+
 ## Nov 27, 2026 6:33 PM CT — Remove card emotion labels; fix political diversity scale
 Made by the Fuller Feuds Dev bot (Grok Bot)
 - Removed the "Delight"/"Revulsion" and "Aggressive"/"Academic" badges from the top-right of topic cards (front and back). The underlying taste/passion scores and the AI/lexicon analysis are unchanged.
